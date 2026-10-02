@@ -1,0 +1,11 @@
+{
+  "id": "SpireAiCoach",
+  "name": "尖塔 AI 教练 / Spire AI Coach",
+  "author": "w7lau",
+  "description": "Read-only turn advice from your own AI endpoint, with live combat context and optional draw-order visibility.",
+  "version": "0.1.0",
+  "has_dll": true,
+  "has_pck": false,
+  "affects_gameplay": false,
+  "dependencies": []
+}

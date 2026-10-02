@@ -1,0 +1,16 @@
+**/bin/
+**/obj/
+dist/
+work/
+*.user
+.vs/
+.idea/
+.env*
+*.local.*
+**/config.json
+**/api-key*
+**/diagnostics/
+GamePath.props
+*.dll
+*.pdb
+*.pck

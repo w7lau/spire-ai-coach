@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../GamePath.props" Condition="Exists('../../GamePath.props')" />
+  <PropertyGroup>
+    <AssemblyName>SpireAiCoach</AssemblyName>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <GenerateDependencyFile>false</GenerateDependencyFile>
+    <GenerateRuntimeConfigurationFiles>false</GenerateRuntimeConfigurationFiles>
+    <GameDataDir Condition="'$(GameDataDir)' == ''">$(GameDir)/data_sts2_windows_x86_64</GameDataDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- Embed our core sources so installation is just one mod DLL. -->
+    <Compile Include="../SpireAiCoach.Core/*.cs" Link="Core/%(Filename)%(Extension)" />
+    <Reference Include="sts2" HintPath="$(GameDataDir)/sts2.dll" Private="false" />
+    <Reference Include="GodotSharp" HintPath="$(GameDataDir)/GodotSharp.dll" Private="false" />
+    <None Include="../../SpireAiCoach.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <Target Name="CheckGameAssemblies" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(GameDataDir)/sts2.dll')" Text="Set GameDir or GameDataDir to your local Slay the Spire 2 installation. See README.md." />
+  </Target>
+</Project>
