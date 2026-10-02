@@ -1,5 +1,12 @@
 namespace SpireAiCoach.Core;
 
+public static class GuidanceScopes
+{
+    public const string CurrentTurn = "current_turn";
+    public const string Combat = "combat";
+    public const int MaxRounds = 10;
+}
+
 public sealed record CoachSettings
 {
     public string BaseUrl { get; init; } = "https://api.openai.com/v1";
@@ -7,6 +14,7 @@ public sealed record CoachSettings
     public bool RevealDrawOrder { get; init; } = true;
     public bool RememberKey { get; init; }
     public int TimeoutSeconds { get; init; } = 120;
+    public string GuidanceScope { get; init; } = GuidanceScopes.CurrentTurn;
 
     public Uri Endpoint()
     {
@@ -23,6 +31,8 @@ public sealed record CoachSettings
     public void Validate()
     {
         _ = Endpoint();
+        if (GuidanceScope is not (GuidanceScopes.CurrentTurn or GuidanceScopes.Combat))
+            throw new CoachException("configuration", "指导范围无效，请重新选择。");
         if (string.IsNullOrWhiteSpace(Model) || Model.Length > 200)
             throw new CoachException("configuration", "请填写模型名称。");
         if (TimeoutSeconds is < 10 or > 600)

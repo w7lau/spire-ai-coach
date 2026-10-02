@@ -88,12 +88,13 @@ public sealed class StateCapture : IDisposable
         pile.Cards.Select(card => new CardInfo(Id(card, "card-"), card.Id.ToString(), Source(card),
             card.Title, Read(() => Clean(card.GetDescriptionForPile(pile.Type)), card.Id + ".description"),
             Read<int?>(() => card.EnergyCost.GetAmountToSpend(), card.Id + ".cost"), card.EnergyCost.CostsX,
-            card.GetStarCostWithModifiers(), card.Type.ToString(), card.TargetType.ToString(), card.CurrentUpgradeLevel,
+            CardInfo.NormalizeStarCost(card.GetStarCostWithModifiers()), card.Type.ToString(), card.TargetType.ToString(), card.CurrentUpgradeLevel,
             pile.Type == PileType.Hand ? Read<bool?>(() => card.CanPlay(), card.Id + ".playable") : null,
             targets.Where(card.IsValidTarget).Select(t => Id(t, "unit-")).ToArray(),
             card.Keywords.Select(k => k.ToString()).Order(StringComparer.Ordinal).ToArray(), Variables(card.DynamicVars),
             pile.Type == PileType.Hand ? targets.Where(card.IsValidTarget).ToDictionary(t => Id(t, "unit-"),
-                t => Read(() => Preview(card, t), card.Id + ".target_preview")) : new Dictionary<string, IReadOnlyDictionary<string, decimal>?>()
+                t => Read(() => Preview(card, t), card.Id + ".target_preview")) : new Dictionary<string, IReadOnlyDictionary<string, decimal>?>(),
+            Read<bool?>(() => !card.IsValidTarget(null), card.Id + ".requires_target_selection"), card.HasStarCostX
         )).ToArray());
 
     private CreatureInfo Creature(Creature creature, Creature localPlayer)

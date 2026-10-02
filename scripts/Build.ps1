@@ -15,8 +15,9 @@ try {
     Copy-Item -LiteralPath 'src/SpireAiCoach.Mod/bin/Release/net9.0/SpireAiCoach.dll' -Destination $package
     Copy-Item -LiteralPath 'SpireAiCoach.json' -Destination $package
     Copy-Item -LiteralPath 'README.md' -Destination (Join-Path $package 'README.md')
-    Compress-Archive -LiteralPath $package -DestinationPath (Join-Path $root 'dist/SpireAiCoach-0.1.0.zip') -Force
-    $zipPath = Join-Path $root 'dist/SpireAiCoach-0.1.0.zip'
+    $version = (Get-Content -LiteralPath 'SpireAiCoach.json' -Raw | ConvertFrom-Json).version
+    $zipPath = Join-Path $root "dist/SpireAiCoach-$version.zip"
+    Compress-Archive -LiteralPath $package -DestinationPath $zipPath -Force
     $sha = [System.Security.Cryptography.SHA256]::Create()
     try {
         $digest = [BitConverter]::ToString($sha.ComputeHash([IO.File]::ReadAllBytes($zipPath))).Replace('-', '').ToLowerInvariant()

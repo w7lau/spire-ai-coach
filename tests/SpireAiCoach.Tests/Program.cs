@@ -33,7 +33,8 @@ JsonObject Reply(CombatSnapshot state) => new()
 {
     ["snapshot_id"] = state.Fingerprint(), ["summary"] = "集中攻击一个敌人。",
     ["steps"] = new JsonArray(Step("play_card", "card-1", target: "enemy-1"), Step("end_turn")),
-    ["uncertainties"] = new JsonArray()
+    ["uncertainties"] = new JsonArray(), ["guidance_scope"] = GuidanceScopes.CurrentTurn,
+    ["future_turns"] = new JsonArray(), ["horizon_note"] = "本回合结束后重新观察。"
 };
 JsonObject First(JsonObject reply) => reply["steps"]![0]!.AsObject();
 var state = Snapshot();
@@ -228,6 +229,119 @@ AsyncTest("nonplayer phase never sends", async () =>
 {
     using var client = new CoachClient(new FakeHandler((_, _) => throw new Exception("Unexpected HTTP call")));
     await RejectAsync(() => client.AnalyzeAsync(Settings(), "", state with { CanAdvise = false }), "phase");
+});
+
+Test("Self recipient equivalent normalized only with verified targeting semantics", () =>
+{
+    var defend = Card("card-1") with { TargetType = "Self", RequiresTargetSelection = false, LegalTargetsNow = [] };
+    var sample = state with { Hand = Pile(defend) };
+    var json = Reply(sample); First(json)["target_id"] = "me";
+    var advice = AdviceContract.Parse(json.ToJsonString(), sample);
+    Check(advice.Steps[0].TargetId == null);
+    First(json)["target_id"] = "enemy-1";
+    Reject(() => AdviceContract.Parse(json.ToJsonString(), sample), "illegal_first_action");
+    var unknown = sample with { Hand = Pile(defend with { RequiresTargetSelection = null }) };
+    json = Reply(unknown); First(json)["target_id"] = "me";
+    Reject(() => AdviceContract.Parse(json.ToJsonString(), unknown), "illegal_first_action");
+});
+Test("star sentinel becomes zero spend and X cost remains explicit", () =>
+{
+    Check(CardInfo.NormalizeStarCost(-1) == 0 && CardInfo.NormalizeStarCost(3) == 3);
+    var card = Card("star-card") with { StarCost = CardInfo.NormalizeStarCost(-1), StarCostX = true };
+    using var json = JsonDocument.Parse(Wire.Serialize(card));
+    Check(json.RootElement.GetProperty("star_cost").GetInt32() == 0 && json.RootElement.GetProperty("star_cost_x").GetBoolean());
+});
+JsonObject CombatReply(int count)
+{
+    var json = Reply(state); json["guidance_scope"] = GuidanceScopes.Combat;
+    json["future_turns"] = new JsonArray(Enumerable.Range(1, count).Select(i => (JsonNode)new JsonObject
+        { ["turn_offset"] = i, ["plan"] = "优先防御并寻找斩杀机会。", ["assumptions"] = "若抽到防御牌且敌人攻击；否则重新分析。", ["ignored"] = 7 }).ToArray());
+    return json;
+}
+Test("combat plan accepts current plus nine rounds and formats absolute rounds", () =>
+{
+    var advice = AdviceContract.Parse(CombatReply(9).ToJsonString(), state, GuidanceScopes.Combat);
+    Check(advice.FutureTurns.Count == 9 && AdviceFormatter.Format(advice, state).Contains("第 10 轮"));
+    Check(!Wire.Serialize(advice).Contains("ignored"));
+    Check(AdviceContract.Parse(CombatReply(0).ToJsonString(), state, GuidanceScopes.Combat).FutureTurns.Count == 0);
+});
+Test("combat horizon cannot exceed ten or skip repeat and fractional offsets", () =>
+{
+    Reject(() => AdviceContract.Parse(CombatReply(10).ToJsonString(), state, GuidanceScopes.Combat), "schema");
+    foreach (var offset in new[] { 0m, 2m, 1.5m })
+    {
+        var json = CombatReply(1); json["future_turns"]![0]!["turn_offset"] = offset;
+        Reject(() => AdviceContract.Parse(json.ToJsonString(), state, GuidanceScopes.Combat), "horizon");
+    }
+    var duplicate = CombatReply(2); duplicate["future_turns"]![1]!["turn_offset"] = 1;
+    Reject(() => AdviceContract.Parse(duplicate.ToJsonString(), state, GuidanceScopes.Combat), "horizon");
+});
+Test("scope mismatch future plans in current mode and empty assumptions rejected", () =>
+{
+    Reject(() => AdviceContract.Parse(CombatReply(1).ToJsonString(), state), "scope");
+    var json = CombatReply(1); json["guidance_scope"] = GuidanceScopes.CurrentTurn;
+    Reject(() => AdviceContract.Parse(json.ToJsonString(), state), "schema");
+    json = CombatReply(1); json["future_turns"]![0]!["assumptions"] = "";
+    Reject(() => AdviceContract.Parse(json.ToJsonString(), state, GuidanceScopes.Combat), "schema");
+});
+AsyncTest("combat scope travels through frozen request and response validation", async () =>
+{
+    using var client = new CoachClient(new FakeHandler(async (req, _) =>
+    {
+        using var body = JsonDocument.Parse(await req.Content!.ReadAsStringAsync());
+        using var prompt = JsonDocument.Parse(body.RootElement.GetProperty("messages")[1].GetProperty("content").GetString()!);
+        Check(prompt.RootElement.GetProperty("guidance_scope").GetString() == GuidanceScopes.Combat);
+        Check(prompt.RootElement.GetProperty("max_rounds").GetInt32() == 10);
+        return new(HttpStatusCode.OK) { Content = new StringContent(Envelope(CombatReply(2).ToJsonString())) };
+    }));
+    Check((await client.AnalyzeAsync(Settings() with { GuidanceScope = GuidanceScopes.Combat }, "", state)).Advice.FutureTurns.Count == 2);
+});
+AsyncTest("invalid first action keeps exact frozen input original output and reason", async () =>
+{
+    var json = Reply(state); First(json)["target_id"] = null;
+    var content = json.ToJsonString(); var trace = new CallDiagnostics();
+    using var client = new CoachClient(new FakeHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        { Content = new StringContent(Envelope(content)) })));
+    await RejectAsync(() => client.AnalyzeAsync(Settings(), "dummy-key", state, diagnostics: trace), "illegal_first_action");
+    Check(trace.AssistantContent == content && trace.ResponseBody == Envelope(content));
+    Check(trace.SnapshotId == state.Fingerprint() && trace.RequestBody!.Contains(state.Fingerprint()));
+    Check(trace.Outcome == "illegal_first_action" && trace.ErrorDetail!.Contains("card-1") && trace.ErrorDetail.Contains("target=null"));
+    Check(trace.FinishReason == "stop" && trace.ProviderRequestId == "fake-request");
+});
+Test("diagnostics redact configured key including escaped echoes without corrupting JSON", () =>
+{
+    const string key = "secret-quote-\"-slash-\\-中文";
+    var trace = new CallDiagnostics { AssistantContent = key, ResponseBody = Envelope(key), RequestBody = "safe" };
+    var text = trace.RedactedJson(key);
+    using var doc = JsonDocument.Parse(text);
+    Check(doc.RootElement.GetProperty("assistant_content").GetString() == "[REDACTED]");
+    Check(!doc.RootElement.GetProperty("response_body").GetString()!.Contains("secret-quote"));
+});
+AsyncTest("truncated response keeps partial content and HTTP auth never captures echo", async () =>
+{
+    var trace = new CallDiagnostics();
+    using var client = new CoachClient(new FakeHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+        { Content = new StringContent(Envelope("partial", "length")) })));
+    await RejectAsync(() => client.AnalyzeAsync(Settings(), "", state, diagnostics: trace), "truncated");
+    Check(trace.AssistantContent == "partial" && trace.FinishReason == "length" && trace.Outcome == "truncated");
+    using var auth = new CoachClient(new FakeHandler((_, _) => Task.FromResult(new HttpResponseMessage(HttpStatusCode.Unauthorized)
+        { Content = new StringContent("Authorization: secret-echo") })));
+    trace = new();
+    await RejectAsync(() => auth.AnalyzeAsync(Settings(), "secret-echo", state, diagnostics: trace), "authentication");
+    Check(trace.ResponseBody == null && trace.HttpStatus == 401 && !trace.RedactedJson("secret-echo").Contains("secret-echo"));
+});
+Test("diagnostic retention keeps twenty owned records and leaves unrelated files", () =>
+{
+    var directory = Path.GetFullPath(Path.Combine("work", "diagnostics-test-" + Guid.NewGuid().ToString("N")));
+    Directory.CreateDirectory(directory);
+    var unrelated = Path.Combine(directory, "call-user.json"); File.WriteAllText(unrelated, "user");
+    try
+    {
+        var store = new DiagnosticStore(directory);
+        for (int i = 0; i < 22; i++) { var trace = new CallDiagnostics(); store.Save(trace, trace.RedactedJson("")); }
+        Check(Directory.GetFiles(directory).Length == 21 && File.ReadAllText(unrelated) == "user");
+    }
+    finally { foreach (var file in Directory.GetFiles(directory)) File.Delete(file); Directory.Delete(directory); }
 });
 
 int failures = 0;

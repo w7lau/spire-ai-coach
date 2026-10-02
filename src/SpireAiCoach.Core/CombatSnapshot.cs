@@ -10,6 +10,7 @@ public static class Wire
     public static readonly JsonSerializerOptions Json = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         DefaultIgnoreCondition = JsonIgnoreCondition.Never
     };
     public static string Serialize<T>(T value) => JsonSerializer.Serialize(value, Json);
@@ -19,10 +20,14 @@ public sealed record EffectInfo(string ModelId, string Source, string Name, stri
     decimal? Amount, IReadOnlyDictionary<string, decimal>? Variables = null, bool? UsedUp = null, int? StackCount = null);
 
 public sealed record CardInfo(string InstanceId, string ModelId, string Source, string Name,
-    string? Description, int? EnergyCost, bool XCost, int Stars, string Type, string TargetType,
+    string? Description, int? EnergyCost, bool XCost, int StarCost, string Type, string TargetType,
     int UpgradeLevel, bool? PlayableNow, IReadOnlyList<string> LegalTargetsNow,
     IReadOnlyList<string> Keywords, IReadOnlyDictionary<string, decimal> Variables,
-    IReadOnlyDictionary<string, IReadOnlyDictionary<string, decimal>?> TargetPreviews);
+    IReadOnlyDictionary<string, IReadOnlyDictionary<string, decimal>?> TargetPreviews,
+    bool? RequiresTargetSelection = null, bool StarCostX = false)
+{
+    public static int NormalizeStarCost(int value) => Math.Max(0, value);
+}
 
 public sealed record CardCount(string ModelId, string Name, int UpgradeLevel, int Count);
 public sealed record PileInfo(int Count, IReadOnlyList<CardInfo> Cards)

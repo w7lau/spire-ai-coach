@@ -12,6 +12,7 @@ public sealed class CoachOverlay
     private readonly StateCapture _capture = new();
     private readonly CoachClient _client = new();
     private readonly SettingsStore _store = new(ProjectSettings.GlobalizePath("user://spire_ai_coach"));
+    private readonly DiagnosticStore _diagnostics = new(ProjectSettings.GlobalizePath("user://spire_ai_coach/diagnostics"));
     private readonly ConcurrentQueue<Action> _mainThread = new();
     private CoachSettings _settings = new();
     private string _key = "";
@@ -39,6 +40,10 @@ public sealed class CoachOverlay
     private LineEdit _apiKey = null!;
     private CheckBox _remember = null!;
     private CheckBox _reveal = null!;
+    private OptionButton _scope = null!;
+    private TextEdit _diagnosticView = null!;
+    private string _diagnosticJson = "暂无请求记录。";
+    private int _diagnosticGeneration;
 
     public CoachOverlay(SceneTree tree) => _tree = tree;
 
@@ -72,11 +77,16 @@ public sealed class CoachOverlay
         body.AddThemeConstantOverride("separation", 10);
         scroll.AddChild(body);
         body.AddChild(new Label { Text = "尖塔 AI 教练", ThemeTypeVariation = "HeaderLarge" });
-        body.AddChild(Wrapped("自己出牌，AI 帮你规划。F9 分析当前回合 · F10 设置"));
+        body.AddChild(Wrapped("自己出牌，AI 帮你规划。F9 按所选范围分析 · F10 设置"));
         _battle = Wrapped("进入战斗后可分析当前回合。"); body.AddChild(_battle);
         _status = Wrapped("先填写 API 地址、模型和密钥。"); body.AddChild(_status);
+        _scope = new OptionButton();
+        _scope.AddItem("指导本回合");
+        _scope.AddItem("指导到本次战斗结束（最多 10 轮，含当前轮）");
+        _scope.Selected = _settings.GuidanceScope == GuidanceScopes.Combat ? 1 : 0;
+        body.AddChild(_scope);
         var row = new HBoxContainer(); body.AddChild(row);
-        _analyze = new Button { Text = "分析本回合 · F9", Disabled = true }; row.AddChild(_analyze);
+        _analyze = new Button { Text = "开始分析 · F9", Disabled = true }; row.AddChild(_analyze);
         _analyze.Pressed += Analyze;
         _cancel = new Button { Text = "取消", Disabled = true }; row.AddChild(_cancel);
         _cancel.Pressed += () => Cancel("已取消分析。");
@@ -105,7 +115,7 @@ public sealed class CoachOverlay
             Text = "等待分析。建议出现后，按编号顺序操作；遇到抽牌、随机结果或额外选牌时可再次分析。"
         };
         body.AddChild(_advice);
-        var preview = new Button { Text = "展开 / 收起发送给 AI 的战斗信息" }; body.AddChild(preview);
+        var preview = new Button { Text = "展开 / 收起实时战斗预览（尚未发送）" }; body.AddChild(preview);
         _context = new TextEdit
         {
             Editable = false, Visible = false, CustomMinimumSize = new Vector2(0, 240),
@@ -113,6 +123,22 @@ public sealed class CoachOverlay
         };
         body.AddChild(_context);
         preview.Pressed += () => { _context.Visible = !_context.Visible; RefreshPreview(); };
+        var diagnosticButton = new Button { Text = "展开 / 收起最近请求与 AI 原始回复" }; body.AddChild(diagnosticButton);
+        _diagnosticView = new TextEdit { Editable = false, Visible = false, Text = "暂无请求记录。",
+            CustomMinimumSize = new Vector2(0, 300), WrapMode = TextEdit.LineWrappingMode.Boundary };
+        body.AddChild(_diagnosticView);
+        diagnosticButton.Pressed += () => _diagnosticView.Visible = !_diagnosticView.Visible;
+        var copy = new Button { Text = "复制最近诊断记录（含战斗信息，已隐藏本次密钥）" }; body.AddChild(copy);
+        copy.Pressed += () => DisplayServer.ClipboardSet(_diagnosticJson);
+        _scope.ItemSelected += index =>
+        {
+            Cancel("指导范围已切换，请重新分析。");
+            _settings = _settings with { GuidanceScope = index == 1 ? GuidanceScopes.Combat : GuidanceScopes.CurrentTurn };
+            _freshness.Text = "指导范围已变化，旧建议不适用。";
+            RefreshPreview();
+            try { if (!string.IsNullOrWhiteSpace(_settings.Model)) _store.Save(_settings, _key); }
+            catch (Exception ex) { _feedback.Text = $"指导范围已切换，但未能保存（{ex.GetType().Name}）。"; }
+        };
         _tree.ProcessFrame += OnFrame;
         _layer.TreeExiting += Dispose;
         Resize();
@@ -185,7 +211,7 @@ public sealed class CoachOverlay
 
     private void RefreshPreview()
     {
-        if (_context.Visible) _context.Text = _snapshot == null ? "无战斗快照" : PromptBuilder.UserPrompt(_snapshot);
+        if (_context.Visible) _context.Text = _snapshot == null ? "无战斗快照" : PromptBuilder.UserPrompt(_snapshot, _settings.GuidanceScope);
     }
 
     private void SaveSettings()
@@ -195,7 +221,7 @@ public sealed class CoachOverlay
             var next = _settings with { BaseUrl = _url.Text.Trim(), Model = _model.Text.Trim(),
                 RememberKey = _remember.ButtonPressed, RevealDrawOrder = _reveal.ButtonPressed };
             _store.Save(next, _apiKey.Text.Trim());
-            Cancel("设置已保存，可以分析本回合。");
+            Cancel("设置已保存，可以开始分析。");
             _settings = next; _key = _apiKey.Text.Trim();
             _feedback.Text = "已保存。";
             RefreshSnapshot();
@@ -216,6 +242,7 @@ public sealed class CoachOverlay
         var key = _key;
         var generation = ++_generation;
         var cancellation = new CancellationTokenSource();
+        var trace = new CallDiagnostics();
         _request = cancellation;
         _analyze.Disabled = true; _cancel.Disabled = false;
         _status.Text = "正在分析… 可以取消；继续出牌会使本次分析失效。";
@@ -223,7 +250,7 @@ public sealed class CoachOverlay
         {
             try
             {
-                var result = await _client.AnalyzeAsync(settings, key, frozen, cancellation.Token);
+                var result = await _client.AnalyzeAsync(settings, key, frozen, cancellation.Token, trace);
                 _mainThread.Enqueue(() =>
                 {
                     if (generation != _generation) return;
@@ -239,18 +266,35 @@ public sealed class CoachOverlay
             catch (OperationCanceledException) { /* Cancel() owns the visible status. */ }
             catch (CoachException ex)
             {
+                trace.Outcome = ex.Category; trace.ErrorDetail = ex.Message;
                 _mainThread.Enqueue(() => { if (generation == _generation) _status.Text = ex.Message; });
                 // Category only; never log the API URL, key, raw HTTP errors or provider response.
-                GD.Print($"[SpireAiCoach] request failed category={ex.Category}");
+                GD.Print($"[SpireAiCoach] request failed category={ex.Category} call={trace.CallId} snapshot={frozen.Fingerprint()}");
             }
             catch (Exception ex)
             {
+                trace.Outcome = "unexpected"; trace.ErrorDetail = ex.GetType().Name;
                 _mainThread.Enqueue(() => { if (generation == _generation) _status.Text = $"分析未完成（{ex.GetType().Name}）。"; });
             }
             finally
             {
+                var diagnosticJson = trace.RedactedJson(key);
+                string location;
+                try { location = _diagnostics.Save(trace, diagnosticJson); }
+                catch (Exception ex) { location = $"诊断保存失败（{ex.GetType().Name}），仍可复制下方记录。"; }
                 _mainThread.Enqueue(() =>
                 {
+                    if (generation >= _diagnosticGeneration)
+                    {
+                        _diagnosticGeneration = generation;
+                        _diagnosticJson = diagnosticJson;
+                        using var doc = System.Text.Json.JsonDocument.Parse(diagnosticJson);
+                        var root = doc.RootElement;
+                        _diagnosticView.Text = $"调用 {trace.CallId}\n结果：{trace.Outcome}\n文件：{location}\n\n" +
+                            "AI 原始正文（不是实时预览；已隐藏本次密钥）：\n" +
+                            (root.GetProperty("assistant_content").GetString() ?? "未取得 AI 正文，见接口回复及错误详情。") +
+                            "\n\n完整诊断（包含本次冻结请求、接口回复和校验原因）：\n" + diagnosticJson;
+                    }
                     if (generation == _generation)
                     {
                         _request = null; _cancel.Disabled = true;
