@@ -90,7 +90,7 @@ public static class LocalWorker
         var timer = Stopwatch.StartNew();
         LocalCandidate? best = null;
         int evaluated = 0, rejected = 0, victories = 0;
-        var frontier = new LocalFrontier(256);
+        var search = new LocalSearchTree(1729 + request.Partition);
         long sequence = 0, lastProgress = -1000;
         int route = 0, bestRoute = 0;
         var events = new Queue<LocalSimEvent>();
@@ -104,7 +104,7 @@ public static class LocalWorker
         }
         void Publish(string status, string message) => LocalWire.Write(Path.Combine(_root, "result.json"),
             new LocalSearchResult(request.Id, request.SnapshotId, status, message, evaluated, rejected, timer.ElapsedMilliseconds, best,
-                frontier.Duplicates, frontier.BudgetPruned, victories, IncludePotions: request.IncludePotions));
+                Victories: victories, IncludePotions: request.IncludePotions));
         try
         {
             if (request.Partitions is < 1 or > 16 || request.Partition < 0 || request.Partition >= request.Partitions ||
@@ -116,13 +116,12 @@ public static class LocalWorker
             Publish("running", "正在恢复并核对当前战斗…");
             Progress("恢复当前战斗", force: true);
             await Restore(request);
-            var first = EnumerateActions().OrderByDescending(a => a.Preference).ToArray();
-            for (var i = 0; i < first.Length; i++)
-                if (i % request.Partitions == request.Partition) frontier.Add([first[i]], 2e12 - i);
+            var first = EnumerateActions();
+            var roots = first.Where((_, i) => i % request.Partitions == request.Partition).ToArray();
             // More workers than first moves explore different continuations of the same first move.
-            if (frontier.Count == 0) frontier.Add([first[request.Partition % first.Length]], 2e12);
-            var random = new Random(1729 + request.Partition);
-            while (evaluated < request.MaxNodes && timer.Elapsed.TotalSeconds < request.BudgetSeconds && frontier.TryTake(out var prefix))
+            if (roots.Length == 0) roots = [first[request.Partition % first.Length]];
+            var initialEnemyHp = CombatManager.Instance.DebugOnlyGetState()!.Enemies.Sum(e => Math.Max(0, e.CurrentHp));
+            while (evaluated < request.MaxNodes && timer.Elapsed.TotalSeconds < request.BudgetSeconds && !search.Exhausted)
             {
                 route = evaluated + 1;
                 events.Clear();
@@ -131,7 +130,7 @@ public static class LocalWorker
                 var player = LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!;
                 var startRound = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
                 var actions = new List<LocalAction>();
-                var alternatives = new List<(LocalAction[] Actions, int Preference)>();
+                var trial = search.Begin();
                 int lost = 0;
                 void HpChanged(int oldHp, int newHp) => lost += Math.Max(0, oldHp - newHp);
                 player.Creature.CurrentHpChanged += HpChanged;
@@ -145,22 +144,12 @@ public static class LocalWorker
                         var round = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
                         if (round - startRound >= request.MaxRounds) { stop = "达到轮数上限"; break; }
                         if (timer.Elapsed.TotalSeconds >= request.BudgetSeconds) { stop = "达到时间预算"; break; }
-                        LocalAction next;
-                        if (actions.Count < prefix.Length) next = prefix[actions.Count];
-                        else
+                        if (plays >= request.MaxDepth)
                         {
-                            var choices = EnumerateActions(); // Includes ending the turn, even when a card remains playable.
-                            if (plays >= request.MaxDepth)
-                            {
-                                // Infinite/very long zero-cost cycles are bounded, not assumed equivalent or worthless.
-                                stop = "达到单回合操作上限"; break;
-                            }
-                            var ordered = choices.OrderByDescending(a => a.Preference).ToArray();
-                            // Guided rollout plus seeded exploration. All choices still enter the bounded frontier.
-                            next = evaluated == 0 || random.Next(4) != 0 ? ordered[0] : ordered[random.Next(ordered.Length)];
-                            foreach (var choice in ordered)
-                                if (choice != next) alternatives.Add(([.. actions, choice], choice.Preference));
+                            // Infinite/very long zero-cost cycles are bounded, not assumed equivalent or worthless.
+                            stop = "达到单回合操作上限"; break;
                         }
+                        var next = search.Select(trial, actions.Count == 0 ? roots : EnumerateActions());
                         var before = Observe(player);
                         Progress("执行：" + LocalSearchPolicy.Describe(next), before);
                         var priorLost = lost;
@@ -172,7 +161,6 @@ public static class LocalWorker
                         events.Enqueue(new(actions.Count, next.Round, LocalSearchPolicy.Describe(next), changes));
                         while (events.Count > 12) events.Dequeue();
                         Progress("试走路线", after);
-                        frontier.MarkVisited(actions.ToArray());
                         plays = next.EndTurn ? 0 : plays + 1;
                     }
                     await StableOrTerminal(player);
@@ -190,12 +178,9 @@ public static class LocalWorker
                     if (won) victories++;
                     Progress(won ? "路线获胜" : candidate.StopReason, Observe(player), true);
                     if (LocalSearchPolicy.Better(candidate, best)) { best = candidate; bestRoute = route; }
-                    // Prefer exploring deviations from a successful rollout, while initial moves retain coverage priority.
-                    double score = (won ? 1e9 : player.Creature.IsDead ? -1e9 : 0) +
-                        candidate.Hp * 10000d - candidate.EnemyHp * 100d + candidate.Gold;
-                    foreach (var alternative in alternatives)
-                        frontier.Add(alternative.Actions, score + alternative.Preference - alternative.Actions.Length);
-                    Publish("running", $"已找到 {victories} 条整场获胜路线；每条路线连续模拟到胜负或预算边界。");
+                    // A wall-clock interruption says nothing about the strength of this continuation.
+                    if (stop != "达到时间预算") search.Complete(trial, candidate, initialEnemyHp, closeExactPrefix: true);
+                    Publish("running", $"已找到 {victories} 条整场获胜路线；已记录 {search.Nodes} 个操作树节点，按实际结算反馈选路。");
                     if (LocalSearchPolicy.CanStop(candidate, request.ContinueOptimization)) break;
                 }
                 catch (LocalChoiceException)
@@ -225,7 +210,7 @@ public static class LocalWorker
             }
             else Progress("未取得可用路线", force: true, status: "unsupported");
             Publish(best == null ? "unsupported" : "done", best == null ? "没有找到可完整结算的路线。" :
-                "整场战斗搜索已完成当前预算；未证明最优，奖励机制覆盖尚不完整。");
+                $"已完成当前预算，操作树 {search.Nodes} 个节点；按模拟结果选路，未证明最优，奖励机制覆盖尚不完整。");
             await Cleanup();
             return true;
         }
@@ -367,13 +352,12 @@ public static class LocalWorker
         {
             var card = hand[i];
             if (!card.CanPlay()) continue;
-            // Ordering only: never delete zero-damage/extra-block cards or merge same-name instances.
-            int preference = card.Type == CardType.Attack ? 30 : card.Type == CardType.Power ? 20 : 10;
-            if (card.IsValidTarget(null)) result.Add(new(i, card.Id.ToString(), null, card.Title, "", hash, state.RoundNumber, Preference: preference));
+            // Do not assume that attacks precede setup, or that zero damage means no value.
+            if (card.IsValidTarget(null)) result.Add(new(i, card.Id.ToString(), null, card.Title, "", hash, state.RoundNumber));
             else foreach (var target in state.Creatures.Where(c => c.IsAlive && card.IsValidTarget(c)))
                 result.Add(new(i, card.Id.ToString(), target.CombatId, card.Title,
                     target.CombatId is { } id && _targetLabels?.TryGetValue(id, out var label) == true ? label : target.Name,
-                    hash, state.RoundNumber, Preference: preference));
+                    hash, state.RoundNumber));
         }
         if (_includePotions)
         {
@@ -382,11 +366,11 @@ public static class LocalWorker
                 var potion = player.PotionSlots[i];
                 if (potion == null || !PotionUsable(potion)) continue;
                 if (potion.IsValidTarget(null)) result.Add(new(-1, potion.Id.ToString(), null, potion.Title.GetFormattedText(), "", hash,
-                    state.RoundNumber, Preference: -5, PotionSlot: i));
+                    state.RoundNumber, PotionSlot: i));
                 else foreach (var target in state.Creatures.Where(c => c.IsAlive && potion.IsValidTarget(c)))
                     result.Add(new(-1, potion.Id.ToString(), target.CombatId, potion.Title.GetFormattedText(),
                         target == player.Creature ? "自己" : target.CombatId is { } id && _targetLabels?.TryGetValue(id, out var label) == true ? label : target.Name,
-                        hash, state.RoundNumber, Preference: -5, PotionSlot: i));
+                        hash, state.RoundNumber, PotionSlot: i));
             }
         }
         result.Add(new(-1, "", null, "", "", hash, state.RoundNumber, EndTurn: true));

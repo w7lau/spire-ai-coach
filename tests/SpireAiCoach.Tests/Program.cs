@@ -797,13 +797,18 @@ AsyncTest("frequent local telemetry replacement stays readable during concurrent
     finally { Directory.Delete(directory, true); }
 });
 
+SearchAlgorithmTests.Register(Test);
+var filter = args.Length == 2 && args[0] == "--filter" ? args[1] : null;
+if (args.Length != 0 && filter == null) { Console.Error.WriteLine("Usage: [--filter substring]"); return 2; }
+var selected = tests.Where(t => filter == null || t.Item1.Contains(filter, StringComparison.OrdinalIgnoreCase)).ToArray();
+if (selected.Length == 0) { Console.Error.WriteLine("No tests matched"); return 2; }
 int failures = 0;
-foreach (var (name, test) in tests)
+foreach (var (name, test) in selected)
 {
     try { await test(); Console.WriteLine($"PASS {name}"); }
     catch (Exception ex) { failures++; Console.Error.WriteLine($"FAIL {name}: {ex.Message}"); }
 }
-Console.WriteLine($"{tests.Count - failures}/{tests.Count} passed");
+Console.WriteLine($"{selected.Length - failures}/{selected.Length} passed");
 return failures == 0 ? 0 : 1;
 
 sealed class FakeHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) : HttpMessageHandler

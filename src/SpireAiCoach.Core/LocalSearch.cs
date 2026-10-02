@@ -37,6 +37,7 @@ public static class LocalSearchPolicy
         // Unfinished horizons are not comparable to completed victories. Prefer progress within that fallback class.
         if (!candidate.Won && candidate.EnemyHp != prior.EnemyHp) return candidate.EnemyHp < prior.EnemyHp;
         if (candidate.Hp != prior.Hp) return candidate.Hp > prior.Hp;
+        if (candidate.HpLost != prior.HpLost) return candidate.HpLost < prior.HpLost;
         if (candidate.MaxHp != prior.MaxHp) return candidate.MaxHp > prior.MaxHp;
         if (candidate.Gold != prior.Gold) return candidate.Gold > prior.Gold;
         if (candidate.EnemyHp != prior.EnemyHp) return candidate.EnemyHp < prior.EnemyHp;
@@ -50,7 +51,7 @@ public static class LocalSearchPolicy
     {
         if (result.Best is not { } best) return result.Message;
         var lines = new List<string> { best.Won ? "本地整场战斗 · 已找到获胜路线" : "本地整场战斗 · 尚未找到获胜路线", result.Message,
-            $"{result.Workers} 路并发，评估 {result.Evaluated} 条路线，其中 {result.Victories} 条获胜；去重 {result.Duplicates}，预算裁剪 {result.BudgetPruned}，不支持 {result.Rejected}。",
+            $"{result.Workers} 路并发，评估 {result.Evaluated} 条路线，其中 {result.Victories} 条获胜，不支持 {result.Rejected}。",
             $"预测结算：生命 {best.Hp}，期间失去生命 {best.HpLost}，敌人剩余生命合计 {best.EnemyHp}。" };
         if (!best.Won) lines.Add("以下仅为已模拟的部分路线，不代表能打赢本次战斗。停止原因：" + best.StopReason);
         if (best.Dead) lines.Add("注意：目前找到的路线仍会死亡，不能保证存活。");
