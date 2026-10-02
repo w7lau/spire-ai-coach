@@ -193,8 +193,10 @@ AsyncTest("HTTP request contains frozen state without token cap or secret in pro
         Check(requestBody.Contains(state.Fingerprint()));
         return new(HttpStatusCode.OK) { Content = new StringContent(Envelope(Reply(state).ToJsonString())) };
     }));
-    var result = await client.AnalyzeAsync(Settings(), "dummy-key", state);
+    var trace = new CallDiagnostics(); string? preview = null;
+    var result = await client.AnalyzeAsync(Settings(), "dummy-key", state, diagnostics: trace, onContent: text => preview = text);
     Check(result.RequestId == "fake-request" && result.Advice.Steps.Count == 2 && requestBody != null);
+    Check(trace.ResponseFormat == "json" && !trace.StreamCompleted && preview == Reply(state).ToJsonString());
 });
 AsyncTest("provider authentication body never surfaced and no retries", async () =>
 {
@@ -350,6 +352,166 @@ AsyncTest("current turn HTTP input preserves powers relic descriptions amounts a
     Check(result.Advice.Steps.Count == 2 && trace.GuidanceScope == "current_turn");
 });
 
+string Chunk(string? content, string? finish = null, int index = 0) => Wire.Serialize(new
+{
+    id = "stream-request", model = "stream-model",
+    choices = new[] { new { index, delta = new { content }, finish_reason = finish } }
+});
+string Event(string json, string ending = "\n") => "data: " + json + ending + ending;
+HttpResponseMessage StreamResponse(Stream stream) => new(HttpStatusCode.OK)
+{
+    Content = new StreamContent(stream) { Headers = { ContentType = new("text/event-stream") } }
+};
+CoachClient StreamClient(string text, int chunkSize = 7) => new(new FakeHandler((_, _) =>
+    Task.FromResult(StreamResponse(new ScriptedStream([Encoding.UTF8.GetBytes(text)], chunkSize: chunkSize)))));
+AsyncTest("SSE displays content before completion and requests streaming once", async () =>
+{
+    var reply = Reply(state).ToJsonString(); var middle = reply.Length / 2;
+    var received = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var first = Event(Chunk(reply[..middle]));
+    var rest = Event(Chunk(reply[middle..])) + Event(Chunk(null, "stop")) + Event("[DONE]");
+    int calls = 0;
+    using var client = new CoachClient(new FakeHandler(async (req, _) =>
+    {
+        calls++;
+        using var body = JsonDocument.Parse(await req.Content!.ReadAsStringAsync());
+        Check(body.RootElement.GetProperty("stream").GetBoolean());
+        Check(req.Headers.Accept.Any(v => v.MediaType == "text/event-stream"));
+        return StreamResponse(new ScriptedStream([Encoding.UTF8.GetBytes(first), Encoding.UTF8.GetBytes(rest)],
+            (part, token) => part == 1 ? release.Task.WaitAsync(token) : Task.CompletedTask));
+    }));
+    var trace = new CallDiagnostics(); string? preview = null;
+    var pending = client.AnalyzeAsync(Settings(), "", state, diagnostics: trace,
+        onContent: text => { preview = text; received.TrySetResult(); });
+    try
+    {
+        await received.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        Check(!pending.IsCompleted && preview == reply[..middle]);
+    }
+    finally { release.TrySetResult(); }
+    var result = await pending;
+    Check(calls == 1 && result.Advice.Steps.Count == 2 && preview == reply);
+    Check(trace.ResponseFormat == "sse" && trace.StreamCompleted && trace.ResponseBody == first + rest);
+    Check(trace.AssistantContent == reply && result.Model == "stream-model" && result.RequestId == "stream-request");
+});
+AsyncTest("SSE handles Chinese byte splits BOM comments multiline events CR LF and usage", async () =>
+{
+    var reply = Wire.Serialize(Reply(state));
+    var chunk = Chunk(reply).Replace(",\"choices\"", ",\ndata: \"choices\"", StringComparison.Ordinal);
+    var usage = """{"choices":[],"usage":{"total_tokens":87}}""";
+    var wire = "\uFEFF: heartbeat\r\n\r\nid: ignored\r\ndata: " + chunk.Replace("\n", "\r\n") +
+        "\r\n\r\n" + Event(Chunk(null, "stop"), "\r") + Event(usage) + Event("[DONE]");
+    using var client = StreamClient(wire, 1);
+    var trace = new CallDiagnostics();
+    var result = await client.AnalyzeAsync(Settings(), "", state, diagnostics: trace);
+    Check(trace.AssistantContent == reply && result.Usage!.Contains("87") && result.Advice.Summary.Contains("集中"));
+});
+AsyncTest("SSE clean framed stop without DONE is accepted but unfinished responses are not", async () =>
+{
+    var reply = Reply(state).ToJsonString();
+    using var clean = StreamClient(Event(Chunk(reply)) + Event(Chunk(null, "stop")));
+    Check((await clean.AnalyzeAsync(Settings(), "", state)).Advice.Steps.Count == 2);
+    foreach (var tail in new[] { "", Event("[DONE]"), "data: " + Chunk(null, "stop"), Event(Chunk(null, "stop")) + "data: {" })
+    {
+        using var client = StreamClient(Event(Chunk(reply)) + tail);
+        var trace = new CallDiagnostics();
+        await RejectAsync(() => client.AnalyzeAsync(Settings(), "", state, diagnostics: trace), "stream_incomplete");
+        Check(!trace.StreamCompleted && trace.AssistantContent == reply && trace.ResponseBody!.Contains("data:"));
+    }
+});
+AsyncTest("SSE length malformed event provider error and unsupported finish stay distinct", async () =>
+{
+    foreach (var (tail, category) in new[]
+    {
+        (Event(Chunk(null, "length")), "truncated"), (Event("{"), "provider_json"),
+        (Event("{\"error\":{\"message\":\"remote secret\"}}"), "provider_error"),
+        ("event: error\ndata: failure\n\n", "provider_error"),
+        (Event(Chunk(null, "tool_calls")), "finish_reason"),
+        (Event("{\"choices\":[{\"index\":\"bad\",\"delta\":{}}]}"), "provider_schema")
+    })
+    {
+        using var client = StreamClient(Event(Chunk("partial")) + tail);
+        var trace = new CallDiagnostics();
+        await RejectAsync(() => client.AnalyzeAsync(Settings(), "", state, diagnostics: trace), category);
+        Check(trace.AssistantContent == "partial" && trace.Outcome == category && !trace.StreamCompleted);
+    }
+});
+AsyncTest("SSE cannot merge other choices or append content after finish", async () =>
+{
+    var reply = Reply(state).ToJsonString();
+    using var client = StreamClient(Event(Chunk("ignore", index: 1)) + Event(Chunk(reply)) + Event(Chunk(null, "stop")) + Event("[DONE]"));
+    var trace = new CallDiagnostics();
+    await client.AnalyzeAsync(Settings(), "", state, diagnostics: trace);
+    Check(trace.AssistantContent == reply);
+    using var invalid = StreamClient(Event(Chunk(reply, "stop")) + Event(Chunk("more")) + Event("[DONE]"));
+    await RejectAsync(() => invalid.AnalyzeAsync(Settings(), "", state), "provider_schema");
+});
+AsyncTest("SSE transport failure retains partial raw events and assistant content", async () =>
+{
+    var first = Event(Chunk("partial"));
+    using var client = new CoachClient(new FakeHandler((_, _) => Task.FromResult(StreamResponse(
+        new ScriptedStream([Encoding.UTF8.GetBytes(first)], (part, _) => part == 1 ? Task.FromException(new IOException("disconnect")) : Task.CompletedTask)))));
+    var trace = new CallDiagnostics();
+    await RejectAsync(() => client.AnalyzeAsync(Settings(), "", state, diagnostics: trace), "transport");
+    Check(trace.AssistantContent == "partial" && trace.ResponseBody == first && !trace.StreamCompleted);
+});
+AsyncTest("SSE cancellation during body read retains partial content", async () =>
+{
+    using var cancel = new CancellationTokenSource();
+    using var client = new CoachClient(new FakeHandler((_, _) => Task.FromResult(StreamResponse(
+        new ScriptedStream([Encoding.UTF8.GetBytes(Event(Chunk("partial")))],
+            (part, token) => part == 1 ? Task.Delay(Timeout.Infinite, token) : Task.CompletedTask)))));
+    var trace = new CallDiagnostics();
+    try { await client.AnalyzeAsync(Settings(), "", state, cancel.Token, trace, _ => cancel.Cancel()); }
+    catch (OperationCanceledException)
+    {
+        Check(trace.Outcome == "cancelled" && trace.AssistantContent == "partial" && trace.ResponseBody != null); return;
+    }
+    throw new Exception("Expected cancellation");
+});
+AsyncTest("SSE overall timeout also applies after response headers", async () =>
+{
+    using var client = new CoachClient(new FakeHandler((_, _) => Task.FromResult(StreamResponse(
+        new ScriptedStream([Encoding.UTF8.GetBytes(Event(Chunk("partial")))],
+            (part, token) => part == 1 ? Task.Delay(Timeout.Infinite, token) : Task.CompletedTask)))));
+    var trace = new CallDiagnostics();
+    await RejectAsync(() => client.AnalyzeAsync(Settings() with { TimeoutSeconds = 10 }, "", state, diagnostics: trace), "timeout");
+    Check(trace.AssistantContent == "partial" && trace.Outcome == "timeout" && !trace.StreamCompleted);
+});
+AsyncTest("SSE response limit applies without content length or any newline", async () =>
+{
+    using var client = StreamClient("data: " + new string('x', 2 * 1024 * 1024), 8192);
+    await RejectAsync(() => client.AnalyzeAsync(Settings(), "", state), "response_size");
+});
+AsyncTest("SSE completed content still goes through snapshot and action validation", async () =>
+{
+    var json = Reply(state); First(json)["target_id"] = null;
+    using var client = StreamClient(Event(Chunk(json.ToJsonString())) + Event(Chunk(null, "stop")) + Event("[DONE]"));
+    var trace = new CallDiagnostics();
+    await RejectAsync(() => client.AnalyzeAsync(Settings(), "", state, diagnostics: trace), "illegal_first_action");
+    Check(trace.StreamCompleted && trace.Outcome == "illegal_first_action" && trace.AssistantContent == json.ToJsonString());
+});
+Test("stream preview and diagnostics redact secrets split across provider chunks", () =>
+{
+    var key = "test-secret-key";
+    Check(!SecretRedactor.Redact("reply test-sec", key, true).Contains("test-sec"));
+    Check(SecretRedactor.Redact("reply " + key + " done", key, true) == "reply [REDACTED] done");
+    var trace = new CallDiagnostics { ResponseFormat = "sse", AssistantContent = "reply " + key + " done",
+        ResponseBody = Event(Chunk("reply test-")) + Event(Chunk("secret-key done")) };
+    using var doc = JsonDocument.Parse(trace.RedactedJson(key));
+    Check(doc.RootElement.GetProperty("response_body").GetString()!.StartsWith("[OMITTED:"));
+    Check(doc.RootElement.GetProperty("assistant_content").GetString() == "reply [REDACTED] done");
+});
+AsyncTest("invalid stream UTF-8 is classified and captured", async () =>
+{
+    using var client = new CoachClient(new FakeHandler((_, _) => Task.FromResult(StreamResponse(
+        new ScriptedStream([new byte[] { 0xff, 0xff, 0x0a }])))));
+    var trace = new CallDiagnostics();
+    await RejectAsync(() => client.AnalyzeAsync(Settings(), "", state, diagnostics: trace), "provider_encoding");
+    Check(trace.ResponseBody != null && trace.Outcome == "provider_encoding" && !trace.StreamCompleted);
+});
+
 int failures = 0;
 foreach (var (name, test) in tests)
 {
@@ -362,4 +524,30 @@ return failures == 0 ? 0 : 1;
 sealed class FakeHandler(Func<HttpRequestMessage, CancellationToken, Task<HttpResponseMessage>> send) : HttpMessageHandler
 {
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => send(request, cancellationToken);
+}
+
+sealed class ScriptedStream(IReadOnlyList<byte[]> parts, Func<int, CancellationToken, Task>? beforePart = null, int chunkSize = 7) : Stream
+{
+    private int _part, _offset;
+    public override bool CanRead => true;
+    public override bool CanWrite => false;
+    public override bool CanSeek => false;
+    public override long Length => throw new NotSupportedException();
+    public override long Position { get => throw new NotSupportedException(); set => throw new NotSupportedException(); }
+    public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken token = default)
+    {
+        token.ThrowIfCancellationRequested();
+        if (_offset == 0 && beforePart != null) await beforePart(_part, token);
+        if (_part == parts.Count) return 0;
+        int count = Math.Min(Math.Min(buffer.Length, chunkSize), parts[_part].Length - _offset);
+        parts[_part].AsMemory(_offset, count).CopyTo(buffer);
+        _offset += count;
+        if (_offset == parts[_part].Length) { _offset = 0; _part++; }
+        return count;
+    }
+    public override void Flush() => throw new NotSupportedException();
+    public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+    public override void SetLength(long value) => throw new NotSupportedException();
+    public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
 }

@@ -43,6 +43,9 @@ public sealed class CoachOverlay
     private TextEdit _diagnosticView = null!;
     private string _diagnosticJson = "暂无请求记录。";
     private int _diagnosticGeneration;
+    private sealed record StreamPreview(int Generation, string Text);
+    private StreamPreview? _pendingStream;
+    private bool _streaming;
 
     public CoachOverlay(SceneTree tree) => _tree = tree;
 
@@ -151,6 +154,16 @@ public sealed class CoachOverlay
     {
         if (_disposed) return;
         while (_mainThread.TryDequeue(out var action)) action();
+        var preview = Interlocked.Exchange(ref _pendingStream, null);
+        if (preview != null && preview.Generation == _generation && _streaming)
+        {
+            RefreshSnapshot();
+            if (preview.Generation == _generation && _streaming)
+            {
+                _advice.Text = preview.Text;
+                _status.Text = "正在接收 AI 回复…";
+            }
+        }
         bool f8 = Input.IsKeyPressed(Key.F8), f9 = Input.IsKeyPressed(Key.F9), f10 = Input.IsKeyPressed(Key.F10);
         var focus = _tree.Root.GuiGetFocusOwner();
         if (focus is not LineEdit && focus is not TextEdit)
@@ -229,22 +242,29 @@ public sealed class CoachOverlay
         var cancellation = new CancellationTokenSource();
         var trace = new CallDiagnostics();
         _request = cancellation;
+        _streaming = true;
+        _adviceHash = null;
+        _advice.Text = "等待 AI 开始回复…";
+        _freshness.Text = "接收中的内容尚未完成，请等待整理后的出牌建议。";
         _analyze.Disabled = true; _cancel.Disabled = false;
         _status.Text = "正在分析… 可以取消；继续出牌会使本次分析失效。";
         _ = Task.Run(async () =>
         {
             try
             {
-                var result = await _client.AnalyzeAsync(settings, key, frozen, cancellation.Token, trace);
+                var result = await _client.AnalyzeAsync(settings, key, frozen, cancellation.Token, trace,
+                    text => Interlocked.Exchange(ref _pendingStream, new StreamPreview(generation, SecretRedactor.Redact(text, key, true))));
                 _mainThread.Enqueue(() =>
                 {
                     if (generation != _generation) return;
                     RefreshSnapshot(); // Recheck on the main thread at delivery, not only the timer.
                     if (generation != _generation || _snapshotHash != frozen.Fingerprint()) return;
+                    _streaming = false;
                     _advice.Text = AdviceFormatter.Format(result.Advice, frozen);
                     _adviceHash = result.Advice.SnapshotId;
                     _freshness.Text = "基于当前状态的 AI 建议；后续效果仍需在游戏中核对。";
-                    _status.Text = $"分析完成 · {result.ElapsedMs / 1000.0:F1} 秒";
+                    _status.Text = $"分析完成 · {result.ElapsedMs / 1000.0:F1} 秒" +
+                        (trace.ResponseFormat == "json" ? "（服务商一次性返回）" : "");
                     GD.Print($"[SpireAiCoach] success snapshot={_adviceHash} elapsed_ms={result.ElapsedMs} prompt={PromptBuilder.Version}");
                 });
             }
@@ -252,14 +272,16 @@ public sealed class CoachOverlay
             catch (CoachException ex)
             {
                 trace.Outcome = ex.Category; trace.ErrorDetail = ex.Message;
-                _mainThread.Enqueue(() => { if (generation == _generation) _status.Text = ex.Message; });
+                _mainThread.Enqueue(() => { if (generation == _generation)
+                    { _streaming = false; _status.Text = ex.Message; _freshness.Text = "本次未生成有效建议；部分回复可在诊断中查看。"; _advice.Text = "未取得完整有效建议。"; } });
                 // Category only; never log the API URL, key, raw HTTP errors or provider response.
                 GD.Print($"[SpireAiCoach] request failed category={ex.Category} call={trace.CallId} snapshot={frozen.Fingerprint()}");
             }
             catch (Exception ex)
             {
                 trace.Outcome = "unexpected"; trace.ErrorDetail = ex.GetType().Name;
-                _mainThread.Enqueue(() => { if (generation == _generation) _status.Text = $"分析未完成（{ex.GetType().Name}）。"; });
+                _mainThread.Enqueue(() => { if (generation == _generation)
+                    { _streaming = false; _status.Text = $"分析未完成（{ex.GetType().Name}）。"; _freshness.Text = "本次未生成有效建议。"; _advice.Text = "未取得完整有效建议。"; } });
             }
             finally
             {
@@ -294,6 +316,12 @@ public sealed class CoachOverlay
     private void Cancel(string status)
     {
         ++_generation;
+        if (_streaming)
+        {
+            _streaming = false;
+            _freshness.Text = "接收已停止，未生成有效建议。";
+            _advice.Text = "本次分析已停止。";
+        }
         if (_request != null)
         {
             try { _request.Cancel(); } catch (ObjectDisposedException) { }

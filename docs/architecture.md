@@ -2,7 +2,7 @@
 
 ## 数据流
 
-Godot 主线程 → `StateCapture` → 独立 C# 快照 → SHA-256 指纹 → `PromptBuilder` → 单次 HTTP 请求 → `AdviceContract` 投影和校验 → 主线程核对当前指纹 → 纯文本建议。
+Godot 主线程 → `StateCapture` → 独立 C# 快照 → SHA-256 指纹 → `PromptBuilder` → 单次流式 HTTP 请求 → 接收中正文预览 → 完整正文交 `AdviceContract` 投影和校验 → 主线程核对当前指纹 → 纯文本建议。
 
 状态只在主线程读取，网络和 JSON 解析在后台执行。UI 每 750ms 采集一次，发送前、结果显示前另外刷新。游戏 StateTracker 的变更事件递增快照 revision，因此事件后即使可见数值恰好恢复原样，旧建议仍失效。回合、牌堆、资源、意图等变化会取消进行中的分析并标记旧建议。请求序号防止取消后的迟到回复覆盖更新结果。Mod 不调用出牌、药水使用、回合结束或状态机推进命令。
 
@@ -43,11 +43,17 @@ JSON 顶层和每个步骤先投影到消费字段。额外字段被丢弃；非
 
 ## HTTP 与日志
 
-使用非流式 Chat Completions。输入包含 model、messages、stream=false，不设置温度或输出 token 上限。超时和取消独立处理；限制回复体 2 MiB；不跟随重定向，防止 Authorization 被交给另一个地址；默认仅允许 HTTPS，本机允许 HTTP。
+使用流式 Chat Completions。输入包含 model、messages、stream=true，Accept 为 text/event-stream，不设置温度或输出 token 上限。超时覆盖响应头和响应体读取，取消独立处理；限制完整线上的回复体 2 MiB（包括 SSE 元数据），底层按读取字节计数，没有换行的超长事件也不能绕过；不跟随重定向；默认仅允许 HTTPS，本机允许 HTTP。
 
-分类包括 configuration、phase、authentication、http、transport、timeout、provider_json、provider_schema、empty_response、truncated、finish_reason、invalid_json、schema、contract、identity、condition、illegal_first_action、stale_snapshot。
+`StreamingResponse` 按 [WHATWG SSE 事件格式](https://html.spec.whatwg.org/multipage/server-sent-events.html#event-stream-interpretation) 解码 UTF-8，支持 BOM、LF/CRLF/CR、注释心跳与多行 data。只拼接 choices 中 index=0 的 delta.content，允许单项回复省略 index；角色和 usage 事件不当作正文，忽略其他选择的正文。finish_reason=stop 且 [DONE] 或完整事件后的正常 EOF 才算流完整；缺少结束原因、未闭合事件、异常断线或 length 均不发布建议。明确 stop 后仍追加正文视为接口结构错误。仅有正常流结束还需通过已有建议合同。
+
+正文回调提供累计文本，首段立即通知，随后最多每100ms刷新一次，并在流结束时补齐。UI 只保留最新待显示片段，避免按 token 累积主线程队列；用请求代次和快照复查阻止取消或过期请求覆盖新内容。接收中正文与最终校验建议有明确状态区分；失败或取消后清除主面板预览，部分正文留在诊断。服务商若忽略 stream 并返回 JSON，则在同一次请求内用完整响应路径校验，标明一次性返回，不隐式重试。
+
+分类包括 configuration、phase、authentication、http、transport、timeout、provider_json、provider_schema、provider_error、provider_encoding、stream_incomplete、empty_response、truncated、finish_reason、invalid_json、schema、contract、identity、condition、illegal_first_action、stale_snapshot。
 
 `CallDiagnostics` 在解析前捕获成功 HTTP 的原始响应体，并在格式校验前捕获 AI 正文、finish_reason、请求 ID。校验失败也保留精确冻结输入、响应和具体首步错误。非成功 HTTP 不读取响应体；截断、取消、传输错误分别记录，不补造 AI 建议。原始响应在保留本次密钥脱敏后写入本地 diagnostics，最多保留20个本组件命名的文件。UI 最近记录用请求序号防止被旧请求覆盖；实时预览明确标注尚未发送。游戏日志仅记分类、调用ID及快照等摘要；完整诊断只能通过本地文件或用户复制分享。
+
+诊断 response_format 区分 sse/json；stream_completed 只表示流式传输有完整结束，不代表建议合法。SSE 中断时也保留原始已读事件和已拼接正文。预览掩去本次密钥及末尾可能仍在接收的密钥前缀；拼接正文需要脱敏时，省略原始 SSE 事件体以避免从片段重建密钥，保留脱敏正文。
 
 ## 预测扩展
 

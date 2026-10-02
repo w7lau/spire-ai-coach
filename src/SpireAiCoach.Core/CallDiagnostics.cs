@@ -12,6 +12,8 @@ public sealed class CallDiagnostics
     public string GuidanceScope => "current_turn";
     public string? RequestBody { get; set; }
     public int? HttpStatus { get; set; }
+    public string? ResponseFormat { get; set; }
+    public bool StreamCompleted { get; set; }
     public string? ResponseBody { get; set; }
     public string? AssistantContent { get; set; }
     public string? ProviderRequestId { get; set; }
@@ -23,22 +25,35 @@ public sealed class CallDiagnostics
 
     public string RedactedJson(string key)
     {
-        // Redact decoded string values, including JSON strings embedded in request/response text.
-        string Redact(string value)
-        {
-            if (string.IsNullOrEmpty(key)) return value;
-            var forms = new List<string> { key.Trim() };
-            for (int i = 0; i < 3; i++) forms.Add(JsonSerializer.Serialize(forms[^1])[1..^1]);
-            foreach (var form in forms.Where(s => s.Length > 0).Distinct().OrderByDescending(s => s.Length))
-                value = value.Replace(form, "[REDACTED]", StringComparison.Ordinal);
-            return value;
-        }
         var node = System.Text.Json.Nodes.JsonNode.Parse(Wire.Serialize(this))!.AsObject();
         foreach (var entry in node.ToArray())
             if (entry.Value is System.Text.Json.Nodes.JsonValue value && value.TryGetValue<string>(out var text))
-                node[entry.Key] = Redact(text);
+                node[entry.Key] = SecretRedactor.Redact(text, key, entry.Key == "assistant_content");
+        // A key echoed across SSE chunks is reconstructable from raw events. Suppress that raw
+        // stream when assembled content needs redaction; the redacted assistant body is retained.
+        if (ResponseFormat == "sse" && AssistantContent != null && SecretRedactor.Redact(AssistantContent, key, true) != AssistantContent)
+            node["response_body"] = "[OMITTED: configured key or its trailing prefix appeared in streamed content]";
         return node.ToJsonString(new JsonSerializerOptions { WriteIndented = true,
             Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
+    }
+}
+
+public static class SecretRedactor
+{
+    public static string Redact(string value, string key, bool trailingPartial = false)
+    {
+        if (string.IsNullOrWhiteSpace(key)) return value;
+        var forms = new List<string> { key.Trim() };
+        for (int i = 0; i < 3; i++) forms.Add(JsonSerializer.Serialize(forms[^1])[1..^1]);
+        foreach (var form in forms.Distinct().OrderByDescending(s => s.Length))
+        {
+            value = value.Replace(form, "[REDACTED]", StringComparison.Ordinal);
+            if (!trailingPartial) continue;
+            for (int length = Math.Min(form.Length - 1, value.Length); length > 0; length--)
+                if (value.EndsWith(form[..length], StringComparison.Ordinal))
+                { value = value[..^length] + "[REDACTED]"; break; }
+        }
+        return value;
     }
 }
 
