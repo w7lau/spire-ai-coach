@@ -17,7 +17,7 @@
 
 资源加载竞争和模拟死亡的备份删除错误在测试中复现后，分别通过等待 Common 加载、搜索范围内保留资源及仅后台关闭 ShouldSave 处理；继续保持 CreateProcessW 不继承 OS 句柄。当前标准选择流程具有通用支持，但自定义界面、任意 Mod 私有状态和奖励识别仍没有全面证明，搜索也不保证全局最优。
 
-只提交去除真实重放、身份和路径的 [验证摘要](../experiments/LocalIntegration/results/2026-10-03-mechanics.json)。旧记录中的 10 回合/不支持普通武装属于旧版本边界，以本节为准。使用 Build.ps1 -SkipTests 打包，沿用已完成的定向测试，不重复全量；打包 DLL 与最后原生回归宿主 DLL 逐字节相同，SHA-256 为 `d74a715f6256623c136bf4b7d05a4b24a9dc0d945ea63cbff52a5c23e7c95b55`，ZIP SHA-256 为 `3bab0d6a88d0eb1b6adc98d0317354e16c265b1001595ed080680b2e5e3c425b`。尚未人工验收用户真实窗口中新版操作；安装需退出游戏，安装状态另行记录。
+只提交去除真实重放、身份和路径的 [验证摘要](../experiments/LocalIntegration/results/2026-10-03-mechanics.json)。旧记录中的 10 回合/不支持普通武装属于旧版本边界，以本节为准。使用 Build.ps1 -SkipTests 打包，沿用已完成的定向测试，不重复全量；打包 DLL 与最后原生回归宿主 DLL 逐字节相同，SHA-256 为 `d74a715f6256623c136bf4b7d05a4b24a9dc0d945ea63cbff52a5c23e7c95b55`，ZIP SHA-256 为 `3bab0d6a88d0eb1b6adc98d0317354e16c265b1001595ed080680b2e5e3c425b`。用户退出游戏后已安装 0.7.2，回读清单、DLL、ZIP 和原生测试 DLL 逐字节一致，0.7.1 旧文件备份哈希核对通过。尚未人工验收用户真实窗口中新版操作，安装不等于实战最优或性能验收。
 
 参考 [CombatSolver 的搜索说明](https://github.com/Torch1230/CombatSolver/blob/main/docs/strategy/search-logic-explained-20260912.md)、[原生动作与选择接口参考](https://github.com/LightEnding/autoSpire/blob/0f6b862c88af4e4bd4452a0f98de936126984c6b/scripts/core/GameHookServer.cs)。参考其展开动作后状态与选择分支的做法，没有复制手写效果模拟器或引入外部项目依赖。
 

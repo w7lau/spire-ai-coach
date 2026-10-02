@@ -188,5 +188,12 @@
     "verified_steps": 8
   },
   "privacy": "Native replay, player IDs, hashes, filesystem paths and complete private logs omitted",
-  "limits": "Focused samples; no proof of global optimality, arbitrary mod state restoration or custom selection screens"
+  "limits": "Focused samples; no proof of global optimality, arbitrary mod state restoration or custom selection screens",
+  "installation": {
+    "manifest_version": "0.7.2",
+    "dll_sha256": "d74a715f6256623c136bf4b7d05a4b24a9dc0d945ea63cbff52a5c23e7c95b55",
+    "package_sha256": "3bab0d6a88d0eb1b6adc98d0317354e16c265b1001595ed080680b2e5e3c425b",
+    "installed_matches_package_and_native_test": true,
+    "previous_version_backup_verified": true
+  }
 }
