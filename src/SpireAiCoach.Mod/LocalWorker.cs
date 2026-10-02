@@ -81,51 +81,88 @@ public static class LocalWorker
         _targetLabels = request.TargetLabels;
         var timer = Stopwatch.StartNew();
         LocalCandidate? best = null;
-        int evaluated = 0, rejected = 0;
+        int evaluated = 0, rejected = 0, victories = 0;
+        var frontier = new LocalFrontier(256);
         void Publish(string status, string message) => LocalWire.Write(Path.Combine(_root, "result.json"),
-            new LocalSearchResult(request.Id, request.SnapshotId, status, message, evaluated, rejected, timer.ElapsedMilliseconds, best));
+            new LocalSearchResult(request.Id, request.SnapshotId, status, message, evaluated, rejected, timer.ElapsedMilliseconds, best,
+                frontier.Duplicates, frontier.BudgetPruned, victories));
         try
         {
-            if (request.Partitions is < 1 or > 2 || request.Partition < 0 || request.Partition >= request.Partitions ||
-                request.MaxNodes is < 1 or > 128 || request.MaxDepth is < 1 or > 12 || request.BudgetSeconds is < 1 or > 120)
+            if (request.Partitions is < 1 or > 16 || request.Partition < 0 || request.Partition >= request.Partitions ||
+                request.MaxNodes is < 1 or > 128 || request.MaxDepth is < 1 or > 64 || request.BudgetSeconds is < 1 or > 120 ||
+                request.MaxRounds is < 1 or > 10)
                 throw new InvalidDataException("Invalid search limits");
             if (request.ModelHash != ModelIdSerializationCache.Hash || !request.LoadedMods.SequenceEqual(LocalCapture.LoadedMods()))
                 throw new InvalidOperationException("后台的游戏模型或 Mod 清单与当前游戏不一致，请重启游戏后重试。");
             Publish("running", "正在恢复并核对当前战斗…");
             await Restore(request);
-            var first = EnumerateActions();
-            var queue = new PriorityQueue<LocalAction[], (int Depth, int Order)>();
-            int order = 0;
-            if (request.Partition == 0) queue.Enqueue([], (0, order++));
+            var first = EnumerateActions().OrderByDescending(a => a.Preference).ToArray();
             for (var i = 0; i < first.Length; i++)
-                if (i % request.Partitions == request.Partition) queue.Enqueue([first[i]], (1, order++));
-            while (queue.TryDequeue(out var actions, out _) && evaluated < request.MaxNodes && timer.Elapsed.TotalSeconds < request.BudgetSeconds)
+                if (i % request.Partitions == request.Partition) frontier.Add([first[i]], 2e12 - i);
+            // More workers than first moves explore different continuations of the same first move.
+            if (frontier.Count == 0) frontier.Add([first[request.Partition % first.Length]], 2e12);
+            var random = new Random(1729 + request.Partition);
+            while (evaluated < request.MaxNodes && timer.Elapsed.TotalSeconds < request.BudgetSeconds && frontier.TryTake(out var prefix))
             {
-                await Restore(request);
+                if (evaluated > 0) await Restore(request);
                 var player = LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!;
+                var startRound = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
+                var actions = new List<LocalAction>();
+                var alternatives = new List<(LocalAction[] Actions, int Preference)>();
                 int lost = 0;
                 void HpChanged(int oldHp, int newHp) => lost += Math.Max(0, oldHp - newHp);
                 player.Creature.CurrentHpChanged += HpChanged;
                 try
                 {
-                    foreach (var action in actions) await Play(action);
-                    var children = IsTerminal(player) ? [] : EnumerateActions();
-                    if (!IsTerminal(player)) await EndTurn(player);
+                    int plays = 0;
+                    string stop = "";
+                    while (!IsTerminal(player))
+                    {
+                        var round = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
+                        if (round - startRound >= request.MaxRounds) { stop = "达到轮数上限"; break; }
+                        if (timer.Elapsed.TotalSeconds >= request.BudgetSeconds) { stop = "达到时间预算"; break; }
+                        LocalAction next;
+                        if (actions.Count < prefix.Length) next = prefix[actions.Count];
+                        else
+                        {
+                            var choices = EnumerateActions(); // Includes ending the turn, even when a card remains playable.
+                            if (plays >= request.MaxDepth)
+                            {
+                                // Infinite/very long zero-cost cycles are bounded, not assumed equivalent or worthless.
+                                stop = "达到单回合操作上限"; break;
+                            }
+                            var ordered = choices.OrderByDescending(a => a.Preference).ToArray();
+                            // Guided rollout plus seeded exploration. All choices still enter the bounded frontier.
+                            next = evaluated == 0 || random.Next(4) != 0 ? ordered[0] : ordered[random.Next(ordered.Length)];
+                            foreach (var choice in ordered)
+                                if (choice != next) alternatives.Add(([.. actions, choice], choice.Preference));
+                        }
+                        await Play(next);
+                        actions.Add(next);
+                        frontier.MarkVisited(actions.ToArray());
+                        plays = next.EndTurn ? 0 : plays + 1;
+                    }
                     await StableOrTerminal(player);
                     var state = CombatManager.Instance.DebugOnlyGetState();
                     var won = _combatWon && !player.Creature.IsDead;
-                    var candidate = new LocalCandidate(actions, player.Creature.CurrentHp, lost,
+                    var candidate = new LocalCandidate(actions.ToArray(), player.Creature.CurrentHp, lost,
                         state?.Enemies.Sum(e => Math.Max(0, e.CurrentHp)) ?? 0,
                         player.Gold, player.Creature.MaxHp, won, player.Creature.IsDead,
                         // A general Mod reward classifier does not exist yet. Unknown must not enable early exit.
-                        RewardCoverageKnown: false);
+                        RewardCoverageKnown: false,
+                        Rounds: actions.Select(a => a.Round).Distinct().Count(),
+                        StopReason: won ? "胜利结算完成" : player.Creature.IsDead ? "玩家死亡" :
+                            string.IsNullOrEmpty(stop) ? "战斗结束但未确认胜利" : stop);
                     evaluated++;
+                    if (won) victories++;
                     if (LocalSearchPolicy.Better(candidate, best)) best = candidate;
-                    Publish("running", "正在比较出牌顺序；未识别的成长收益不会触发无伤提前停止。");
+                    // Prefer exploring deviations from a successful rollout, while initial moves retain coverage priority.
+                    double score = (won ? 1e9 : player.Creature.IsDead ? -1e9 : 0) +
+                        candidate.Hp * 10000d - candidate.EnemyHp * 100d + candidate.Gold;
+                    foreach (var alternative in alternatives)
+                        frontier.Add(alternative.Actions, score + alternative.Preference - alternative.Actions.Length);
+                    Publish("running", $"已找到 {victories} 条整场获胜路线；每条路线连续模拟到胜负或预算边界。");
                     if (LocalSearchPolicy.CanStop(candidate, request.ContinueOptimization)) break;
-                    if (actions.Length < request.MaxDepth)
-                        foreach (var child in children)
-                        queue.Enqueue([.. actions, child], (-(actions.Length + 1), order++));
                 }
                 catch (LocalChoiceException)
                 {
@@ -136,8 +173,13 @@ public static class LocalWorker
                 }
                 finally { player.Creature.CurrentHpChanged -= HpChanged; }
             }
+            if (best != null)
+            {
+                Publish("running", "正在从当前状态重新执行最佳路线，复核每步状态与最终结算…");
+                await VerifyBest(request, best);
+            }
             Publish(best == null ? "unsupported" : "done", best == null ? "没有找到可完整结算的路线。" :
-                "当前预算内完成的候选结果；未证明最优，奖励机制覆盖尚不完整。");
+                "整场战斗搜索已完成当前预算；未证明最优，奖励机制覆盖尚不完整。");
             await Cleanup();
             return true;
         }
@@ -148,6 +190,26 @@ public static class LocalWorker
             Publish("failed", ex.Message);
             return false;
         }
+    }
+
+    private static async Task VerifyBest(LocalSearchRequest request, LocalCandidate candidate)
+    {
+        await Restore(request);
+        var player = LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!;
+        int lost = 0;
+        void HpChanged(int oldHp, int newHp) => lost += Math.Max(0, oldHp - newHp);
+        player.Creature.CurrentHpChanged += HpChanged;
+        try
+        {
+            foreach (var action in candidate.Actions) await Play(action);
+            await StableOrTerminal(player);
+            var enemyHp = CombatManager.Instance.DebugOnlyGetState()?.Enemies.Sum(e => Math.Max(0, e.CurrentHp)) ?? 0;
+            if ((_combatWon && !player.Creature.IsDead) != candidate.Won || player.Creature.IsDead != candidate.Dead ||
+                player.Creature.CurrentHp != candidate.Hp || lost != candidate.HpLost || enemyHp != candidate.EnemyHp ||
+                player.Gold != candidate.Gold || player.Creature.MaxHp != candidate.MaxHp)
+                throw new InvalidOperationException("最佳路线重新执行后的结算不一致，未发布该进程的建议。");
+        }
+        finally { player.Creature.CurrentHpChanged -= HpChanged; }
     }
 
     private static async Task Cleanup()
@@ -213,11 +275,15 @@ public static class LocalWorker
         {
             var card = hand[i];
             if (!card.CanPlay()) continue;
-            if (card.IsValidTarget(null)) result.Add(new(i, card.Id.ToString(), null, card.Title, "", hash));
+            // Ordering only: never delete zero-damage/extra-block cards or merge same-name instances.
+            int preference = card.Type == CardType.Attack ? 30 : card.Type == CardType.Power ? 20 : 10;
+            if (card.IsValidTarget(null)) result.Add(new(i, card.Id.ToString(), null, card.Title, "", hash, state.RoundNumber, Preference: preference));
             else foreach (var target in state.Creatures.Where(c => c.IsAlive && card.IsValidTarget(c)))
                 result.Add(new(i, card.Id.ToString(), target.CombatId, card.Title,
-                    target.CombatId is { } id && _targetLabels?.TryGetValue(id, out var label) == true ? label : target.Name, hash));
+                    target.CombatId is { } id && _targetLabels?.TryGetValue(id, out var label) == true ? label : target.Name,
+                    hash, state.RoundNumber, Preference: preference));
         }
+        result.Add(new(-1, "", null, "", "", hash, state.RoundNumber, EndTurn: true));
         return result.ToArray();
     }
 
@@ -226,6 +292,7 @@ public static class LocalWorker
         if (LocalCapture.Fingerprint() != action.BeforeHash) throw new InvalidOperationException("搜索分支状态复现不一致。");
         var state = CombatManager.Instance.DebugOnlyGetState()!;
         var player = LocalContext.GetMe(state)!;
+        if (action.EndTurn) { await EndTurn(player); return; }
         var card = player.PlayerCombatState!.Hand.Cards[action.HandIndex];
         var target = action.TargetId == null ? null : state.Creatures.Single(c => c.CombatId == action.TargetId);
         if (card.Id.ToString() != action.ModelId || !card.CanPlay() || !card.IsValidTarget(target))

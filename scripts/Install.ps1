@@ -20,4 +20,5 @@ if ($PSCmdlet.ShouldProcess($destination, 'Install Spire AI Coach')) {
         Copy-Item -LiteralPath (Join-Path $source $name) -Destination $target -Force
     }
     Write-Output "Installed to $destination. Restart the game and enable the mod."
+    & (Join-Path $PSScriptRoot 'RemoveLegacyWorkerCopies.ps1')
 }

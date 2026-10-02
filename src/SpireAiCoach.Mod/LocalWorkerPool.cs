@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Runtime.InteropServices;
 using SpireAiCoach.Core;
 
 namespace SpireAiCoach.Mod;
@@ -9,7 +10,7 @@ namespace SpireAiCoach.Mod;
 public sealed class LocalWorkerPool(string directory) : IDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
-    private readonly Worker[] _workers = [new(), new()];
+    private readonly Worker[] _workers = Enumerable.Range(0, 16).Select(_ => new Worker()).ToArray();
     private bool _disposed;
 
     public async Task<LocalSearchResult> Analyze(LocalSearchRequest request, LocalInstallation installation,
@@ -19,16 +20,27 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
         try
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            progress("正在准备两个独立的本地工作进程；首次需复制游戏资源，约占 6 GB…");
-            var results = await Task.WhenAll(_workers.Select((worker, index) => Run(worker, index)));
+            var totalTime = Stopwatch.StartNew();
+            var memory = new MemoryStatus();
+            if (!GlobalMemoryStatusEx(memory)) throw new IOException("Cannot determine available memory for local workers");
+            // Keep automatic sizing stable when reusing our own already allocated worker heaps.
+            ulong reusable = (ulong)_workers.Where(w => w.Process?.HasExited == false).Sum(w => w.Process!.PrivateMemorySize64);
+            int count = LocalSearchPolicy.WorkerCount(Environment.ProcessorCount, memory.AvailablePhysical + reusable, request.Workers);
+            foreach (var idle in _workers.Skip(count)) idle.Stop();
+            progress($"正在准备 {count} 个独立工作进程，共享游戏资源文件；搜索整场战斗（最多 {request.MaxRounds} 轮）…");
+            var results = await Task.WhenAll(_workers.Take(count).Select((worker, index) => Run(worker, index)));
             cancellation.ThrowIfCancellationRequested();
             var valid = results.Where(r => r.Status is "done" or "partial" && r.Best != null).ToArray();
             if (valid.Length == 0)
                 throw new CoachException("local_failed", string.Join("\n", results.Select(r => r.Message).Distinct()));
             var best = valid.Aggregate((a, b) => LocalSearchPolicy.Better(b.Best!, a.Best) ? b : a);
             return best with { Evaluated = results.Sum(r => r.Evaluated), Rejected = results.Sum(r => r.Rejected),
+                Duplicates = results.Sum(r => r.Duplicates), BudgetPruned = results.Sum(r => r.BudgetPruned),
+                Victories = valid.Sum(r => r.Victories), Workers = count,
+                ElapsedMs = totalTime.ElapsedMilliseconds, SearchElapsedMs = results.Max(r => r.ElapsedMs),
+                WorkerMemoryBytes = results.Sum(r => r.WorkerMemoryBytes),
                 Status = results.All(r => r.Status == "done") ? "done" : "partial",
-                Message = "本地计算完成。" + (valid.Length < 2 ? "部分工作进程未完成，仅保留已验证的路线。" : "") +
+                Message = "本地整场计算完成。" + (valid.Length < count ? "部分工作进程未完成，仅保留已验证的路线。" : "") +
                     "预算内候选，不保证最优；未知奖励机制仍按预算搜索。" };
 
             async Task<LocalSearchResult> Run(Worker worker, int index)
@@ -36,7 +48,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 try
                 {
                     await worker.Ensure(directory, index, installation, cancellation);
-                    var command = request with { Partition = index, Partitions = 2 };
+                    var command = request with { Partition = index, Partitions = count };
                     LocalWire.Write(Path.Combine(worker.Root, "request.json"), command);
                     var timer = Stopwatch.StartNew();
                     while (timer.Elapsed.TotalSeconds < 180)
@@ -50,6 +62,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                             {
                                 if (result.Status != "running")
                                 {
+                                    if (worker.Process?.HasExited == false)
+                                    { worker.Process.Refresh(); result = result with { WorkerMemoryBytes = worker.Process.PrivateMemorySize64 }; }
                                     if (worker.GameErrors())
                                     {
                                         worker.Stop();
@@ -58,7 +72,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                                     if (result.Status != "done") worker.Stop();
                                     return result;
                                 }
-                                progress($"本地进程 {index + 1}：已结算 {result.Evaluated} 条路线。{result.Message}");
+                                progress($"本地进程 {index + 1}/{count}：已评估 {result.Evaluated} 条路线。{result.Message}");
                             }
                         }
                         if (worker.Process?.HasExited != false)
@@ -85,6 +99,18 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
         foreach (var worker in _workers) worker.Stop();
     }
 
+    [StructLayout(LayoutKind.Sequential)]
+    private sealed class MemoryStatus
+    {
+        public uint Length = (uint)Marshal.SizeOf<MemoryStatus>();
+        public uint Load;
+        public ulong TotalPhysical, AvailablePhysical, TotalPageFile, AvailablePageFile,
+            TotalVirtual, AvailableVirtual, AvailableExtendedVirtual;
+    }
+    [DllImport("kernel32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool GlobalMemoryStatusEx([In, Out] MemoryStatus status);
+
     private sealed class Worker
     {
         public string Root { get; private set; } = "";
@@ -95,26 +121,28 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
         public async Task Ensure(string directory, int index, LocalInstallation installation, CancellationToken token)
         {
             var signature = typeof(LocalWorker).Assembly.ManifestModule.ModuleVersionId + "|" +
-                installation.GameDirectory + "|" + string.Join("|", installation.ModDirectories);
+                installation.GameDirectory + "|" + Path.GetFullPath(directory) + "|" + string.Join("|", installation.ModDirectories);
             var configuration = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(signature)))[..16];
             if (Process?.HasExited == false && _configuration == configuration) return;
             Stop();
             _configuration = configuration;
-            Root = Path.GetFullPath(Path.Combine(directory, configuration, "worker-" + index));
+            // NTFS hardlinks require one volume. Keep tiny launch trees beside the installation, never in it.
+            var sharedRoot = Path.Combine(Directory.GetParent(installation.GameDirectory)!.FullName, ".spire-ai-coach-workers");
+            Root = Path.GetFullPath(Path.Combine(sharedRoot, configuration, "worker-" + index));
             if (Root.StartsWith(Path.GetFullPath(installation.GameDirectory) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Worker must not be inside game installation");
             if (Directory.Exists(Root) && Directory.EnumerateFileSystemEntries(Root).Any() && !File.Exists(Path.Combine(Root, ".coach-worker")))
                 throw new IOException("Refusing an unowned worker directory");
             Directory.CreateDirectory(Root);
             _lock = new FileStream(Path.Combine(Root, ".lock"), FileMode.OpenOrCreate, System.IO.FileAccess.ReadWrite, FileShare.None);
-            File.WriteAllText(Path.Combine(Root, ".coach-worker"), "SpireAiCoach local worker v1");
+            File.WriteAllText(Path.Combine(Root, ".coach-worker"), "SpireAiCoach shared local worker v2");
             var game = Path.Combine(Root, "game");
             Directory.CreateDirectory(game);
             foreach (var source in Directory.EnumerateFiles(installation.GameDirectory))
                 if (new[] { ".exe", ".dll", ".pck", ".json" }.Contains(Path.GetExtension(source).ToLowerInvariant()))
-                    CopyFile(source, Path.Combine(game, Path.GetFileName(source)), token);
+                    ShareFile(source, Path.Combine(game, Path.GetFileName(source)), token);
             foreach (var source in Directory.EnumerateDirectories(installation.GameDirectory, "data_sts2_*"))
-                CopyTree(source, Path.Combine(game, Path.GetFileName(source)), token);
+                ShareTree(source, Path.Combine(game, Path.GetFileName(source)), token);
             for (var i = 0; i < installation.ModDirectories.Length; i++)
                 CopyTree(installation.ModDirectories[i], Path.Combine(game, "mods", "loaded-" + i), token);
             var roaming = Path.Combine(Root, "Roaming");
@@ -158,6 +186,28 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             if (!prior.Exists || prior.Length != info.Length || prior.LastWriteTimeUtc != info.LastWriteTimeUtc)
                 File.Copy(source, target, true); // Never hardlink a writable worker to the live installation.
         }
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool CreateHardLink(string newName, string existingName, IntPtr security);
+
+        private static void ShareFile(string source, string target, CancellationToken token)
+        {
+            token.ThrowIfCancellationRequested();
+            // Remove the old directory entry, never overwrite a shared inode (including after Steam updates).
+            if (File.Exists(target)) File.Delete(target);
+            if (!CreateHardLink(target, source, IntPtr.Zero))
+                throw new IOException("无法共享游戏资源文件（需要同盘 NTFS）；未回退为复制整套资源。", Marshal.GetLastWin32Error());
+        }
+        private static void ShareTree(string source, string target, CancellationToken token)
+        {
+            Directory.CreateDirectory(target);
+            foreach (var file in Directory.EnumerateFiles(source)) ShareFile(file, Path.Combine(target, Path.GetFileName(file)), token);
+            foreach (var child in Directory.EnumerateDirectories(source))
+            {
+                if ((File.GetAttributes(child) & FileAttributes.ReparsePoint) != 0) throw new IOException("Linked game directories are not supported");
+                ShareTree(child, Path.Combine(target, Path.GetFileName(child)), token);
+            }
+        }
         private static void CopyTree(string source, string target, CancellationToken token)
         {
             Directory.CreateDirectory(target);
@@ -172,7 +222,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
         {
             try
             {
-                if (Process?.HasExited == false) { Process.Kill(); Process.WaitForExit(5000); }
+                if (Process?.HasExited == false) { Process.Kill(entireProcessTree: true); Process.WaitForExit(5000); }
             }
             catch (InvalidOperationException) { }
             Process?.Dispose(); Process = null;

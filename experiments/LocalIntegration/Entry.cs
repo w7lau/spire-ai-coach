@@ -55,6 +55,23 @@ public static class Entry
             var player = LocalContext.GetMe(run)!;
             var capture = new StateCapture();
             while (capture.Capture(true)?.CanAdvise != true) await Frame();
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_BENCHMARK") == "1")
+            {
+                var before = LocalCapture.Fingerprint();
+                var benchmark = LocalCapture.Capture(capture.Capture(true)!.Fingerprint(), true);
+                var installation = LocalCapture.Installation();
+                // Warm each size separately, then use the same frozen state and 20s budget.
+                foreach (int workers in new[] { 2, 4 })
+                {
+                    await Task.Run(() => pool.Analyze(benchmark with { Id = Guid.NewGuid().ToString("N"), Workers = workers, MaxNodes = 1 }, installation, _ => { }, CancellationToken.None));
+                    var result = await Task.Run(() => pool.Analyze(benchmark with { Id = Guid.NewGuid().ToString("N"), Workers = workers, MaxNodes = 128, BudgetSeconds = 20 }, installation, _ => { }, CancellationToken.None));
+                    records.Add(new { stage = "benchmark", workers, unchanged = before == LocalCapture.Fingerprint(), result });
+                    LocalWire.Write(Path.Combine(root, "integration-benchmark.json"), records);
+                    if (before != LocalCapture.Fingerprint() || result.Best?.Won != true) throw new InvalidOperationException("Benchmark changed host or did not complete combat");
+                }
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
             foreach (var stage in new[] { "root", "after_play", "after_turn" })
             {
                 if (stage == "after_play")
@@ -72,7 +89,7 @@ public static class Entry
                 }
                 var before = LocalCapture.Fingerprint();
                 var request = LocalCapture.Capture(capture.Capture(true)!.Fingerprint(), false) with
-                    { MaxNodes = System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_INTEGRATION_QUICK") == "1" ? 2 : 6, BudgetSeconds = 45 };
+                    { MaxNodes = System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_INTEGRATION_QUICK") == "1" ? 2 : 6, BudgetSeconds = 45, Workers = 4 };
                 var installation = LocalCapture.Installation();
                 LocalWire.Write(Path.Combine(root, "integration-" + stage + "-request.json"), request);
                 var result = await Task.Run(() => pool.Analyze(request, installation,
@@ -81,7 +98,16 @@ public static class Entry
                 records.Add(new { stage, unchanged, result });
                 LocalWire.Write(Path.Combine(root, "integration-result.json"), records);
                 if (!unchanged || result.Best == null) throw new InvalidOperationException("Integration did not produce a valid isolated result");
+                if (result.Best.Won != true || result.Best.Rounds < 2 || !result.Best.Actions.Any(a => a.EndTurn))
+                    throw new InvalidOperationException("Expected a native victory spanning multiple player rounds");
             }
+            var limitedHash = LocalCapture.Fingerprint();
+            var limitedRequest = LocalCapture.Capture(capture.Capture(true)!.Fingerprint(), false) with { MaxRounds = 1, MaxNodes = 1, Workers = 4 };
+            var limitedInstall = LocalCapture.Installation();
+            var limited = await Task.Run(() => pool.Analyze(limitedRequest, limitedInstall, _ => { }, CancellationToken.None));
+            records.Add(new { stage = "round_limit", unchanged = limitedHash == LocalCapture.Fingerprint(), result = limited });
+            if (limited.Best == null || limited.Best.Won || !limited.Best.StopReason.Contains("轮数上限") || limitedHash != LocalCapture.Fingerprint())
+                throw new InvalidOperationException("Round limit falsely claimed victory or modified host");
             // A separate synthetic lethal route verifies that victory healing has fully settled.
             RunManager.Instance.CleanUp();
             NGame.Instance!.RootSceneContainer.SetCurrentScene(new Control());
@@ -108,7 +134,7 @@ public static class Entry
             }
             var lethalHash = LocalCapture.Fingerprint();
             var lethalHp = player.Creature.CurrentHp;
-            var lethalRequest = LocalCapture.Capture(capture.Capture(true)!.Fingerprint(), true) with { MaxNodes = 3 };
+            var lethalRequest = LocalCapture.Capture(capture.Capture(true)!.Fingerprint(), true) with { MaxNodes = 3, Workers = 4 };
             var lethalInstall = LocalCapture.Installation();
             var lethal = await Task.Run(() => pool.Analyze(lethalRequest, lethalInstall, _ => { }, CancellationToken.None));
             records.Add(new { stage = "victory", unchanged = lethalHash == LocalCapture.Fingerprint(), live_hp = lethalHp, result = lethal });
@@ -116,7 +142,7 @@ public static class Entry
             if (lethal.Best?.Won != true || lethal.Best.Hp != Math.Min(player.Creature.MaxHp, lethalHp + 6) || lethalHash != LocalCapture.Fingerprint())
                 throw new InvalidOperationException("Victory did not settle native Burning Blood healing or changed the live state");
             var finalHash = LocalCapture.Fingerprint();
-            var finalRequest = LocalCapture.Capture(capture.Capture(true)!.Fingerprint(), false);
+            var finalRequest = LocalCapture.Capture(capture.Capture(true)!.Fingerprint(), false) with { Workers = 4 };
             var finalInstall = LocalCapture.Installation();
             using (var cancel = new CancellationTokenSource(500))
             {

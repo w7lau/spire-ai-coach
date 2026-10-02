@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using SpireAiCoach.Core;
 
 namespace SpireAiCoach.Mod;
@@ -32,6 +33,16 @@ public sealed class SettingsStore
             AtomicWrite(KeyPath, Protect(Encoding.UTF8.GetBytes(key), true));
         else if (File.Exists(KeyPath)) File.Delete(KeyPath);
         AtomicWrite(ConfigPath, Encoding.UTF8.GetBytes(Wire.Serialize(settings)));
+    }
+
+    public void SaveLocalWorkers(int workers)
+    {
+        if (workers is < 0 or > 16) throw new ArgumentOutOfRangeException(nameof(workers));
+        var settings = File.Exists(ConfigPath) ? JsonNode.Parse(File.ReadAllText(ConfigPath))!.AsObject() : new JsonObject();
+        settings["local_workers"] = workers;
+        Directory.CreateDirectory(_directory);
+        AtomicWrite(ConfigPath, Encoding.UTF8.GetBytes(settings.ToJsonString()));
+        // Local-only preferences must not require AI credentials or rewrite the encrypted key.
     }
 
     private static void AtomicWrite(string path, byte[] content)

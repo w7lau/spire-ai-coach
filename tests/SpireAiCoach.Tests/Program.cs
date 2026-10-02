@@ -631,21 +631,23 @@ AsyncTest("HTTP content has one JSON object encoding and readable diagnostics pr
 
 Test("local no-damage stopping requires known rewards and opt-in continuation wins", () =>
 {
-    var safe = new LocalCandidate([], 50, 0, 20, 100, 80, false, false, true);
+    var safe = new LocalCandidate([], 50, 0, 0, 100, 80, true, false, true);
     Check(LocalSearchPolicy.CanStop(safe, false));
     Check(!LocalSearchPolicy.CanStop(safe, true));
     Check(!LocalSearchPolicy.CanStop(safe with { RewardCoverageKnown = false }, false));
     Check(!LocalSearchPolicy.CanStop(safe with { HpLost = 3 }, false), "Healing back to the same HP must not hide damage");
     Check(!LocalSearchPolicy.CanStop(safe with { Dead = true }, false));
+    Check(!LocalSearchPolicy.CanStop(safe with { Won = false }, false));
 });
-Test("local ranking preserves survival and health before damage", () =>
+Test("local ranking prioritizes combat victory over healthy unfinished horizons", () =>
 {
-    var prior = new LocalCandidate([], 50, 0, 30, 100, 80, false, false, false);
+    var prior = new LocalCandidate([], 50, 0, 0, 100, 80, true, false, false);
     Check(LocalSearchPolicy.Better(prior, prior with { Dead = true, EnemyHp = 0 }));
     Check(!LocalSearchPolicy.Better(prior with { Hp = 49, EnemyHp = 0 }, prior));
     Check(LocalSearchPolicy.Better(prior with { MaxHp = 81 }, prior));
     Check(LocalSearchPolicy.Better(prior with { Gold = 110 }, prior));
-    Check(LocalSearchPolicy.Better(prior with { EnemyHp = 20 }, prior));
+    Check(LocalSearchPolicy.Better(prior with { Hp = 5 }, prior with { Won = false, Hp = 80 }));
+    Check(!LocalSearchPolicy.Better(prior with { Won = false, Hp = 80 }, prior));
 });
 Test("local protocol preserves instance position and pre-state identity", () =>
 {
@@ -656,6 +658,65 @@ Test("local protocol preserves instance position and pre-state identity", () =>
     Check(copy.Best!.Actions.Single() == action && copy.Id == "job" && copy.SnapshotId == "snapshot");
     Check(LocalSearchPolicy.Format(copy).Contains("第 4 张"));
     Check(LocalSearchPolicy.Format(copy).Contains("42"));
+    Check(LocalSearchPolicy.Format(copy).Contains("尚未找到获胜路线"));
+});
+Test("combat plans preserve end turn boundaries and never invent a final end turn", () =>
+{
+    var end = new LocalAction(-1, "", null, "", "", "h1", Round: 3, EndTurn: true);
+    var card = new LocalAction(0, "STRIKE", 5, "Strike", "Enemy", "h2", Round: 4);
+    var best = new LocalCandidate([end, card], 45, 5, 0, 100, 80, true, false, false, Rounds: 2);
+    var result = new LocalSearchResult("j", "s", "done", "ok", 1, 0, 20, best, Victories: 1, Workers: 4);
+    var copy = JsonSerializer.Deserialize<LocalSearchResult>(JsonSerializer.Serialize(result))!;
+    Check(copy.Best!.Actions.SequenceEqual(best.Actions));
+    var text = LocalSearchPolicy.Format(copy);
+    Check(text.Contains("第 3 回合") && text.Contains("第 4 回合") && text.Contains("已找到获胜路线"));
+    Check(!text.Contains("3. 结束回合") && text.Contains("4 路并发"));
+});
+Test("frontier deduplicates exact prefixes without merging distinct card instances or rounds", () =>
+{
+    var frontier = new LocalFrontier(3);
+    var a = new LocalAction(0, "SAME", 1, "Same", "Enemy", "hash", Round: 1);
+    frontier.Add([a], 1); frontier.Add([a], 2);
+    frontier.Add([a with { HandIndex = 1 }], 3);
+    frontier.Add([a with { Round = 2 }], 4);
+    Check(frontier.Count == 3 && frontier.Duplicates == 1);
+    frontier.MarkVisited([a]);
+    Check(frontier.Count == 2);
+    frontier.Add([a], 100); Check(frontier.Count == 2 && frontier.Duplicates == 2);
+    Check(frontier.TryTake(out var next) && next[0].Round == 2);
+    frontier.Add([a with { BeforeHash = "other" }], 5);
+    frontier.Add([a with { TargetId = 2 }], 6);
+    frontier.Add([a with { TargetId = 3 }], 7);
+    Check(frontier.Count == 3 && frontier.BudgetPruned == 1);
+});
+Test("automatic local concurrency reserves CPU and memory and manual selection is bounded", () =>
+{
+    const ulong gib = 1024UL * 1024 * 1024;
+    Check(LocalSearchPolicy.WorkerCount(16, 9 * gib, 0) == 4);
+    Check(LocalSearchPolicy.WorkerCount(32, 32 * gib, 0) == 8);
+    Check(LocalSearchPolicy.WorkerCount(2, gib, 0) == 1);
+    Check(LocalSearchPolicy.WorkerCount(16, 9 * gib, 8) == 8);
+    Check(LocalSearchPolicy.WorkerCount(16, 9 * gib, 100) == 16);
+});
+Test("local concurrency persists without AI configuration and preserves existing settings and key", () =>
+{
+    var directory = Path.Combine(Path.GetTempPath(), "spire-local-settings-" + Guid.NewGuid().ToString("N"));
+    try
+    {
+        var store = new SpireAiCoach.Mod.SettingsStore(directory);
+        store.SaveLocalWorkers(6);
+        Check(store.Load().Settings.LocalWorkers == 6 && store.Load().Settings.Model == "");
+        store.Save(Settings() with { RememberKey = true }, "synthetic-test-secret");
+        var key = File.ReadAllBytes(Path.Combine(directory, "api-key.dpapi"));
+        var before = JsonNode.Parse(File.ReadAllText(Path.Combine(directory, "config.json")))!;
+        store.SaveLocalWorkers(8);
+        var after = JsonNode.Parse(File.ReadAllText(Path.Combine(directory, "config.json")))!;
+        before["local_workers"] = 8;
+        Check(JsonNode.DeepEquals(before, after));
+        Check(key.SequenceEqual(File.ReadAllBytes(Path.Combine(directory, "api-key.dpapi"))));
+        Check(store.Load().Key == "synthetic-test-secret" && store.Load().Settings.LocalWorkers == 8);
+    }
+    finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
 });
 
 int failures = 0;

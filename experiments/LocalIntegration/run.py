@@ -14,6 +14,7 @@ from worker_lock import worker_lock
 parser = argparse.ArgumentParser()
 parser.add_argument('--workspace', type=Path, required=True)
 parser.add_argument('--quick', action='store_true')
+parser.add_argument('--benchmark', action='store_true')
 args = parser.parse_args()
 root = args.workspace.resolve()
 if not (root / '.spire-native-probe-owner').is_file() or not (root / 'fixture.json').is_file():
@@ -39,6 +40,7 @@ with worker_lock(root):
     env.pop('SPIRE_NATIVE_PROBE_ROOT', None)
     env.pop('SPIRE_COACH_WORKER', None)
     env['SPIRE_LOCAL_INTEGRATION_QUICK'] = '1' if args.quick else '0'
+    env['SPIRE_LOCAL_BENCHMARK'] = '1' if args.benchmark else '0'
     with (root / 'integration-stdout.log').open('wb') as output:
         process = subprocess.Popen([str(root / 'game/SlayTheSpire2.exe'), '--headless', '--max-fps', '120',
                                     '--force-steam=off', '--log-file', str(root / 'integration-game.log')],

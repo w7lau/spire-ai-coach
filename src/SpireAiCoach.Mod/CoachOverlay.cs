@@ -37,6 +37,7 @@ public sealed class CoachOverlay
     private Button _localAnalyze = null!;
     private LocalWorkerPool _localPool = null!;
     private bool _localAnalyzing;
+    private SpinBox _localWorkers = null!;
     private Button _cancel = null!;
     private LineEdit _url = null!;
     private LineEdit _model = null!;
@@ -90,7 +91,7 @@ public sealed class CoachOverlay
         var row = new HBoxContainer(); body.AddChild(row);
         _analyze = new Button { Text = "AI 分析 · F9", Disabled = true }; row.AddChild(_analyze);
         _analyze.Pressed += Analyze;
-        _localAnalyze = new Button { Text = "本地计算（实验）", Disabled = true }; row.AddChild(_localAnalyze);
+        _localAnalyze = new Button { Text = "本地整场计算（实验）", Disabled = true }; row.AddChild(_localAnalyze);
         _localAnalyze.Pressed += AnalyzeLocal;
         _cancel = new Button { Text = "取消", Disabled = true }; row.AddChild(_cancel);
         _cancel.Pressed += () => Cancel("已取消分析。");
@@ -98,7 +99,17 @@ public sealed class CoachOverlay
         config.Pressed += () => _settingsPanel.Visible = !_settingsPanel.Visible;
         var hide = new Button { Text = "收起" }; row.AddChild(hide);
         hide.Pressed += () => _panel.Hide();
-        body.AddChild(Wrapped("本地仅支持单人，首次准备约需 6 GB 空间；两个独立进程计算，之后复用。本版按预算搜索，奖励识别与无伤提前停止尚未接入。"));
+        body.AddChild(Wrapped("本地搜索整场战斗，最多 10 轮，共享游戏资源。找到胜利路线或显示未完成的原因；奖励识别与无伤提前停止尚未接入。"));
+        var localOptions = new HBoxContainer(); body.AddChild(localOptions);
+        localOptions.AddChild(new Label { Text = "本地并发（0 自动，1–16 手动）" });
+        _localWorkers = new SpinBox { MinValue = 0, MaxValue = 16, Step = 1, Value = Math.Clamp(_settings.LocalWorkers, 0, 16) };
+        localOptions.AddChild(_localWorkers);
+        var saveLocal = new Button { Text = "保存并发" }; localOptions.AddChild(saveLocal);
+        saveLocal.Pressed += () =>
+        {
+            try { _store.SaveLocalWorkers((int)_localWorkers.Value); _settings = _settings with { LocalWorkers = (int)_localWorkers.Value }; _status.Text = "本地并发已保存，下次计算生效。"; }
+            catch (Exception ex) { _status.Text = "本地并发保存失败：" + ex.GetType().Name; }
+        };
 
         _settingsPanel = new VBoxContainer { Visible = string.IsNullOrEmpty(_settings.Model) || loadError != null };
         body.AddChild(_settingsPanel);
@@ -230,7 +241,7 @@ public sealed class CoachOverlay
         {
             var next = _settings with { BaseUrl = _url.Text.Trim(), Model = _model.Text.Trim(),
                 RememberKey = _remember.ButtonPressed, RevealDrawOrder = _reveal.ButtonPressed,
-                IncludeStreamUsage = _usage.ButtonPressed };
+                IncludeStreamUsage = _usage.ButtonPressed, LocalWorkers = (int)_localWorkers.Value };
             _store.Save(next, _apiKey.Text.Trim());
             Cancel("设置已保存，可以开始分析。");
             _settings = next; _key = _apiKey.Text.Trim();
@@ -332,7 +343,7 @@ public sealed class CoachOverlay
         LocalInstallation installation;
         try
         {
-            request = LocalCapture.Capture(_snapshotHash!, continueOptimization: true);
+            request = LocalCapture.Capture(_snapshotHash!, continueOptimization: true) with { Workers = (int)_localWorkers.Value };
             installation = LocalCapture.Installation();
         }
         catch (Exception ex) { _status.Text = ex.Message; return; }
