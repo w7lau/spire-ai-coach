@@ -1,0 +1,869 @@
+{
+  "version": "0.7.4",
+  "date": "2026-10-03",
+  "game_version": "v0.111.0",
+  "scope": "Owned native host; no real player combat was executed.",
+  "core_focused_tests": {
+    "local": "9/9",
+    "optimization": "10/10",
+    "search feedback": "6/6",
+    "timeline": "5/5"
+  },
+  "fixed_route_benchmark": {
+    "method": "Same DLL, frozen 33-step line, simulation speed 8, one warmup per mode, forward/reverse order, two measured samples per mode.",
+    "experiment_only_limits": {
+      "workers": 1,
+      "max_nodes": 1,
+      "budget_seconds": 60
+    },
+    "product_search_budget_unchanged_seconds": 60,
+    "includes_independent_native_verification": true,
+    "all_step_states_full_history_and_settlement_match": true,
+    "samples": [
+      {
+        "fast_card_presentation": false,
+        "event_driven_waits": false,
+        "SimulationSpeed": 8,
+        "ElapsedMs": 8135,
+        "Timing": {
+          "RestoreMs": 521,
+          "ActionMs": 3137,
+          "DecisionMs": 110,
+          "VerificationMs": 3789,
+          "StartupMs": 0,
+          "Actions": 33,
+          "Restores": 1,
+          "Verifications": 1
+        },
+        "HpLost": 14,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "Rounds": 9,
+        "steps": 33,
+        "native_states_and_history_match": true
+      },
+      {
+        "fast_card_presentation": true,
+        "event_driven_waits": false,
+        "SimulationSpeed": 8,
+        "ElapsedMs": 7935,
+        "Timing": {
+          "RestoreMs": 452,
+          "ActionMs": 3091,
+          "DecisionMs": 100,
+          "VerificationMs": 3663,
+          "StartupMs": 0,
+          "Actions": 33,
+          "Restores": 1,
+          "Verifications": 1
+        },
+        "HpLost": 14,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "Rounds": 9,
+        "steps": 33,
+        "native_states_and_history_match": true
+      },
+      {
+        "fast_card_presentation": true,
+        "event_driven_waits": true,
+        "SimulationSpeed": 8,
+        "ElapsedMs": 6967,
+        "Timing": {
+          "RestoreMs": 473,
+          "ActionMs": 2457,
+          "DecisionMs": 105,
+          "VerificationMs": 2970,
+          "StartupMs": 0,
+          "Actions": 33,
+          "Restores": 1,
+          "Verifications": 1
+        },
+        "HpLost": 14,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "Rounds": 9,
+        "steps": 33,
+        "native_states_and_history_match": true
+      },
+      {
+        "fast_card_presentation": true,
+        "event_driven_waits": true,
+        "SimulationSpeed": 8,
+        "ElapsedMs": 6466,
+        "Timing": {
+          "RestoreMs": 433,
+          "ActionMs": 2434,
+          "DecisionMs": 99,
+          "VerificationMs": 2966,
+          "StartupMs": 0,
+          "Actions": 33,
+          "Restores": 1,
+          "Verifications": 1
+        },
+        "HpLost": 14,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "Rounds": 9,
+        "steps": 33,
+        "native_states_and_history_match": true
+      },
+      {
+        "fast_card_presentation": true,
+        "event_driven_waits": false,
+        "SimulationSpeed": 8,
+        "ElapsedMs": 9070,
+        "Timing": {
+          "RestoreMs": 432,
+          "ActionMs": 3000,
+          "DecisionMs": 94,
+          "VerificationMs": 4665,
+          "StartupMs": 0,
+          "Actions": 33,
+          "Restores": 1,
+          "Verifications": 1
+        },
+        "HpLost": 14,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "Rounds": 9,
+        "steps": 33,
+        "native_states_and_history_match": true
+      },
+      {
+        "fast_card_presentation": false,
+        "event_driven_waits": false,
+        "SimulationSpeed": 8,
+        "ElapsedMs": 8757,
+        "Timing": {
+          "RestoreMs": 550,
+          "ActionMs": 3425,
+          "DecisionMs": 107,
+          "VerificationMs": 3821,
+          "StartupMs": 0,
+          "Actions": 33,
+          "Restores": 1,
+          "Verifications": 1
+        },
+        "HpLost": 14,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "Rounds": 9,
+        "steps": 33,
+        "native_states_and_history_match": true
+      }
+    ],
+    "means": [
+      {
+        "fast_card_presentation": false,
+        "event_driven_waits": false,
+        "samples": 2,
+        "mean_elapsed_ms": 8446,
+        "mean_action_ms": 3281,
+        "mean_verify_ms": 3805
+      },
+      {
+        "fast_card_presentation": true,
+        "event_driven_waits": false,
+        "samples": 2,
+        "mean_elapsed_ms": 8502.5,
+        "mean_action_ms": 3045.5,
+        "mean_verify_ms": 4164
+      },
+      {
+        "fast_card_presentation": true,
+        "event_driven_waits": true,
+        "samples": 2,
+        "mean_elapsed_ms": 6716.5,
+        "mean_action_ms": 2445.5,
+        "mean_verify_ms": 2968
+      }
+    ],
+    "combined_mean_elapsed_reduction_percent": 20.477,
+    "limits": "Two samples per mode; presentation alone did not show a stable speed benefit. This is not a whole-search or all-Mod speed guarantee."
+  },
+  "full_battle": {
+    "Status": "done",
+    "Evaluated": 39,
+    "Rejected": 0,
+    "Victories": 18,
+    "ElapsedMs": 79414,
+    "Timing": {
+      "RestoreMs": 35816,
+      "ActionMs": 149979,
+      "DecisionMs": 5988,
+      "VerificationMs": 3351,
+      "StartupMs": 100535,
+      "Actions": 1275,
+      "Restores": 39,
+      "Verifications": 1
+    },
+    "Workers": 4,
+    "MaxRounds": 64,
+    "BudgetSeconds": 45,
+    "MaxNodes": 32,
+    "IncludePotions": true,
+    "Won": true,
+    "StartingHp": 87,
+    "Hp": 87,
+    "NetHpLoss": 0,
+    "HpLost": 14,
+    "Rounds": 9,
+    "EnemyHp": 0,
+    "used_potion": false,
+    "choices": 0,
+    "verified_steps": 32
+  },
+  "full_timeline": {
+    "span_count": 9066,
+    "dropped": 0,
+    "all_intervals_in_request": true,
+    "one_verify_after_all_lanes": true,
+    "last_finishing_lane": 1,
+    "last_lane_prepare_ms": 26002.319,
+    "last_lane_first_restore_ms": 4259.823,
+    "last_lane_first_restore_end_ms": 30391.002,
+    "last_lane_search_end_ms": 75478.148,
+    "verify_start_ms": 75808.203,
+    "verify_end_ms": 79211.098,
+    "phases": [
+      {
+        "stage": "main",
+        "phase": "queue",
+        "depth": 0,
+        "count": 1,
+        "cumulative_ms": 0.256
+      },
+      {
+        "stage": "prepare",
+        "phase": "engine",
+        "depth": 1,
+        "count": 4,
+        "cumulative_ms": 95610.6
+      },
+      {
+        "stage": "prepare",
+        "phase": "files",
+        "depth": 1,
+        "count": 4,
+        "cumulative_ms": 1091.961
+      },
+      {
+        "stage": "prepare",
+        "phase": "launch",
+        "depth": 1,
+        "count": 4,
+        "cumulative_ms": 3798.063
+      },
+      {
+        "stage": "prepare",
+        "phase": "prepare",
+        "depth": 0,
+        "count": 4,
+        "cumulative_ms": 100500.634
+      },
+      {
+        "stage": "prepare",
+        "phase": "reuse",
+        "depth": 0,
+        "count": 1,
+        "cumulative_ms": 0.002
+      },
+      {
+        "stage": "search",
+        "phase": "action_queue",
+        "depth": 2,
+        "count": 1000,
+        "cumulative_ms": 8827.565
+      },
+      {
+        "stage": "search",
+        "phase": "assets",
+        "depth": 2,
+        "count": 4,
+        "cumulative_ms": 5733.395
+      },
+      {
+        "stage": "search",
+        "phase": "card",
+        "depth": 1,
+        "count": 914,
+        "cumulative_ms": 66631.386
+      },
+      {
+        "stage": "search",
+        "phase": "cleanup",
+        "depth": 1,
+        "count": 4,
+        "cumulative_ms": 255.271
+      },
+      {
+        "stage": "search",
+        "phase": "cleanup",
+        "depth": 2,
+        "count": 39,
+        "cumulative_ms": 2601.756
+      },
+      {
+        "stage": "search",
+        "phase": "decision",
+        "depth": 1,
+        "count": 1279,
+        "cumulative_ms": 6647.467
+      },
+      {
+        "stage": "search",
+        "phase": "decode",
+        "depth": 2,
+        "count": 39,
+        "cumulative_ms": 1103.559
+      },
+      {
+        "stage": "search",
+        "phase": "dispatch",
+        "depth": 1,
+        "count": 4,
+        "cumulative_ms": 323.696
+      },
+      {
+        "stage": "search",
+        "phase": "end_turn",
+        "depth": 1,
+        "count": 345,
+        "cumulative_ms": 82600.676
+      },
+      {
+        "stage": "search",
+        "phase": "fingerprint",
+        "depth": 2,
+        "count": 39,
+        "cumulative_ms": 83.819
+      },
+      {
+        "stage": "search",
+        "phase": "history",
+        "depth": 2,
+        "count": 39,
+        "cumulative_ms": 1.404
+      },
+      {
+        "stage": "search",
+        "phase": "ipc",
+        "depth": 1,
+        "count": 4,
+        "cumulative_ms": 16.057
+      },
+      {
+        "stage": "search",
+        "phase": "observe",
+        "depth": 1,
+        "count": 2628,
+        "cumulative_ms": 172.966
+      },
+      {
+        "stage": "search",
+        "phase": "potion",
+        "depth": 1,
+        "count": 16,
+        "cumulative_ms": 1363.945
+      },
+      {
+        "stage": "search",
+        "phase": "publish",
+        "depth": 1,
+        "count": 984,
+        "cumulative_ms": 2505.335
+      },
+      {
+        "stage": "search",
+        "phase": "receive",
+        "depth": 1,
+        "count": 4,
+        "cumulative_ms": 543.63
+      },
+      {
+        "stage": "search",
+        "phase": "refine",
+        "depth": 1,
+        "count": 39,
+        "cumulative_ms": 349.654
+      },
+      {
+        "stage": "search",
+        "phase": "restore",
+        "depth": 1,
+        "count": 39,
+        "cumulative_ms": 35791.03
+      },
+      {
+        "stage": "search",
+        "phase": "result_transfer",
+        "depth": 1,
+        "count": 4,
+        "cumulative_ms": 738.372
+      },
+      {
+        "stage": "search",
+        "phase": "scene",
+        "depth": 2,
+        "count": 39,
+        "cumulative_ms": 24568.402
+      },
+      {
+        "stage": "search",
+        "phase": "session",
+        "depth": 0,
+        "count": 4,
+        "cumulative_ms": 198473.121
+      },
+      {
+        "stage": "search",
+        "phase": "settle",
+        "depth": 2,
+        "count": 1314,
+        "cumulative_ms": 58824.008
+      },
+      {
+        "stage": "search",
+        "phase": "settle",
+        "depth": 3,
+        "count": 39,
+        "cumulative_ms": 1023.36
+      },
+      {
+        "stage": "search",
+        "phase": "setup",
+        "depth": 2,
+        "count": 39,
+        "cumulative_ms": 1688.643
+      },
+      {
+        "stage": "verify",
+        "phase": "action_queue",
+        "depth": 2,
+        "count": 26,
+        "cumulative_ms": 127.791
+      },
+      {
+        "stage": "verify",
+        "phase": "assets",
+        "depth": 2,
+        "count": 1,
+        "cumulative_ms": 149.544
+      },
+      {
+        "stage": "verify",
+        "phase": "card",
+        "depth": 1,
+        "count": 24,
+        "cumulative_ms": 1278.775
+      },
+      {
+        "stage": "verify",
+        "phase": "cleanup",
+        "depth": 1,
+        "count": 1,
+        "cumulative_ms": 44.875
+      },
+      {
+        "stage": "verify",
+        "phase": "cleanup",
+        "depth": 2,
+        "count": 1,
+        "cumulative_ms": 4.707
+      },
+      {
+        "stage": "verify",
+        "phase": "decode",
+        "depth": 2,
+        "count": 1,
+        "cumulative_ms": 2.552
+      },
+      {
+        "stage": "verify",
+        "phase": "dispatch",
+        "depth": 1,
+        "count": 1,
+        "cumulative_ms": 43.836
+      },
+      {
+        "stage": "verify",
+        "phase": "end_turn",
+        "depth": 1,
+        "count": 8,
+        "cumulative_ms": 1482.949
+      },
+      {
+        "stage": "verify",
+        "phase": "fingerprint",
+        "depth": 2,
+        "count": 1,
+        "cumulative_ms": 0.972
+      },
+      {
+        "stage": "verify",
+        "phase": "history",
+        "depth": 2,
+        "count": 1,
+        "cumulative_ms": 0.001
+      },
+      {
+        "stage": "verify",
+        "phase": "ipc",
+        "depth": 1,
+        "count": 1,
+        "cumulative_ms": 45.003
+      },
+      {
+        "stage": "verify",
+        "phase": "observe",
+        "depth": 1,
+        "count": 65,
+        "cumulative_ms": 3.603
+      },
+      {
+        "stage": "verify",
+        "phase": "publish",
+        "depth": 1,
+        "count": 18,
+        "cumulative_ms": 36.982
+      },
+      {
+        "stage": "verify",
+        "phase": "receive",
+        "depth": 1,
+        "count": 1,
+        "cumulative_ms": 87.295
+      },
+      {
+        "stage": "verify",
+        "phase": "restore",
+        "depth": 1,
+        "count": 1,
+        "cumulative_ms": 496.786
+      },
+      {
+        "stage": "verify",
+        "phase": "result_transfer",
+        "depth": 1,
+        "count": 1,
+        "cumulative_ms": 78.182
+      },
+      {
+        "stage": "verify",
+        "phase": "scene",
+        "depth": 2,
+        "count": 1,
+        "cumulative_ms": 316.771
+      },
+      {
+        "stage": "verify",
+        "phase": "settle",
+        "depth": 2,
+        "count": 33,
+        "cumulative_ms": 1145.442
+      },
+      {
+        "stage": "verify",
+        "phase": "settle",
+        "depth": 3,
+        "count": 1,
+        "cumulative_ms": 17.968
+      },
+      {
+        "stage": "verify",
+        "phase": "setup",
+        "depth": 2,
+        "count": 1,
+        "cumulative_ms": 22.234
+      },
+      {
+        "stage": "verify",
+        "phase": "verify",
+        "depth": 0,
+        "count": 1,
+        "cumulative_ms": 3402.895
+      }
+    ],
+    "interpretation": "Parallel cumulative durations are not serial wall time; nested phases overlap."
+  },
+  "mechanics": [
+    {
+      "kind": "turnend",
+      "Status": "done",
+      "Evaluated": 1,
+      "Rejected": 0,
+      "ElapsedMs": 24948,
+      "Timing": {
+        "RestoreMs": 3499,
+        "ActionMs": 514,
+        "DecisionMs": 34,
+        "VerificationMs": 493,
+        "StartupMs": 19604,
+        "Actions": 1,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "StartingHp": 80,
+      "Hp": 58,
+      "NetHpLoss": 22,
+      "HpLost": 22,
+      "Rounds": 1,
+      "Won": false,
+      "verified": true,
+      "steps": 1,
+      "choice_count": 0,
+      "normal_speed_host_execution_passed": true,
+      "endpoint_recapture_passed": true
+    },
+    {
+      "kind": "exhaust",
+      "Status": "done",
+      "Evaluated": 1,
+      "Rejected": 0,
+      "ElapsedMs": 1777,
+      "Timing": {
+        "RestoreMs": 402,
+        "ActionMs": 193,
+        "DecisionMs": 0,
+        "VerificationMs": 463,
+        "StartupMs": 0,
+        "Actions": 4,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "StartingHp": 80,
+      "Hp": 80,
+      "NetHpLoss": 0,
+      "HpLost": 0,
+      "Rounds": 1,
+      "Won": false,
+      "verified": true,
+      "steps": 4,
+      "choice_count": 1,
+      "normal_speed_host_execution_passed": true,
+      "endpoint_recapture_passed": true
+    },
+    {
+      "kind": "upgrade",
+      "Status": "done",
+      "Evaluated": 1,
+      "Rejected": 0,
+      "ElapsedMs": 1525,
+      "Timing": {
+        "RestoreMs": 360,
+        "ActionMs": 135,
+        "DecisionMs": 1,
+        "VerificationMs": 485,
+        "StartupMs": 0,
+        "Actions": 4,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "StartingHp": 80,
+      "Hp": 80,
+      "NetHpLoss": 0,
+      "HpLost": 0,
+      "Rounds": 1,
+      "Won": false,
+      "verified": true,
+      "steps": 4,
+      "choice_count": 1,
+      "normal_speed_host_execution_passed": true,
+      "endpoint_recapture_passed": true
+    },
+    {
+      "kind": "multi",
+      "Status": "done",
+      "Evaluated": 1,
+      "Rejected": 0,
+      "ElapsedMs": 1527,
+      "Timing": {
+        "RestoreMs": 330,
+        "ActionMs": 113,
+        "DecisionMs": 0,
+        "VerificationMs": 457,
+        "StartupMs": 0,
+        "Actions": 4,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "StartingHp": 80,
+      "Hp": 75,
+      "NetHpLoss": 5,
+      "HpLost": 5,
+      "Rounds": 1,
+      "Won": false,
+      "verified": true,
+      "steps": 4,
+      "choice_count": 1,
+      "normal_speed_host_execution_passed": true,
+      "endpoint_recapture_passed": true
+    },
+    {
+      "kind": "retrieve",
+      "Status": "done",
+      "Evaluated": 1,
+      "Rejected": 0,
+      "ElapsedMs": 1527,
+      "Timing": {
+        "RestoreMs": 354,
+        "ActionMs": 186,
+        "DecisionMs": 0,
+        "VerificationMs": 449,
+        "StartupMs": 0,
+        "Actions": 4,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "StartingHp": 80,
+      "Hp": 75,
+      "NetHpLoss": 5,
+      "HpLost": 5,
+      "Rounds": 1,
+      "Won": false,
+      "verified": true,
+      "steps": 4,
+      "choice_count": 1,
+      "normal_speed_host_execution_passed": true,
+      "endpoint_recapture_passed": true
+    },
+    {
+      "kind": "carry",
+      "Status": "done",
+      "Evaluated": 8,
+      "Rejected": 0,
+      "ElapsedMs": 24867,
+      "Timing": {
+        "RestoreMs": 3262,
+        "ActionMs": 17763,
+        "DecisionMs": 25,
+        "VerificationMs": 1897,
+        "StartupMs": 0,
+        "Actions": 399,
+        "Restores": 8,
+        "Verifications": 1
+      },
+      "StartingHp": 65,
+      "Hp": 71,
+      "NetHpLoss": 0,
+      "HpLost": 0,
+      "Rounds": 10,
+      "Won": true,
+      "verified": true,
+      "steps": 38,
+      "choice_count": 0,
+      "normal_speed_host_execution_passed": true,
+      "endpoint_recapture_passed": null
+    },
+    {
+      "kind": "compact",
+      "Status": "done",
+      "Evaluated": 1,
+      "Rejected": 0,
+      "ElapsedMs": 1903,
+      "Timing": {
+        "RestoreMs": 364,
+        "ActionMs": 175,
+        "DecisionMs": 0,
+        "VerificationMs": 412,
+        "StartupMs": 0,
+        "Actions": 6,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "StartingHp": 80,
+      "Hp": 71,
+      "NetHpLoss": 9,
+      "HpLost": 9,
+      "Rounds": 1,
+      "Won": false,
+      "verified": true,
+      "steps": 6,
+      "choice_count": 0,
+      "normal_speed_host_execution_passed": true,
+      "endpoint_recapture_passed": null
+    }
+  ],
+  "generated_choices": {
+    "executed_steps": 3,
+    "recapture_replay_verified": true,
+    "unchanged_after_search": true,
+    "result": {
+      "Status": "done",
+      "Evaluated": 12,
+      "Rejected": 0,
+      "ElapsedMs": 28971,
+      "Timing": {
+        "RestoreMs": 6337,
+        "ActionMs": 1761,
+        "DecisionMs": 34,
+        "VerificationMs": 441,
+        "StartupMs": 19359,
+        "Actions": 30,
+        "Restores": 12,
+        "Verifications": 1
+      },
+      "Hp": 80,
+      "HpLost": 0,
+      "StartingHp": 80,
+      "NetHpLoss": 0,
+      "Won": false,
+      "Rounds": 1,
+      "steps": 3,
+      "choice_count": 1
+    },
+    "replay": {
+      "Status": "done",
+      "Evaluated": 1,
+      "Rejected": 0,
+      "ElapsedMs": 1526,
+      "Timing": {
+        "RestoreMs": 447,
+        "ActionMs": 116,
+        "DecisionMs": 2,
+        "VerificationMs": 522,
+        "StartupMs": 0,
+        "Actions": 4,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "Hp": 80,
+      "HpLost": 0,
+      "StartingHp": 80,
+      "NetHpLoss": 0,
+      "Won": false,
+      "Rounds": 1,
+      "steps": 4,
+      "choice_count": 0
+    }
+  },
+  "prior_full_run_observation": {
+    "version": "0.7.3",
+    "elapsed_ms": 90007,
+    "evaluated": 29,
+    "victories": 15,
+    "note": "Same frozen input and search settings, different dynamic routes and startup conditions; not a controlled speed pair."
+  },
+  "interim_regression": {
+    "symptom": "Fixed route matched, but full four-lane search hung in native card trail geometry and raised List array growth OOM.",
+    "correction": "Complete native fly notifications/signals/cleanup without curve and trail frame loops; bound registered Tween stepping.",
+    "final_full_run_all_lanes_completed": true,
+    "harness_requires_done_not_partial": true
+  },
+  "boundaries": [
+    "Native scene restoration remains; this is not a scene-free forkable simulator.",
+    "No guarantee for unknown private Mod state, custom UI, visual callbacks, wall-clock behavior or rewards.",
+    "Net HP loss zero without potion reaches those two cost targets, not global optimality for all rewards or route length.",
+    "Synthetic seeded cases prove tested execution and continuation, not autonomous discovery of every card mechanic."
+  ],
+  "delivery": {
+    "version": "0.7.4",
+    "native_test_package_installed_dll_identical": true,
+    "dll_sha256": "69e94032ff10c4e277b3e046424cf5c046f1b47f62e1c34361c0dd0c97dd166a",
+    "zip_sha256": "8dbc995d62492ed8db78516b6ea0aad3518b159af302e2b9e52c3ffa53be5305",
+    "installed_manifest_identical": true,
+    "old_files_backup_hashes_match": true,
+    "real_game_exited_at_install": true
+  }
+}

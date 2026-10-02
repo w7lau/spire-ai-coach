@@ -34,6 +34,43 @@ public static class ReplayIntegration
         var installation = new LocalInstallation(game, directories);
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT") is { Length: > 0 } seedPath)
             request = request with { InitialPlan = LocalWire.Read<LocalSearchResult>(seedPath).Best!.Actions };
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_VISUAL_BENCHMARK") == "1")
+        {
+            if (request.InitialPlan is not { Length: > 0 }) throw new InvalidOperationException("A fixed complete line is required");
+            // Fixed-route experiment only. Product search limits are unchanged.
+            request = request with { Workers = 1, MaxNodes = 1, BudgetSeconds = 60, SimulationSpeed = 8 };
+            await Task.Run(() => pool.Prepare(installation, 1, CancellationToken.None));
+            LocalCandidate? baseline = null;
+            async Task<LocalSearchResult> Sample(bool fast, bool eventWaits)
+            {
+                var sample = await Task.Run(() => pool.Analyze(request with
+                    { Id = Guid.NewGuid().ToString("N"), FastCardPresentation = fast, FastNativeWaits = eventWaits }, installation, _ => { }, CancellationToken.None));
+                var best = sample.Best ?? throw new InvalidOperationException("Presentation sample returned no route");
+                if (!best.Won || sample.Rejected != 0 || best.Continuation?.Length != best.Actions.Length || sample.Timing?.Verifications != 1)
+                    throw new InvalidOperationException("Presentation sample did not produce independently verified victory");
+                if (baseline != null && (best.Hp != baseline.Hp || best.HpLost != baseline.HpLost || best.Gold != baseline.Gold ||
+                    best.MaxHp != baseline.MaxHp || best.Rounds != baseline.Rounds || best.StartingHp != baseline.StartingHp ||
+                    JsonSerializer.Serialize(best.Actions) != JsonSerializer.Serialize(baseline.Actions) ||
+                    !best.Continuation!.SequenceEqual(baseline.Continuation!)))
+                    throw new InvalidOperationException("Presentation optimization changed actions, native states, history or settlement");
+                baseline ??= best;
+                return sample;
+            }
+            // Warm every path. Reverse the three-mode order to reduce timing/order bias.
+            await Sample(false, false); await Sample(true, false); await Sample(true, true);
+            var records = new List<object>();
+            foreach (var (fast, eventWaits) in new[] { (false, false), (true, false), (true, true), (true, true), (true, false), (false, false) })
+            {
+                var sample = await Sample(fast, eventWaits);
+                var best = sample.Best!;
+                LocalWire.Write(Path.Combine(root, $"integration-visual-private-{records.Count}.json"), sample);
+                records.Add(new { fast_card_presentation = fast, event_driven_waits = eventWaits, request.SimulationSpeed, sample.ElapsedMs, sample.Timing,
+                    best.HpLost, best.Hp, best.NetHpLoss, best.Rounds, steps = best.Actions.Length,
+                    native_states_and_history_match = true });
+            }
+            LocalWire.Write(Path.Combine(root, "integration-visual-summary.json"), records);
+            return;
+        }
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SPEED_BENCHMARK") == "1")
         {
             request = request with { Workers = 1, MaxNodes = 1, BudgetSeconds = 60 };
@@ -61,12 +98,14 @@ public static class ReplayIntegration
         }
         var result = await Task.Run(() => pool.Analyze(request, installation, _ => { }, CancellationToken.None));
         LocalWire.Write(Path.Combine(root, "integration-replay-private.json"), result);
-        if (result.Best == null || result.Rejected != 0 || result.Best.Continuation?.Length != result.Best.Actions.Length || result.Timing?.Verifications != 1)
-            throw new InvalidOperationException("Incident replay did not produce a verified route");
+        if (result.Status != "done" || result.Best == null || result.Rejected != 0 ||
+            result.Best.Continuation?.Length != result.Best.Actions.Length || result.Timing?.Verifications != 1)
+            throw new InvalidOperationException("Incident replay did not complete every lane with a verified route: " + result.Message);
         LocalWire.Write(Path.Combine(root, "integration-replay-summary.json"), new
         {
             result.Status, result.Evaluated, result.Rejected, result.Victories, result.ElapsedMs, result.Timing,
             result.Workers, result.MaxRounds, request.BudgetSeconds, request.MaxNodes, request.IncludePotions,
+            request.FastCardPresentation, request.FastNativeWaits,
             result.Best.Won, result.Best.StartingHp, result.Best.Hp, result.Best.NetHpLoss, result.Best.HpLost, result.Best.Rounds,
             result.Best.EnemyHp, result.Best.StopReason,
             used_potion = result.Best.Actions.Any(a => a.PotionSlot.HasValue),

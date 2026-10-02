@@ -50,6 +50,7 @@ public static class MechanicsIntegration
                 "longfight" => new[] { "BLUDGEON", "DEFEND_IRONCLAD", "DEFEND_IRONCLAD", "DEFEND_IRONCLAD", "DEFEND_IRONCLAD" },
                 "carry" => new[] { "BARRICADE", "BODY_SLAM", "DEFEND_IRONCLAD", "DEFEND_IRONCLAD", "DEFEND_IRONCLAD" },
                 "compact" => new[] { "COMPACT", "BODY_SLAM", "WOUND", "WOUND", "WOUND" },
+                "turnend" => new[] { "BURN", "DAZED", "REGRET", "STRIKE_IRONCLAD", "DEFEND_IRONCLAD" },
                 _ => new[] { "HEADBUTT", "DEFEND_IRONCLAD", "DEFEND_IRONCLAD", "DEFEND_IRONCLAD", "DEFEND_IRONCLAD" }
             };
             foreach (var id in ids)
@@ -80,9 +81,16 @@ public static class MechanicsIntegration
             LocalAction Action(CardModel c) => new(hand.ToList().IndexOf(c), c.Id.ToString(), c.IsValidTarget(null) ? null : player.Creature.CombatState!.Enemies[0].CombatId,
                 c.Title, "enemy", LocalCapture.Fingerprint(), CombatManager.Instance.DebugOnlyGetState()!.RoundNumber,
                 CombatCardIndex: NetCombatCard.FromModel(c).CombatCardIndex);
-            var target = hand.Single(c => c.Id.Entry == (kind == "ordering" || kind == "upgrade" ? "ARMAMENTS" : kind == "exhaust" ? "TRUE_GRIT" : kind == "multi" ? "PREPARED" : kind == "longfight" ? "BLUDGEON" : kind == "carry" ? "BODY_SLAM" : kind == "compact" ? "COMPACT" : "HEADBUTT"));
+            var targetId = kind switch
+            {
+                "ordering" or "upgrade" => "ARMAMENTS", "exhaust" => "TRUE_GRIT", "multi" => "PREPARED",
+                "longfight" => "BLUDGEON", "carry" => "BODY_SLAM", "compact" => "COMPACT",
+                "turnend" => "STRIKE_IRONCLAD", _ => "HEADBUTT"
+            };
+            var target = hand.Single(c => c.Id.Entry == targetId);
             var initial = kind == "ordering" ? hand.Where(c => c.Id.Entry == "STRIKE_IRONCLAD").Select(Action).Append(Action(target)).ToArray() :
                 kind == "retrieve" ? hand.Where(c => c.Id.Entry == "DEFEND_IRONCLAD").Take(2).Select(Action).Append(Action(target)).ToArray() : [Action(target)];
+            if (kind == "turnend") initial = [new(-1, "", null, "", "", "", CombatManager.Instance.DebugOnlyGetState()!.RoundNumber, EndTurn: true)];
             if (kind == "longfight")
             {
                 var firstRound = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
@@ -119,17 +127,31 @@ public static class MechanicsIntegration
             {
                 if (best.Rounds <= 10 || !best.Won) throw new InvalidOperationException("Need verified victory beyond ten rounds");
             }
-            else if (kind == "carry" || kind == "compact")
+            else if (kind == "carry" || kind == "compact" || kind == "turnend")
             {
                 if (kind == "carry" && (baseline?.Best == null || !LocalSearchPolicy.Better(best, baseline.Best)))
                     throw new InvalidOperationException("Carry-block search did not improve the deliberately incomplete line");
                 if (kind == "compact" && (!best.Actions.Any(a => a.ModelId == "CARD.COMPACT") ||
                     !best.Actions.Any(a => a.ModelId == "CARD.FUEL"))) throw new InvalidOperationException("Native status transformation and fuel were not executed");
+                if (kind == "turnend" && (best.HpLost <= 0 || !best.Actions.Any(a => a.EndTurn)))
+                    throw new InvalidOperationException("Native turn-end damage did not run");
                 var messages = new List<string>();
                 await new LocalPlanExecutor(tree).Execute(new(snapshot.CombatId, request.LoadedMods, result),
                     () => capture.Capture(false)?.CombatId, false, messages.Add, CancellationToken.None);
                 if (messages.Count != best.Actions.Length || player.Creature.CurrentHp != best.Hp)
                     throw new InvalidOperationException("Accelerated route diverged at normal-speed synthetic host execution");
+                if (kind == "turnend")
+                {
+                    if (!PileType.Exhaust.GetPile(player).Cards.Any(c => c.Id.Entry == "DAZED"))
+                        throw new InvalidOperationException("Native ethereal exhaustion did not run");
+                    // A fresh root from the ordinary-speed endpoint must restore exactly with
+                    // the optimized turn-end path, including damage, exhausted cards and history.
+                    var after = LocalCapture.Capture(capture.Capture(true)!.Fingerprint(), true) with
+                        { Workers = 1, MaxNodes = 1, MaxRounds = 1, BudgetSeconds = 25, DebugEncounter = "SLUMBERING_BEETLE_NORMAL" };
+                    var replay = await Task.Run(() => pool.Analyze(after, LocalCapture.Installation(), _ => { }, CancellationToken.None));
+                    if (replay.Best == null || replay.Rejected != 0 || replay.Best.Continuation?.Length != replay.Best.Actions.Length ||
+                        after.NativeHash != LocalCapture.Fingerprint()) throw new InvalidOperationException("Turn-end endpoint restoration changed native effects/history");
+                }
             }
             else
             {

@@ -497,7 +497,7 @@ public sealed class CoachOverlay
                         try
                         {
                             Directory.CreateDirectory(Path.GetDirectoryName(timingPath)!);
-                            LocalWire.Write(timingPath, new { version = "0.7.3", result.ElapsedMs, result.Workers,
+                            LocalWire.Write(timingPath, new { version = "0.7.4", result.ElapsedMs, result.Workers,
                                 result.Evaluated, result.Victories, result.Trace });
                         }
                         catch (Exception ex) { GD.Print("[SpireAiCoach] Timing save failed: " + ex.GetType().Name); }

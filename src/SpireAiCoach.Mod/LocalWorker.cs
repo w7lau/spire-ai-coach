@@ -33,6 +33,7 @@ public static class LocalWorker
     private static bool _combatWon;
     private static IReadOnlyDictionary<uint, string>? _targetLabels;
     private static bool _includePotions;
+    private static bool _fastNativeWaits;
     private static LocalChoices? _choices;
     private static HashSet<string> _excludedModels = [];
     private static string? _assetsRequest;
@@ -161,6 +162,8 @@ public static class LocalWorker
             // Owned worker only. Accelerate native animation/timer waits, never model effects/RNG.
             if (request.SimulationSpeed > 1) { Engine.TimeScale = request.SimulationSpeed; Engine.MaxFps = 240; }
             LocalWorkerVisuals.Active = request.SimulationSpeed > 1;
+            LocalWorkerVisuals.FastCardPresentation = request.SimulationSpeed > 1 && request.FastCardPresentation;
+            _fastNativeWaits = request.SimulationSpeed > 1 && request.FastNativeWaits;
             if (request.ModelHash != ModelIdSerializationCache.Hash || !request.LoadedMods.SequenceEqual(LocalCapture.LoadedMods()))
                 throw new InvalidOperationException("后台的游戏模型或 Mod 清单与当前游戏不一致，请重启游戏后重试。");
             if (request.VerifyCandidate is { } proposed)
@@ -386,7 +389,7 @@ public static class LocalWorker
             Publish("failed", ex.Message);
             return false;
         }
-        finally { LocalWorkerVisuals.Active = false; LocalWorkerResources.Retain = false; Engine.TimeScale = originalScale; Engine.MaxFps = originalFps; _timeline = null; }
+        finally { LocalWorkerVisuals.Reset(); _fastNativeWaits = false; LocalWorkerResources.Retain = false; Engine.TimeScale = originalScale; Engine.MaxFps = originalFps; _timeline = null; }
     }
 
     private static void Silence()
@@ -539,7 +542,7 @@ public static class LocalWorker
                 else if (action is PlayCardAction)
                 {
                     manager.ActionQueueSet.EnqueueWithoutSynchronizing(action);
-                    await Frame();
+                    if (!_fastNativeWaits) await Frame();
                     await WaitActionQueue();
                     await StableOrTerminal(player);
                 }
@@ -631,7 +634,9 @@ public static class LocalWorker
         if (card.Id.ToString() != action.ModelId || !card.CanPlay() || !card.IsValidTarget(target))
             throw new InvalidOperationException("出牌实例或目标不再合法。");
         RunManager.Instance.ActionQueueSet.EnqueueWithoutSynchronizing(new PlayCardAction(card, target));
-        await Frame();
+        // Enqueue creates the native queue-completion task synchronously. No extra frame is
+        // needed to observe it; choices still get serviced while that task is incomplete.
+        if (!_fastNativeWaits) await Frame();
         await WaitActionQueue();
         await StableOrTerminal(player);
     }
@@ -648,7 +653,8 @@ public static class LocalWorker
         {
             _choices?.Tick();
             if (timer.Elapsed.TotalSeconds > 5) throw new LocalChoiceException("等待动作结算超时（" + LocalChoices.PendingDescription() + "）。");
-            await Frame();
+            if (_fastNativeWaits) await Task.WhenAny(pending, Frame());
+            else await Frame();
         }
         await pending;
     }

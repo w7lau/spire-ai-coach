@@ -10,7 +10,8 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     IReadOnlyDictionary<uint, string>? TargetLabels = null, int MaxRounds = 64,
     int Workers = 0, bool IncludePotions = false, LocalHistoryStamp? History = null, string[]? ExcludedModels = null,
     LocalAction[]? InitialPlan = null, int SimulationSpeed = 8, bool DeferVerification = false,
-    LocalCandidate? VerifyCandidate = null, long TimelineOrigin = 0, LocalTrace? InitialTrace = null);
+    LocalCandidate? VerifyCandidate = null, long TimelineOrigin = 0, LocalTrace? InitialTrace = null,
+    bool FastCardPresentation = true, bool FastNativeWaits = true);
 
 public sealed record LocalAction(int HandIndex, string ModelId, uint? TargetId,
     string CardName, string TargetName, string BeforeHash, int Round = 0,

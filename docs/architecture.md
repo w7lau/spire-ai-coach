@@ -1,5 +1,15 @@
 # 设计与合同
 
+## 0.7.4 原生牌堆回调与队列完成等待
+
+LocalWorkerVisuals 在拥有的模拟进程中登记 CardPileCmd.GetTweenForCardsChangingPiles 返回的 Tween，以及手动出牌使用的 AppendPlayPileLerpTween。登记表使用弱引用，并在 Search 的 finally 清空。只在这些 Tween 的原生 AwaitFinished 入口以有界 CustomStep 执行完成回调，保留原始牌堆命令、返回值、移除/添加通知、节点清理及 Tween 回调。未知长/循环 Tween 未完成时沿用原等待，不能假报完成。节点退出条件及已经取消的 token 沿用原生失败/取消语义；不把整个回合末任务设为 CompletedTask，也不全局强制 skipVisuals，因为静默移牌会省略部分通知。
+
+牌堆回调还会创建 NCardFlyVfx / NCardFlyShuffleVfx。仅省 Tween 等待而继续让飞行、拖尾动画逐帧采样，会使快速移动的节点产生过长拖尾补点循环；实际四路测试的主线程调用栈与数组溢出已确认 NCardTrail.CreatePoint 卡点。因此后台同时省去这两个原生 PlayAnim 的曲线/缩放循环：保留 CardAddFinished 通知、SwooshAwayCompletion 完成和原生节点退出清理，并跳过纯 Line2D 拖尾采样。其他 Tween、卡牌 OnPlay、Mod 钩子、敌方行动、回合末状态效果和 CombatEnded 均不替换；没有卡牌名称或 Mod 名称分支。
+
+出牌入队时，原生 EnqueueWithoutSynchronizing 已同步创建 BecameEmpty 的完成任务，因此后台可以直接等待该任务，不必先额外等待一帧。等待期间仍处理 LocalChoices，并等待队列完成或下一帧，防止已完成动作继续空等。药水入队后的帧等待、敌方回合完成条件和 StableOrTerminal 的稳定边界继续保留。
+
+本地协议的 FastCardPresentation / FastNativeWaits 默认开启，只在 SimulationSpeed>1 的 Search scope 生效，用于同构建、同速度的原生对照实验；产品设置不暴露这些内部开关。普通速度及实际玩家进程保持原路径。搜索预算、候选排序和采用前的独立复核要求不变。
+
 ## 0.7.3 搜索与复核分离、净生命成本
 
 LocalWorkerPool 首阶段对各 lane 冻结 DeferVerification=true；searched 结果只有候选，不能直接发布给前台。汇总后按 LocalSearchPolicy.Better 选择候选，提交拥有独立请求 ID 的 VerifyCandidate 命令，重新从同一原生根执行完整路线。仅 done 且拥有与 Actions 等长的 Continuation 的结果可发布；复核失败会丢弃此候选，再尝试其他候选，全部失败明确报错。池将验证阶段进度映射回原请求及独立递增序号，不混用旧搜索进度。取消仍只停止拥有的进程。Timing.Verifications 记录完成的独立复核数量，正常请求为 1，不再每路都复核其局部最佳。
