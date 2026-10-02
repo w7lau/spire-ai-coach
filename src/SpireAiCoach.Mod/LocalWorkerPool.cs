@@ -178,7 +178,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             start.Environment["SPIRE_COACH_WORKER"] = Root;
             start.Environment.Remove("SPIRE_NATIVE_PROBE_ROOT");
             token.ThrowIfCancellationRequested();
-            Process = System.Diagnostics.Process.Start(start) ?? throw new IOException("Worker did not start");
+            Process = IsolatedProcess.Start(start);
             var timer = Stopwatch.StartNew();
             while (!File.Exists(Path.Combine(Root, "ready")))
             {

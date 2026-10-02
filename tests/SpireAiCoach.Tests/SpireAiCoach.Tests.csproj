@@ -2,4 +2,5 @@
   <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
   <ItemGroup><ProjectReference Include="../../src/SpireAiCoach.Core/SpireAiCoach.Core.csproj" /></ItemGroup>
   <ItemGroup><Compile Include="../../src/SpireAiCoach.Mod/SettingsStore.cs" Link="SettingsStore.cs" /></ItemGroup>
+  <ItemGroup><Compile Include="../../src/SpireAiCoach.Mod/IsolatedProcess.cs" Link="IsolatedProcess.cs" /></ItemGroup>
 </Project>

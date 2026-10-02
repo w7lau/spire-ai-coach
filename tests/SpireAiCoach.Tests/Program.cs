@@ -5,9 +5,13 @@ using System.Text.Json.Nodes;
 using SpireAiCoach.Core;
 using SpireAiCoach.Mod;
 
+if (args.Length > 0 && args[0] == "--isolation-child")
+    return await WorkerIsolationTests.Child(args);
+
 var tests = new List<(string, Func<Task>)>();
 void Test(string name, Action test) => tests.Add((name, () => { test(); return Task.CompletedTask; }));
 void AsyncTest(string name, Func<Task> test) => tests.Add((name, test));
+AsyncTest("worker isolation prevents inherited save locks and preserves environment and arguments", WorkerIsolationTests.Run);
 void Check(bool condition, string message = "Assertion failed") { if (!condition) throw new Exception(message); }
 void Reject(Action action, string category)
 {
