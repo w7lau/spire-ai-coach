@@ -629,6 +629,35 @@ AsyncTest("HTTP content has one JSON object encoding and readable diagnostics pr
     Check(DiagnosticDisplay.Format(new CallDiagnostics().RedactedJson("")).Contains("尚未生成请求"));
 });
 
+Test("local no-damage stopping requires known rewards and opt-in continuation wins", () =>
+{
+    var safe = new LocalCandidate([], 50, 0, 20, 100, 80, false, false, true);
+    Check(LocalSearchPolicy.CanStop(safe, false));
+    Check(!LocalSearchPolicy.CanStop(safe, true));
+    Check(!LocalSearchPolicy.CanStop(safe with { RewardCoverageKnown = false }, false));
+    Check(!LocalSearchPolicy.CanStop(safe with { HpLost = 3 }, false), "Healing back to the same HP must not hide damage");
+    Check(!LocalSearchPolicy.CanStop(safe with { Dead = true }, false));
+});
+Test("local ranking preserves survival and health before damage", () =>
+{
+    var prior = new LocalCandidate([], 50, 0, 30, 100, 80, false, false, false);
+    Check(LocalSearchPolicy.Better(prior, prior with { Dead = true, EnemyHp = 0 }));
+    Check(!LocalSearchPolicy.Better(prior with { Hp = 49, EnemyHp = 0 }, prior));
+    Check(LocalSearchPolicy.Better(prior with { MaxHp = 81 }, prior));
+    Check(LocalSearchPolicy.Better(prior with { Gold = 110 }, prior));
+    Check(LocalSearchPolicy.Better(prior with { EnemyHp = 20 }, prior));
+});
+Test("local protocol preserves instance position and pre-state identity", () =>
+{
+    var action = new LocalAction(3, "CARD.STRIKE", 42, "Strike", "Slime", "native-before");
+    var candidate = new LocalCandidate([action], 49, 1, 12, 99, 80, false, false, false);
+    var result = new LocalSearchResult("job", "snapshot", "partial", "limited", 7, 1, 120, candidate);
+    var copy = JsonSerializer.Deserialize<LocalSearchResult>(JsonSerializer.Serialize(result))!;
+    Check(copy.Best!.Actions.Single() == action && copy.Id == "job" && copy.SnapshotId == "snapshot");
+    Check(LocalSearchPolicy.Format(copy).Contains("第 4 张"));
+    Check(LocalSearchPolicy.Format(copy).Contains("42"));
+});
+
 int failures = 0;
 foreach (var (name, test) in tests)
 {

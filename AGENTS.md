@@ -1,6 +1,7 @@
 # Spire AI Coach
 
 - Keep the mod advisory and read-only. Never play cards, use potions, end turns, mutate RNG or edit saves without a new product decision.
+- Local guidance is authorized to execute synthetic/replayed actions only in an owned isolated worker process. Keep the live game's capture and UI read-only; never invoke LocalWorker actions there. Keep replay mismatch, stale-result and cancellation checks intact.
 - Read `docs/architecture.md` before changing snapshots, prompts or parsers. Keep the prompt, projection, validation and display contract synchronized.
 - Game assemblies are local references only. Never commit DLLs, PCKs, decompiled game source, saves, credentials or real API configurations.
 - Prefer codebase-memory graph tools for code discovery; fall back to local search if they are unavailable or insufficient.

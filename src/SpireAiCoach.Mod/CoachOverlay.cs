@@ -34,6 +34,9 @@ public sealed class CoachOverlay
     private RichTextLabel _advice = null!;
     private TextEdit _context = null!;
     private Button _analyze = null!;
+    private Button _localAnalyze = null!;
+    private LocalWorkerPool _localPool = null!;
+    private bool _localAnalyzing;
     private Button _cancel = null!;
     private LineEdit _url = null!;
     private LineEdit _model = null!;
@@ -52,12 +55,13 @@ public sealed class CoachOverlay
 
     public void Mount()
     {
+        _localPool = new LocalWorkerPool(ProjectSettings.GlobalizePath("user://spire_ai_coach/local-workers"));
         string? loadError = null;
         try { (_settings, _key) = _store.Load(); }
         catch (Exception ex) { loadError = $"本地设置未能读取（{ex.GetType().Name}），请重新填写后保存。"; }
         _layer = new CanvasLayer { Name = "SpireAiCoach", Layer = 90 };
         _tree.Root.AddChild(_layer);
-        var toggle = new Button { Text = "AI 教练 · F8", Position = new Vector2(24, 12) };
+        var toggle = new Button { Text = "尖塔教练 · F8", Position = new Vector2(24, 12) };
         toggle.Pressed += () => _panel.Visible = !_panel.Visible;
         _layer.AddChild(toggle);
 
@@ -79,19 +83,22 @@ public sealed class CoachOverlay
         var body = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         body.AddThemeConstantOverride("separation", 10);
         scroll.AddChild(body);
-        body.AddChild(new Label { Text = "尖塔 AI 教练", ThemeTypeVariation = "HeaderLarge" });
-        body.AddChild(Wrapped("自己出牌，AI 帮你规划。F9 分析本回合 · F10 设置"));
+        body.AddChild(new Label { Text = "尖塔教练 · AI / 本地", ThemeTypeVariation = "HeaderLarge" });
+        body.AddChild(Wrapped("自己出牌，教练帮你规划。F9 调用 AI · 本地计算无需 API · F10 设置"));
         _battle = Wrapped("进入战斗后可分析当前回合。"); body.AddChild(_battle);
-        _status = Wrapped("先填写 API 地址、模型和密钥。"); body.AddChild(_status);
+        _status = Wrapped("本地计算无需 API；使用 AI 时请先填写地址、模型和密钥。"); body.AddChild(_status);
         var row = new HBoxContainer(); body.AddChild(row);
-        _analyze = new Button { Text = "分析本回合 · F9", Disabled = true }; row.AddChild(_analyze);
+        _analyze = new Button { Text = "AI 分析 · F9", Disabled = true }; row.AddChild(_analyze);
         _analyze.Pressed += Analyze;
+        _localAnalyze = new Button { Text = "本地计算（实验）", Disabled = true }; row.AddChild(_localAnalyze);
+        _localAnalyze.Pressed += AnalyzeLocal;
         _cancel = new Button { Text = "取消", Disabled = true }; row.AddChild(_cancel);
         _cancel.Pressed += () => Cancel("已取消分析。");
         var config = new Button { Text = "设置" }; row.AddChild(config);
         config.Pressed += () => _settingsPanel.Visible = !_settingsPanel.Visible;
         var hide = new Button { Text = "收起" }; row.AddChild(hide);
         hide.Pressed += () => _panel.Hide();
+        body.AddChild(Wrapped("本地仅支持单人，首次准备约需 6 GB 空间；两个独立进程计算，之后复用。本版按预算搜索，奖励识别与无伤提前停止尚未接入。"));
 
         _settingsPanel = new VBoxContainer { Visible = string.IsNullOrEmpty(_settings.Model) || loadError != null };
         body.AddChild(_settingsPanel);
@@ -199,6 +206,7 @@ public sealed class CoachOverlay
             _battle.Text = snapshot == null ? "当前不在战斗中。" :
                 $"第 {snapshot.Round} 轮 · {snapshot.Phase}\n生命 {snapshot.Player.Hp}/{snapshot.Player.MaxHp} · 格挡 {snapshot.Player.Block} · 能量 {snapshot.Player.Energy}\n手牌 {snapshot.Hand.Count} / 抽牌 {snapshot.DrawPile.Count} / 弃牌 {snapshot.DiscardPile.Count} / 消耗 {snapshot.ExhaustPile.Count}";
             _analyze.Disabled = _request != null || snapshot?.CanAdvise != true;
+            _localAnalyze.Disabled = _analyze.Disabled;
         }
         catch (Exception ex)
         {
@@ -207,6 +215,7 @@ public sealed class CoachOverlay
             _freshness.Text = "当前状态不可用，旧建议不适用。";
             _battle.Text = $"读取失败：{ex.GetType().Name}";
             _analyze.Disabled = true;
+            _localAnalyze.Disabled = true;
         }
     }
 
@@ -250,7 +259,7 @@ public sealed class CoachOverlay
         _adviceHash = null;
         _advice.Text = "等待 AI 开始回复…";
         _freshness.Text = "接收中的内容尚未完成，请等待整理后的出牌建议。";
-        _analyze.Disabled = true; _cancel.Disabled = false;
+        _analyze.Disabled = true; _localAnalyze.Disabled = true; _cancel.Disabled = false;
         _status.Text = "正在分析… 可以取消；继续出牌会使本次分析失效。";
         _ = Task.Run(async () =>
         {
@@ -306,7 +315,67 @@ public sealed class CoachOverlay
                     {
                         _request = null; _cancel.Disabled = true;
                         _analyze.Disabled = _snapshot?.CanAdvise != true;
+                        _localAnalyze.Disabled = _analyze.Disabled;
                     }
+                });
+                cancellation.Dispose();
+            }
+        });
+    }
+
+    private void AnalyzeLocal()
+    {
+        if (_request != null) return;
+        RefreshSnapshot();
+        if (_snapshot?.CanAdvise != true) { _status.Text = "请等待自己的出牌阶段。"; return; }
+        LocalSearchRequest request;
+        LocalInstallation installation;
+        try
+        {
+            request = LocalCapture.Capture(_snapshotHash!, continueOptimization: true);
+            installation = LocalCapture.Installation();
+        }
+        catch (Exception ex) { _status.Text = ex.Message; return; }
+        var generation = ++_generation;
+        var cancellation = new CancellationTokenSource();
+        _request = cancellation;
+        _localAnalyzing = true;
+        _adviceHash = null;
+        _advice.Text = "正在本地计算，不调用 AI…";
+        _freshness.Text = "继续出牌会取消本次计算；候选路线仅在后台执行。";
+        _analyze.Disabled = true; _localAnalyze.Disabled = true; _cancel.Disabled = false;
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                var result = await _localPool.Analyze(request, installation,
+                    message => _mainThread.Enqueue(() => { if (generation == _generation) _status.Text = message; }), cancellation.Token);
+                _mainThread.Enqueue(() =>
+                {
+                    if (generation != _generation) return;
+                    RefreshSnapshot();
+                    if (generation != _generation || _snapshotHash != request.SnapshotId) return;
+                    if (LocalCapture.Fingerprint() != request.NativeHash)
+                    { Cancel("原生战斗状态已变化，请重新计算。"); return; }
+                    _advice.Text = LocalSearchPolicy.Format(result);
+                    _adviceHash = request.SnapshotId;
+                    _freshness.Text = "后台重放通过当前状态校验；这是预算内候选，未保证最优或所有 Mod 兼容。";
+                    _status.Text = "本地计算完成 · 不消耗 API";
+                });
+            }
+            catch (OperationCanceledException) { }
+            catch (Exception ex)
+            {
+                _mainThread.Enqueue(() => { if (generation == _generation)
+                    { _status.Text = ex.Message; _advice.Text = "本次未取得可靠的本地方案，可改用 AI 分析。"; } });
+            }
+            finally
+            {
+                _mainThread.Enqueue(() =>
+                {
+                    if (generation != _generation) return;
+                    _localAnalyzing = false; _request = null; _cancel.Disabled = true;
+                    _analyze.Disabled = _snapshot?.CanAdvise != true; _localAnalyze.Disabled = _analyze.Disabled;
                 });
                 cancellation.Dispose();
             }
@@ -316,6 +385,12 @@ public sealed class CoachOverlay
     private void Cancel(string status)
     {
         ++_generation;
+        if (_localAnalyzing)
+        {
+            _localAnalyzing = false;
+            _advice.Text = "本次本地计算已停止。";
+            _freshness.Text = "未发布本地建议。";
+        }
         if (_streaming)
         {
             _streaming = false;
@@ -339,5 +414,6 @@ public sealed class CoachOverlay
         _tree.Root.SizeChanged -= Resize;
         _capture.Dispose();
         _client.Dispose();
+        _localPool.Dispose();
     }
 }

@@ -1,0 +1,56 @@
+"""Run integration in an existing owned NativeProbe workspace, never in the real game."""
+import argparse
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+here = Path(__file__).resolve().parent
+sys.path.insert(0, str(here.parent / 'NativeProbe'))
+from worker_lock import worker_lock
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--workspace', type=Path, required=True)
+parser.add_argument('--quick', action='store_true')
+args = parser.parse_args()
+root = args.workspace.resolve()
+if not (root / '.spire-native-probe-owner').is_file() or not (root / 'fixture.json').is_file():
+    raise ValueError('Prepare an owned synthetic NativeProbe workspace first')
+with worker_lock(root):
+    repo = here.parent.parent
+    coach = root / 'game/mods/SpireAiCoach'
+    coach.mkdir(exist_ok=True)
+    shutil.copy2(repo / 'src/SpireAiCoach.Mod/bin/Release/net9.0/SpireAiCoach.dll', coach)
+    shutil.copy2(repo / 'SpireAiCoach.json', coach)
+    integration = root / 'game/mods/SpireLocalIntegration'
+    integration.mkdir(exist_ok=True)
+    shutil.copy2(here / 'bin/Release/net9.0/SpireLocalIntegration.dll', integration)
+    (integration / 'SpireLocalIntegration.json').write_text(json.dumps(dict(
+        id='SpireLocalIntegration', name='Isolated local integration test', author='w7lau',
+        description='Synthetic capture, search and read-only integration verification', version='0.0.1',
+        has_dll=True, has_pck=False, affects_gameplay=False,
+        dependencies=[dict(id='SpireAiCoach', min_version='0.4.0')])), encoding='utf-8')
+    for name in ['integration-success', 'integration-error.txt', 'integration-result.json']:
+        (root / name).unlink(missing_ok=True)
+    env = dict(os.environ, APPDATA=str(root / 'Roaming'), LOCALAPPDATA=str(root / 'Local'),
+               SPIRE_LOCAL_INTEGRATION=str(root))
+    env.pop('SPIRE_NATIVE_PROBE_ROOT', None)
+    env.pop('SPIRE_COACH_WORKER', None)
+    env['SPIRE_LOCAL_INTEGRATION_QUICK'] = '1' if args.quick else '0'
+    with (root / 'integration-stdout.log').open('wb') as output:
+        process = subprocess.Popen([str(root / 'game/SlayTheSpire2.exe'), '--headless', '--max-fps', '120',
+                                    '--force-steam=off', '--log-file', str(root / 'integration-game.log')],
+            cwd=root / 'game', env=env, stdout=output, stderr=output, creationflags=subprocess.CREATE_NO_WINDOW)
+        try:
+            process.wait(timeout=300)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=10)
+            raise
+    if (root / 'integration-error.txt').exists():
+        print((root / 'integration-error.txt').read_text(encoding='utf-8'))
+    passed = (root / 'integration-success').is_file()
+    print(json.dumps(dict(exit_code=process.returncode, passed=passed)))
+    raise SystemExit(0 if passed and process.returncode == 0 else 1)

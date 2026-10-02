@@ -9,6 +9,7 @@ public static class ModEntry
     private static CoachOverlay? _overlay;
     public static void Initialize()
     {
+        if (LocalWorker.TryStart()) return;
         if (_overlay != null) return;
         Callable.From(() =>
         {
@@ -17,7 +18,7 @@ public static class ModEntry
                 if (Engine.GetMainLoop() is not SceneTree tree) throw new InvalidOperationException("SceneTree unavailable");
                 _overlay = new CoachOverlay(tree);
                 _overlay.Mount();
-                GD.Print("[SpireAiCoach] 0.1.0 loaded. F8 panel / F9 analyze / F10 settings.");
+                GD.Print("[SpireAiCoach] 0.4.0 loaded. F8 AI/local panel / F9 AI analyze / F10 settings.");
             }
             catch (Exception ex) { GD.PrintErr($"[SpireAiCoach] Initialization failed: {ex.GetType().Name}"); }
         }).CallDeferred();

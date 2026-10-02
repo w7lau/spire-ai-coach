@@ -1,0 +1,304 @@
+{
+  "scope": "Synthetic singleplayer in owned game copies; no live player save or visual button acceptance test",
+  "version": "0.4.0",
+  "dll_sha256": "a24fae0ed8461804c72c4e45eeb7cc608638f561e2f77407dd4265123b69aa99",
+  "tested_binary_matches_package": true,
+  "earlier_full_search": [
+    {
+      "stage": "root",
+      "unchanged": true,
+      "result": {
+        "Id": "ffc0dae595c241ae9840dfeb57d6b0c1",
+        "SnapshotId": "2158248F97FCC5EE9931BD2E7675441D1A41A6C2504126C7A2AB1F9DC5F4A75A",
+        "Status": "done",
+        "Message": "本地计算完成。预算内候选，不保证最优；未知奖励机制仍按预算搜索。",
+        "Evaluated": 12,
+        "Rejected": 0,
+        "ElapsedMs": 17011,
+        "Best": {
+          "Actions": [],
+          "Hp": 80,
+          "HpLost": 0,
+          "EnemyHp": 38,
+          "Gold": 99,
+          "MaxHp": 80,
+          "Won": false,
+          "Dead": false,
+          "RewardCoverageKnown": false
+        }
+      }
+    },
+    {
+      "stage": "after_play",
+      "unchanged": true,
+      "result": {
+        "Id": "f03929d8f4fa492890bd4dfa79aec787",
+        "SnapshotId": "87E370CA3B4BA1979E8A017344CDEA6135CCC9E2D0E9C8DC86A4CE5837E5B336",
+        "Status": "done",
+        "Message": "本地计算完成。预算内候选，不保证最优；未知奖励机制仍按预算搜索。",
+        "Evaluated": 12,
+        "Rejected": 0,
+        "ElapsedMs": 7112,
+        "Best": {
+          "Actions": [
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.DEFEND_IRONCLAD",
+              "TargetId": null,
+              "CardName": "防御",
+              "TargetName": "",
+              "BeforeHash": "803E24A3F5955994676F38B66F053E34E9CC97BCB2FE10D136195878C6A7BC3E"
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "缩小甲虫",
+              "BeforeHash": "5F937A57AFD3F9D8F3EBE014653A60FA9F41C390962F9DFAC7ECAEBFA8DC8B95"
+            },
+            {
+              "HandIndex": 1,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "缩小甲虫",
+              "BeforeHash": "5357F0DC9C63BD74F38346F520D62F0078D4E2510A42CBC7CAD378C3AAFBBCC6"
+            }
+          ],
+          "Hp": 77,
+          "HpLost": 0,
+          "EnemyHp": 26,
+          "Gold": 99,
+          "MaxHp": 80,
+          "Won": false,
+          "Dead": false,
+          "RewardCoverageKnown": false
+        }
+      }
+    },
+    {
+      "stage": "after_turn",
+      "unchanged": true,
+      "result": {
+        "Id": "a18ceaec8ff349f79d168dd21355dd20",
+        "SnapshotId": "92AC3AB8C62E105DFFA6360558D0D1A4E2AB9F5D5B62E83C3F997ADA8B69EE91",
+        "Status": "done",
+        "Message": "本地计算完成。预算内候选，不保证最优；未知奖励机制仍按预算搜索。",
+        "Evaluated": 12,
+        "Rejected": 0,
+        "ElapsedMs": 7954,
+        "Best": {
+          "Actions": [
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "缩小甲虫",
+              "BeforeHash": "3D0A8BCBE0441D1044ADB8B8BCBC7957CF5E288C2FAB4C963583A9F344F840C8"
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "缩小甲虫",
+              "BeforeHash": "8C89EED5A7D247638AE365F4C9A916DF23CC5B534F1AB3D189D634755B97D50F"
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.BLOODLETTING",
+              "TargetId": null,
+              "CardName": "放血",
+              "TargetName": "",
+              "BeforeHash": "2BF2EBDC16EFE00CAE4FE2118218D9A4276335A213B188CCECCA599687869B41"
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.DEFEND_IRONCLAD",
+              "TargetId": null,
+              "CardName": "防御",
+              "TargetName": "",
+              "BeforeHash": "11E7D89D64D4C1C3CF196AF4F2C59D8AF21F9062FD3695472DAB22461C1EDD84"
+            }
+          ],
+          "Hp": 74,
+          "HpLost": 3,
+          "EnemyHp": 30,
+          "Gold": 99,
+          "MaxHp": 80,
+          "Won": false,
+          "Dead": false,
+          "RewardCoverageKnown": false
+        }
+      }
+    },
+    {
+      "stage": "cancel",
+      "unchanged": true
+    },
+    {
+      "stage": "wrong_root",
+      "category": "local_failed",
+      "unchanged": true
+    }
+  ],
+  "final_build": [
+    {
+      "stage": "root",
+      "unchanged": true,
+      "result": {
+        "Id": "158a46d27d2e462fa4957861c82b58a1",
+        "SnapshotId": "E378E45103C1CE5AA7021E1484A75152FA016E01F956DA9B8D42FD989AA3AED3",
+        "Status": "done",
+        "Message": "本地计算完成。预算内候选，不保证最优；未知奖励机制仍按预算搜索。",
+        "Evaluated": 4,
+        "Rejected": 0,
+        "ElapsedMs": 12182,
+        "Best": {
+          "Actions": [],
+          "Hp": 80,
+          "HpLost": 0,
+          "EnemyHp": 38,
+          "Gold": 99,
+          "MaxHp": 80,
+          "Won": false,
+          "Dead": false,
+          "RewardCoverageKnown": false
+        }
+      }
+    },
+    {
+      "stage": "after_play",
+      "unchanged": true,
+      "result": {
+        "Id": "0e9663f6a02c4d698fd1ed7e87ba78ea",
+        "SnapshotId": "D65C685D78AEFC4C659C77FD3FBBC40936BD7EE1B6307995AFB695ABEEB3416E",
+        "Status": "done",
+        "Message": "本地计算完成。预算内候选，不保证最优；未知奖励机制仍按预算搜索。",
+        "Evaluated": 4,
+        "Rejected": 0,
+        "ElapsedMs": 2857,
+        "Best": {
+          "Actions": [
+            {
+              "HandIndex": 1,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "803E24A3F5955994676F38B66F053E34E9CC97BCB2FE10D136195878C6A7BC3E"
+            }
+          ],
+          "Hp": 77,
+          "HpLost": 0,
+          "EnemyHp": 32,
+          "Gold": 99,
+          "MaxHp": 80,
+          "Won": false,
+          "Dead": false,
+          "RewardCoverageKnown": false
+        }
+      }
+    },
+    {
+      "stage": "after_turn",
+      "unchanged": true,
+      "result": {
+        "Id": "0a8b0e62f16f4657bd6bb71beb4f418e",
+        "SnapshotId": "EC008B7F59F6E97355A3C76856731A854154D139962913B74592E0BA4564BB2C",
+        "Status": "done",
+        "Message": "本地计算完成。预算内候选，不保证最优；未知奖励机制仍按预算搜索。",
+        "Evaluated": 4,
+        "Rejected": 0,
+        "ElapsedMs": 3834,
+        "Best": {
+          "Actions": [
+            {
+              "HandIndex": 1,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "3D0A8BCBE0441D1044ADB8B8BCBC7957CF5E288C2FAB4C963583A9F344F840C8"
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "8C89EED5A7D247638AE365F4C9A916DF23CC5B534F1AB3D189D634755B97D50F"
+            }
+          ],
+          "Hp": 72,
+          "HpLost": 5,
+          "EnemyHp": 30,
+          "Gold": 99,
+          "MaxHp": 80,
+          "Won": false,
+          "Dead": false,
+          "RewardCoverageKnown": false
+        }
+      }
+    },
+    {
+      "stage": "victory",
+      "unchanged": true,
+      "live_hp": 68,
+      "result": {
+        "Id": "c02c15d10450466a94bb942c72e537e6",
+        "SnapshotId": "ABC1EB046BE41079577FC46181A3AF5EC193BC2D5285382A640096AAB707A726",
+        "Status": "partial",
+        "Message": "本地计算完成。部分工作进程未完成，仅保留已验证的路线。预算内候选，不保证最优；未知奖励机制仍按预算搜索。",
+        "Evaluated": 3,
+        "Rejected": 0,
+        "ElapsedMs": 4413,
+        "Best": {
+          "Actions": [
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.WHIRLWIND",
+              "TargetId": null,
+              "CardName": "旋风斩",
+              "TargetName": "",
+              "BeforeHash": "11C474F094F79DD57D1A7E47362147EC2F0AA20659A7141EFBD903122BDBA603"
+            }
+          ],
+          "Hp": 74,
+          "HpLost": 0,
+          "EnemyHp": 0,
+          "Gold": 99,
+          "MaxHp": 80,
+          "Won": true,
+          "Dead": false,
+          "RewardCoverageKnown": false
+        }
+      }
+    },
+    {
+      "stage": "cancel",
+      "unchanged": true
+    },
+    {
+      "stage": "wrong_root",
+      "category": "local_failed",
+      "unchanged": true
+    }
+  ],
+  "game_errors": [],
+  "engine_errors": [
+    "ERROR: 1 RID allocations of type 'N26RendererEnvironmentStorage11EnvironmentE' were leaked at exit.",
+    "ERROR: 11 RID allocations of type 'PN18TextServerAdvanced27FontAdvancedLinkedVariationE' were leaked at exit.",
+    "ERROR: 18 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.",
+    "ERROR: 24 RID allocations of type 'N13RendererDummy9DummyMeshE' were leaked at exit.",
+    "ERROR: 307 RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.",
+    "ERROR: 312 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.",
+    "ERROR: 369 resources still in use at exit (run with --verbose for details).",
+    "ERROR: 6 RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit.",
+    "ERROR: 73 RID allocations of type 'N13RendererDummy15MaterialStorage13DummyMaterialE' were leaked at exit.",
+    "ERROR: Invalid Task ID",
+    "ERROR: Parameter \"t\" is null."
+  ]
+}

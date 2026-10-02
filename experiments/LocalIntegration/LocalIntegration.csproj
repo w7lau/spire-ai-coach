@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <AssemblyName>SpireLocalIntegration</AssemblyName>
+    <EnableDynamicLoading>true</EnableDynamicLoading>
+    <GameDataDir>$(GameDir)/data_sts2_windows_x86_64</GameDataDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/SpireAiCoach.Mod/SpireAiCoach.Mod.csproj" />
+    <Reference Include="sts2" HintPath="$(GameDataDir)/sts2.dll" Private="false" />
+    <Reference Include="GodotSharp" HintPath="$(GameDataDir)/GodotSharp.dll" Private="false" />
+  </ItemGroup>
+</Project>
