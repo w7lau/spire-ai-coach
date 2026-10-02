@@ -88,6 +88,14 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192)
 
     private LocalAction Explore(IReadOnlyList<LocalAction> actions)
     {
+        // State-dependent tactical priors seed exploration; they never suppress unknown mechanics.
+        // One quarter of choices ignore the prior so an incorrect preview cannot freeze ordering.
+        if (_random.Next(4) != 0)
+        {
+            var best = actions.Max(a => a.Preference);
+            var leaders = actions.Where(a => a.Preference == best).ToArray();
+            if (leaders.Length < actions.Count) return leaders[_random.Next(leaders.Length)];
+        }
         // No Attack/Skill/Power preference. End turn is a real choice even with playable cards.
         // Potions get a lower exploration frequency, never deletion; all unseen choices are visited
         // before an already measured child, provided the simulation budget reaches this node again.

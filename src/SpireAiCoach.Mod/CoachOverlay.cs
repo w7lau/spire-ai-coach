@@ -37,6 +37,8 @@ public sealed class CoachOverlay
     private Button _localAnalyze = null!;
     private LocalWorkerPool _localPool = null!;
     private bool _localAnalyzing;
+    private LocalContinuation? _continuation;
+    private bool _continuationPending;
     private SpinBox _localWorkers = null!;
     private CheckBox _localPotions = null!;
     private LocalProgressPanel _localProgress = null!;
@@ -114,6 +116,12 @@ public sealed class CoachOverlay
             catch (Exception ex) { _status.Text = "本地并发保存失败：" + ex.GetType().Name; }
         };
         _localPotions = new CheckBox { Text = "计算主动使用药水的路线", ButtonPressed = _settings.LocalIncludePotions };
+        _localPotions.Toggled += _ =>
+        {
+            if (_continuation == null && !_localAnalyzing) return;
+            Cancel("药水选项已变化，请重新计算。");
+            _adviceHash = null; _advice.Text = "药水策略已改变，原本地路线已清除。";
+        };
         body.AddChild(_localPotions);
         _localProgress = new LocalProgressPanel(); body.AddChild(_localProgress.View);
 
@@ -214,7 +222,8 @@ public sealed class CoachOverlay
         {
             var snapshot = _capture.Capture(_settings.RevealDrawOrder);
             var hash = snapshot?.Fingerprint();
-            if (hash != _snapshotHash)
+            var changed = hash != _snapshotHash;
+            if (changed)
             {
                 _snapshot = snapshot; _snapshotHash = hash;
                 if (_request != null) Cancel("战斗状态已变化，请重新分析。");
@@ -223,6 +232,7 @@ public sealed class CoachOverlay
                     _freshness.Text = "旧建议已过期：手牌、目标、资源或回合状态发生了变化。";
                 RefreshPreview();
             }
+            if (_continuation != null && (changed || _continuationPending)) ContinueLocalPlan(snapshot);
             _battle.Text = snapshot == null ? "当前不在战斗中。" :
                 $"第 {snapshot.Round} 轮 · {snapshot.Phase}\n生命 {snapshot.Player.Hp}/{snapshot.Player.MaxHp} · 格挡 {snapshot.Player.Block} · 能量 {snapshot.Player.Energy}\n手牌 {snapshot.Hand.Count} / 抽牌 {snapshot.DrawPile.Count} / 弃牌 {snapshot.DiscardPile.Count} / 消耗 {snapshot.ExhaustPile.Count}";
             _analyze.Disabled = _request != null || snapshot?.CanAdvise != true;
@@ -242,6 +252,37 @@ public sealed class CoachOverlay
     private void RefreshPreview()
     {
         if (_context.Visible) _context.Text = _snapshot == null ? "无战斗快照" : PromptBuilder.InputPreview(_snapshot);
+    }
+
+    private void ContinueLocalPlan(CombatSnapshot? snapshot)
+    {
+        if (_continuation == null) return;
+        if (snapshot == null)
+        { _continuation = null; _adviceHash = null; _advice.Text = "当前战斗已结束，路线已清除。"; return; }
+        if (!snapshot.CanAdvise || !LocalCapture.Stable())
+        {
+            _continuationPending = true;
+            _freshness.Text = "正在结算，暂停建议；稳定后核对操作历史与预测状态。";
+            _advice.Text = "等待结算完成后续用原路线…";
+            return;
+        }
+        _continuationPending = false;
+        try
+        {
+            var next = _continuation.Advance(snapshot.CombatId, LocalCapture.LoadedMods(),
+                LocalCapture.Fingerprint(), LocalCapture.History(), requireProgress: _adviceHash != _snapshotHash);
+            if (next == null) throw new InvalidOperationException("Continuation mismatch");
+            _advice.Text = LocalSearchPolicy.Format(next);
+            _adviceHash = _snapshotHash;
+            _freshness.Text = "实际操作历史和下一步原生状态一致，已续用原路线；仍受原有 Mod 覆盖限制。";
+            _status.Text = $"已完成 {_continuation.CompletedActions} 步 · 续用剩余方案，无需重新搜索";
+        }
+        catch
+        {
+            _continuation = null; _adviceHash = null;
+            _advice.Text = "实际操作或状态偏离原路线，剩余建议已清除，请重新计算。";
+            _freshness.Text = "未复用不一致或无法验证的路线。";
+        }
     }
 
     private void SaveSettings()
@@ -277,6 +318,7 @@ public sealed class CoachOverlay
         var trace = new CallDiagnostics();
         _request = cancellation;
         _streaming = true;
+        _continuation = null;
         _pendingLocalProgress.Clear(); _localProgress.Finish("当前使用 AI 分析。", true);
         _adviceHash = null;
         _advice.Text = "等待 AI 开始回复…";
@@ -363,6 +405,7 @@ public sealed class CoachOverlay
         var cancellation = new CancellationTokenSource();
         _request = cancellation;
         _localAnalyzing = true;
+        _continuation = null;
         _pendingLocalProgress.Clear();
         _localProgress.Begin(request);
         _adviceHash = null;
@@ -387,6 +430,11 @@ public sealed class CoachOverlay
                     _adviceHash = request.SnapshotId;
                     _freshness.Text = "后台重放通过当前状态校验；这是预算内候选，未保证最优或所有 Mod 兼容。";
                     _status.Text = "本地计算完成 · 不消耗 API";
+                    if (result.Best?.Continuation is { Length: > 0 })
+                    {
+                        _continuation = new(_snapshot!.CombatId, request.LoadedMods, result);
+                        _continuationPending = false;
+                    }
                     _localProgress.Finish("计算完成。以下保留后台过程记录，正式建议见下方。", false);
                 });
             }
@@ -412,6 +460,7 @@ public sealed class CoachOverlay
 
     private void Cancel(string status)
     {
+        _continuation = null; _continuationPending = false;
         ++_generation;
         if (_localAnalyzing)
         {

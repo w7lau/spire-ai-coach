@@ -8,7 +8,7 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     int Partition = 0, int Partitions = 2, int MaxNodes = 32, int MaxDepth = 24,
     int BudgetSeconds = 60, string? DebugEncounter = null,
     IReadOnlyDictionary<uint, string>? TargetLabels = null, int MaxRounds = 10,
-    int Workers = 0, bool IncludePotions = false);
+    int Workers = 0, bool IncludePotions = false, LocalHistoryStamp? History = null);
 
 public sealed record LocalAction(int HandIndex, string ModelId, uint? TargetId,
     string CardName, string TargetName, string BeforeHash, int Round = 0,
@@ -16,12 +16,12 @@ public sealed record LocalAction(int HandIndex, string ModelId, uint? TargetId,
 
 public sealed record LocalCandidate(LocalAction[] Actions, int Hp, int HpLost, int EnemyHp,
     int Gold, int MaxHp, bool Won, bool Dead, bool RewardCoverageKnown,
-    int Rounds = 0, string StopReason = "");
+    int Rounds = 0, string StopReason = "", LocalContinuationPoint[]? Continuation = null);
 
 public sealed record LocalSearchResult(string Id, string SnapshotId, string Status,
     string Message, int Evaluated, int Rejected, long ElapsedMs, LocalCandidate? Best,
     int Duplicates = 0, int BudgetPruned = 0, int Victories = 0, int Workers = 1,
-    long WorkerMemoryBytes = 0, long SearchElapsedMs = 0, bool IncludePotions = false);
+    long WorkerMemoryBytes = 0, long SearchElapsedMs = 0, bool IncludePotions = false, LocalSearchTiming? Timing = null);
 
 public static class LocalSearchPolicy
 {
@@ -55,6 +55,8 @@ public static class LocalSearchPolicy
             $"预测结算：生命 {best.Hp}，期间失去生命 {best.HpLost}，敌人剩余生命合计 {best.EnemyHp}。" };
         if (!best.Won) lines.Add("以下仅为已模拟的部分路线，不代表能打赢本次战斗。停止原因：" + best.StopReason);
         if (best.Dead) lines.Add("注意：目前找到的路线仍会死亡，不能保证存活。");
+        if (result.Timing is { } time)
+            lines.Add($"耗时（各进程累计，非总等待）：准备 {time.StartupMs / 1000d:F1}s / 恢复 {time.RestoreMs / 1000d:F1}s / 决策 {time.DecisionMs / 1000d:F1}s / 执行 {time.ActionMs / 1000d:F1}s / 复核 {time.VerificationMs / 1000d:F1}s；模拟动作 {time.Actions} 次。");
         int round = -1;
         for (var i = 0; i < best.Actions.Length; i++)
         {

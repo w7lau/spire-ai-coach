@@ -2,9 +2,11 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using Godot;
+using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Context;
 using MegaCrit.Sts2.Core.Entities.Multiplayer;
+using MegaCrit.Sts2.Core.GameActions;
 using MegaCrit.Sts2.Core.Modding;
 using MegaCrit.Sts2.Core.Multiplayer;
 using MegaCrit.Sts2.Core.Multiplayer.Game;
@@ -19,6 +21,42 @@ public sealed record LocalInstallation(string GameDirectory, string[] ModDirecto
 
 public static class LocalCapture
 {
+    private static CombatReplay Replay() => typeof(CombatReplayWriter).GetField("_replay", BindingFlags.Instance | BindingFlags.NonPublic)
+        ?.GetValue(RunManager.Instance.CombatReplayWriter) as CombatReplay ?? throw new InvalidOperationException("No combat replay");
+
+    // The native network action encodes the combat-card instance, unlike its current hand index.
+    // Normalize only turn readiness/hook bookkeeping; unknown and choice events disallow reuse.
+    public static LocalHistoryStamp History()
+    {
+        var player = LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!;
+        var entries = new List<string>();
+        foreach (var item in Replay().events)
+        {
+            if (item.eventType == CombatReplayEventType.HookAction) continue;
+            if (item.eventType != CombatReplayEventType.GameAction || item.action == null)
+                throw new InvalidOperationException("Unsupported replay choice for continuation");
+            var action = item.action.ToGameAction(player);
+            string? entry = action switch
+            {
+                PlayCardAction card => $"card:{card.NetCombatCard.CombatCardIndex}:{card.CardModelId}:{card.TargetId}",
+                UsePotionAction potion => $"potion:{potion.PotionIndex}:{potion.TargetId}",
+                EndPlayerTurnAction => "end",
+                ReadyToBeginEnemyTurnAction => null,
+                _ => throw new InvalidOperationException("Unsupported replay action for continuation")
+            };
+            if (entry != null) entries.Add($"{item.playerId}:{entry}");
+        }
+        return new(entries.Count, Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join("\n", entries)))));
+    }
+
+    public static bool Stable()
+    {
+        var state = CombatManager.Instance.DebugOnlyGetState();
+        var pcs = state == null ? null : LocalContext.GetMe(state)?.PlayerCombatState;
+        return pcs?.Phase == PlayerTurnPhase.Play && pcs.PlayPile.IsEmpty && !CombatManager.Instance.PlayerActionsDisabled &&
+            RunManager.Instance.ActionQueueSet.BecameEmpty().IsCompletedSuccessfully;
+    }
+
     public static string Fingerprint()
     {
         var state = CombatManager.Instance.DebugOnlyGetState() ?? throw new InvalidOperationException("No combat");
@@ -51,8 +89,7 @@ public static class LocalCapture
         if (!manager.ActionQueueSet.BecameEmpty().IsCompletedSuccessfully ||
             player.PlayerCombatState?.PlayPile.IsEmpty != true || CombatManager.Instance.PlayerActionsDisabled)
             throw new CoachException("local_busy", "请等所有出牌和选择结算完成后再计算。");
-        var replay = typeof(CombatReplayWriter).GetField("_replay", BindingFlags.Instance | BindingFlags.NonPublic)
-            ?.GetValue(manager.CombatReplayWriter) as CombatReplay;
+        var replay = Replay();
         if (replay == null)
             throw new CoachException("local_replay", "这场战斗没有可用的原生重放记录，请在下一场战斗重试。");
         if (replay.events.Any(e => e.eventType is CombatReplayEventType.PlayerChoice or CombatReplayEventType.ResumeAction))
@@ -67,7 +104,7 @@ public static class LocalCapture
             TargetLabels: state.Enemies.Where(e => e.IsAlive && e.CombatId.HasValue)
                 .OrderBy(e => e.GetCreatureNode()?.GlobalPosition.X ?? float.MaxValue)
                 .Select((e, index) => new { Id = e.CombatId!.Value, Label = $"从左到右第 {index + 1} 个敌人「{e.Name}」" })
-                .ToDictionary(e => e.Id, e => e.Label));
+                .ToDictionary(e => e.Id, e => e.Label), History: History());
     }
 
     public static LocalInstallation Installation() => new(

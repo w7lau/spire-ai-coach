@@ -91,6 +91,14 @@ public static class LocalWorker
         LocalCandidate? best = null;
         int evaluated = 0, rejected = 0, victories = 0;
         var search = new LocalSearchTree(1729 + request.Partition);
+        long restoreMs = 0, actionMs = 0, decisionMs = 0, verifyMs = 0;
+        int executed = 0, restores = 0;
+        async Task RestoreMeasured()
+        {
+            var started = Stopwatch.GetTimestamp();
+            try { await Restore(request); }
+            finally { restoreMs += (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds; restores++; }
+        }
         long sequence = 0, lastProgress = -1000;
         int route = 0, bestRoute = 0;
         var events = new Queue<LocalSimEvent>();
@@ -104,7 +112,8 @@ public static class LocalWorker
         }
         void Publish(string status, string message) => LocalWire.Write(Path.Combine(_root, "result.json"),
             new LocalSearchResult(request.Id, request.SnapshotId, status, message, evaluated, rejected, timer.ElapsedMilliseconds, best,
-                Victories: victories, IncludePotions: request.IncludePotions));
+                Victories: victories, IncludePotions: request.IncludePotions,
+                Timing: new(restoreMs, actionMs, decisionMs, verifyMs, Actions: executed, Restores: restores)));
         try
         {
             if (request.Partitions is < 1 or > 16 || request.Partition < 0 || request.Partition >= request.Partitions ||
@@ -115,8 +124,10 @@ public static class LocalWorker
                 throw new InvalidOperationException("后台的游戏模型或 Mod 清单与当前游戏不一致，请重启游戏后重试。");
             Publish("running", "正在恢复并核对当前战斗…");
             Progress("恢复当前战斗", force: true);
-            await Restore(request);
+            await RestoreMeasured();
+            var decisionStarted = Stopwatch.GetTimestamp();
             var first = EnumerateActions();
+            decisionMs += (long)Stopwatch.GetElapsedTime(decisionStarted).TotalMilliseconds;
             var roots = first.Where((_, i) => i % request.Partitions == request.Partition).ToArray();
             // More workers than first moves explore different continuations of the same first move.
             if (roots.Length == 0) roots = [first[request.Partition % first.Length]];
@@ -126,7 +137,7 @@ public static class LocalWorker
                 route = evaluated + 1;
                 events.Clear();
                 Progress("恢复路线起点", force: true);
-                if (evaluated > 0) await Restore(request);
+                if (evaluated > 0) await RestoreMeasured();
                 var player = LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!;
                 var startRound = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
                 var actions = new List<LocalAction>();
@@ -149,11 +160,15 @@ public static class LocalWorker
                             // Infinite/very long zero-cost cycles are bounded, not assumed equivalent or worthless.
                             stop = "达到单回合操作上限"; break;
                         }
+                        decisionStarted = Stopwatch.GetTimestamp();
                         var next = search.Select(trial, actions.Count == 0 ? roots : EnumerateActions());
+                        decisionMs += (long)Stopwatch.GetElapsedTime(decisionStarted).TotalMilliseconds;
                         var before = Observe(player);
                         Progress("执行：" + LocalSearchPolicy.Describe(next), before);
                         var priorLost = lost;
-                        await Play(next);
+                        var actionStarted = Stopwatch.GetTimestamp();
+                        try { await Play(next); }
+                        finally { actionMs += (long)Stopwatch.GetElapsedTime(actionStarted).TotalMilliseconds; executed++; }
                         actions.Add(next);
                         var after = Observe(player);
                         var changes = before != null && after != null ? LocalProgressBook.Changes(before, after) : "动作已结算；状态预览暂不可用。";
@@ -199,14 +214,17 @@ public static class LocalWorker
                 events.Clear();
                 route = bestRoute;
                 Progress("复核最佳路线", force: true);
-                var verifiedState = await VerifyBest(request, best, (action, step, before, after) =>
+                var verifyStarted = Stopwatch.GetTimestamp();
+                var verified = await VerifyBest(request, best, (action, step, before, after) =>
                 {
                     events.Enqueue(new(step, action.Round, LocalSearchPolicy.Describe(action), before != null && after != null ?
                         LocalProgressBook.Changes(before, after) : "动作已复核。"));
                     while (events.Count > 12) events.Dequeue();
                     Progress("复核最佳路线", after);
                 });
-                Progress("计算完成 · 最佳路线复核通过", verifiedState, true, "done");
+                verifyMs += (long)Stopwatch.GetElapsedTime(verifyStarted).TotalMilliseconds;
+                best = best with { Continuation = verified.Points };
+                Progress("计算完成 · 最佳路线复核通过", verified.State, true, "done");
             }
             else Progress("未取得可用路线", force: true, status: "unsupported");
             Publish(best == null ? "unsupported" : "done", best == null ? "没有找到可完整结算的路线。" :
@@ -254,12 +272,14 @@ public static class LocalWorker
         catch { return null; }
     }
 
-    private static async Task<LocalSimState?> VerifyBest(LocalSearchRequest request, LocalCandidate candidate,
+    private static async Task<(LocalSimState? State, LocalContinuationPoint[] Points)> VerifyBest(LocalSearchRequest request, LocalCandidate candidate,
         Action<LocalAction, int, LocalSimState?, LocalSimState?> progress)
     {
         await Restore(request);
         var player = LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!;
         int lost = 0;
+        var points = new List<LocalContinuationPoint>();
+        bool canContinue = request.History != null && request.History == LocalCapture.History();
         void HpChanged(int oldHp, int newHp) => lost += Math.Max(0, oldHp - newHp);
         player.Creature.CurrentHpChanged += HpChanged;
         try
@@ -267,6 +287,7 @@ public static class LocalWorker
             int step = 0;
             foreach (var action in candidate.Actions)
             {
+                if (canContinue) points.Add(new(step, action.BeforeHash, LocalCapture.History(), lost));
                 var before = Observe(player);
                 await Play(action);
                 progress(action, ++step, before, Observe(player));
@@ -277,7 +298,7 @@ public static class LocalWorker
                 player.Creature.CurrentHp != candidate.Hp || lost != candidate.HpLost || enemyHp != candidate.EnemyHp ||
                 player.Gold != candidate.Gold || player.Creature.MaxHp != candidate.MaxHp)
                 throw new InvalidOperationException("最佳路线重新执行后的结算不一致，未发布该进程的建议。");
-            return Observe(player);
+            return (Observe(player), points.ToArray());
         }
         finally { player.Creature.CurrentHpChanged -= HpChanged; }
     }
@@ -348,16 +369,18 @@ public static class LocalWorker
         var hash = LocalCapture.Fingerprint();
         var result = new List<LocalAction>();
         var hand = player.PlayerCombatState!.Hand.Cards;
+        var tactics = LocalTacticalPreview.Capture(player);
         for (var i = 0; i < hand.Count; i++)
         {
             var card = hand[i];
             if (!card.CanPlay()) continue;
             // Do not assume that attacks precede setup, or that zero damage means no value.
-            if (card.IsValidTarget(null)) result.Add(new(i, card.Id.ToString(), null, card.Title, "", hash, state.RoundNumber));
+            if (card.IsValidTarget(null)) result.Add(new(i, card.Id.ToString(), null, card.Title, "", hash, state.RoundNumber,
+                Preference: tactics.Priority(card, null)));
             else foreach (var target in state.Creatures.Where(c => c.IsAlive && card.IsValidTarget(c)))
                 result.Add(new(i, card.Id.ToString(), target.CombatId, card.Title,
                     target.CombatId is { } id && _targetLabels?.TryGetValue(id, out var label) == true ? label : target.Name,
-                    hash, state.RoundNumber));
+                    hash, state.RoundNumber, Preference: tactics.Priority(card, target)));
         }
         if (_includePotions)
         {
@@ -373,7 +396,7 @@ public static class LocalWorker
                         hash, state.RoundNumber, PotionSlot: i));
             }
         }
-        result.Add(new(-1, "", null, "", "", hash, state.RoundNumber, EndTurn: true));
+        result.Add(new(-1, "", null, "", "", hash, state.RoundNumber, EndTurn: true, Preference: tactics.EndTurnPriority));
         return result.ToArray();
     }
 

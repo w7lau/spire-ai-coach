@@ -1,0 +1,1111 @@
+{
+  "version": "0.6.2",
+  "date": "2026-10-02",
+  "focused_tests": "optimization 4/4; search feedback 6/6",
+  "full_suite_run": false,
+  "native_scope": "one synthetic combat, cold and warm 4-route search, card and turn continuation",
+  "dll_sha256": "a2fd8617e76233581c6b9ccc7bb573874f260c2eb5b77ffd4c460a6feae05d86",
+  "host_game_errors": 0,
+  "continued_through_end_turn": true,
+  "integration": {
+    "unchanged_during_search": true,
+    "continued_steps": 4,
+    "history_mismatch_rejected": true,
+    "result": {
+      "Id": "201f182c1e1a4de1ae58b2b835fcbed7",
+      "SnapshotId": "D99BD1B651E938A50751343D09A9198619D02CE830BB2F2D9F4D3805AA96DB48",
+      "Status": "done",
+      "Message": "本地整场计算完成。预算内候选，不保证最优；未知奖励机制仍按预算搜索。",
+      "Evaluated": 4,
+      "Rejected": 0,
+      "ElapsedMs": 37632,
+      "Best": {
+        "Actions": [
+          {
+            "HandIndex": 1,
+            "ModelId": "CARD.BLOODLETTING",
+            "TargetId": null,
+            "CardName": "放血",
+            "TargetName": "",
+            "BeforeHash": "AA889D9338C097C017C4AF64094BDD8614F13136100F3D89FE8535DD0A338625",
+            "Round": 1,
+            "EndTurn": false,
+            "Preference": 15,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 3,
+            "ModelId": "CARD.STRIKE_IRONCLAD",
+            "TargetId": 1,
+            "CardName": "打击",
+            "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+            "BeforeHash": "9B140C5B4FA2C2FF6A6A767A3A5110FDDFCDAA46FEE9EE00CCFFB52A3A243657",
+            "Round": 1,
+            "EndTurn": false,
+            "Preference": 12,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 1,
+            "ModelId": "CARD.STRIKE_IRONCLAD",
+            "TargetId": 1,
+            "CardName": "打击",
+            "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+            "BeforeHash": "C5522D87EB35F063FC01AE27C52539810DFC553320419ED2378FAB47F315176C",
+            "Round": 1,
+            "EndTurn": false,
+            "Preference": 12,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": -1,
+            "ModelId": "",
+            "TargetId": null,
+            "CardName": "",
+            "TargetName": "",
+            "BeforeHash": "E010FBEB44851071A99F44DC93A91EE90509FE6D7443E0661B6E7B105BB01322",
+            "Round": 1,
+            "EndTurn": true,
+            "Preference": 0,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 4,
+            "ModelId": "CARD.DEFEND_IRONCLAD",
+            "TargetId": null,
+            "CardName": "防御",
+            "TargetName": "",
+            "BeforeHash": "01CB17C86443E3CF3D45DBB08C0D5D6948473CA4D0800DAAC3B58CD8D9B618E4",
+            "Round": 2,
+            "EndTurn": false,
+            "Preference": 20,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 1,
+            "ModelId": "CARD.STRIKE_IRONCLAD",
+            "TargetId": 1,
+            "CardName": "打击",
+            "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+            "BeforeHash": "153A04E8F34E3C0226CDED63AAEC9F980C57AC12E28356EB63CA82082C603016",
+            "Round": 2,
+            "EndTurn": false,
+            "Preference": 8,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": -1,
+            "ModelId": "",
+            "TargetId": null,
+            "CardName": "",
+            "TargetName": "",
+            "BeforeHash": "EAF578C657C7FE5F3BECFF3DAFBC73F07AC4A82AC1C929B0AFBBE23F037F7074",
+            "Round": 2,
+            "EndTurn": true,
+            "Preference": -15,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 4,
+            "ModelId": "CARD.BLOODLETTING",
+            "TargetId": null,
+            "CardName": "放血",
+            "TargetName": "",
+            "BeforeHash": "8C1DB67C0896B9B13A70EF748EAFD9DECB8CD2F12D2E012FFF45365508BAE851",
+            "Round": 3,
+            "EndTurn": false,
+            "Preference": 15,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 2,
+            "ModelId": "CARD.DEFEND_IRONCLAD",
+            "TargetId": null,
+            "CardName": "防御",
+            "TargetName": "",
+            "BeforeHash": "44867688F8C4351FC4C38DAD23FCB233D4C9C5F3BDB41C49D038E4967C73754C",
+            "Round": 3,
+            "EndTurn": false,
+            "Preference": 20,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 0,
+            "ModelId": "CARD.DEFEND_IRONCLAD",
+            "TargetId": null,
+            "CardName": "防御",
+            "TargetName": "",
+            "BeforeHash": "84DE8E669499C2A8877E016F2E21AA53A90AFCCBEC48BB5B15E01EC6319A4CCA",
+            "Round": 3,
+            "EndTurn": false,
+            "Preference": 20,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 0,
+            "ModelId": "CARD.STRIKE_IRONCLAD",
+            "TargetId": 1,
+            "CardName": "打击",
+            "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+            "BeforeHash": "3C5B4BC2AAF7F6CBCC2D6FB450F6DEAFBA8E9B03174CA27EEE74294B30303718",
+            "Round": 3,
+            "EndTurn": false,
+            "Preference": 8,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 0,
+            "ModelId": "CARD.STRIKE_IRONCLAD",
+            "TargetId": 1,
+            "CardName": "打击",
+            "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+            "BeforeHash": "B31392C09FAFBF2ED0EE49A1C61AACEA4372DCDAF9A999019538937C80599608",
+            "Round": 3,
+            "EndTurn": false,
+            "Preference": 8,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": -1,
+            "ModelId": "",
+            "TargetId": null,
+            "CardName": "",
+            "TargetName": "",
+            "BeforeHash": "141A5CFDF88DF57A821E9FFBA6D6B42B07D51784BEE612C054353A174D961906",
+            "Round": 3,
+            "EndTurn": true,
+            "Preference": -15,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 4,
+            "ModelId": "CARD.DEFEND_IRONCLAD",
+            "TargetId": null,
+            "CardName": "防御",
+            "TargetName": "",
+            "BeforeHash": "57903CB0C01E288445C320B0297FB3766D3B5869633A72B17712F6C1BF5F00C3",
+            "Round": 4,
+            "EndTurn": false,
+            "Preference": 20,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 2,
+            "ModelId": "CARD.STRIKE_IRONCLAD",
+            "TargetId": 1,
+            "CardName": "打击",
+            "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+            "BeforeHash": "0E08CF3BF56C3EA6584C059F3887CCA47BBAA63F9B3C6A7A25273A51FA5306B1",
+            "Round": 4,
+            "EndTurn": false,
+            "Preference": 8,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 2,
+            "ModelId": "CARD.BLOODLETTING",
+            "TargetId": null,
+            "CardName": "放血",
+            "TargetName": "",
+            "BeforeHash": "7980D553718742EFFE319364AC8D58B3A9192E61C7B4A08F88E9F53B039248D8",
+            "Round": 4,
+            "EndTurn": false,
+            "Preference": 15,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 0,
+            "ModelId": "CARD.DEFEND_IRONCLAD",
+            "TargetId": null,
+            "CardName": "防御",
+            "TargetName": "",
+            "BeforeHash": "DC14DA42F89573BBCE281BC11952A409F937D70178DC42D7835E074E9A3C6123",
+            "Round": 4,
+            "EndTurn": false,
+            "Preference": 8,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 0,
+            "ModelId": "CARD.STRIKE_IRONCLAD",
+            "TargetId": 1,
+            "CardName": "打击",
+            "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+            "BeforeHash": "1C0E5CE83EC97466042F1F1BA1417527B78C12F5376A2CD0D42B06BC2874E3C9",
+            "Round": 4,
+            "EndTurn": false,
+            "Preference": 8,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": -1,
+            "ModelId": "",
+            "TargetId": null,
+            "CardName": "",
+            "TargetName": "",
+            "BeforeHash": "6CBA2665CFB6C930EC46BCB08F499FAFFF1E71640C55112BA58667B7A52B93D1",
+            "Round": 4,
+            "EndTurn": true,
+            "Preference": 0,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 2,
+            "ModelId": "CARD.DEFEND_IRONCLAD",
+            "TargetId": null,
+            "CardName": "防御",
+            "TargetName": "",
+            "BeforeHash": "D5DBE92828D47189573D72A4C51969A67B391AA2E7E71BAFD49E34276A06CB5A",
+            "Round": 5,
+            "EndTurn": false,
+            "Preference": 20,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 1,
+            "ModelId": "CARD.DEFEND_IRONCLAD",
+            "TargetId": null,
+            "CardName": "防御",
+            "TargetName": "",
+            "BeforeHash": "720207875D05B799A0426E0071C18DFF9DB254C205F3FA0B90CEB1894FCFB978",
+            "Round": 5,
+            "EndTurn": false,
+            "Preference": 20,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 2,
+            "ModelId": "CARD.BLOODLETTING",
+            "TargetId": null,
+            "CardName": "放血",
+            "TargetName": "",
+            "BeforeHash": "027BEB2FA52D66B714F90C8166CEF3DC73F7AE5960C8C4A63A152AFA4B045585",
+            "Round": 5,
+            "EndTurn": false,
+            "Preference": 15,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 0,
+            "ModelId": "CARD.STRIKE_IRONCLAD",
+            "TargetId": 1,
+            "CardName": "打击",
+            "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+            "BeforeHash": "42BEF982FEEAA34BDF3EFA08775F9EE741ED6CCBDCB445A44D80C978382F620C",
+            "Round": 5,
+            "EndTurn": false,
+            "Preference": 8,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 0,
+            "ModelId": "CARD.STRIKE_IRONCLAD",
+            "TargetId": 1,
+            "CardName": "打击",
+            "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+            "BeforeHash": "8C08CA979AD87A141D6E7180855CC48639F0619E75343C32CEFE6B33405C6020",
+            "Round": 5,
+            "EndTurn": false,
+            "Preference": 89,
+            "PotionSlot": null
+          }
+        ],
+        "Hp": 74,
+        "HpLost": 12,
+        "EnemyHp": 0,
+        "Gold": 99,
+        "MaxHp": 80,
+        "Won": true,
+        "Dead": false,
+        "RewardCoverageKnown": false,
+        "Rounds": 5,
+        "StopReason": "胜利结算完成",
+        "Continuation": [
+          {
+            "ActionIndex": 0,
+            "NativeHash": "AA889D9338C097C017C4AF64094BDD8614F13136100F3D89FE8535DD0A338625",
+            "History": {
+              "Count": 0,
+              "Hash": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+            },
+            "HpLost": 0
+          },
+          {
+            "ActionIndex": 1,
+            "NativeHash": "9B140C5B4FA2C2FF6A6A767A3A5110FDDFCDAA46FEE9EE00CCFFB52A3A243657",
+            "History": {
+              "Count": 1,
+              "Hash": "8A0BD69724E288A2A09EE2EB0BE3EFBAFCB923BE064C6BBF4EF1B4EECE27DD71"
+            },
+            "HpLost": 3
+          },
+          {
+            "ActionIndex": 2,
+            "NativeHash": "C5522D87EB35F063FC01AE27C52539810DFC553320419ED2378FAB47F315176C",
+            "History": {
+              "Count": 2,
+              "Hash": "A7B1B109381540574F4E483E2ED45226D2CCFDD557019773F7B42033EF7EE6F2"
+            },
+            "HpLost": 3
+          },
+          {
+            "ActionIndex": 3,
+            "NativeHash": "E010FBEB44851071A99F44DC93A91EE90509FE6D7443E0661B6E7B105BB01322",
+            "History": {
+              "Count": 3,
+              "Hash": "A2D851659759A0418A5968635505BDAD5C4F5145F4374AD9624535F2C54B683B"
+            },
+            "HpLost": 3
+          },
+          {
+            "ActionIndex": 4,
+            "NativeHash": "01CB17C86443E3CF3D45DBB08C0D5D6948473CA4D0800DAAC3B58CD8D9B618E4",
+            "History": {
+              "Count": 3,
+              "Hash": "A2D851659759A0418A5968635505BDAD5C4F5145F4374AD9624535F2C54B683B"
+            },
+            "HpLost": 3
+          },
+          {
+            "ActionIndex": 5,
+            "NativeHash": "153A04E8F34E3C0226CDED63AAEC9F980C57AC12E28356EB63CA82082C603016",
+            "History": {
+              "Count": 4,
+              "Hash": "D2CAD7659B44A847663D216470D4578D715E84229F75513DB46E28A1D68C48BB"
+            },
+            "HpLost": 3
+          },
+          {
+            "ActionIndex": 6,
+            "NativeHash": "EAF578C657C7FE5F3BECFF3DAFBC73F07AC4A82AC1C929B0AFBBE23F037F7074",
+            "History": {
+              "Count": 5,
+              "Hash": "13647F4A52EB6B2E6E20C8783040194A20DB115903E9C6FDAD96DDB200B6DF7D"
+            },
+            "HpLost": 3
+          },
+          {
+            "ActionIndex": 7,
+            "NativeHash": "8C1DB67C0896B9B13A70EF748EAFD9DECB8CD2F12D2E012FFF45365508BAE851",
+            "History": {
+              "Count": 5,
+              "Hash": "13647F4A52EB6B2E6E20C8783040194A20DB115903E9C6FDAD96DDB200B6DF7D"
+            },
+            "HpLost": 3
+          },
+          {
+            "ActionIndex": 8,
+            "NativeHash": "44867688F8C4351FC4C38DAD23FCB233D4C9C5F3BDB41C49D038E4967C73754C",
+            "History": {
+              "Count": 6,
+              "Hash": "987BE7B511C670EB6FBAB8748102D662D59D7DFAD7A5476EC32D280BF6ED691B"
+            },
+            "HpLost": 6
+          },
+          {
+            "ActionIndex": 9,
+            "NativeHash": "84DE8E669499C2A8877E016F2E21AA53A90AFCCBEC48BB5B15E01EC6319A4CCA",
+            "History": {
+              "Count": 7,
+              "Hash": "EBF5E8F73D94D68D2BC71F80A41D01B7052A650C505C10DF9EAED545CC7FE993"
+            },
+            "HpLost": 6
+          },
+          {
+            "ActionIndex": 10,
+            "NativeHash": "3C5B4BC2AAF7F6CBCC2D6FB450F6DEAFBA8E9B03174CA27EEE74294B30303718",
+            "History": {
+              "Count": 8,
+              "Hash": "F595F5A5795F89786E707609831CD83A6E90A9404532CE4638EE8578720E3041"
+            },
+            "HpLost": 6
+          },
+          {
+            "ActionIndex": 11,
+            "NativeHash": "B31392C09FAFBF2ED0EE49A1C61AACEA4372DCDAF9A999019538937C80599608",
+            "History": {
+              "Count": 9,
+              "Hash": "9FCADFE759E3B838CB2E945AAAC13EE080818B5C0266B857BBB7C4CAE9054B2A"
+            },
+            "HpLost": 6
+          },
+          {
+            "ActionIndex": 12,
+            "NativeHash": "141A5CFDF88DF57A821E9FFBA6D6B42B07D51784BEE612C054353A174D961906",
+            "History": {
+              "Count": 10,
+              "Hash": "33530567A629041A7CBA75D86A4287D085F450DAB7F0BFBD1B148ACB4DC23088"
+            },
+            "HpLost": 6
+          },
+          {
+            "ActionIndex": 13,
+            "NativeHash": "57903CB0C01E288445C320B0297FB3766D3B5869633A72B17712F6C1BF5F00C3",
+            "History": {
+              "Count": 10,
+              "Hash": "33530567A629041A7CBA75D86A4287D085F450DAB7F0BFBD1B148ACB4DC23088"
+            },
+            "HpLost": 6
+          },
+          {
+            "ActionIndex": 14,
+            "NativeHash": "0E08CF3BF56C3EA6584C059F3887CCA47BBAA63F9B3C6A7A25273A51FA5306B1",
+            "History": {
+              "Count": 11,
+              "Hash": "764D1C5A3B56C6F633D8D9BAFF2676228EB0A0A49FE945AA96B105FC61FA8BC3"
+            },
+            "HpLost": 6
+          },
+          {
+            "ActionIndex": 15,
+            "NativeHash": "7980D553718742EFFE319364AC8D58B3A9192E61C7B4A08F88E9F53B039248D8",
+            "History": {
+              "Count": 12,
+              "Hash": "C542B4B2A81D2D074CF84290E8AF013F36F19A9A86D6BB94BEC7FCE6C6912B2F"
+            },
+            "HpLost": 6
+          },
+          {
+            "ActionIndex": 16,
+            "NativeHash": "DC14DA42F89573BBCE281BC11952A409F937D70178DC42D7835E074E9A3C6123",
+            "History": {
+              "Count": 13,
+              "Hash": "2E3555DED515D947AABB627D8633165AEB108897CAC1988C022467526A2435E1"
+            },
+            "HpLost": 9
+          },
+          {
+            "ActionIndex": 17,
+            "NativeHash": "1C0E5CE83EC97466042F1F1BA1417527B78C12F5376A2CD0D42B06BC2874E3C9",
+            "History": {
+              "Count": 14,
+              "Hash": "C7FEAA901F176AE56537F83F16FA8BADF0DD685029D7281759F20D98F3D4AFEB"
+            },
+            "HpLost": 9
+          },
+          {
+            "ActionIndex": 18,
+            "NativeHash": "6CBA2665CFB6C930EC46BCB08F499FAFFF1E71640C55112BA58667B7A52B93D1",
+            "History": {
+              "Count": 15,
+              "Hash": "95296FA42E50E6D4A22CC6CBF732E26EA7CBAA8569B1DBF9AD50F3FD648E76E5"
+            },
+            "HpLost": 9
+          },
+          {
+            "ActionIndex": 19,
+            "NativeHash": "D5DBE92828D47189573D72A4C51969A67B391AA2E7E71BAFD49E34276A06CB5A",
+            "History": {
+              "Count": 15,
+              "Hash": "95296FA42E50E6D4A22CC6CBF732E26EA7CBAA8569B1DBF9AD50F3FD648E76E5"
+            },
+            "HpLost": 9
+          },
+          {
+            "ActionIndex": 20,
+            "NativeHash": "720207875D05B799A0426E0071C18DFF9DB254C205F3FA0B90CEB1894FCFB978",
+            "History": {
+              "Count": 16,
+              "Hash": "DE149D28E29D6B2C6F30AE838CC9F51566957A66AFC817EF04DFDBED4F933203"
+            },
+            "HpLost": 9
+          },
+          {
+            "ActionIndex": 21,
+            "NativeHash": "027BEB2FA52D66B714F90C8166CEF3DC73F7AE5960C8C4A63A152AFA4B045585",
+            "History": {
+              "Count": 17,
+              "Hash": "9D5ABC28071FAAC99D8C1EFBCF7E186E8D8602232B24E6F3D8D138536FCEC7FF"
+            },
+            "HpLost": 9
+          },
+          {
+            "ActionIndex": 22,
+            "NativeHash": "42BEF982FEEAA34BDF3EFA08775F9EE741ED6CCBDCB445A44D80C978382F620C",
+            "History": {
+              "Count": 18,
+              "Hash": "BF57AF0E69E13C14B1A0C9A10B9FD5513EFCE36186A1930079218A05CE1EE1FF"
+            },
+            "HpLost": 12
+          },
+          {
+            "ActionIndex": 23,
+            "NativeHash": "8C08CA979AD87A141D6E7180855CC48639F0619E75343C32CEFE6B33405C6020",
+            "History": {
+              "Count": 19,
+              "Hash": "C8B02B718E4D8E26FCACEC5F479617F861CAA8A36BCF54FD2E03895BBE5F901F"
+            },
+            "HpLost": 12
+          }
+        ]
+      },
+      "Duplicates": 0,
+      "BudgetPruned": 0,
+      "Victories": 3,
+      "Workers": 1,
+      "WorkerMemoryBytes": 1280245760,
+      "SearchElapsedMs": 16883,
+      "IncludePotions": false,
+      "Timing": {
+        "RestoreMs": 10109,
+        "ActionMs": 4598,
+        "DecisionMs": 44,
+        "VerificationMs": 1833,
+        "StartupMs": 20013,
+        "Actions": 80,
+        "Restores": 4
+      }
+    },
+    "warm_result": {
+      "Id": "91c1cbdd29a14d5d886e0d65756ac66f",
+      "SnapshotId": "D99BD1B651E938A50751343D09A9198619D02CE830BB2F2D9F4D3805AA96DB48",
+      "Status": "done",
+      "Message": "本地整场计算完成。预算内候选，不保证最优；未知奖励机制仍按预算搜索。",
+      "Evaluated": 4,
+      "Rejected": 0,
+      "ElapsedMs": 9557,
+      "Best": {
+        "Actions": [
+          {
+            "HandIndex": 1,
+            "ModelId": "CARD.BLOODLETTING",
+            "TargetId": null,
+            "CardName": "放血",
+            "TargetName": "",
+            "BeforeHash": "AA889D9338C097C017C4AF64094BDD8614F13136100F3D89FE8535DD0A338625",
+            "Round": 1,
+            "EndTurn": false,
+            "Preference": 15,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 3,
+            "ModelId": "CARD.STRIKE_IRONCLAD",
+            "TargetId": 1,
+            "CardName": "打击",
+            "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+            "BeforeHash": "9B140C5B4FA2C2FF6A6A767A3A5110FDDFCDAA46FEE9EE00CCFFB52A3A243657",
+            "Round": 1,
+            "EndTurn": false,
+            "Preference": 12,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 1,
+            "ModelId": "CARD.STRIKE_IRONCLAD",
+            "TargetId": 1,
+            "CardName": "打击",
+            "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+            "BeforeHash": "C5522D87EB35F063FC01AE27C52539810DFC553320419ED2378FAB47F315176C",
+            "Round": 1,
+            "EndTurn": false,
+            "Preference": 12,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": -1,
+            "ModelId": "",
+            "TargetId": null,
+            "CardName": "",
+            "TargetName": "",
+            "BeforeHash": "E010FBEB44851071A99F44DC93A91EE90509FE6D7443E0661B6E7B105BB01322",
+            "Round": 1,
+            "EndTurn": true,
+            "Preference": 0,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 4,
+            "ModelId": "CARD.DEFEND_IRONCLAD",
+            "TargetId": null,
+            "CardName": "防御",
+            "TargetName": "",
+            "BeforeHash": "01CB17C86443E3CF3D45DBB08C0D5D6948473CA4D0800DAAC3B58CD8D9B618E4",
+            "Round": 2,
+            "EndTurn": false,
+            "Preference": 20,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 1,
+            "ModelId": "CARD.STRIKE_IRONCLAD",
+            "TargetId": 1,
+            "CardName": "打击",
+            "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+            "BeforeHash": "153A04E8F34E3C0226CDED63AAEC9F980C57AC12E28356EB63CA82082C603016",
+            "Round": 2,
+            "EndTurn": false,
+            "Preference": 8,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": -1,
+            "ModelId": "",
+            "TargetId": null,
+            "CardName": "",
+            "TargetName": "",
+            "BeforeHash": "EAF578C657C7FE5F3BECFF3DAFBC73F07AC4A82AC1C929B0AFBBE23F037F7074",
+            "Round": 2,
+            "EndTurn": true,
+            "Preference": -15,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 4,
+            "ModelId": "CARD.BLOODLETTING",
+            "TargetId": null,
+            "CardName": "放血",
+            "TargetName": "",
+            "BeforeHash": "8C1DB67C0896B9B13A70EF748EAFD9DECB8CD2F12D2E012FFF45365508BAE851",
+            "Round": 3,
+            "EndTurn": false,
+            "Preference": 15,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 2,
+            "ModelId": "CARD.DEFEND_IRONCLAD",
+            "TargetId": null,
+            "CardName": "防御",
+            "TargetName": "",
+            "BeforeHash": "44867688F8C4351FC4C38DAD23FCB233D4C9C5F3BDB41C49D038E4967C73754C",
+            "Round": 3,
+            "EndTurn": false,
+            "Preference": 20,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 0,
+            "ModelId": "CARD.DEFEND_IRONCLAD",
+            "TargetId": null,
+            "CardName": "防御",
+            "TargetName": "",
+            "BeforeHash": "84DE8E669499C2A8877E016F2E21AA53A90AFCCBEC48BB5B15E01EC6319A4CCA",
+            "Round": 3,
+            "EndTurn": false,
+            "Preference": 20,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 0,
+            "ModelId": "CARD.STRIKE_IRONCLAD",
+            "TargetId": 1,
+            "CardName": "打击",
+            "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+            "BeforeHash": "3C5B4BC2AAF7F6CBCC2D6FB450F6DEAFBA8E9B03174CA27EEE74294B30303718",
+            "Round": 3,
+            "EndTurn": false,
+            "Preference": 8,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 0,
+            "ModelId": "CARD.STRIKE_IRONCLAD",
+            "TargetId": 1,
+            "CardName": "打击",
+            "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+            "BeforeHash": "B31392C09FAFBF2ED0EE49A1C61AACEA4372DCDAF9A999019538937C80599608",
+            "Round": 3,
+            "EndTurn": false,
+            "Preference": 8,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": -1,
+            "ModelId": "",
+            "TargetId": null,
+            "CardName": "",
+            "TargetName": "",
+            "BeforeHash": "141A5CFDF88DF57A821E9FFBA6D6B42B07D51784BEE612C054353A174D961906",
+            "Round": 3,
+            "EndTurn": true,
+            "Preference": -15,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 4,
+            "ModelId": "CARD.DEFEND_IRONCLAD",
+            "TargetId": null,
+            "CardName": "防御",
+            "TargetName": "",
+            "BeforeHash": "57903CB0C01E288445C320B0297FB3766D3B5869633A72B17712F6C1BF5F00C3",
+            "Round": 4,
+            "EndTurn": false,
+            "Preference": 20,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 2,
+            "ModelId": "CARD.STRIKE_IRONCLAD",
+            "TargetId": 1,
+            "CardName": "打击",
+            "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+            "BeforeHash": "0E08CF3BF56C3EA6584C059F3887CCA47BBAA63F9B3C6A7A25273A51FA5306B1",
+            "Round": 4,
+            "EndTurn": false,
+            "Preference": 8,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 2,
+            "ModelId": "CARD.BLOODLETTING",
+            "TargetId": null,
+            "CardName": "放血",
+            "TargetName": "",
+            "BeforeHash": "7980D553718742EFFE319364AC8D58B3A9192E61C7B4A08F88E9F53B039248D8",
+            "Round": 4,
+            "EndTurn": false,
+            "Preference": 15,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 0,
+            "ModelId": "CARD.DEFEND_IRONCLAD",
+            "TargetId": null,
+            "CardName": "防御",
+            "TargetName": "",
+            "BeforeHash": "DC14DA42F89573BBCE281BC11952A409F937D70178DC42D7835E074E9A3C6123",
+            "Round": 4,
+            "EndTurn": false,
+            "Preference": 8,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 0,
+            "ModelId": "CARD.STRIKE_IRONCLAD",
+            "TargetId": 1,
+            "CardName": "打击",
+            "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+            "BeforeHash": "1C0E5CE83EC97466042F1F1BA1417527B78C12F5376A2CD0D42B06BC2874E3C9",
+            "Round": 4,
+            "EndTurn": false,
+            "Preference": 8,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": -1,
+            "ModelId": "",
+            "TargetId": null,
+            "CardName": "",
+            "TargetName": "",
+            "BeforeHash": "6CBA2665CFB6C930EC46BCB08F499FAFFF1E71640C55112BA58667B7A52B93D1",
+            "Round": 4,
+            "EndTurn": true,
+            "Preference": 0,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 2,
+            "ModelId": "CARD.DEFEND_IRONCLAD",
+            "TargetId": null,
+            "CardName": "防御",
+            "TargetName": "",
+            "BeforeHash": "D5DBE92828D47189573D72A4C51969A67B391AA2E7E71BAFD49E34276A06CB5A",
+            "Round": 5,
+            "EndTurn": false,
+            "Preference": 20,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 1,
+            "ModelId": "CARD.DEFEND_IRONCLAD",
+            "TargetId": null,
+            "CardName": "防御",
+            "TargetName": "",
+            "BeforeHash": "720207875D05B799A0426E0071C18DFF9DB254C205F3FA0B90CEB1894FCFB978",
+            "Round": 5,
+            "EndTurn": false,
+            "Preference": 20,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 2,
+            "ModelId": "CARD.BLOODLETTING",
+            "TargetId": null,
+            "CardName": "放血",
+            "TargetName": "",
+            "BeforeHash": "027BEB2FA52D66B714F90C8166CEF3DC73F7AE5960C8C4A63A152AFA4B045585",
+            "Round": 5,
+            "EndTurn": false,
+            "Preference": 15,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 0,
+            "ModelId": "CARD.STRIKE_IRONCLAD",
+            "TargetId": 1,
+            "CardName": "打击",
+            "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+            "BeforeHash": "42BEF982FEEAA34BDF3EFA08775F9EE741ED6CCBDCB445A44D80C978382F620C",
+            "Round": 5,
+            "EndTurn": false,
+            "Preference": 8,
+            "PotionSlot": null
+          },
+          {
+            "HandIndex": 0,
+            "ModelId": "CARD.STRIKE_IRONCLAD",
+            "TargetId": 1,
+            "CardName": "打击",
+            "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+            "BeforeHash": "8C08CA979AD87A141D6E7180855CC48639F0619E75343C32CEFE6B33405C6020",
+            "Round": 5,
+            "EndTurn": false,
+            "Preference": 89,
+            "PotionSlot": null
+          }
+        ],
+        "Hp": 74,
+        "HpLost": 12,
+        "EnemyHp": 0,
+        "Gold": 99,
+        "MaxHp": 80,
+        "Won": true,
+        "Dead": false,
+        "RewardCoverageKnown": false,
+        "Rounds": 5,
+        "StopReason": "胜利结算完成",
+        "Continuation": [
+          {
+            "ActionIndex": 0,
+            "NativeHash": "AA889D9338C097C017C4AF64094BDD8614F13136100F3D89FE8535DD0A338625",
+            "History": {
+              "Count": 0,
+              "Hash": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855"
+            },
+            "HpLost": 0
+          },
+          {
+            "ActionIndex": 1,
+            "NativeHash": "9B140C5B4FA2C2FF6A6A767A3A5110FDDFCDAA46FEE9EE00CCFFB52A3A243657",
+            "History": {
+              "Count": 1,
+              "Hash": "8A0BD69724E288A2A09EE2EB0BE3EFBAFCB923BE064C6BBF4EF1B4EECE27DD71"
+            },
+            "HpLost": 3
+          },
+          {
+            "ActionIndex": 2,
+            "NativeHash": "C5522D87EB35F063FC01AE27C52539810DFC553320419ED2378FAB47F315176C",
+            "History": {
+              "Count": 2,
+              "Hash": "A7B1B109381540574F4E483E2ED45226D2CCFDD557019773F7B42033EF7EE6F2"
+            },
+            "HpLost": 3
+          },
+          {
+            "ActionIndex": 3,
+            "NativeHash": "E010FBEB44851071A99F44DC93A91EE90509FE6D7443E0661B6E7B105BB01322",
+            "History": {
+              "Count": 3,
+              "Hash": "A2D851659759A0418A5968635505BDAD5C4F5145F4374AD9624535F2C54B683B"
+            },
+            "HpLost": 3
+          },
+          {
+            "ActionIndex": 4,
+            "NativeHash": "01CB17C86443E3CF3D45DBB08C0D5D6948473CA4D0800DAAC3B58CD8D9B618E4",
+            "History": {
+              "Count": 3,
+              "Hash": "A2D851659759A0418A5968635505BDAD5C4F5145F4374AD9624535F2C54B683B"
+            },
+            "HpLost": 3
+          },
+          {
+            "ActionIndex": 5,
+            "NativeHash": "153A04E8F34E3C0226CDED63AAEC9F980C57AC12E28356EB63CA82082C603016",
+            "History": {
+              "Count": 4,
+              "Hash": "D2CAD7659B44A847663D216470D4578D715E84229F75513DB46E28A1D68C48BB"
+            },
+            "HpLost": 3
+          },
+          {
+            "ActionIndex": 6,
+            "NativeHash": "EAF578C657C7FE5F3BECFF3DAFBC73F07AC4A82AC1C929B0AFBBE23F037F7074",
+            "History": {
+              "Count": 5,
+              "Hash": "13647F4A52EB6B2E6E20C8783040194A20DB115903E9C6FDAD96DDB200B6DF7D"
+            },
+            "HpLost": 3
+          },
+          {
+            "ActionIndex": 7,
+            "NativeHash": "8C1DB67C0896B9B13A70EF748EAFD9DECB8CD2F12D2E012FFF45365508BAE851",
+            "History": {
+              "Count": 5,
+              "Hash": "13647F4A52EB6B2E6E20C8783040194A20DB115903E9C6FDAD96DDB200B6DF7D"
+            },
+            "HpLost": 3
+          },
+          {
+            "ActionIndex": 8,
+            "NativeHash": "44867688F8C4351FC4C38DAD23FCB233D4C9C5F3BDB41C49D038E4967C73754C",
+            "History": {
+              "Count": 6,
+              "Hash": "987BE7B511C670EB6FBAB8748102D662D59D7DFAD7A5476EC32D280BF6ED691B"
+            },
+            "HpLost": 6
+          },
+          {
+            "ActionIndex": 9,
+            "NativeHash": "84DE8E669499C2A8877E016F2E21AA53A90AFCCBEC48BB5B15E01EC6319A4CCA",
+            "History": {
+              "Count": 7,
+              "Hash": "EBF5E8F73D94D68D2BC71F80A41D01B7052A650C505C10DF9EAED545CC7FE993"
+            },
+            "HpLost": 6
+          },
+          {
+            "ActionIndex": 10,
+            "NativeHash": "3C5B4BC2AAF7F6CBCC2D6FB450F6DEAFBA8E9B03174CA27EEE74294B30303718",
+            "History": {
+              "Count": 8,
+              "Hash": "F595F5A5795F89786E707609831CD83A6E90A9404532CE4638EE8578720E3041"
+            },
+            "HpLost": 6
+          },
+          {
+            "ActionIndex": 11,
+            "NativeHash": "B31392C09FAFBF2ED0EE49A1C61AACEA4372DCDAF9A999019538937C80599608",
+            "History": {
+              "Count": 9,
+              "Hash": "9FCADFE759E3B838CB2E945AAAC13EE080818B5C0266B857BBB7C4CAE9054B2A"
+            },
+            "HpLost": 6
+          },
+          {
+            "ActionIndex": 12,
+            "NativeHash": "141A5CFDF88DF57A821E9FFBA6D6B42B07D51784BEE612C054353A174D961906",
+            "History": {
+              "Count": 10,
+              "Hash": "33530567A629041A7CBA75D86A4287D085F450DAB7F0BFBD1B148ACB4DC23088"
+            },
+            "HpLost": 6
+          },
+          {
+            "ActionIndex": 13,
+            "NativeHash": "57903CB0C01E288445C320B0297FB3766D3B5869633A72B17712F6C1BF5F00C3",
+            "History": {
+              "Count": 10,
+              "Hash": "33530567A629041A7CBA75D86A4287D085F450DAB7F0BFBD1B148ACB4DC23088"
+            },
+            "HpLost": 6
+          },
+          {
+            "ActionIndex": 14,
+            "NativeHash": "0E08CF3BF56C3EA6584C059F3887CCA47BBAA63F9B3C6A7A25273A51FA5306B1",
+            "History": {
+              "Count": 11,
+              "Hash": "764D1C5A3B56C6F633D8D9BAFF2676228EB0A0A49FE945AA96B105FC61FA8BC3"
+            },
+            "HpLost": 6
+          },
+          {
+            "ActionIndex": 15,
+            "NativeHash": "7980D553718742EFFE319364AC8D58B3A9192E61C7B4A08F88E9F53B039248D8",
+            "History": {
+              "Count": 12,
+              "Hash": "C542B4B2A81D2D074CF84290E8AF013F36F19A9A86D6BB94BEC7FCE6C6912B2F"
+            },
+            "HpLost": 6
+          },
+          {
+            "ActionIndex": 16,
+            "NativeHash": "DC14DA42F89573BBCE281BC11952A409F937D70178DC42D7835E074E9A3C6123",
+            "History": {
+              "Count": 13,
+              "Hash": "2E3555DED515D947AABB627D8633165AEB108897CAC1988C022467526A2435E1"
+            },
+            "HpLost": 9
+          },
+          {
+            "ActionIndex": 17,
+            "NativeHash": "1C0E5CE83EC97466042F1F1BA1417527B78C12F5376A2CD0D42B06BC2874E3C9",
+            "History": {
+              "Count": 14,
+              "Hash": "C7FEAA901F176AE56537F83F16FA8BADF0DD685029D7281759F20D98F3D4AFEB"
+            },
+            "HpLost": 9
+          },
+          {
+            "ActionIndex": 18,
+            "NativeHash": "6CBA2665CFB6C930EC46BCB08F499FAFFF1E71640C55112BA58667B7A52B93D1",
+            "History": {
+              "Count": 15,
+              "Hash": "95296FA42E50E6D4A22CC6CBF732E26EA7CBAA8569B1DBF9AD50F3FD648E76E5"
+            },
+            "HpLost": 9
+          },
+          {
+            "ActionIndex": 19,
+            "NativeHash": "D5DBE92828D47189573D72A4C51969A67B391AA2E7E71BAFD49E34276A06CB5A",
+            "History": {
+              "Count": 15,
+              "Hash": "95296FA42E50E6D4A22CC6CBF732E26EA7CBAA8569B1DBF9AD50F3FD648E76E5"
+            },
+            "HpLost": 9
+          },
+          {
+            "ActionIndex": 20,
+            "NativeHash": "720207875D05B799A0426E0071C18DFF9DB254C205F3FA0B90CEB1894FCFB978",
+            "History": {
+              "Count": 16,
+              "Hash": "DE149D28E29D6B2C6F30AE838CC9F51566957A66AFC817EF04DFDBED4F933203"
+            },
+            "HpLost": 9
+          },
+          {
+            "ActionIndex": 21,
+            "NativeHash": "027BEB2FA52D66B714F90C8166CEF3DC73F7AE5960C8C4A63A152AFA4B045585",
+            "History": {
+              "Count": 17,
+              "Hash": "9D5ABC28071FAAC99D8C1EFBCF7E186E8D8602232B24E6F3D8D138536FCEC7FF"
+            },
+            "HpLost": 9
+          },
+          {
+            "ActionIndex": 22,
+            "NativeHash": "42BEF982FEEAA34BDF3EFA08775F9EE741ED6CCBDCB445A44D80C978382F620C",
+            "History": {
+              "Count": 18,
+              "Hash": "BF57AF0E69E13C14B1A0C9A10B9FD5513EFCE36186A1930079218A05CE1EE1FF"
+            },
+            "HpLost": 12
+          },
+          {
+            "ActionIndex": 23,
+            "NativeHash": "8C08CA979AD87A141D6E7180855CC48639F0619E75343C32CEFE6B33405C6020",
+            "History": {
+              "Count": 19,
+              "Hash": "C8B02B718E4D8E26FCACEC5F479617F861CAA8A36BCF54FD2E03895BBE5F901F"
+            },
+            "HpLost": 12
+          }
+        ]
+      },
+      "Duplicates": 0,
+      "BudgetPruned": 0,
+      "Victories": 4,
+      "Workers": 1,
+      "WorkerMemoryBytes": 1316048896,
+      "SearchElapsedMs": 9248,
+      "IncludePotions": false,
+      "Timing": {
+        "RestoreMs": 2441,
+        "ActionMs": 4625,
+        "DecisionMs": 29,
+        "VerificationMs": 1857,
+        "StartupMs": 0,
+        "Actions": 96,
+        "Restores": 4
+      }
+    }
+  },
+  "installation": {
+    "installed_matches_package": true,
+    "installed_matches_tested": true,
+    "settings_and_key_unchanged": true,
+    "package_sha256": "899adb4ad9a4d7d3147bb0d0fa07f405223c24a780d1e5d2dba2dbb3b04574c6"
+  }
+}

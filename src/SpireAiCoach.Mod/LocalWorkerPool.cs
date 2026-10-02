@@ -40,6 +40,9 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 ElapsedMs = totalTime.ElapsedMilliseconds, SearchElapsedMs = results.Max(r => r.ElapsedMs),
                 WorkerMemoryBytes = results.Sum(r => r.WorkerMemoryBytes),
                 IncludePotions = request.IncludePotions,
+                Timing = new(results.Sum(r => r.Timing?.RestoreMs ?? 0), results.Sum(r => r.Timing?.ActionMs ?? 0),
+                    results.Sum(r => r.Timing?.DecisionMs ?? 0), results.Sum(r => r.Timing?.VerificationMs ?? 0),
+                    results.Sum(r => r.Timing?.StartupMs ?? 0), results.Sum(r => r.Timing?.Actions ?? 0), results.Sum(r => r.Timing?.Restores ?? 0)),
                 Status = results.All(r => r.Status == "done") ? "done" : "partial",
                 Message = "本地整场计算完成。" + (valid.Length < count ? "部分工作进程未完成，仅保留已验证的路线。" : "") +
                     "预算内候选，不保证最优；未知奖励机制仍按预算搜索。" };
@@ -50,7 +53,9 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 {
                     simulationProgress?.Invoke(new(request.Id, request.SnapshotId, index, count, 0, 0, 0, request.MaxNodes, 0,
                         0, request.BudgetSeconds, "准备静音工作进程", null, []));
+                    var preparation = Stopwatch.StartNew();
                     await worker.Ensure(directory, index, installation, cancellation);
+                    preparation.Stop();
                     var command = request with { Partition = index, Partitions = count };
                     LocalWire.Write(Path.Combine(worker.Root, "request.json"), command);
                     var timer = Stopwatch.StartNew();
@@ -74,6 +79,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                             {
                                 if (result.Status != "running")
                                 {
+                                    result = result with { Timing = (result.Timing ?? new()) with { StartupMs = preparation.ElapsedMilliseconds } };
                                     if (worker.Process?.HasExited == false)
                                     { worker.Process.Refresh(); result = result with { WorkerMemoryBytes = worker.Process.PrivateMemorySize64 }; }
                                     if (worker.GameErrors())
