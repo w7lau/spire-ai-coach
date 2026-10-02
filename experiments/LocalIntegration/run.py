@@ -25,6 +25,8 @@ parser.add_argument('--mechanic-cases')
 parser.add_argument('--replay', type=Path)
 parser.add_argument('--game', type=Path)
 parser.add_argument('--mods', type=Path)
+parser.add_argument('--seed-result', type=Path)
+parser.add_argument('--speed-benchmark', action='store_true')
 args = parser.parse_args()
 root = args.workspace.resolve()
 if not (root / '.spire-native-probe-owner').is_file() or not (root / 'fixture.json').is_file():
@@ -63,6 +65,8 @@ with worker_lock(root):
     env['SPIRE_LOCAL_REPLAY'] = str(args.replay.resolve()) if args.replay else ''
     env['SPIRE_LOCAL_REPLAY_GAME'] = str(args.game.resolve()) if args.game else ''
     env['SPIRE_LOCAL_REPLAY_MODS'] = str(args.mods.resolve()) if args.mods else ''
+    env['SPIRE_LOCAL_SEED_RESULT'] = str(args.seed_result.resolve()) if args.seed_result else ''
+    env['SPIRE_LOCAL_SPEED_BENCHMARK'] = '1' if args.speed_benchmark else '0'
     settings = root / 'Roaming/SlayTheSpire2/default/1/settings.save'
     settings_data = json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}
     settings_data.update(volume_master=0, volume_bgm=0, volume_sfx=0, volume_ambience=0)

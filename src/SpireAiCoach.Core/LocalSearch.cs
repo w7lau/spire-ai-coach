@@ -9,7 +9,8 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     int BudgetSeconds = 60, string? DebugEncounter = null,
     IReadOnlyDictionary<uint, string>? TargetLabels = null, int MaxRounds = 64,
     int Workers = 0, bool IncludePotions = false, LocalHistoryStamp? History = null, string[]? ExcludedModels = null,
-    LocalAction[]? InitialPlan = null);
+    LocalAction[]? InitialPlan = null, int SimulationSpeed = 8, bool DeferVerification = false,
+    LocalCandidate? VerifyCandidate = null, long TimelineOrigin = 0, LocalTrace? InitialTrace = null);
 
 public sealed record LocalAction(int HandIndex, string ModelId, uint? TargetId,
     string CardName, string TargetName, string BeforeHash, int Round = 0,
@@ -22,20 +23,31 @@ public sealed record LocalCardChoice(string OfferHash, int Index, string ModelId
 
 public sealed record LocalCandidate(LocalAction[] Actions, int Hp, int HpLost, int EnemyHp,
     int Gold, int MaxHp, bool Won, bool Dead, bool RewardCoverageKnown,
-    int Rounds = 0, string StopReason = "", LocalContinuationPoint[]? Continuation = null);
+    int Rounds = 0, string StopReason = "", LocalContinuationPoint[]? Continuation = null,
+    LocalDecision[]? Decisions = null, int? StartingHp = null)
+{
+    // Gross HP costs remain useful diagnostics, but healing and victory hooks are part of the goal.
+    public int? NetHpLoss => StartingHp.HasValue ? Math.Max(0, StartingHp.Value - Hp) : null;
+}
+
+// Legal alternatives observed before a real native action. Search hints only, never instructions.
+public sealed record LocalDecision(int BeforeStep, LocalAction[] Legal, LocalChoiceDecision[]? Choices = null);
+public sealed record LocalChoiceDecision(int AtChoice, LocalCardChoice[] Legal);
 
 public sealed record LocalSearchResult(string Id, string SnapshotId, string Status,
     string Message, int Evaluated, int Rejected, long ElapsedMs, LocalCandidate? Best,
     int Duplicates = 0, int BudgetPruned = 0, int Victories = 0, int Workers = 1,
     long WorkerMemoryBytes = 0, long SearchElapsedMs = 0, bool IncludePotions = false, LocalSearchTiming? Timing = null,
-    LocalAction? BlockedAction = null, int MaxRounds = 64);
+    LocalAction? BlockedAction = null, int MaxRounds = 64, LocalTrace? Trace = null);
 
 public static class LocalSearchPolicy
 {
     public static bool CanStop(LocalCandidate candidate, bool continueOptimization) =>
-        !continueOptimization && candidate.Won && !candidate.Dead && candidate.HpLost == 0 && candidate.RewardCoverageKnown;
+        !continueOptimization && candidate.Won && !candidate.Dead &&
+        (candidate.NetHpLoss == 0 || candidate.StartingHp == null && candidate.HpLost == 0) &&
+        !candidate.Actions.Any(a => a.PotionSlot.HasValue) && candidate.RewardCoverageKnown;
 
-    // Survival, final HP, permanent HP/gold, then remaining enemy HP. Not a global strategy proof.
+    // Same root, completed native victory: net HP loss first, potions are a reserve resource.
     public static bool Better(LocalCandidate candidate, LocalCandidate? prior)
     {
         if (prior == null) return true;
@@ -43,14 +55,16 @@ public static class LocalSearchPolicy
         if (candidate.Dead != prior.Dead) return !candidate.Dead;
         // Unfinished horizons are not comparable to completed victories. Prefer progress within that fallback class.
         if (!candidate.Won && candidate.EnemyHp != prior.EnemyHp) return candidate.EnemyHp < prior.EnemyHp;
-        if (candidate.Hp != prior.Hp) return candidate.Hp > prior.Hp;
-        if (candidate.HpLost != prior.HpLost) return candidate.HpLost < prior.HpLost;
-        if (candidate.MaxHp != prior.MaxHp) return candidate.MaxHp > prior.MaxHp;
-        if (candidate.Gold != prior.Gold) return candidate.Gold > prior.Gold;
-        if (candidate.EnemyHp != prior.EnemyHp) return candidate.EnemyHp < prior.EnemyHp;
+        bool sameRoot = candidate.StartingHp.HasValue && candidate.StartingHp == prior.StartingHp;
+        if (sameRoot && candidate.NetHpLoss != prior.NetHpLoss) return candidate.NetHpLoss < prior.NetHpLoss;
+        if (!sameRoot && candidate.Hp != prior.Hp) return candidate.Hp > prior.Hp;
         var potions = candidate.Actions.Count(a => a.PotionSlot.HasValue);
         var priorPotions = prior.Actions.Count(a => a.PotionSlot.HasValue);
         if (potions != priorPotions) return potions < priorPotions;
+        if (candidate.Hp != prior.Hp) return candidate.Hp > prior.Hp;
+        if (candidate.MaxHp != prior.MaxHp) return candidate.MaxHp > prior.MaxHp;
+        if (candidate.Gold != prior.Gold) return candidate.Gold > prior.Gold;
+        if (candidate.EnemyHp != prior.EnemyHp) return candidate.EnemyHp < prior.EnemyHp;
         if (candidate.Rounds != prior.Rounds) return candidate.Rounds < prior.Rounds;
         return candidate.Actions.Length < prior.Actions.Length;
     }
@@ -60,7 +74,13 @@ public static class LocalSearchPolicy
         if (result.Best is not { } best) return result.Message;
         var lines = new List<string> { best.Won ? "本地整场战斗 · 已找到获胜路线" : "本地整场战斗 · 尚未找到获胜路线", result.Message,
             $"{result.Workers} 路并发，评估 {result.Evaluated} 条路线，其中 {result.Victories} 条获胜，不支持 {result.Rejected}。",
-            $"预测结算：生命 {best.Hp}，期间失去生命 {best.HpLost}，敌人剩余生命合计 {best.EnemyHp}。" };
+            best.StartingHp is { } initial ?
+                $"{(best.Won ? "预测战后生命" : "已模拟到的生命")} {initial} → {best.Hp}/{best.MaxHp}；净生命损失 {best.NetHpLoss}{(best.Won ? "（包含战中、战后回血）" : "（战斗尚未完成）")}。" :
+                $"{(best.Won ? "预测战后生命" : "已模拟到的生命")} {best.Hp}/{best.MaxHp}。",
+            $"过程累计扣血 {best.HpLost}" + (best.StartingHp is { } start ? $"，已恢复或增加生命 {Math.Max(0, best.Hp - start + best.HpLost)}" : "") +
+                $"；敌人剩余生命合计 {best.EnemyHp}。" };
+        if (best.Won && best.NetHpLoss == 0 && !best.Actions.Any(a => a.PotionSlot.HasValue))
+            lines.Add("已达到战后净损失 0 且不消耗药水的目标；其他收益和最短路线未证明最优。");
         if (!best.Won) lines.Add("以下仅为已模拟的部分路线，不代表能打赢本次战斗。停止原因：" + best.StopReason);
         if (best.Dead) lines.Add("注意：目前找到的路线仍会死亡，不能保证存活。");
         lines.Add($"计算用时 {result.ElapsedMs / 1000d:F1} 秒。");
@@ -72,7 +92,7 @@ public static class LocalSearchPolicy
             lines.Add($"{i + 1}. " + Describe(action));
         }
         if (best.Won) lines.Add("模拟结果：战斗获胜。");
-        lines.Add($"最多规划 {result.MaxRounds} 轮；{(result.IncludePotions ? "已纳入主动使用药水" : "未纳入主动使用药水（自动触发仍按游戏结算）")}；选牌组合受搜索预算限制。实际状态偏离时请重新计算。" );
+        lines.Add($"最多规划 {result.MaxRounds} 轮；{(result.IncludePotions ? "已纳入主动使用药水，优先保留药水" : "未纳入主动使用药水（自动触发仍按游戏结算）")}；选牌组合受搜索预算限制。实际状态偏离时请重新计算。" );
         return string.Join("\n", lines);
     }
 

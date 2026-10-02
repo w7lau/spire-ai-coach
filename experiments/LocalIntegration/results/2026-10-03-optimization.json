@@ -1,0 +1,732 @@
+{
+  "version": "0.7.3",
+  "date": "2026-10-03",
+  "scope": "Frozen private incident in owned isolated simulation; no live battle executed",
+  "search_settings": {
+    "Workers": 4,
+    "BudgetSeconds": 45,
+    "MaxNodes": 32,
+    "MaxRounds": 64,
+    "IncludePotions": true
+  },
+  "outcome": {
+    "Status": "done",
+    "Evaluated": 29,
+    "Rejected": 0,
+    "Victories": 15,
+    "ElapsedMs": 90007,
+    "Won": true,
+    "StartingHp": 87,
+    "Hp": 87,
+    "NetHpLoss": 0,
+    "HpLost": 14,
+    "Rounds": 9,
+    "used_potion": false,
+    "verified_steps": 33
+  },
+  "trace_checks": {
+    "common_clock": true,
+    "bounded": true,
+    "spans": 7022,
+    "dropped": 0,
+    "winner_verified_once": true
+  },
+  "critical_lane": {
+    "worker": 1,
+    "prepare_ms": 32521.12,
+    "first_restore_ms": 6550.13,
+    "search_from_ms": 39268.93,
+    "search_to_ms": 84413.35,
+    "verification_from_ms": 84553.69,
+    "verification_duration_ms": 5202.2
+  },
+  "parallel_totals_not_wall_time": [
+    {
+      "depth": 0,
+      "stage": "main",
+      "phase": "queue",
+      "ms": 0.32,
+      "count": 1
+    },
+    {
+      "depth": 0,
+      "stage": "prepare",
+      "phase": "prepare",
+      "ms": 125280.83,
+      "count": 4
+    },
+    {
+      "depth": 0,
+      "stage": "prepare",
+      "phase": "reuse",
+      "ms": 0.0,
+      "count": 1
+    },
+    {
+      "depth": 0,
+      "stage": "search",
+      "phase": "session",
+      "ms": 206282.5,
+      "count": 4
+    },
+    {
+      "depth": 0,
+      "stage": "verify",
+      "phase": "verify",
+      "ms": 5202.2,
+      "count": 1
+    },
+    {
+      "depth": 1,
+      "stage": "prepare",
+      "phase": "engine",
+      "ms": 116725.66,
+      "count": 4
+    },
+    {
+      "depth": 1,
+      "stage": "prepare",
+      "phase": "files",
+      "ms": 1393.54,
+      "count": 4
+    },
+    {
+      "depth": 1,
+      "stage": "prepare",
+      "phase": "launch",
+      "ms": 7161.61,
+      "count": 4
+    },
+    {
+      "depth": 1,
+      "stage": "search",
+      "phase": "card",
+      "ms": 69912.21,
+      "count": 706
+    },
+    {
+      "depth": 1,
+      "stage": "search",
+      "phase": "cleanup",
+      "ms": 294.97,
+      "count": 4
+    },
+    {
+      "depth": 1,
+      "stage": "search",
+      "phase": "decision",
+      "ms": 5720.44,
+      "count": 977
+    },
+    {
+      "depth": 1,
+      "stage": "search",
+      "phase": "dispatch",
+      "ms": 479.76,
+      "count": 4
+    },
+    {
+      "depth": 1,
+      "stage": "search",
+      "phase": "end_turn",
+      "ms": 84428.13,
+      "count": 259
+    },
+    {
+      "depth": 1,
+      "stage": "search",
+      "phase": "ipc",
+      "ms": 18.15,
+      "count": 4
+    },
+    {
+      "depth": 1,
+      "stage": "search",
+      "phase": "observe",
+      "ms": 177.48,
+      "count": 2004
+    },
+    {
+      "depth": 1,
+      "stage": "search",
+      "phase": "potion",
+      "ms": 913.73,
+      "count": 8
+    },
+    {
+      "depth": 1,
+      "stage": "search",
+      "phase": "publish",
+      "ms": 2282.3,
+      "count": 796
+    },
+    {
+      "depth": 1,
+      "stage": "search",
+      "phase": "receive",
+      "ms": 36.06,
+      "count": 4
+    },
+    {
+      "depth": 1,
+      "stage": "search",
+      "phase": "refine",
+      "ms": 298.23,
+      "count": 29
+    },
+    {
+      "depth": 1,
+      "stage": "search",
+      "phase": "restore",
+      "ms": 41716.51,
+      "count": 29
+    },
+    {
+      "depth": 1,
+      "stage": "search",
+      "phase": "result_transfer",
+      "ms": 474.91,
+      "count": 4
+    },
+    {
+      "depth": 1,
+      "stage": "verify",
+      "phase": "card",
+      "ms": 2109.0,
+      "count": 25
+    },
+    {
+      "depth": 1,
+      "stage": "verify",
+      "phase": "cleanup",
+      "ms": 52.22,
+      "count": 1
+    },
+    {
+      "depth": 1,
+      "stage": "verify",
+      "phase": "dispatch",
+      "ms": 96.74,
+      "count": 1
+    },
+    {
+      "depth": 1,
+      "stage": "verify",
+      "phase": "end_turn",
+      "ms": 2260.99,
+      "count": 8
+    },
+    {
+      "depth": 1,
+      "stage": "verify",
+      "phase": "ipc",
+      "ms": 10.72,
+      "count": 1
+    },
+    {
+      "depth": 1,
+      "stage": "verify",
+      "phase": "observe",
+      "ms": 4.64,
+      "count": 67
+    },
+    {
+      "depth": 1,
+      "stage": "verify",
+      "phase": "publish",
+      "ms": 55.35,
+      "count": 23
+    },
+    {
+      "depth": 1,
+      "stage": "verify",
+      "phase": "receive",
+      "ms": 7.5,
+      "count": 1
+    },
+    {
+      "depth": 1,
+      "stage": "verify",
+      "phase": "restore",
+      "ms": 692.65,
+      "count": 1
+    },
+    {
+      "depth": 1,
+      "stage": "verify",
+      "phase": "result_transfer",
+      "ms": 243.11,
+      "count": 1
+    },
+    {
+      "depth": 2,
+      "stage": "search",
+      "phase": "action_queue",
+      "ms": 20491.05,
+      "count": 764
+    },
+    {
+      "depth": 2,
+      "stage": "search",
+      "phase": "assets",
+      "ms": 7810.49,
+      "count": 4
+    },
+    {
+      "depth": 2,
+      "stage": "search",
+      "phase": "cleanup",
+      "ms": 2050.21,
+      "count": 29
+    },
+    {
+      "depth": 2,
+      "stage": "search",
+      "phase": "decode",
+      "ms": 1356.43,
+      "count": 29
+    },
+    {
+      "depth": 2,
+      "stage": "search",
+      "phase": "fingerprint",
+      "ms": 81.29,
+      "count": 29
+    },
+    {
+      "depth": 2,
+      "stage": "search",
+      "phase": "history",
+      "ms": 1.93,
+      "count": 29
+    },
+    {
+      "depth": 2,
+      "stage": "search",
+      "phase": "scene",
+      "ms": 27065.33,
+      "count": 29
+    },
+    {
+      "depth": 2,
+      "stage": "search",
+      "phase": "settle",
+      "ms": 70120.64,
+      "count": 1002
+    },
+    {
+      "depth": 2,
+      "stage": "search",
+      "phase": "setup",
+      "ms": 3339.4,
+      "count": 29
+    },
+    {
+      "depth": 2,
+      "stage": "verify",
+      "phase": "action_queue",
+      "ms": 680.79,
+      "count": 27
+    },
+    {
+      "depth": 2,
+      "stage": "verify",
+      "phase": "assets",
+      "ms": 161.0,
+      "count": 1
+    },
+    {
+      "depth": 2,
+      "stage": "verify",
+      "phase": "cleanup",
+      "ms": 2.78,
+      "count": 1
+    },
+    {
+      "depth": 2,
+      "stage": "verify",
+      "phase": "decode",
+      "ms": 2.67,
+      "count": 1
+    },
+    {
+      "depth": 2,
+      "stage": "verify",
+      "phase": "fingerprint",
+      "ms": 1.52,
+      "count": 1
+    },
+    {
+      "depth": 2,
+      "stage": "verify",
+      "phase": "history",
+      "ms": 0.0,
+      "count": 1
+    },
+    {
+      "depth": 2,
+      "stage": "verify",
+      "phase": "scene",
+      "ms": 500.03,
+      "count": 1
+    },
+    {
+      "depth": 2,
+      "stage": "verify",
+      "phase": "settle",
+      "ms": 1942.93,
+      "count": 34
+    },
+    {
+      "depth": 2,
+      "stage": "verify",
+      "phase": "setup",
+      "ms": 24.65,
+      "count": 1
+    },
+    {
+      "depth": 3,
+      "stage": "search",
+      "phase": "settle",
+      "ms": 6262.36,
+      "count": 29
+    },
+    {
+      "depth": 3,
+      "stage": "verify",
+      "phase": "settle",
+      "ms": 163.42,
+      "count": 1
+    }
+  ],
+  "fixed_line_speed_comparison": [
+    {
+      "speed": 1,
+      "ElapsedMs": 16348,
+      "Timing": {
+        "RestoreMs": 647,
+        "ActionMs": 6941,
+        "DecisionMs": 146,
+        "VerificationMs": 8092,
+        "StartupMs": 0,
+        "Actions": 33,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "HpLost": 14,
+      "Hp": 87,
+      "Rounds": 9,
+      "steps": 33,
+      "native_states_and_history_match": true
+    },
+    {
+      "speed": 8,
+      "ElapsedMs": 10570,
+      "Timing": {
+        "RestoreMs": 597,
+        "ActionMs": 4067,
+        "DecisionMs": 130,
+        "VerificationMs": 5000,
+        "StartupMs": 0,
+        "Actions": 33,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "HpLost": 14,
+      "Hp": 87,
+      "Rounds": 9,
+      "steps": 33,
+      "native_states_and_history_match": true
+    }
+  ],
+  "mechanics": [
+    {
+      "kind": "carry",
+      "Status": "done",
+      "Evaluated": 8,
+      "Rejected": 0,
+      "ElapsedMs": 17886,
+      "Timing": {
+        "RestoreMs": 3864,
+        "ActionMs": 11066,
+        "DecisionMs": 37,
+        "VerificationMs": 1503,
+        "StartupMs": 0,
+        "Actions": 399,
+        "Restores": 8,
+        "Verifications": 1
+      },
+      "EnemyHp": 0,
+      "StartingHp": 65,
+      "Hp": 71,
+      "NetHpLoss": 0,
+      "HpLost": 0,
+      "Rounds": 10,
+      "Won": true,
+      "baseline": {
+        "Hp": 42,
+        "HpLost": 29,
+        "Rounds": 20,
+        "Won": true
+      },
+      "actions": [
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "CombatCardIndex": 1,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "CombatCardIndex": 3,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "CombatCardIndex": 0,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.BODY_SLAM",
+          "CombatCardIndex": 2,
+          "choices": []
+        },
+        {
+          "ModelId": "",
+          "CombatCardIndex": null,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.BODY_SLAM",
+          "CombatCardIndex": 2,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "CombatCardIndex": 1,
+          "choices": []
+        },
+        {
+          "ModelId": "",
+          "CombatCardIndex": null,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.BODY_SLAM",
+          "CombatCardIndex": 2,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "CombatCardIndex": 0,
+          "choices": []
+        },
+        {
+          "ModelId": "",
+          "CombatCardIndex": null,
+          "choices": []
+        },
+        {
+          "ModelId": "",
+          "CombatCardIndex": null,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "CombatCardIndex": 0,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.BODY_SLAM",
+          "CombatCardIndex": 2,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "CombatCardIndex": 3,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "CombatCardIndex": 1,
+          "choices": []
+        },
+        {
+          "ModelId": "",
+          "CombatCardIndex": null,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "CombatCardIndex": 1,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.BODY_SLAM",
+          "CombatCardIndex": 2,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "CombatCardIndex": 0,
+          "choices": []
+        },
+        {
+          "ModelId": "",
+          "CombatCardIndex": null,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "CombatCardIndex": 1,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.BODY_SLAM",
+          "CombatCardIndex": 2,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "CombatCardIndex": 0,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "CombatCardIndex": 3,
+          "choices": []
+        },
+        {
+          "ModelId": "",
+          "CombatCardIndex": null,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "CombatCardIndex": 1,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "CombatCardIndex": 3,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "CombatCardIndex": 0,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.BODY_SLAM",
+          "CombatCardIndex": 2,
+          "choices": []
+        },
+        {
+          "ModelId": "",
+          "CombatCardIndex": null,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "CombatCardIndex": 0,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.BODY_SLAM",
+          "CombatCardIndex": 2,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "CombatCardIndex": 3,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "CombatCardIndex": 1,
+          "choices": []
+        },
+        {
+          "ModelId": "",
+          "CombatCardIndex": null,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "CombatCardIndex": 3,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.BODY_SLAM",
+          "CombatCardIndex": 2,
+          "choices": []
+        }
+      ],
+      "verified": true
+    },
+    {
+      "kind": "compact",
+      "Status": "done",
+      "Evaluated": 1,
+      "Rejected": 0,
+      "ElapsedMs": 1525,
+      "Timing": {
+        "RestoreMs": 438,
+        "ActionMs": 221,
+        "DecisionMs": 1,
+        "VerificationMs": 569,
+        "StartupMs": 0,
+        "Actions": 6,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "EnemyHp": 168,
+      "StartingHp": 80,
+      "Hp": 71,
+      "NetHpLoss": 9,
+      "HpLost": 9,
+      "Rounds": 1,
+      "Won": false,
+      "baseline": null,
+      "actions": [
+        {
+          "ModelId": "CARD.COMPACT",
+          "CombatCardIndex": 4,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.FUEL",
+          "CombatCardIndex": 6,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.BODY_SLAM",
+          "CombatCardIndex": 2,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.FUEL",
+          "CombatCardIndex": 5,
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.FUEL",
+          "CombatCardIndex": 7,
+          "choices": []
+        },
+        {
+          "ModelId": "",
+          "CombatCardIndex": null,
+          "choices": []
+        }
+      ],
+      "verified": true
+    }
+  ],
+  "generated_choices": {
+    "passed": true,
+    "selected_and_executed": true,
+    "completed_history_replayed": true,
+    "whole_victory_claimed": false,
+    "scope": "one-round synthetic choice fixture"
+  }
+}

@@ -66,7 +66,7 @@ static class SearchAlgorithmTests
             var unfinished = lowWin with { Hp = 80, HpLost = 0, Won = false, EnemyHp = 1 };
             Check(LocalSearchTree.Reward(lowWin, 100) > LocalSearchTree.Reward(unfinished, 100), "Unfinished must not beat a victory");
             var healed = lowWin with { Hp = 80, HpLost = 10 };
-            Check(LocalSearchPolicy.Better(healed with { HpLost = 0 }, healed), "Equal final HP should favor less actual damage");
+            Check(!LocalSearchPolicy.Better(healed with { HpLost = 0 }, healed), "Equal final HP must not reject a route solely for already healed costs");
         });
         test("search feedback never resimulates a closed exact terminal history", () =>
         {

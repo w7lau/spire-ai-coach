@@ -12,6 +12,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly Worker[] _workers = Enumerable.Range(0, 16).Select(_ => new Worker()).ToArray();
     private bool _disposed;
+    private LocalTrace? _lastPreparation;
 
     private int Count(int configured)
     {
@@ -23,6 +24,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
 
     public async Task Prepare(LocalInstallation installation, int configured, CancellationToken token)
     {
+        var timeline = new LocalTimeline(capacity: 65536);
         await _gate.WaitAsync(token);
         try
         {
@@ -30,18 +32,23 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             await Task.WhenAll(_workers.Take(Count(configured)).Select((worker, index) =>
                 Task.Run(async () =>
                 {
-                    try { await worker.Ensure(directory, index, installation, token); }
+                    try { await worker.Ensure(directory, index, installation, token, timeline); }
                     catch { worker.Stop(); throw; }
                 }, token)));
         }
-        finally { _gate.Release(); }
+        finally { _lastPreparation = timeline.Snapshot(); _gate.Release(); }
     }
 
     public async Task<LocalSearchResult> Analyze(LocalSearchRequest request, LocalInstallation installation,
         Action<string> progress, CancellationToken cancellation, Action<LocalProgress>? simulationProgress = null)
     {
-        var totalTime = Stopwatch.StartNew();
-        await _gate.WaitAsync(cancellation);
+        var timeline = new LocalTimeline(request.TimelineOrigin, 65536);
+        timeline.Import(request.InitialTrace);
+        request = request with { TimelineOrigin = timeline.Origin, InitialTrace = null };
+        double queueStart = timeline.ElapsedMs;
+        using (timeline.Measure(-1, "main", "queue")) await _gate.WaitAsync(cancellation);
+        // Include only the portion of prewarming that really blocked this click.
+        timeline.Import(_lastPreparation, queueStart, timeline.ElapsedMs);
         try
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
@@ -60,45 +67,70 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             var blocked = results.Where(r => r.Status is "unsupported" or "partial" && r.BlockedAction is { EndTurn: false })
                 .Select(r => r.BlockedAction!).DistinctBy(a => a.ModelId).ToArray();
             var remainingSeconds = request.BudgetSeconds - (int)Math.Ceiling(results.Max(r => r.ElapsedMs) / 1000d);
-            if (!results.Any(r => r.Status == "done" && r.Best != null) && blocked.Length > 0 && remainingSeconds >= 5)
+            if (!results.Any(r => r.Status is "searched" or "done" && r.Best != null) && blocked.Length > 0 && remainingSeconds >= 5)
             {
                 progress("部分动作无法完成，正在计算其他路线…");
-                var fallback = request with { Partition = 0, Partitions = 1, BudgetSeconds = remainingSeconds,
+                var fallback = request with { Partition = 0, Partitions = 1, BudgetSeconds = remainingSeconds, DeferVerification = true,
                     ExcludedModels = (request.ExcludedModels ?? []).Concat(blocked.Select(a => a.ModelId)).Distinct().ToArray() };
                 results.Add(await Task.Run(() => Run(_workers[0], 0, fallback), cancellation));
             }
-            var valid = results.Where(r => r.Status is "done" or "partial" && r.Best != null).ToArray();
+            var valid = results.Where(r => r.Status is "searched" or "done" or "partial" && r.Best != null).ToArray();
             if (valid.Length == 0)
                 throw new CoachException("local_failed", string.Join("\n", results.Select(r => r.Message).Distinct()));
-            if (valid.Any(r => r.Status == "done")) valid = valid.Where(r => r.Status == "done").ToArray();
-            var best = valid.Aggregate((a, b) => LocalSearchPolicy.Better(b.Best!, a.Best) ? b : a);
+            // Search all lanes first. Only a globally selected candidate is independently replayed.
+            // Failed verification discards that candidate; it never bypasses checks to publish it.
+            var verificationResults = new List<LocalSearchResult>();
+            LocalSearchResult? verifiedBest = null;
+            while (valid.Length > 0)
+            {
+                var proposed = valid.Aggregate((a, b) => LocalSearchPolicy.Better(b.Best!, a.Best) ? b : a);
+                int index = Math.Clamp(results.IndexOf(proposed), 0, count - 1);
+                var verify = request with { Id = request.Id + "-verify-" + verificationResults.Count,
+                    Partition = index, Partitions = count, DeferVerification = false, VerifyCandidate = proposed.Best };
+                progress("正在复核最终路线…");
+                var check = await Task.Run(() => Run(_workers[index], index, verify), cancellation);
+                verificationResults.Add(check);
+                if (check.Status == "done" && check.Best?.Continuation?.Length == check.Best?.Actions.Length && check.Best != null)
+                { verifiedBest = check; break; }
+                valid = valid.Where(r => !ReferenceEquals(r, proposed)).ToArray();
+            }
+            if (verifiedBest == null) throw new CoachException("local_verify_failed",
+                string.Join("\n", verificationResults.Select(r => r.Message).Distinct()));
+            var best = verifiedBest;
+            var allRuns = results.Concat(verificationResults).ToArray();
+            foreach (var run in allRuns) timeline.Import(run.Trace);
             return best with { Evaluated = results.Sum(r => r.Evaluated), Rejected = results.Sum(r => r.Rejected),
                 Duplicates = results.Sum(r => r.Duplicates), BudgetPruned = results.Sum(r => r.BudgetPruned),
                 Victories = valid.Sum(r => r.Victories), Workers = count,
-                ElapsedMs = totalTime.ElapsedMilliseconds, SearchElapsedMs = results.Take(count).Max(r => r.ElapsedMs) +
+                ElapsedMs = (long)timeline.ElapsedMs, Trace = timeline.Snapshot(), SearchElapsedMs = results.Take(count).Max(r => r.ElapsedMs) +
                     (results.Count > count ? results[^1].ElapsedMs : 0),
                 WorkerMemoryBytes = (results.Count > count ? results.Skip(1) : results).Sum(r => r.WorkerMemoryBytes),
                 IncludePotions = request.IncludePotions,
-                Timing = new(results.Sum(r => r.Timing?.RestoreMs ?? 0), results.Sum(r => r.Timing?.ActionMs ?? 0),
-                    results.Sum(r => r.Timing?.DecisionMs ?? 0), results.Sum(r => r.Timing?.VerificationMs ?? 0),
-                    results.Sum(r => r.Timing?.StartupMs ?? 0), results.Sum(r => r.Timing?.Actions ?? 0), results.Sum(r => r.Timing?.Restores ?? 0)),
-                Status = results.All(r => r.Status == "done") ? "done" : "partial",
-                Message = "本地整场计算完成。" + (results.Any(r => r.Status != "done") ? "部分搜索未完成，显示已取得的可用路线。" : "") +
+                Id = request.Id,
+                Timing = new(allRuns.Sum(r => r.Timing?.RestoreMs ?? 0), allRuns.Sum(r => r.Timing?.ActionMs ?? 0),
+                    allRuns.Sum(r => r.Timing?.DecisionMs ?? 0), allRuns.Sum(r => r.Timing?.VerificationMs ?? 0),
+                    allRuns.Sum(r => r.Timing?.StartupMs ?? 0), allRuns.Sum(r => r.Timing?.Actions ?? 0), allRuns.Sum(r => r.Timing?.Restores ?? 0),
+                    allRuns.Sum(r => r.Timing?.Verifications ?? 0)),
+                Status = results.All(r => r.Status is "searched" or "done") && verificationResults.All(r => r.Status == "done") ? "done" : "partial",
+                Message = "本地整场计算完成。" + (results.Any(r => r.Status is not ("searched" or "done")) || verificationResults.Any(r => r.Status != "done") ? "部分搜索未完成，显示已复核的可用路线。" : "") +
                     (results.Count > count ? "本次补充搜索未纳入：" + string.Join("、", blocked.Select(a => a.CardName)) + "。" : "") +
-                    "预算内候选，不保证最优；未知奖励机制仍按预算搜索。" };
+                    "按战后净生命损失选路，同等净损失优先保留药水；预算内候选，未证明全局最优。" };
 
             async Task<LocalSearchResult> Run(Worker worker, int index, LocalSearchRequest? fallback = null)
             {
+                var command = fallback ?? request with { Partition = index, Partitions = count, DeferVerification = true };
+                bool verifying = command.VerifyCandidate != null;
                 try
                 {
                     simulationProgress?.Invoke(new(request.Id, request.SnapshotId, index, count, 0, 0, 0, request.MaxNodes, 0,
                         0, request.BudgetSeconds, "准备计算", null, []));
                     var preparation = Stopwatch.StartNew();
-                    await worker.Ensure(directory, index, installation, cancellation);
+                    await worker.Ensure(directory, index, installation, cancellation, timeline);
                     preparation.Stop();
                     progress("正在计算…");
-                    var command = fallback ?? request with { Partition = index, Partitions = count };
-                    LocalWire.Write(Path.Combine(worker.Root, "request.json"), command);
+                    using (timeline.Measure(index, verifying ? "verify" : "search", "ipc", depth: 1))
+                        LocalWire.Write(Path.Combine(worker.Root, "request.json"), command);
+                    double dispatched = timeline.ElapsedMs;
                     var timer = Stopwatch.StartNew();
                     long seenSequence = 0;
                     while (timer.Elapsed.TotalSeconds < 180)
@@ -108,19 +140,29 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                         if (simulationProgress != null && File.Exists(previewPath))
                         {
                             var preview = LocalWire.Read<LocalProgress>(previewPath);
-                            if (preview.Id == request.Id && preview.SnapshotId == request.SnapshotId && preview.Worker == index &&
+                            if (preview.Id == command.Id && preview.SnapshotId == request.SnapshotId && preview.Worker == index &&
                                 preview.Workers == command.Partitions && preview.Sequence > seenSequence)
-                            { seenSequence = preview.Sequence; simulationProgress(preview with { Workers = count,
-                                Sequence = preview.Sequence + (fallback == null ? 0 : 1_000_000) }); }
+                            { seenSequence = preview.Sequence; simulationProgress(preview with { Id = request.Id, Workers = count,
+                                Sequence = preview.Sequence + (verifying ? 2_000_000 : fallback == null ? 0 : 1_000_000) }); }
                         }
                         var file = Path.Combine(worker.Root, "result.json");
                         if (File.Exists(file))
                         {
                             var result = LocalWire.Read<LocalSearchResult>(file);
-                            if (result.Id == request.Id && result.SnapshotId == request.SnapshotId)
+                            if (result.Id == command.Id && result.SnapshotId == request.SnapshotId)
                             {
                                 if (result.Status != "running")
                                 {
+                                    if (result.Trace?.Spans is { Length: > 0 } spans)
+                                    {
+                                        double received = spans.Min(s => s.StartMs);
+                                        if (received >= dispatched) timeline.Add(new(index, verifying ? "verify" : "search",
+                                            "dispatch", "", dispatched, received - dispatched, Depth: 1));
+                                        double finished = spans.Max(s => s.StartMs + s.DurationMs);
+                                        if (timeline.ElapsedMs >= finished) timeline.Add(new(index, verifying ? "verify" : "search",
+                                            "result_transfer", "写入结果与轮询等待", finished, timeline.ElapsedMs - finished, Depth: 1));
+                                    }
+                                    using var receiving = timeline.Measure(index, verifying ? "verify" : "search", "receive", depth: 1);
                                     result = result with { Timing = (result.Timing ?? new()) with { StartupMs = preparation.ElapsedMilliseconds } };
                                     if (worker.Process?.HasExited == false)
                                     { worker.Process.Refresh(); result = result with { WorkerMemoryBytes = worker.Process.PrivateMemorySize64 }; }
@@ -129,7 +171,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                                         worker.Stop();
                                         return result with { Status = "failed", Best = null, Message = "后台游戏报告运行错误，未采用该进程的结果。" };
                                     }
-                                    if (result.Status != "done") worker.Stop();
+                                    if (result.Status is not ("done" or "searched")) worker.Stop();
                                     return result;
                                 }
                                 progress($"正在计算 · 已评估 {result.Evaluated} 条路线");
@@ -178,12 +220,18 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
         private FileStream? _lock;
         private string? _configuration;
 
-        public async Task Ensure(string directory, int index, LocalInstallation installation, CancellationToken token)
+        public async Task Ensure(string directory, int index, LocalInstallation installation, CancellationToken token, LocalTimeline? timeline = null)
         {
             var signature = typeof(LocalWorker).Assembly.ManifestModule.ModuleVersionId + "|" +
                 installation.GameDirectory + "|" + Path.GetFullPath(directory) + "|" + string.Join("|", installation.ModDirectories);
             var configuration = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(signature)))[..16];
-            if (Process?.HasExited == false && _configuration == configuration) return;
+            if (Process?.HasExited == false && _configuration == configuration)
+            {
+                using var reuse = timeline?.Measure(index, "prepare", "reuse");
+                return;
+            }
+            using var preparation = timeline?.Measure(index, "prepare", "prepare");
+            using var files = timeline?.Measure(index, "prepare", "files", depth: 1);
             Stop();
             _configuration = configuration;
             // NTFS hardlinks require one volume. Keep tiny launch trees beside the installation, never in it.
@@ -220,8 +268,10 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             start.Environment["SPIRE_COACH_WORKER"] = Root;
             start.Environment.Remove("SPIRE_NATIVE_PROBE_ROOT");
             token.ThrowIfCancellationRequested();
-            Process = IsolatedProcess.Start(start);
+            files?.Dispose();
+            using (timeline?.Measure(index, "prepare", "launch", depth: 1)) Process = IsolatedProcess.Start(start);
             var timer = Stopwatch.StartNew();
+            using var engine = timeline?.Measure(index, "prepare", "engine", depth: 1);
             while (!File.Exists(Path.Combine(Root, "ready")))
             {
                 token.ThrowIfCancellationRequested();

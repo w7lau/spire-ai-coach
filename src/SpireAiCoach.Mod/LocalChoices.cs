@@ -79,6 +79,9 @@ public sealed class LocalChoices
         if (top is NChooseACardSelectionScreen screen && top.GetType() == typeof(NChooseACardSelectionScreen))
         {
             if (!screen.IsNodeReady() || _handled.Contains(screen) || Field<bool>(screen, "_screenComplete")) return;
+            // The click debounce is a UI delay, unrelated to native choice legality or effects.
+            // Preserve it in the real executor. Only an owned simulation can bypass it.
+            if (LocalWorkerVisuals.Active) FindField(screen, "_openedTicks").SetValue(screen, 0UL);
             if (Godot.Time.GetTicksMsec() - Field<ulong>(screen, "_openedTicks") <= 350) return;
             var cards = Field<IReadOnlyList<CardModel>>(screen, "_cards");
             var canSkip = Field<bool>(screen, "_canSkip");

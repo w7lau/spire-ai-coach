@@ -5,6 +5,55 @@ static class OptimizationTests
     public static void Register(Action<string, Action> test)
     {
         void Check(bool ok, string message) { if (!ok) throw new Exception(message); }
+        test("optimization tests unused legal resources before end turn and removes wasted actions", () =>
+        {
+            var hit = new LocalAction(0, "unknown-hit", 1, "", "", "a", 1, CombatCardIndex: 1);
+            var block = new LocalAction(1, "unknown-carry-mechanism", null, "", "", "b", 1, CombatCardIndex: 2);
+            var end = new LocalAction(-1, "", null, "", "", "b", 1, EndTurn: true);
+            var nextEnd = end with { Round = 2, BeforeHash = "c" };
+            var candidate = new LocalCandidate([hit,end,nextEnd], 70, 10, 0, 0, 80, true, false, false,
+                Decisions: [new(1,[block,end])]);
+            var refiner = new LocalRouteRefiner(); refiner.Offer(candidate);
+            var proposals = new List<LocalAction[]>();
+            while (refiner.TryTake(out var plan)) proposals.Add(plan);
+            Check(proposals.Any(p => p.SequenceEqual(new[] { hit,block,end,nextEnd })), "Unused defense/setup must be tested with the whole suffix");
+            Check(proposals.Any(p => p.SequenceEqual(new[] { end,nextEnd })), "Removing an action must also be tested");
+            Check(proposals.All(p => p.Count(a => a.EndTurn) == 2), "Insertion/removal must keep enemy turns");
+        });
+        test("optimization final net HP loss includes healing and accepts recovered HP costs", () =>
+        {
+            var less = new LocalCandidate([], 60, 0, 0, 0, 80, true, false, false, StartingHp: 80);
+            var healed = less with { Hp = 80, HpLost = 20 };
+            Check(LocalSearchPolicy.Better(healed, less) && !LocalSearchPolicy.Better(less, healed), "Net loss includes native healing");
+            Check(LocalSearchTree.Reward(healed, 100) > LocalSearchTree.Reward(less, 100), "Exploration must favor the final outcome");
+            Check(!LocalSearchPolicy.Better(healed with { HpLost = 40 }, healed), "Gross healed costs must not disqualify equal final outcomes");
+            Check(!LocalSearchPolicy.Better(less with { Won = false }, healed), "A partial no-loss route is not a victory");
+        });
+        test("optimization reserve potions only improve a route when final net loss benefits", () =>
+        {
+            var potion = new LocalAction(-1, "unknown-potion", null, "", "", "", PotionSlot: 0);
+            var kept = new LocalCandidate([], 70, 20, 0, 0, 80, true, false, false, StartingHp: 60);
+            var used = kept with { Hp = 80, Actions = [potion] };
+            Check(LocalSearchPolicy.Better(kept, used), "No net loss without potion: preserve it even if potion heals above start HP");
+            Check(LocalSearchTree.Reward(kept, 100) > LocalSearchTree.Reward(used, 100), "Tree must also prefer preserving a reserve");
+            Check(LocalSearchPolicy.Better(used, kept with { Hp = 59 }), "Potion preventing final HP loss is valid");
+            var result = new LocalSearchResult("", "", "done", "", 1, 0, 1, kept);
+            Check(LocalSearchPolicy.Format(result).Contains("净生命损失 0") && LocalSearchPolicy.Format(result).Contains("累计扣血 20"), "Display separates net and gross");
+        });
+        test("optimization varies native selection targets without per-card adapters", () =>
+        {
+            var c = new LocalCardChoice("offer", 0, "playable", "", [0], "hand");
+            var status = c with { Index = 1, ModelId = "unknown-status", Indices = [1] };
+            var a = new LocalAction(0, "unknown-select-exhaust", null, "", "", "", 1, Choices: [c], CombatCardIndex: 10);
+            var end = new LocalAction(-1, "", null, "", "", "", 1, EndTurn: true);
+            var seed = new LocalCandidate([a,end], 80, 0, 0, 0, 80, true, false, false,
+                Decisions: [new(0,[a,end],[new(0,[c,status])])]);
+            var refine = new LocalRouteRefiner(); refine.Offer(seed);
+            var found = false;
+            while (refine.TryTake(out var plan))
+                found |= plan.Length == 2 && plan[0].Choices?.Single().ModelId == "unknown-status";
+            Check(found, "Changing discard/exhaust selection must be offered with native offer identity");
+        });
         test("optimization reorders native card instances without name type or hand-position rules", () =>
         {
             var a = new LocalAction(0, "mod-attack", 1, "same-name", "", "root", 1, CombatCardIndex: 10);
@@ -55,8 +104,8 @@ static class OptimizationTests
         LocalSearchResult Result()
         {
             var actions = Enumerable.Range(0, 3).Select(i => new LocalAction(i, "card", 1, "card", "", "state" + i, 1)).ToArray();
-            var points = Enumerable.Range(0, 3).Select(i => new LocalContinuationPoint(i, "state" + i, new(10 + i, "history" + i), i * 2)).ToArray();
-            return new("id", "snapshot", "done", "", 1, 0, 100, new(actions, 76, 4, 0, 99, 80, true, false, false, Continuation: points));
+            var points = Enumerable.Range(0, 3).Select(i => new LocalContinuationPoint(i, "state" + i, new(10 + i, "history" + i), i * 2, 80 - i * 2)).ToArray();
+            return new("id", "snapshot", "done", "", 1, 0, 100, new(actions, 76, 4, 0, 99, 80, true, false, false, Continuation: points, StartingHp: 80));
         }
         test("optimization continuation reuses exact forward history and adjusts remaining damage", () =>
         {
@@ -64,6 +113,7 @@ static class OptimizationTests
             Check(plan.Advance("fight", ["mod"], "state0", new(10, "history0"))?.Best?.Actions.Length == 3, "Root");
             var next = plan.Advance("fight", ["mod"], "state2", new(12, "history2"));
             Check(next?.Best?.Actions.Length == 1 && next.Best.HpLost == 0 && plan.CompletedActions == 2, "Skip observed intermediate frames safely");
+            Check(next?.Best?.StartingHp == 76 && next.Best.NetHpLoss == 0, "Remaining cost uses HP at this exact continuation point");
             Check(plan.Advance("fight", ["mod"], "state1", new(11, "history1")) == null && plan.Invalid, "Cannot move backward");
             var noProgress = new LocalContinuation("fight", ["mod"], Result());
             Check(noProgress.Advance("fight", ["mod"], "state0", new(10, "history0"), requireProgress: true) == null,

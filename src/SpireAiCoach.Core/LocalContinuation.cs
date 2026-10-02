@@ -1,7 +1,7 @@
 namespace SpireAiCoach.Core;
 
 public sealed record LocalHistoryStamp(int Count, string Hash);
-public sealed record LocalContinuationPoint(int ActionIndex, string NativeHash, LocalHistoryStamp History, int HpLost);
+public sealed record LocalContinuationPoint(int ActionIndex, string NativeHash, LocalHistoryStamp History, int HpLost, int? Hp = null);
 
 public sealed class LocalContinuation(string combatId, string[] mods, LocalSearchResult original)
 {
@@ -22,7 +22,8 @@ public sealed class LocalContinuation(string combatId, string[] mods, LocalSearc
         var point = matches[0]; CompletedActions = point.ActionIndex;
         var remaining = best.Actions.Skip(CompletedActions).ToArray();
         return original with { Best = best with { Actions = remaining,
-            HpLost = Math.Max(0, best.HpLost - point.HpLost), Rounds = remaining.Select(a => a.Round).Distinct().Count() },
+            StartingHp = point.Hp ?? best.StartingHp, HpLost = Math.Max(0, best.HpLost - point.HpLost),
+            Rounds = remaining.Select(a => a.Round).Distinct().Count() },
             Message = CompletedActions == 0 ? original.Message : $"已核对并完成前 {CompletedActions} 步，继续使用原路线；未重新搜索。" };
     }
 
@@ -30,4 +31,4 @@ public sealed class LocalContinuation(string combatId, string[] mods, LocalSearc
 }
 
 public sealed record LocalSearchTiming(long RestoreMs = 0, long ActionMs = 0, long DecisionMs = 0,
-    long VerificationMs = 0, long StartupMs = 0, int Actions = 0, int Restores = 0);
+    long VerificationMs = 0, long StartupMs = 0, int Actions = 0, int Restores = 0, int Verifications = 0);

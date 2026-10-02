@@ -635,11 +635,13 @@ AsyncTest("HTTP content has one JSON object encoding and readable diagnostics pr
 
 Test("local no-damage stopping requires known rewards and opt-in continuation wins", () =>
 {
-    var safe = new LocalCandidate([], 50, 0, 0, 100, 80, true, false, true);
+    var safe = new LocalCandidate([], 50, 0, 0, 100, 80, true, false, true, StartingHp: 50);
     Check(LocalSearchPolicy.CanStop(safe, false));
     Check(!LocalSearchPolicy.CanStop(safe, true));
     Check(!LocalSearchPolicy.CanStop(safe with { RewardCoverageKnown = false }, false));
-    Check(!LocalSearchPolicy.CanStop(safe with { HpLost = 3 }, false), "Healing back to the same HP must not hide damage");
+    Check(LocalSearchPolicy.CanStop(safe with { HpLost = 3 }, false), "Recovered damage still meets the net no-loss objective");
+    Check(!LocalSearchPolicy.CanStop(safe with { Hp = 49 }, false));
+    Check(!LocalSearchPolicy.CanStop(safe with { Actions = [new(-1, "potion", null, "", "", "", PotionSlot: 0)] }, false));
     Check(!LocalSearchPolicy.CanStop(safe with { Dead = true }, false));
     Check(!LocalSearchPolicy.CanStop(safe with { Won = false }, false));
 });
@@ -835,6 +837,7 @@ AsyncTest("frequent local telemetry replacement stays readable during concurrent
 
 SearchAlgorithmTests.Register(Test);
 OptimizationTests.Register(Test);
+TimelineTests.Register(Test);
 var filter = args.Length == 2 && args[0] == "--filter" ? args[1] : null;
 if (args.Length != 0 && filter == null) { Console.Error.WriteLine("Usage: [--filter substring]"); return 2; }
 var selected = tests.Where(t => filter == null || t.Item1.Contains(filter, StringComparison.OrdinalIgnoreCase)).ToArray();

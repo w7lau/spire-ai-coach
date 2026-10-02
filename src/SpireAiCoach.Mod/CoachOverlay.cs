@@ -35,6 +35,7 @@ public sealed class CoachOverlay
     private TextEdit _context = null!;
     private Button _analyze = null!;
     private Button _localAnalyze = null!;
+    private Button _continueOptimize = null!;
     private LocalWorkerPool _localPool = null!;
     private bool _localAnalyzing;
     private bool _executing;
@@ -48,6 +49,7 @@ public sealed class CoachOverlay
     private SpinBox _localWorkers = null!;
     private CheckBox _localPotions = null!;
     private LocalProgressPanel _localProgress = null!;
+    private TextEdit _localTiming = null!;
     private readonly ConcurrentDictionary<int, LocalProgress> _pendingLocalProgress = new();
     private Button _cancel = null!;
     private LineEdit _url = null!;
@@ -110,7 +112,7 @@ public sealed class CoachOverlay
         config.Pressed += () => _settingsPanel.Visible = !_settingsPanel.Visible;
         var hide = new Button { Text = "收起" }; row.AddChild(hide);
         hide.Pressed += () => _panel.Hide();
-        body.AddChild(Wrapped("规划整场战斗，最多 64 轮。计算完成后可手动出牌，也可执行已验证的路线。"));
+        body.AddChild(Wrapped("规划整场战斗，最多 64 轮，优先减少战后净生命损失、保留药水。可沿已找到的路线继续优化。"));
         var localOptions = new HBoxContainer(); body.AddChild(localOptions);
         localOptions.AddChild(new Label { Text = "本地并发（0 自动，1–16 手动）" });
         _localWorkers = new SpinBox { MinValue = 0, MaxValue = 16, Step = 1, Value = Math.Clamp(_settings.LocalWorkers, 0, 16) };
@@ -121,7 +123,7 @@ public sealed class CoachOverlay
             try { _store.SaveLocalOptions((int)_localWorkers.Value, _localPotions.ButtonPressed); _settings = _settings with { LocalWorkers = (int)_localWorkers.Value, LocalIncludePotions = _localPotions.ButtonPressed }; _status.Text = "本地设置已保存，下次计算生效。"; }
             catch (Exception ex) { _status.Text = "本地并发保存失败：" + ex.GetType().Name; }
         };
-        _localPotions = new CheckBox { Text = "计算主动使用药水的路线", ButtonPressed = _settings.LocalIncludePotions };
+        _localPotions = new CheckBox { Text = "必要时考虑药水（优先保留）", ButtonPressed = _settings.LocalIncludePotions };
         _localPotions.Toggled += _ =>
         {
             if (_continuation == null && !_localAnalyzing) return;
@@ -130,6 +132,11 @@ public sealed class CoachOverlay
         };
         body.AddChild(_localPotions);
         _localProgress = new LocalProgressPanel(); body.AddChild(_localProgress.View);
+        var timing = new Button { Text = "展开 / 收起耗时分析" }; body.AddChild(timing);
+        _localTiming = new TextEdit { Editable = false, Visible = false, Text = "计算完成后显示耗时分析。",
+            CustomMinimumSize = new Vector2(0, 260), WrapMode = TextEdit.LineWrappingMode.Boundary };
+        body.AddChild(_localTiming);
+        timing.Pressed += () => _localTiming.Visible = !_localTiming.Visible;
 
         _settingsPanel = new VBoxContainer { Visible = string.IsNullOrEmpty(_settings.Model) || loadError != null };
         body.AddChild(_settingsPanel);
@@ -147,6 +154,8 @@ public sealed class CoachOverlay
         _feedback = Wrapped(loadError ?? "密钥不会写入游戏日志，也不会提交到 GitHub。"); _settingsPanel.AddChild(_feedback);
         _freshness = Wrapped(""); body.AddChild(_freshness);
         var executionRow = new HBoxContainer(); body.AddChild(executionRow);
+        _continueOptimize = new Button { Text = "继续优化", Disabled = true }; executionRow.AddChild(_continueOptimize);
+        _continueOptimize.Pressed += () => AnalyzeLocal(true);
         _execute = new Button { Text = "执行方案", Disabled = true }; executionRow.AddChild(_execute);
         _execute.Pressed += ExecuteLocalPlan;
         _stopExecution = new Button { Text = "停止执行 · Esc", Disabled = true }; executionRow.AddChild(_stopExecution);
@@ -250,6 +259,7 @@ public sealed class CoachOverlay
             _analyze.Disabled = _executing || _request != null || snapshot?.CanAdvise != true;
             _localAnalyze.Disabled = _analyze.Disabled;
             _execute.Disabled = _analyze.Disabled || _continuation == null || _continuation.Invalid || !LocalCapture.Stable();
+            _continueOptimize.Disabled = _execute.Disabled;
             _stopExecution.Disabled = !_executing;
             if (snapshot?.CanAdvise == true && _preparedCombat != snapshot.CombatId && _request == null && !_executing &&
                 MegaCrit.Sts2.Core.Runs.RunManager.Instance.NetService.Type == MegaCrit.Sts2.Core.Multiplayer.Game.NetGameType.Singleplayer &&
@@ -275,6 +285,7 @@ public sealed class CoachOverlay
             _analyze.Disabled = true;
             _localAnalyze.Disabled = true;
             _execute.Disabled = true;
+            _continueOptimize.Disabled = true;
         }
     }
 
@@ -416,20 +427,34 @@ public sealed class CoachOverlay
         });
     }
 
-    private void AnalyzeLocal()
+    private void AnalyzeLocal() => AnalyzeLocal(false);
+
+    private void AnalyzeLocal(bool continueOptimization)
     {
         if (_request != null || _executing) return;
+        var timeline = new LocalTimeline(capacity: 65536);
+        using var capturing = timeline.Measure(-1, "main", "capture");
         RefreshSnapshot();
         if (_snapshot?.CanAdvise != true) { _status.Text = "请等待自己的出牌阶段。"; return; }
         LocalSearchRequest request;
         LocalInstallation installation;
         try
         {
-            request = LocalCapture.Capture(_snapshotHash!, continueOptimization: true) with
-                { Workers = (int)_localWorkers.Value, IncludePotions = _localPotions.ButtonPressed };
+            request = LocalCapture.Capture(_snapshotHash!, continueOptimization) with
+                { Workers = (int)_localWorkers.Value, IncludePotions = _localPotions.ButtonPressed,
+                    BudgetSeconds = 60 };
+            // Reuse only the suffix matching this combat, mods, native state and complete history.
+            // It is an exploration seed; the worker re-executes and verifies it, never copies its score.
+            if (_continuation != null && request.History != null)
+            {
+                var seed = _continuation.Advance(_snapshot!.CombatId, request.LoadedMods, request.NativeHash, request.History);
+                if (seed?.IncludePotions == request.IncludePotions) request = request with { InitialPlan = seed.Best?.Actions };
+            }
             installation = LocalCapture.Installation();
         }
         catch (Exception ex) { _status.Text = ex.Message; return; }
+        capturing.Dispose();
+        request = request with { TimelineOrigin = timeline.Origin, InitialTrace = timeline.Snapshot() };
         var generation = ++_generation;
         var cancellation = new CancellationTokenSource();
         _request = cancellation;
@@ -442,6 +467,7 @@ public sealed class CoachOverlay
         _status.Text = "准备计算…";
         _freshness.Text = "继续出牌会取消本次计算；候选路线仅在后台执行。";
         _analyze.Disabled = true; _localAnalyze.Disabled = true; _cancel.Disabled = false;
+        _continueOptimize.Disabled = true; _execute.Disabled = true;
         _ = Task.Run(async () =>
         {
             try
@@ -449,16 +475,35 @@ public sealed class CoachOverlay
                 var result = await _localPool.Analyze(request, installation,
                     message => _mainThread.Enqueue(() => { if (generation == _generation) _status.Text = message; }), cancellation.Token,
                     preview => { if (!cancellation.IsCancellationRequested && generation == Volatile.Read(ref _generation)) _pendingLocalProgress[preview.Worker] = preview; });
+                double ready = timeline.ElapsedMs;
                 _mainThread.Enqueue(() =>
                 {
                     if (generation != _generation) return;
+                    var complete = new LocalTimeline(timeline.Origin, 65536);
+                    complete.Import(result.Trace);
+                    complete.Add(new(-1, "main", "display_wait", "", ready, complete.ElapsedMs - ready));
+                    using var displaying = complete.Measure(-1, "main", "display");
                     RefreshSnapshot();
                     if (generation != _generation || _snapshotHash != request.SnapshotId) return;
                     if (LocalCapture.Fingerprint() != request.NativeHash)
                     { Cancel("原生战斗状态已变化，请重新计算。"); return; }
+                    displaying.Dispose();
+                    result = result with { ElapsedMs = (long)complete.ElapsedMs, Trace = complete.Snapshot() };
                     _advice.Text = LocalSearchPolicy.Format(result);
+                    _localTiming.Text = LocalTimeline.Format(result);
+                    var timingPath = ProjectSettings.GlobalizePath("user://spire_ai_coach/diagnostics/local-timing-latest.json");
+                    _ = Task.Run(() =>
+                    {
+                        try
+                        {
+                            Directory.CreateDirectory(Path.GetDirectoryName(timingPath)!);
+                            LocalWire.Write(timingPath, new { version = "0.7.3", result.ElapsedMs, result.Workers,
+                                result.Evaluated, result.Victories, result.Trace });
+                        }
+                        catch (Exception ex) { GD.Print("[SpireAiCoach] Timing save failed: " + ex.GetType().Name); }
+                    });
                     _adviceHash = request.SnapshotId;
-                    _freshness.Text = "后台重放通过当前状态校验；这是预算内候选，未保证最优或所有 Mod 兼容。";
+                    _freshness.Text = "路线已复核；按建议操作可续用。当前为预算内最佳候选，尚未证明全局最优。";
                     _status.Text = "本地计算完成 · 不消耗 API";
                     if (result.Best?.Continuation is { Length: > 0 })
                     {
@@ -493,6 +538,7 @@ public sealed class CoachOverlay
         _execution?.Cancel();
         _continuation = null; _continuationPending = false;
         _execute.Disabled = true;
+        _continueOptimize.Disabled = true;
         ++_generation;
         if (_localAnalyzing)
         {
@@ -538,6 +584,7 @@ public sealed class CoachOverlay
         using var cancellation = new CancellationTokenSource();
         _execution = cancellation; _executing = true;
         _execute.Disabled = true; _stopExecution.Disabled = false;
+        _continueOptimize.Disabled = true;
         _analyze.Disabled = true; _localAnalyze.Disabled = true;
         _freshness.Text = "正在按方案执行。点击停止或按 Esc 可随时停止后续动作。";
         try

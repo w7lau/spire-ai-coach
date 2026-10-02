@@ -31,15 +31,43 @@ public static class ReplayIntegration
             })).Append(coach).ToArray();
         // Preserve the frozen user's search/potion settings; only raise the old turn horizon.
         var request = original with { Id = Guid.NewGuid().ToString("N"), LoadedMods = loaded, MaxRounds = 64 };
-        var result = await Task.Run(() => pool.Analyze(request, new(game, directories), _ => { }, CancellationToken.None));
+        var installation = new LocalInstallation(game, directories);
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT") is { Length: > 0 } seedPath)
+            request = request with { InitialPlan = LocalWire.Read<LocalSearchResult>(seedPath).Best!.Actions };
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SPEED_BENCHMARK") == "1")
+        {
+            request = request with { Workers = 1, MaxNodes = 1, BudgetSeconds = 60 };
+            await Task.Run(() => pool.Prepare(installation, 1, CancellationToken.None));
+            // Warm run/act assets before comparing the same complete fixed line.
+            await Task.Run(() => pool.Analyze(request with { Id = Guid.NewGuid().ToString("N"), SimulationSpeed = 1 }, installation, _ => { }, CancellationToken.None));
+            var records = new List<object>();
+            LocalCandidate? baseline = null;
+            foreach (var speed in new[] { 1, 8 })
+            {
+                var sample = await Task.Run(() => pool.Analyze(request with { Id = Guid.NewGuid().ToString("N"), SimulationSpeed = speed },
+                    installation, _ => { }, CancellationToken.None));
+                var best = sample.Best ?? throw new InvalidOperationException("Speed sample returned no route");
+                if (!best.Won || sample.Rejected != 0 || best.Continuation?.Length != best.Actions.Length)
+                    throw new InvalidOperationException("Speed sample did not produce verified victory");
+                if (baseline != null && (best.HpLost != baseline.HpLost || best.Hp != baseline.Hp ||
+                    !best.Continuation!.SequenceEqual(baseline.Continuation!)))
+                    throw new InvalidOperationException("Accelerated replay differed from baseline native states/history");
+                baseline = best;
+                records.Add(new { speed, sample.ElapsedMs, sample.Timing, best.HpLost, best.Hp, best.Rounds,
+                    steps = best.Actions.Length, native_states_and_history_match = true });
+            }
+            LocalWire.Write(Path.Combine(root, "integration-speed-summary.json"), records);
+            return;
+        }
+        var result = await Task.Run(() => pool.Analyze(request, installation, _ => { }, CancellationToken.None));
         LocalWire.Write(Path.Combine(root, "integration-replay-private.json"), result);
-        if (result.Best == null || result.Rejected != 0 || result.Best.Continuation?.Length != result.Best.Actions.Length)
+        if (result.Best == null || result.Rejected != 0 || result.Best.Continuation?.Length != result.Best.Actions.Length || result.Timing?.Verifications != 1)
             throw new InvalidOperationException("Incident replay did not produce a verified route");
         LocalWire.Write(Path.Combine(root, "integration-replay-summary.json"), new
         {
             result.Status, result.Evaluated, result.Rejected, result.Victories, result.ElapsedMs, result.Timing,
             result.Workers, result.MaxRounds, request.BudgetSeconds, request.MaxNodes, request.IncludePotions,
-            result.Best.Won, result.Best.Hp, result.Best.HpLost, result.Best.Rounds,
+            result.Best.Won, result.Best.StartingHp, result.Best.Hp, result.Best.NetHpLoss, result.Best.HpLost, result.Best.Rounds,
             result.Best.EnemyHp, result.Best.StopReason,
             used_potion = result.Best.Actions.Any(a => a.PotionSlot.HasValue),
             choices = result.Best.Actions.Sum(a => a.Choices?.Length ?? 0),

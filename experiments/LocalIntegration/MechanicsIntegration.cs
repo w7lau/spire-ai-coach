@@ -48,12 +48,14 @@ public static class MechanicsIntegration
                 "upgrade" => new[] { "ARMAMENTS", "DEFEND_IRONCLAD", "DEFEND_IRONCLAD", "DEFEND_IRONCLAD", "DEFEND_IRONCLAD" },
                 "multi" => new[] { "PREPARED", "DEFEND_IRONCLAD", "DEFEND_IRONCLAD", "DEFEND_IRONCLAD", "DEFEND_IRONCLAD" },
                 "longfight" => new[] { "BLUDGEON", "DEFEND_IRONCLAD", "DEFEND_IRONCLAD", "DEFEND_IRONCLAD", "DEFEND_IRONCLAD" },
+                "carry" => new[] { "BARRICADE", "BODY_SLAM", "DEFEND_IRONCLAD", "DEFEND_IRONCLAD", "DEFEND_IRONCLAD" },
+                "compact" => new[] { "COMPACT", "BODY_SLAM", "WOUND", "WOUND", "WOUND" },
                 _ => new[] { "HEADBUTT", "DEFEND_IRONCLAD", "DEFEND_IRONCLAD", "DEFEND_IRONCLAD", "DEFEND_IRONCLAD" }
             };
             foreach (var id in ids)
             {
                 var card = run.CreateCard(ModelDb.AllCards.Single(c => c.Id.Entry == id), player);
-                if (kind == "ordering" && id == "ARMAMENTS" || kind == "exhaust" && id == "TRUE_GRIT" || kind == "multi" && id == "PREPARED" || kind == "longfight") card.UpgradeInternal();
+                if (kind == "ordering" && id == "ARMAMENTS" || kind == "exhaust" && id == "TRUE_GRIT" || kind == "multi" && id == "PREPARED" || kind == "longfight" || kind == "carry" || kind == "compact" && id == "BODY_SLAM") card.UpgradeInternal();
                 await CardPileCmd.Add(card, player.Deck, skipVisuals: true);
             }
             await PreloadManager.LoadRunAssets(run.Players.Select(p => p.Character));
@@ -63,12 +65,22 @@ public static class MechanicsIntegration
             await RunManager.Instance.EnterRoomDebug(RoomType.Monster, MapPointType.Monster,
                 ModelDb.AllEncounters.Single(e => e.Id.Entry == "SLUMBERING_BEETLE_NORMAL").ToMutable(), false);
             var capture = new StateCapture(); while (!LocalCapture.Stable()) await Frame();
+            if (kind == "carry")
+            {
+                var barricade = player.PlayerCombatState!.Hand.Cards.Single(c => c.Id.Entry == "BARRICADE");
+                RunManager.Instance.ActionQueueSet.EnqueueWithoutSynchronizing(new PlayCardAction(barricade, null));
+                await Frame(); await RunManager.Instance.ActionQueueSet.BecameEmpty();
+                while (!LocalCapture.Stable()) await Frame();
+                var round = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
+                RunManager.Instance.ActionQueueSet.EnqueueWithoutSynchronizing(new EndPlayerTurnAction(player, player.PlayerCombatState.TurnNumber));
+                while (CombatManager.Instance.DebugOnlyGetState()!.RoundNumber <= round || !LocalCapture.Stable()) await Frame();
+            }
             var snapshot = capture.Capture(true)!;
             var hand = player.PlayerCombatState!.Hand.Cards;
             LocalAction Action(CardModel c) => new(hand.ToList().IndexOf(c), c.Id.ToString(), c.IsValidTarget(null) ? null : player.Creature.CombatState!.Enemies[0].CombatId,
                 c.Title, "enemy", LocalCapture.Fingerprint(), CombatManager.Instance.DebugOnlyGetState()!.RoundNumber,
                 CombatCardIndex: NetCombatCard.FromModel(c).CombatCardIndex);
-            var target = hand.Single(c => c.Id.Entry == (kind == "ordering" || kind == "upgrade" ? "ARMAMENTS" : kind == "exhaust" ? "TRUE_GRIT" : kind == "multi" ? "PREPARED" : kind == "longfight" ? "BLUDGEON" : "HEADBUTT"));
+            var target = hand.Single(c => c.Id.Entry == (kind == "ordering" || kind == "upgrade" ? "ARMAMENTS" : kind == "exhaust" ? "TRUE_GRIT" : kind == "multi" ? "PREPARED" : kind == "longfight" ? "BLUDGEON" : kind == "carry" ? "BODY_SLAM" : kind == "compact" ? "COMPACT" : "HEADBUTT"));
             var initial = kind == "ordering" ? hand.Where(c => c.Id.Entry == "STRIKE_IRONCLAD").Select(Action).Append(Action(target)).ToArray() :
                 kind == "retrieve" ? hand.Where(c => c.Id.Entry == "DEFEND_IRONCLAD").Take(2).Select(Action).Append(Action(target)).ToArray() : [Action(target)];
             if (kind == "longfight")
@@ -78,10 +90,20 @@ public static class MechanicsIntegration
                 initial = Enumerable.Range(0, 11).Select(i => new LocalAction(-1, "", null, "", "", "", firstRound + i, EndTurn: true))
                     .Append(Action(target) with { Round = firstRound + 11 }).ToArray();
             }
+            if (kind == "carry")
+            {
+                var firstRound = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
+                var defenses = hand.Where(c => c.Id.Entry == "DEFEND_IRONCLAD").Take(2).Select(Action).ToArray();
+                initial = Enumerable.Range(0, 12).SelectMany(i => defenses.Select(a => a with { Round = firstRound + i })
+                    .Append(Action(target) with { Round = firstRound + i })
+                    .Append(new(-1, "", null, "", "", "", firstRound + i, EndTurn: true))).ToArray();
+            }
             var request = LocalCapture.Capture(snapshot.Fingerprint(), true) with
-                { Workers = 1, MaxNodes = kind == "ordering" ? 8 : 1, MaxRounds = kind == "longfight" ? 64 : 1,
-                    BudgetSeconds = kind == "longfight" ? 40 : 25, InitialPlan = initial,
+                { Workers = 1, MaxNodes = kind == "ordering" || kind == "carry" ? 8 : 1, MaxRounds = kind == "longfight" || kind == "carry" ? 64 : 1,
+                    BudgetSeconds = kind == "longfight" || kind == "carry" ? 40 : 25, InitialPlan = initial,
                     DebugEncounter = "SLUMBERING_BEETLE_NORMAL" };
+            LocalSearchResult? baseline = null;
+            if (kind == "carry") baseline = await Task.Run(() => pool.Analyze(request with { Id = Guid.NewGuid().ToString("N"), MaxNodes = 1 }, LocalCapture.Installation(), _ => { }, CancellationToken.None));
             var result = await Task.Run(() => pool.Analyze(request, LocalCapture.Installation(), _ => { }, CancellationToken.None));
             LocalWire.Write(Path.Combine(root, "integration-mechanics-" + kind + "-private.json"), result);
             if (LocalCapture.Fingerprint() != request.NativeHash || result.Rejected != 0 || result.Best?.Continuation?.Length != result.Best?.Actions.Length)
@@ -96,6 +118,18 @@ public static class MechanicsIntegration
             else if (kind == "longfight")
             {
                 if (best.Rounds <= 10 || !best.Won) throw new InvalidOperationException("Need verified victory beyond ten rounds");
+            }
+            else if (kind == "carry" || kind == "compact")
+            {
+                if (kind == "carry" && (baseline?.Best == null || !LocalSearchPolicy.Better(best, baseline.Best)))
+                    throw new InvalidOperationException("Carry-block search did not improve the deliberately incomplete line");
+                if (kind == "compact" && (!best.Actions.Any(a => a.ModelId == "CARD.COMPACT") ||
+                    !best.Actions.Any(a => a.ModelId == "CARD.FUEL"))) throw new InvalidOperationException("Native status transformation and fuel were not executed");
+                var messages = new List<string>();
+                await new LocalPlanExecutor(tree).Execute(new(snapshot.CombatId, request.LoadedMods, result),
+                    () => capture.Capture(false)?.CombatId, false, messages.Add, CancellationToken.None);
+                if (messages.Count != best.Actions.Length || player.Creature.CurrentHp != best.Hp)
+                    throw new InvalidOperationException("Accelerated route diverged at normal-speed synthetic host execution");
             }
             else
             {
@@ -112,7 +146,9 @@ public static class MechanicsIntegration
                     after.NativeHash != LocalCapture.Fingerprint()) throw new InvalidOperationException(kind + ": completed choice continuation failed");
             }
             records.Add(new { kind, result.Status, result.Evaluated, result.Rejected, result.ElapsedMs, result.Timing,
-                best.EnemyHp, best.HpLost, best.Rounds, best.Won, actions = best.Actions.Select(a => new { a.ModelId, a.CombatCardIndex,
+                best.EnemyHp, best.StartingHp, best.Hp, best.NetHpLoss, best.HpLost, best.Rounds, best.Won,
+                baseline = baseline?.Best is { } previous ? new { previous.Hp, previous.HpLost, previous.Rounds, previous.Won } : null,
+                actions = best.Actions.Select(a => new { a.ModelId, a.CombatCardIndex,
                     choices = (a.Choices ?? []).Select(c => new { c.Kind, c.Indices }) }), verified = true });
             LocalWire.Write(Path.Combine(root, "integration-mechanics.json"), records);
         }
