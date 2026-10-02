@@ -212,7 +212,7 @@ public sealed class CoachOverlay
 
     private void RefreshPreview()
     {
-        if (_context.Visible) _context.Text = _snapshot == null ? "无战斗快照" : PromptBuilder.UserPrompt(_snapshot);
+        if (_context.Visible) _context.Text = _snapshot == null ? "无战斗快照" : PromptBuilder.InputPreview(_snapshot);
     }
 
     private void SaveSettings()
@@ -299,12 +299,8 @@ public sealed class CoachOverlay
                     {
                         _diagnosticGeneration = generation;
                         _diagnosticJson = diagnosticJson;
-                        using var doc = System.Text.Json.JsonDocument.Parse(diagnosticJson);
-                        var root = doc.RootElement;
                         _diagnosticView.Text = $"调用 {trace.CallId}\n结果：{trace.Outcome}\n文件：{location}\n\n" +
-                            "AI 原始正文（不是实时预览；已隐藏本次密钥）：\n" +
-                            (root.GetProperty("assistant_content").GetString() ?? "未取得 AI 正文，见接口回复及错误详情。") +
-                            "\n\n完整诊断（包含本次冻结请求、接口回复和校验原因）：\n" + diagnosticJson;
+                            DiagnosticDisplay.Format(diagnosticJson);
                     }
                     if (generation == _generation)
                     {

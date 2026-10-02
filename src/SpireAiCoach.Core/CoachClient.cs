@@ -37,6 +37,7 @@ public sealed class CoachClient : IDisposable
             ["messages"] = new[]
             {
                 new { role = "system", content = PromptBuilder.SystemPrompt },
+                new { role = "user", content = PromptBuilder.ContextPrompt(snapshot) },
                 new { role = "user", content = PromptBuilder.UserPrompt(snapshot) }
             },
             ["stream"] = true

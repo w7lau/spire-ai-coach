@@ -337,11 +337,14 @@ AsyncTest("current turn HTTP input preserves powers relic descriptions amounts a
     using var client = new CoachClient(new FakeHandler(async (req, _) =>
     {
         using var body = JsonDocument.Parse(await req.Content!.ReadAsStringAsync());
-        using var prompt = JsonDocument.Parse(body.RootElement.GetProperty("messages")[1].GetProperty("content").GetString()!);
+        using var context = JsonDocument.Parse(body.RootElement.GetProperty("messages")[1].GetProperty("content").GetString()!);
+        using var prompt = JsonDocument.Parse(body.RootElement.GetProperty("messages")[2].GetProperty("content").GetString()!);
         var root = prompt.RootElement;
         Check(!root.TryGetProperty("max_rounds", out var unusedRounds) && !root.TryGetProperty("guidance_scope", out var unusedScope));
         var player = root.GetProperty("snapshot").GetProperty("player");
-        var power = player.GetProperty("powers")[0]; var relic = player.GetProperty("relics")[0];
+        var power = player.GetProperty("powers")[0];
+        var relic = context.RootElement.GetProperty("context").GetProperty("player").GetProperty("relics")[0];
+        Check(!player.TryGetProperty("relics", out var duplicateRelics));
         Check(power.GetProperty("amount").GetDecimal() == 3 && power.GetProperty("description").GetString() == "回合结束触发效果。");
         Check(relic.GetProperty("description").GetString() == "失去生命时触发效果。" && relic.GetProperty("used_up").GetBoolean());
         Check(relic.GetProperty("variables").GetProperty("Amount").GetInt32() == 2);
@@ -529,7 +532,9 @@ AsyncTest("different combat states reuse byte-identical system prefix and distin
     Check(messages[0][0].GetProperty("role").GetString() == "system" && messages[0][1].GetProperty("role").GetString() == "user");
     var system = messages[0][0].GetProperty("content").GetString()!;
     Check(system == messages[1][0].GetProperty("content").GetString());
-    Check(messages[0][1].GetProperty("content").GetString() != messages[1][1].GetProperty("content").GetString());
+    Check(messages[0].GetArrayLength() == 3);
+    Check(messages[0][1].GetProperty("content").GetString() == messages[1][1].GetProperty("content").GetString());
+    Check(messages[0][2].GetProperty("content").GetString() != messages[1][2].GetProperty("content").GetString());
     Check(!system.Contains(state.Fingerprint()) && !system.Contains(changed.Fingerprint()));
     Check(first.SystemPromptHash == second.SystemPromptHash && first.SystemPromptHash == Convert.ToHexString(
         System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(system))));
@@ -562,6 +567,66 @@ Test("cache telemetry distinguishes missing zero invalid and nonzero usage", () 
     Check(TokenUsage.Read("""{"prompt_tokens_details":{"cached_tokens":512}}""").CachedInputTokens == 512);
     foreach (var json in new[] { "null", "[]", "bad-json", "{\"prompt_tokens_details\":{\"cached_tokens\":-1}}", "{\"prompt_tokens_details\":{\"cached_tokens\":\"0\"}}" })
         Check(TokenUsage.Read(json).CachedInputTokens == null);
+});
+
+Test("split prompt reconstructs the complete current snapshot without duplicate relics", () =>
+{
+    var relic = new EffectInfo("RELIC.TEST", "test-mod", "测试遗物", "含引号\"、换行\n与反斜杠\\的描述", 2,
+        new Dictionary<string, decimal> { ["counter"] = 3 }, false, 2);
+    var original = state with { Player = state.Player with { Relics = [relic, relic] } };
+    var context = JsonNode.Parse(PromptBuilder.ContextPrompt(original))!;
+    var prompt = JsonNode.Parse(PromptBuilder.UserPrompt(original))!;
+    var snapshot = prompt["snapshot"]!.DeepClone();
+    Check(snapshot["player"]!["relics"] == null);
+    foreach (var item in context["context"]!["player"]!.AsObject())
+        snapshot["player"]![item.Key] = item.Value!.DeepClone();
+    Check(JsonNode.DeepEquals(snapshot, JsonSerializer.SerializeToNode(original, Wire.Json)));
+    Check(prompt["snapshot_id"]!.GetValue<string>() == original.Fingerprint());
+    Check(PromptBuilder.InputPreview(original).Contains("测试遗物"));
+});
+Test("relic context refreshes on every observed change and never carries old combat data", () =>
+{
+    var relic = new EffectInfo("RELIC.TEST", "test-mod", "测试遗物", "当前效果", 2,
+        new Dictionary<string, decimal> { ["counter"] = 3 }, false, 1);
+    var sample = state with { Player = state.Player with { Relics = [relic] } };
+    var prefix = PromptBuilder.ContextPrompt(sample);
+    Check(prefix == PromptBuilder.ContextPrompt(sample with { CombatId = "new-combat", Round = 4, ObservationRevision = 9 }));
+    foreach (var changed in new[] { relic with { UsedUp = true }, relic with { Amount = 4 },
+        relic with { StackCount = 2 }, relic with { Description = "变化后的效果" },
+        relic with { Variables = new Dictionary<string, decimal> { ["counter"] = 4 } } })
+    {
+        var current = sample with { Player = sample.Player with { Relics = [changed] } };
+        Check(PromptBuilder.ContextPrompt(current) != prefix);
+        Check(JsonNode.Parse(PromptBuilder.ContextPrompt(current))!["context"]!["player"]!["relics"]![0]!["description"]!.GetValue<string>() == changed.Description);
+    }
+    Check(PromptBuilder.ContextPrompt(state) != prefix); // Removing the relic restores the empty current set.
+});
+AsyncTest("HTTP content has one JSON object encoding and readable diagnostics preserve text and redaction", async () =>
+{
+    var key = "test-secret-key";
+    var description = "描述含\"引号\"、路径 C:\\cards\\test 和换行\n下一行 " + key;
+    var sample = state with { Player = state.Player with { Relics = [new("R", "mod", "遗物", description, 1)] } };
+    using var client = new CoachClient(new FakeHandler(async (req, _) =>
+    {
+        using var body = JsonDocument.Parse(await req.Content!.ReadAsStringAsync());
+        var messages = body.RootElement.GetProperty("messages");
+        using var context = JsonDocument.Parse(messages[1].GetProperty("content").GetString()!);
+        Check(context.RootElement.ValueKind == JsonValueKind.Object); // Not a quoted JSON string.
+        Check(context.RootElement.GetProperty("context").GetProperty("player").GetProperty("relics")[0].GetProperty("description").GetString() == description);
+        return new(HttpStatusCode.OK) { Content = new StringContent(Envelope(Reply(sample).ToJsonString())) };
+    }));
+    var trace = new CallDiagnostics();
+    await client.AnalyzeAsync(Settings(), key, sample, diagnostics: trace);
+    var diagnostic = trace.RedactedJson(key);
+    var display = DiagnosticDisplay.Format(diagnostic);
+    using var saved = JsonDocument.Parse(diagnostic);
+    using var request = JsonDocument.Parse(saved.RootElement.GetProperty("request_body").GetString()!);
+    foreach (var message in request.RootElement.GetProperty("messages").EnumerateArray())
+        Check(display.Contains(message.GetProperty("content").GetString()!));
+    Check(display.Contains(trace.AssistantContent!) && !display.Contains(key));
+    Check(display.Contains("[REDACTED]") && display.Contains("[system]") && display.Contains("[user]"));
+    Check(trace.RequestBody!.Contains(key)); // Display redaction does not alter the frozen wire evidence.
+    Check(DiagnosticDisplay.Format(new CallDiagnostics().RedactedJson("")).Contains("尚未生成请求"));
 });
 
 int failures = 0;

@@ -10,7 +10,7 @@ Godot 主线程 → `StateCapture` → 独立 C# 快照 → SHA-256 指纹 → `
 
 ## Prompt
 
-`PromptBuilder.SystemPrompt` 是稳定规则：游戏基础机制、例外优先级、证据、不确定性、本回合指导职责。`UserPrompt` 包含任务、快照指纹和完整快照。`AdviceContract.Instructions` 是输出字段与动作枚举的唯一权威，并被系统 Prompt 引用。0.2.1 移除多轮 UI、设置和输出合同，旧配置中的范围字段按未知字段忽略。诊断的 guidance_scope 恒为 current_turn，仅用于记录，不由模型生成。
+`PromptBuilder.SystemPrompt` 是稳定规则：游戏基础机制、例外优先级、证据、不确定性、本回合指导职责。turn-coach-v5 使用三条消息：system、ContextPrompt user、UserPrompt user。ContextPrompt 仅携带 context.player.character / relics；UserPrompt 包含任务、完整快照指纹及去掉这两字段的当前快照。合并两部分即可无损恢复完整观察，遗物不重复发送，原始 CombatSnapshot 与首步校验不变。`AdviceContract.Instructions` 是输出字段与动作枚举的唯一权威，并被系统 Prompt 引用。0.2.1 移除多轮 UI、设置和输出合同，旧配置中的范围字段按未知字段忽略。诊断的 guidance_scope 恒为 current_turn，仅用于记录，不由模型生成。
 
 当前回合推断包括本轮出牌及紧接的敌方行动；要求使用状态效果和遗物的描述、层数、使用状态及触发时机，解释会改变本轮决策的机制。确定性数值结论应核算资源、牌堆移动、格挡和已知触发；缺少后续轮次信息不妨碍规划已有充分证据的本轮动作。该 Prompt 是模型行为要求，没有伪装成本地模拟器校验。
 
@@ -18,7 +18,7 @@ turn-coach-v4 将默认战斗规则集中在 system：回合开始能量重置�
 
 针对本机 v0.111.0 已核实的内置机制，固定说明仅对 source=sts2、相应 model_id 生效：覆甲在所属回合结束的早期给予格挡，回合开始再减层；胆小在符合条件且造成穿透伤害的卡牌攻击之后获得格挡。`StateCapture` 读取公开 `SkittishPower.HasGainedBlockThisTurn` 到 used_up；其他状态仍可为 null，不以描述猜测已触发状态。没有修改游戏状态或推进随机数。
 
-SystemPrompt 初始化一次并保留 SHA-256 指纹；不包含动态快照ID、时间、人物或模型。HTTP 两次不同状态测试直接比较第一条消息逐字相同，第二条包含各自快照。该指纹可用于诊断规则版本一致性，不是服务端缓存凭据。没有新 reviewer，输出字段、首步校验、纯文本显示和旧建议不再注入的边界保持一致。
+SystemPrompt 初始化一次并保留 SHA-256 指纹；不包含动态快照ID、时间、人物或模型。HTTP 两次不同回合测试直接比较前两条消息逐字相同，第三条包含各自快照。ContextPrompt 每次从同一份当前冻结快照重建，没有本地跨请求缓存；遗物含有动态描述、amount、variables、used_up 和 stack_count，任一变化均更新前缀，空数组表示当前无遗物。保留原采集顺序及重复实例，避免压缩改变语义。该指纹可用于诊断规则版本一致性，不是服务端缓存凭据。没有新 reviewer，输出字段、首步校验、纯文本显示和旧建议不再注入的边界保持一致。
 
 选用显式的有序操作序列，因为每一步的资源、目标、条件与后续状态可能变化；不是给模型重复生成所有牌堆。建议不会作为下一次的游戏事实重新注入，下一次始终读取真实状态。
 
@@ -62,6 +62,8 @@ JSON 顶层和每个步骤先投影到消费字段。额外字段被丢弃；非
 `CallDiagnostics` 在解析前捕获成功 HTTP 的原始响应体，并在格式校验前捕获 AI 正文、finish_reason、请求 ID。校验失败也保留精确冻结输入、响应和具体首步错误。非成功 HTTP 不读取响应体；截断、取消、传输错误分别记录，不补造 AI 建议。原始响应在保留本次密钥脱敏后写入本地 diagnostics，最多保留20个本组件命名的文件。UI 最近记录用请求序号防止被旧请求覆盖；实时预览明确标注尚未发送。游戏日志仅记分类、调用ID及快照等摘要；完整诊断只能通过本地文件或用户复制分享。
 
 诊断 response_format 区分 sse/json；stream_completed 只表示流式传输有完整结束，不代表建议合法。SSE 中断时也保留原始已读事件和已拼接正文。预览掩去本次密钥及末尾可能仍在接收的密钥前缀；拼接正文需要脱敏时，省略原始 SSE 事件体以避免从片段重建密钥，保留脱敏正文。
+
+DiagnosticDisplay 只接收已脱敏记录，按已知层级解析日志 → request_body → messages[].content，原样展示模型消息内容和 assistant_content。不会靠替换反斜杠破坏合法 JSON / 描述。UI 不再把整份嵌套诊断追加到文本末尾；复制按钮及本地诊断保留完整记录，实时输入预览包括两个 user 段。修改展示不改变实际发送的文本或诊断存储协议。
 
 ## 预测扩展
 
