@@ -25,7 +25,9 @@ public static class LocalCapture
         var writer = new PacketWriter();
         NetFullCombatState.FromRun(state.RunState, null).Serialize(writer);
         var extra = Encoding.UTF8.GetBytes($"|{state.RoundNumber}|" + string.Join(";",
-            state.Enemies.Select(e => $"{e.CombatId}:{e.Monster?.NextMove?.Id}")));
+            state.Enemies.Select(e => $"{e.CombatId}:{e.Monster?.NextMove?.Id}")) + "|potions|" +
+            string.Join(";", state.Players.SelectMany(p => p.PotionSlots.Select((potion, slot) =>
+                $"{p.NetId}:{slot}:{potion?.Id}:{potion?.IsQueued}"))));
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         hash.AppendData(writer.Buffer.AsSpan(0, (writer.BitPosition + 7) / 8));
         hash.AppendData(extra);

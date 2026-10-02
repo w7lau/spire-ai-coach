@@ -719,6 +719,84 @@ Test("local concurrency persists without AI configuration and preserves existing
     finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
 });
 
+Test("potion actions preserve slots targets and action kind without aliasing card prefixes", () =>
+{
+    var potion = new LocalAction(-1, "POTION.FIRE_POTION", 7, "火焰药水", "敌人", "before", Round: 2, PotionSlot: 2);
+    var copy = JsonSerializer.Deserialize<LocalAction>(JsonSerializer.Serialize(potion))!;
+    Check(copy == potion);
+    Check(LocalSearchPolicy.Describe(copy).Contains("药水槽 3") && !LocalSearchPolicy.Describe(copy).Contains("手牌"));
+    Check(LocalFrontier.Key([potion]) != LocalFrontier.Key([potion with { PotionSlot = 1 }]));
+    Check(LocalFrontier.Key([potion]) != LocalFrontier.Key([potion with { PotionSlot = null }]));
+    var won = new LocalCandidate([], 60, 0, 0, 100, 80, true, false, false);
+    Check(LocalSearchPolicy.Better(won, won with { Actions = [potion] }));
+    Check(LocalSearchPolicy.Better(won with { Hp = 70, Actions = [potion] }, won));
+    var result = new LocalSearchResult("id", "snap", "done", "", 1, 0, 1000, won);
+    Check(LocalSearchPolicy.Format(result).Contains("未纳入主动使用药水"));
+    Check(LocalSearchPolicy.Format(result with { IncludePotions = true }).Contains("已纳入主动使用药水"));
+});
+Test("local potion preference persists independently of AI connection and encrypted secret", () =>
+{
+    var directory = Path.Combine(Path.GetTempPath(), "spire-potion-settings-" + Guid.NewGuid().ToString("N"));
+    try
+    {
+        var store = new SpireAiCoach.Mod.SettingsStore(directory);
+        store.SaveLocalOptions(4, true);
+        Check(store.Load().Settings.LocalIncludePotions);
+        store.SaveLocalWorkers(2); Check(store.Load().Settings.LocalIncludePotions);
+        store.Save(Settings() with { RememberKey = true, LocalIncludePotions = true }, "synthetic-secret");
+        var key = File.ReadAllBytes(Path.Combine(directory, "api-key.dpapi"));
+        store.SaveLocalOptions(4, false);
+        Check(!store.Load().Settings.LocalIncludePotions && store.Load().Settings.Model == Settings().Model);
+        Check(key.SequenceEqual(File.ReadAllBytes(Path.Combine(directory, "api-key.dpapi"))));
+    }
+    finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+});
+Test("progress isolates job snapshot worker and monotonic ordering", () =>
+{
+    var book = new LocalProgressBook("job", "snapshot");
+    var p = new LocalProgress("job", "snapshot", 0, 4, 3, 2, 1, 32, 1, 2000, 60, "试走", null, []);
+    Check(book.Accept(p));
+    Check(!book.Accept(p with { Id = "old-job", Sequence = 9 }));
+    Check(!book.Accept(p with { SnapshotId = "old-snapshot", Sequence = 9 }));
+    Check(!book.Accept(p with { Sequence = 2 }));
+    Check(!book.Accept(p with { Worker = 4 }));
+    Check(book.Accept(p with { Worker = 1, Sequence = 1 }));
+    Check(book.Latest.Count == 2 && book.Latest[0].Sequence == 3);
+    Check(LocalProgressBook.BudgetUsed(p with { ElapsedMs = 90000 }) == 100);
+    Check(LocalProgressBook.BudgetUsed(p with { ElapsedMs = -1 }) == 0);
+});
+Test("progress reports measured damage block energy powers and hand changes", () =>
+{
+    var before = new LocalSimState(1, 80, 80, 0, 3, "覆甲 2", ["打击"], 2,
+        [new(4, "敌人", 40, 40, 0, "", "攻击")]);
+    var after = before with { Block = 12, Energy = 2, Hp = 77, Potions = 1, Hand = [],
+        Enemies = [new(4, "敌人", 20, 40, 0, "易伤 2", "攻击")] };
+    var change = LocalProgressBook.Changes(before, after);
+    Check(change.Contains("80→77") && change.Contains("40→20") && change.Contains("格挡 0→12") && change.Contains("药水 2→1"));
+    Check(change.Contains("易伤 2") && change.Contains("手牌"));
+    Check(LocalProgressBook.StateText(after).Contains("生命 77/80"));
+});
+AsyncTest("frequent local telemetry replacement stays readable during concurrent reads on Windows", async () =>
+{
+    var directory = Path.Combine(Path.GetTempPath(), "spire-wire-test-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(directory);
+    var path = Path.Combine(directory, "progress.json");
+    try
+    {
+        LocalWire.Write(path, new[] { 0, 0 });
+        var writer = Task.Run(() => { for (int i = 1; i < 500; i++) LocalWire.Write(path, new[] { i, i }); });
+        int reads = 0;
+        while (!writer.IsCompleted || reads < 100)
+        {
+            var pair = LocalWire.Read<int[]>(path);
+            Check(pair.Length == 2 && pair[0] == pair[1]); reads++;
+            await Task.Yield();
+        }
+        await writer;
+    }
+    finally { Directory.Delete(directory, true); }
+});
+
 int failures = 0;
 foreach (var (name, test) in tests)
 {

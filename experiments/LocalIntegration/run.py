@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--workspace', type=Path, required=True)
 parser.add_argument('--quick', action='store_true')
 parser.add_argument('--benchmark', action='store_true')
+parser.add_argument('--features', action='store_true')
 args = parser.parse_args()
 root = args.workspace.resolve()
 if not (root / '.spire-native-probe-owner').is_file() or not (root / 'fixture.json').is_file():
@@ -41,8 +42,13 @@ with worker_lock(root):
     env.pop('SPIRE_COACH_WORKER', None)
     env['SPIRE_LOCAL_INTEGRATION_QUICK'] = '1' if args.quick else '0'
     env['SPIRE_LOCAL_BENCHMARK'] = '1' if args.benchmark else '0'
+    env['SPIRE_LOCAL_FEATURES'] = '1' if args.features else '0'
+    settings = root / 'Roaming/SlayTheSpire2/default/1/settings.save'
+    settings_data = json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}
+    settings_data.update(volume_master=0, volume_bgm=0, volume_sfx=0, volume_ambience=0)
+    settings.write_text(json.dumps(settings_data), encoding='utf-8')
     with (root / 'integration-stdout.log').open('wb') as output:
-        process = subprocess.Popen([str(root / 'game/SlayTheSpire2.exe'), '--headless', '--max-fps', '120',
+        process = subprocess.Popen([str(root / 'game/SlayTheSpire2.exe'), '--headless', '--audio-driver', 'Dummy', '--max-fps', '120',
                                     '--force-steam=off', '--log-file', str(root / 'integration-game.log')],
             cwd=root / 'game', env=env, stdout=output, stderr=output, creationflags=subprocess.CREATE_NO_WINDOW)
         try:

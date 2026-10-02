@@ -8,11 +8,11 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     int Partition = 0, int Partitions = 2, int MaxNodes = 32, int MaxDepth = 24,
     int BudgetSeconds = 60, string? DebugEncounter = null,
     IReadOnlyDictionary<uint, string>? TargetLabels = null, int MaxRounds = 10,
-    int Workers = 0);
+    int Workers = 0, bool IncludePotions = false);
 
 public sealed record LocalAction(int HandIndex, string ModelId, uint? TargetId,
     string CardName, string TargetName, string BeforeHash, int Round = 0,
-    bool EndTurn = false, int Preference = 0);
+    bool EndTurn = false, int Preference = 0, int? PotionSlot = null);
 
 public sealed record LocalCandidate(LocalAction[] Actions, int Hp, int HpLost, int EnemyHp,
     int Gold, int MaxHp, bool Won, bool Dead, bool RewardCoverageKnown,
@@ -21,7 +21,7 @@ public sealed record LocalCandidate(LocalAction[] Actions, int Hp, int HpLost, i
 public sealed record LocalSearchResult(string Id, string SnapshotId, string Status,
     string Message, int Evaluated, int Rejected, long ElapsedMs, LocalCandidate? Best,
     int Duplicates = 0, int BudgetPruned = 0, int Victories = 0, int Workers = 1,
-    long WorkerMemoryBytes = 0, long SearchElapsedMs = 0);
+    long WorkerMemoryBytes = 0, long SearchElapsedMs = 0, bool IncludePotions = false);
 
 public static class LocalSearchPolicy
 {
@@ -40,6 +40,9 @@ public static class LocalSearchPolicy
         if (candidate.MaxHp != prior.MaxHp) return candidate.MaxHp > prior.MaxHp;
         if (candidate.Gold != prior.Gold) return candidate.Gold > prior.Gold;
         if (candidate.EnemyHp != prior.EnemyHp) return candidate.EnemyHp < prior.EnemyHp;
+        var potions = candidate.Actions.Count(a => a.PotionSlot.HasValue);
+        var priorPotions = prior.Actions.Count(a => a.PotionSlot.HasValue);
+        if (potions != priorPotions) return potions < priorPotions;
         return candidate.Actions.Length < prior.Actions.Length;
     }
 
@@ -56,13 +59,17 @@ public static class LocalSearchPolicy
         {
             var action = best.Actions[i];
             if (action.Round != round) { round = action.Round; lines.Add($"—— 第 {round} 回合 ——"); }
-            lines.Add(action.EndTurn ? $"{i + 1}. 结束回合，结算敌方行动。" : $"{i + 1}. 打出「{action.CardName}」（当时手牌第 {action.HandIndex + 1} 张）" +
-                (action.TargetId is null ? "。" : $" → {action.TargetName}［目标 {action.TargetId}］。"));
+            lines.Add($"{i + 1}. " + Describe(action));
         }
         if (best.Won) lines.Add("原生战斗胜利结算已完成。");
-        lines.Add("最多规划 10 轮；不使用药水，暂不支持额外选牌。预算裁剪可能遗漏更优路线；未证明任意 Mod 私有状态可恢复。实际出牌或随机结果有变化时请重新计算。" );
+        lines.Add($"最多规划 10 轮；{(result.IncludePotions ? "已纳入主动使用药水" : "未纳入主动使用药水（自动触发仍按游戏结算）")}，暂不支持额外选牌。预算裁剪可能遗漏更优路线；未证明任意 Mod 私有状态可恢复。实际出牌或随机结果有变化时请重新计算。" );
         return string.Join("\n", lines);
     }
+
+    public static string Describe(LocalAction action) => action.EndTurn ? "结束回合，结算敌方行动。" :
+        (action.PotionSlot is { } slot ? $"使用药水「{action.CardName}」（药水槽 {slot + 1}）" :
+            $"打出「{action.CardName}」（当时手牌第 {action.HandIndex + 1} 张）") +
+        (action.TargetId is null ? "。" : $" → {action.TargetName}［目标 {action.TargetId}］。");
 
     public static int WorkerCount(int processors, ulong availableMemory, int configured) => configured > 0
         ? Math.Clamp(configured, 1, 16)
@@ -80,7 +87,7 @@ public sealed class LocalFrontier(int capacity)
     public int BudgetPruned { get; private set; }
     public int Count => _pending.Count;
     public static string Key(IEnumerable<LocalAction> actions) => string.Join("/", actions.Select(a =>
-        $"{a.BeforeHash}:{a.Round}:{a.EndTurn}:{a.HandIndex}:{a.ModelId}:{a.TargetId}"));
+        $"{a.BeforeHash}:{a.Round}:{a.EndTurn}:{a.PotionSlot}:{a.HandIndex}:{a.ModelId}:{a.TargetId}"));
     public void MarkVisited(LocalAction[] actions) { var key = Key(actions); _seen.Add(key); _pending.Remove(key); }
     public void Add(LocalAction[] actions, double priority)
     {
@@ -101,12 +108,34 @@ public sealed class LocalFrontier(int capacity)
 
 public static class LocalWire
 {
-    public static T Read<T>(string path) => JsonSerializer.Deserialize<T>(File.ReadAllText(path))
-        ?? throw new InvalidDataException("Local worker returned empty data");
+    public static T Read<T>(string path)
+    {
+        using var lease = new FileLease(path);
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        return JsonSerializer.Deserialize<T>(stream) ?? throw new InvalidDataException("Local worker returned empty data");
+    }
     public static void Write<T>(string path, T value)
     {
+        using var lease = new FileLease(path);
         var temporary = path + ".tmp";
         File.WriteAllText(temporary, JsonSerializer.Serialize(value));
         File.Move(temporary, path, true);
+    }
+
+    // Windows replacement can race with an open reader even with FileShare.Delete.
+    // Serialize only access to this one IPC file; never hold the lock during game execution.
+    private sealed class FileLease : IDisposable
+    {
+        private readonly Mutex _mutex;
+        public FileLease(string path)
+        {
+            var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Path.GetFullPath(path).ToUpperInvariant()));
+            _mutex = new Mutex(false, "SpireAiCoach-ipc-" + Convert.ToHexString(hash));
+            bool acquired;
+            try { acquired = _mutex.WaitOne(TimeSpan.FromSeconds(5)); }
+            catch (AbandonedMutexException) { acquired = true; }
+            if (!acquired) { _mutex.Dispose(); throw new IOException("Local IPC file is busy"); }
+        }
+        public void Dispose() { _mutex.ReleaseMutex(); _mutex.Dispose(); }
     }
 }

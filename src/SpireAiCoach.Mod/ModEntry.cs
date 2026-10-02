@@ -18,7 +18,7 @@ public static class ModEntry
                 if (Engine.GetMainLoop() is not SceneTree tree) throw new InvalidOperationException("SceneTree unavailable");
                 _overlay = new CoachOverlay(tree);
                 _overlay.Mount();
-                GD.Print("[SpireAiCoach] 0.4.0 loaded. F8 AI/local panel / F9 AI analyze / F10 settings.");
+                GD.Print($"[SpireAiCoach] {typeof(ModEntry).Assembly.GetName().Version} loaded. F8 AI/local panel / F9 AI analyze / F10 settings.");
             }
             catch (Exception ex) { GD.PrintErr($"[SpireAiCoach] Initialization failed: {ex.GetType().Name}"); }
         }).CallDeferred();

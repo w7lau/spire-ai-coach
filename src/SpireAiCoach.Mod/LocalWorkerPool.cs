@@ -14,7 +14,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
     private bool _disposed;
 
     public async Task<LocalSearchResult> Analyze(LocalSearchRequest request, LocalInstallation installation,
-        Action<string> progress, CancellationToken cancellation)
+        Action<string> progress, CancellationToken cancellation, Action<LocalProgress>? simulationProgress = null)
     {
         await _gate.WaitAsync(cancellation);
         try
@@ -39,6 +39,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 Victories = valid.Sum(r => r.Victories), Workers = count,
                 ElapsedMs = totalTime.ElapsedMilliseconds, SearchElapsedMs = results.Max(r => r.ElapsedMs),
                 WorkerMemoryBytes = results.Sum(r => r.WorkerMemoryBytes),
+                IncludePotions = request.IncludePotions,
                 Status = results.All(r => r.Status == "done") ? "done" : "partial",
                 Message = "本地整场计算完成。" + (valid.Length < count ? "部分工作进程未完成，仅保留已验证的路线。" : "") +
                     "预算内候选，不保证最优；未知奖励机制仍按预算搜索。" };
@@ -47,13 +48,24 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             {
                 try
                 {
+                    simulationProgress?.Invoke(new(request.Id, request.SnapshotId, index, count, 0, 0, 0, request.MaxNodes, 0,
+                        0, request.BudgetSeconds, "准备静音工作进程", null, []));
                     await worker.Ensure(directory, index, installation, cancellation);
                     var command = request with { Partition = index, Partitions = count };
                     LocalWire.Write(Path.Combine(worker.Root, "request.json"), command);
                     var timer = Stopwatch.StartNew();
+                    long seenSequence = 0;
                     while (timer.Elapsed.TotalSeconds < 180)
                     {
                         cancellation.ThrowIfCancellationRequested();
+                        var previewPath = Path.Combine(worker.Root, "progress.json");
+                        if (simulationProgress != null && File.Exists(previewPath))
+                        {
+                            var preview = LocalWire.Read<LocalProgress>(previewPath);
+                            if (preview.Id == request.Id && preview.SnapshotId == request.SnapshotId && preview.Worker == index &&
+                                preview.Workers == count && preview.Sequence > seenSequence)
+                            { seenSequence = preview.Sequence; simulationProgress(preview); }
+                        }
                         var file = Path.Combine(worker.Root, "result.json");
                         if (File.Exists(file))
                         {
@@ -149,13 +161,13 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             var local = Path.Combine(Root, "Local");
             var settings = Path.Combine(roaming, "SlayTheSpire2", "default", "1");
             Directory.CreateDirectory(settings); Directory.CreateDirectory(local);
-            File.WriteAllText(Path.Combine(settings, "settings.save"), "{\"mod_settings\":{\"mods_enabled\":true,\"mod_list\":[]}}");
+            File.WriteAllText(Path.Combine(settings, "settings.save"), "{\"volume_master\":0,\"volume_bgm\":0,\"volume_sfx\":0,\"volume_ambience\":0,\"skip_intro_logo\":true,\"mod_settings\":{\"mods_enabled\":true,\"mod_list\":[]}}");
             var saves = Path.Combine(settings, "modded", "profile1", "saves"); Directory.CreateDirectory(saves);
             File.WriteAllText(Path.Combine(saves, "progress.save"), "{\"schema_version\":24,\"enable_ftues\":false,\"ftue_completed\":[\"combat_rules_ftue\"]}");
-            foreach (var name in new[] { "ready", "fatal.txt", "result.json", "request.json" }) File.Delete(Path.Combine(Root, name));
+            foreach (var name in new[] { "ready", "fatal.txt", "result.json", "request.json", "progress.json", "audio.json" }) File.Delete(Path.Combine(Root, name));
             var start = new ProcessStartInfo(Path.Combine(game, "SlayTheSpire2.exe"))
             { WorkingDirectory = game, UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden };
-            foreach (var arg in new[] { "--headless", "--disable-vsync", "--max-fps", "120", "--force-steam=off", "--log-file", Path.Combine(Root, "game.log") }) start.ArgumentList.Add(arg);
+            foreach (var arg in new[] { "--headless", "--audio-driver", "Dummy", "--disable-vsync", "--max-fps", "120", "--force-steam=off", "--log-file", Path.Combine(Root, "game.log") }) start.ArgumentList.Add(arg);
             start.Environment["APPDATA"] = roaming; start.Environment["LOCALAPPDATA"] = local;
             start.Environment["SPIRE_COACH_WORKER"] = Root;
             start.Environment.Remove("SPIRE_NATIVE_PROBE_ROOT");

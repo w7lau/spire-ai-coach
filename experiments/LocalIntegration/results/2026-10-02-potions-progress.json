@@ -1,0 +1,1428 @@
+{
+  "version": "0.6.0",
+  "date": "2026-10-02",
+  "game": "0.111.0",
+  "core_tests": "72/72",
+  "dll_sha256": "4d3c465c76d4c3855e5e58bc7d8392228d3c53a3867ced734ad744002a233d8a",
+  "worker_audio": [
+    {
+      "silent_settings": true,
+      "godot_master_muted": true,
+      "audio_driver": "Dummy"
+    },
+    {
+      "silent_settings": true,
+      "godot_master_muted": true,
+      "audio_driver": "Dummy"
+    }
+  ],
+  "host_game_errors": 0,
+  "integration": [
+    {
+      "stage": "enabled_preserve_baseline",
+      "unchanged": true,
+      "result": {
+        "Id": "7744d0ffd75946f7aaa7d60cd0de3167",
+        "SnapshotId": "255B70E7E0361CCF6E888C458A4B04740C8C19FB2A8144E68902CA9D1015B581",
+        "Status": "done",
+        "Message": "本地整场计算完成。预算内候选，不保证最优；未知奖励机制仍按预算搜索。",
+        "Evaluated": 2,
+        "Rejected": 0,
+        "ElapsedMs": 34662,
+        "Best": {
+          "Actions": [
+            {
+              "HandIndex": 2,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "8CF57A5A10D90E4324FC5FC71B92EBBB12D081D5C1FB04B53EC5E847A7D43609",
+              "Round": 1,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 3,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "CA1F0126E0D07D20A59B878797FE256DC2DF0EEA0C8CC125845F836A382A842F",
+              "Round": 1,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.DEFEND_IRONCLAD",
+              "TargetId": null,
+              "CardName": "防御",
+              "TargetName": "",
+              "BeforeHash": "40AE4CF1F7A84310C4546443C81E4DB93C3FA3A46A632AD1463AC8B48B42DBD1",
+              "Round": 1,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.BLOODLETTING",
+              "TargetId": null,
+              "CardName": "放血",
+              "TargetName": "",
+              "BeforeHash": "809DCF9D64BD8E89E381A0D5C237982ECBF6BC774B7FBADC88605DE2935A1F99",
+              "Round": 1,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.DEFEND_IRONCLAD",
+              "TargetId": null,
+              "CardName": "防御",
+              "TargetName": "",
+              "BeforeHash": "4BD1AEFF7C0C9743BCDDCCE66253853BE20467F7643A3E8FE5A378900076E665",
+              "Round": 1,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": -1,
+              "ModelId": "",
+              "TargetId": null,
+              "CardName": "",
+              "TargetName": "",
+              "BeforeHash": "A2332CBF71476031673EB8B0390A384C9F1C33F8E9FC4AC76AA8698C08A3259E",
+              "Round": 1,
+              "EndTurn": true,
+              "Preference": 0,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "AFDC235B955E1614711CBE102FFAD6653D188A1C7688862089B80EC7EDF46962",
+              "Round": 2,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "6C1D8F42756AACE232BF7014781A0B09DF5D459E1BFDF29830A955C3CC2BE735",
+              "Round": 2,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.BLOODLETTING",
+              "TargetId": null,
+              "CardName": "放血",
+              "TargetName": "",
+              "BeforeHash": "21B8A338867D94F892249F473FBA0DBB203692FDE467366C33115079C02EDEBF",
+              "Round": 2,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.DEFEND_IRONCLAD",
+              "TargetId": null,
+              "CardName": "防御",
+              "TargetName": "",
+              "BeforeHash": "42CA39D5109A6E40C03EC19FFEAF625780E2835A418377E7D5C38254D6C8A521",
+              "Round": 2,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.DEFEND_IRONCLAD",
+              "TargetId": null,
+              "CardName": "防御",
+              "TargetName": "",
+              "BeforeHash": "3FE3D100532087D510DC48BA67325CE945B575BE56259AFC7F4FCE90B7C728CB",
+              "Round": 2,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": -1,
+              "ModelId": "",
+              "TargetId": null,
+              "CardName": "",
+              "TargetName": "",
+              "BeforeHash": "25FBDCF4AFB45B357D1ABB1C72574D0B0F047486CA148BDD76FFF682EC260219",
+              "Round": 2,
+              "EndTurn": true,
+              "Preference": 0,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 1,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "2F6695724E11044E7846DBA26A93136E46D1F6BB47DB0DB16CD52A5129B65E89",
+              "Round": 3,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 2,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "93EB525049B3924B2CDB49A633017D3C8C8622A992710323AE6556EAB95F5520",
+              "Round": 3,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.DEFEND_IRONCLAD",
+              "TargetId": null,
+              "CardName": "防御",
+              "TargetName": "",
+              "BeforeHash": "F045CF4672D1823A90F03A2AE2432EE7BF2B6B1E6A043EC82F49041CE9BB1322",
+              "Round": 3,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 1,
+              "ModelId": "CARD.BLOODLETTING",
+              "TargetId": null,
+              "CardName": "放血",
+              "TargetName": "",
+              "BeforeHash": "F00515A245C3993FDE1ACC573B5A1F7706EB33162C9B69CA24F5890BB1ED84BB",
+              "Round": 3,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.DEFEND_IRONCLAD",
+              "TargetId": null,
+              "CardName": "防御",
+              "TargetName": "",
+              "BeforeHash": "347B532AB7F76B9B8797E39046DD8A31F399AA6A1222B03E8C02AC6BCEC293C0",
+              "Round": 3,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": -1,
+              "ModelId": "",
+              "TargetId": null,
+              "CardName": "",
+              "TargetName": "",
+              "BeforeHash": "D0A26E837160CE30F9E3026B744F6AB8A9697D5D9174CAA366519747C4A7F1D9",
+              "Round": 3,
+              "EndTurn": true,
+              "Preference": 0,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 1,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "066B77C14C561563E1517FA95F092223D309E9D2EC506CE370309900D77695F9",
+              "Round": 4,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 1,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "A500B010B298ADE8D77DA389E36266D67D93DFDB168D4347A37321BFACDB62CF",
+              "Round": 4,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.DEFEND_IRONCLAD",
+              "TargetId": null,
+              "CardName": "防御",
+              "TargetName": "",
+              "BeforeHash": "0208551282B4A74F8357039BF1D4BB2887A541042B6C31E8CAB9B87AA6F8C3C0",
+              "Round": 4,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.BLOODLETTING",
+              "TargetId": null,
+              "CardName": "放血",
+              "TargetName": "",
+              "BeforeHash": "579274CF53B8A11A994BC7F17CD9857AA88147678D70761DE77D5A1A08287003",
+              "Round": 4,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.DEFEND_IRONCLAD",
+              "TargetId": null,
+              "CardName": "防御",
+              "TargetName": "",
+              "BeforeHash": "F47AB7B33175E3B0B41B2BAC4C89ADED8C923F87006DE0C0438B04F7A33D8F72",
+              "Round": 4,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": -1,
+              "ModelId": "",
+              "TargetId": null,
+              "CardName": "",
+              "TargetName": "",
+              "BeforeHash": "D6EA71BA947E72E9222C3EAA532326DC1F0544E88DF87648220002104BE548DA",
+              "Round": 4,
+              "EndTurn": true,
+              "Preference": 0,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "3FD2114E73553C995E04852751AED9723BA2A993427D86C98D6E283C27A69B83",
+              "Round": 5,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            }
+          ],
+          "Hp": 74,
+          "HpLost": 12,
+          "EnemyHp": 0,
+          "Gold": 99,
+          "MaxHp": 80,
+          "Won": true,
+          "Dead": false,
+          "RewardCoverageKnown": false,
+          "Rounds": 5,
+          "StopReason": "胜利结算完成"
+        },
+        "Duplicates": 0,
+        "BudgetPruned": 0,
+        "Victories": 2,
+        "Workers": 2,
+        "WorkerMemoryBytes": 2550177792,
+        "SearchElapsedMs": 12884,
+        "IncludePotions": true
+      }
+    },
+    {
+      "stage": "potions_off",
+      "unchanged": true,
+      "result": {
+        "Id": "b40b3ae61cd646b79409c3b1641e2f29",
+        "SnapshotId": "255B70E7E0361CCF6E888C458A4B04740C8C19FB2A8144E68902CA9D1015B581",
+        "Status": "done",
+        "Message": "本地整场计算完成。预算内候选，不保证最优；未知奖励机制仍按预算搜索。",
+        "Evaluated": 8,
+        "Rejected": 0,
+        "ElapsedMs": 10103,
+        "Best": {
+          "Actions": [
+            {
+              "HandIndex": 2,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "8CF57A5A10D90E4324FC5FC71B92EBBB12D081D5C1FB04B53EC5E847A7D43609",
+              "Round": 1,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 3,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "CA1F0126E0D07D20A59B878797FE256DC2DF0EEA0C8CC125845F836A382A842F",
+              "Round": 1,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.DEFEND_IRONCLAD",
+              "TargetId": null,
+              "CardName": "防御",
+              "TargetName": "",
+              "BeforeHash": "40AE4CF1F7A84310C4546443C81E4DB93C3FA3A46A632AD1463AC8B48B42DBD1",
+              "Round": 1,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.BLOODLETTING",
+              "TargetId": null,
+              "CardName": "放血",
+              "TargetName": "",
+              "BeforeHash": "809DCF9D64BD8E89E381A0D5C237982ECBF6BC774B7FBADC88605DE2935A1F99",
+              "Round": 1,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.DEFEND_IRONCLAD",
+              "TargetId": null,
+              "CardName": "防御",
+              "TargetName": "",
+              "BeforeHash": "4BD1AEFF7C0C9743BCDDCCE66253853BE20467F7643A3E8FE5A378900076E665",
+              "Round": 1,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": -1,
+              "ModelId": "",
+              "TargetId": null,
+              "CardName": "",
+              "TargetName": "",
+              "BeforeHash": "A2332CBF71476031673EB8B0390A384C9F1C33F8E9FC4AC76AA8698C08A3259E",
+              "Round": 1,
+              "EndTurn": true,
+              "Preference": 0,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "AFDC235B955E1614711CBE102FFAD6653D188A1C7688862089B80EC7EDF46962",
+              "Round": 2,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "6C1D8F42756AACE232BF7014781A0B09DF5D459E1BFDF29830A955C3CC2BE735",
+              "Round": 2,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.BLOODLETTING",
+              "TargetId": null,
+              "CardName": "放血",
+              "TargetName": "",
+              "BeforeHash": "21B8A338867D94F892249F473FBA0DBB203692FDE467366C33115079C02EDEBF",
+              "Round": 2,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.DEFEND_IRONCLAD",
+              "TargetId": null,
+              "CardName": "防御",
+              "TargetName": "",
+              "BeforeHash": "42CA39D5109A6E40C03EC19FFEAF625780E2835A418377E7D5C38254D6C8A521",
+              "Round": 2,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.DEFEND_IRONCLAD",
+              "TargetId": null,
+              "CardName": "防御",
+              "TargetName": "",
+              "BeforeHash": "3FE3D100532087D510DC48BA67325CE945B575BE56259AFC7F4FCE90B7C728CB",
+              "Round": 2,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": -1,
+              "ModelId": "",
+              "TargetId": null,
+              "CardName": "",
+              "TargetName": "",
+              "BeforeHash": "25FBDCF4AFB45B357D1ABB1C72574D0B0F047486CA148BDD76FFF682EC260219",
+              "Round": 2,
+              "EndTurn": true,
+              "Preference": 0,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 1,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "2F6695724E11044E7846DBA26A93136E46D1F6BB47DB0DB16CD52A5129B65E89",
+              "Round": 3,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 2,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "93EB525049B3924B2CDB49A633017D3C8C8622A992710323AE6556EAB95F5520",
+              "Round": 3,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.DEFEND_IRONCLAD",
+              "TargetId": null,
+              "CardName": "防御",
+              "TargetName": "",
+              "BeforeHash": "F045CF4672D1823A90F03A2AE2432EE7BF2B6B1E6A043EC82F49041CE9BB1322",
+              "Round": 3,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 1,
+              "ModelId": "CARD.BLOODLETTING",
+              "TargetId": null,
+              "CardName": "放血",
+              "TargetName": "",
+              "BeforeHash": "F00515A245C3993FDE1ACC573B5A1F7706EB33162C9B69CA24F5890BB1ED84BB",
+              "Round": 3,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.DEFEND_IRONCLAD",
+              "TargetId": null,
+              "CardName": "防御",
+              "TargetName": "",
+              "BeforeHash": "347B532AB7F76B9B8797E39046DD8A31F399AA6A1222B03E8C02AC6BCEC293C0",
+              "Round": 3,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": -1,
+              "ModelId": "",
+              "TargetId": null,
+              "CardName": "",
+              "TargetName": "",
+              "BeforeHash": "D0A26E837160CE30F9E3026B744F6AB8A9697D5D9174CAA366519747C4A7F1D9",
+              "Round": 3,
+              "EndTurn": true,
+              "Preference": 0,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 1,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "066B77C14C561563E1517FA95F092223D309E9D2EC506CE370309900D77695F9",
+              "Round": 4,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 1,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "A500B010B298ADE8D77DA389E36266D67D93DFDB168D4347A37321BFACDB62CF",
+              "Round": 4,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.DEFEND_IRONCLAD",
+              "TargetId": null,
+              "CardName": "防御",
+              "TargetName": "",
+              "BeforeHash": "0208551282B4A74F8357039BF1D4BB2887A541042B6C31E8CAB9B87AA6F8C3C0",
+              "Round": 4,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.BLOODLETTING",
+              "TargetId": null,
+              "CardName": "放血",
+              "TargetName": "",
+              "BeforeHash": "579274CF53B8A11A994BC7F17CD9857AA88147678D70761DE77D5A1A08287003",
+              "Round": 4,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.DEFEND_IRONCLAD",
+              "TargetId": null,
+              "CardName": "防御",
+              "TargetName": "",
+              "BeforeHash": "F47AB7B33175E3B0B41B2BAC4C89ADED8C923F87006DE0C0438B04F7A33D8F72",
+              "Round": 4,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": -1,
+              "ModelId": "",
+              "TargetId": null,
+              "CardName": "",
+              "TargetName": "",
+              "BeforeHash": "D6EA71BA947E72E9222C3EAA532326DC1F0544E88DF87648220002104BE548DA",
+              "Round": 4,
+              "EndTurn": true,
+              "Preference": 0,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "3FD2114E73553C995E04852751AED9723BA2A993427D86C98D6E283C27A69B83",
+              "Round": 5,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            }
+          ],
+          "Hp": 74,
+          "HpLost": 12,
+          "EnemyHp": 0,
+          "Gold": 99,
+          "MaxHp": 80,
+          "Won": true,
+          "Dead": false,
+          "RewardCoverageKnown": false,
+          "Rounds": 5,
+          "StopReason": "胜利结算完成"
+        },
+        "Duplicates": 0,
+        "BudgetPruned": 0,
+        "Victories": 8,
+        "Workers": 2,
+        "WorkerMemoryBytes": 2615017472,
+        "SearchElapsedMs": 9874,
+        "IncludePotions": false
+      }
+    },
+    {
+      "stage": "potions_on",
+      "unchanged": true,
+      "result": {
+        "Id": "85cab6314cef4f23ac512597de7caa6c",
+        "SnapshotId": "255B70E7E0361CCF6E888C458A4B04740C8C19FB2A8144E68902CA9D1015B581",
+        "Status": "done",
+        "Message": "本地整场计算完成。预算内候选，不保证最优；未知奖励机制仍按预算搜索。",
+        "Evaluated": 8,
+        "Rejected": 0,
+        "ElapsedMs": 8323,
+        "Best": {
+          "Actions": [
+            {
+              "HandIndex": -1,
+              "ModelId": "POTION.FIRE_POTION",
+              "TargetId": 1,
+              "CardName": "火焰药水",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "8CF57A5A10D90E4324FC5FC71B92EBBB12D081D5C1FB04B53EC5E847A7D43609",
+              "Round": 1,
+              "EndTurn": false,
+              "Preference": -5,
+              "PotionSlot": 0
+            },
+            {
+              "HandIndex": 2,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "DA02D127794E56FA07FB2142D9AB18A17F2E87B488BFBD1B5EA9F44357DA37A2",
+              "Round": 1,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 3,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "F341B4B0A757AAE1B23A1F11B164DAB2D3298DA17BD8786F1A601FA37A16ED15",
+              "Round": 1,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.DEFEND_IRONCLAD",
+              "TargetId": null,
+              "CardName": "防御",
+              "TargetName": "",
+              "BeforeHash": "5E5AC9A1CB66F6617E90C50954BCB84B7B6DF13C58AAF7B4E3296E4711A6170A",
+              "Round": 1,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.BLOODLETTING",
+              "TargetId": null,
+              "CardName": "放血",
+              "TargetName": "",
+              "BeforeHash": "EE17651A2981D65958EFD25B32AC9D46C7297B3162E61C880685BF805D54B07A",
+              "Round": 1,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.DEFEND_IRONCLAD",
+              "TargetId": null,
+              "CardName": "防御",
+              "TargetName": "",
+              "BeforeHash": "EEEF29314BD3CF07776E56B852EC6FC0C3C8AF9ABA95437F659C754B00E5C454",
+              "Round": 1,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": -1,
+              "ModelId": "",
+              "TargetId": null,
+              "CardName": "",
+              "TargetName": "",
+              "BeforeHash": "625BAECDC711DDD2BE062E01B20E92ADAB5389C4A261D5B9C0172AC44DE54A5A",
+              "Round": 1,
+              "EndTurn": true,
+              "Preference": 0,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "C5C49A08950A2D9D3D7BCBD77BA2E8F83E07018FB70C1874EFE918654A5A920B",
+              "Round": 2,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "68F9895B28381365AF25B22E642E434E106F53682B452D46FD1DD31437ACDE2B",
+              "Round": 2,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            }
+          ],
+          "Hp": 80,
+          "HpLost": 3,
+          "EnemyHp": 0,
+          "Gold": 99,
+          "MaxHp": 80,
+          "Won": true,
+          "Dead": false,
+          "RewardCoverageKnown": false,
+          "Rounds": 2,
+          "StopReason": "胜利结算完成"
+        },
+        "Duplicates": 0,
+        "BudgetPruned": 105,
+        "Victories": 8,
+        "Workers": 2,
+        "WorkerMemoryBytes": 2634186752,
+        "SearchElapsedMs": 8000,
+        "IncludePotions": true
+      }
+    },
+    {
+      "stage": "after_native_potions",
+      "unchanged": true,
+      "remaining_slots": [
+        null,
+        null,
+        "POTION.FAIRY_IN_A_BOTTLE"
+      ],
+      "result": {
+        "Id": "5163af76891d4824a744a93a5c50edb0",
+        "SnapshotId": "71773DFB1929EF20E4701455363D2262A97A669A40DB8DA86DA20813E4EE417A",
+        "Status": "done",
+        "Message": "本地整场计算完成。预算内候选，不保证最优；未知奖励机制仍按预算搜索。",
+        "Evaluated": 2,
+        "Rejected": 0,
+        "ElapsedMs": 2522,
+        "Best": {
+          "Actions": [
+            {
+              "HandIndex": 2,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "CE40727ED57114F37084B636CC4D22EB6DD25593734F0569449EB4C46172C60B",
+              "Round": 1,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 3,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "F1FA9FD3785B997BCC58EF0C15AEDF0D5D7BD1231721B3A386BEC31C12AC1DCD",
+              "Round": 1,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.DEFEND_IRONCLAD",
+              "TargetId": null,
+              "CardName": "防御",
+              "TargetName": "",
+              "BeforeHash": "894067F3F07E90C0298F77CBFA55EB401DC7DA4DAE22860501ECCEE1338EDEF2",
+              "Round": 1,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.BLOODLETTING",
+              "TargetId": null,
+              "CardName": "放血",
+              "TargetName": "",
+              "BeforeHash": "5E61FE84153B81FE33F40962ED22282644C18DA60C32C13DF3B72F30727A47C6",
+              "Round": 1,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.DEFEND_IRONCLAD",
+              "TargetId": null,
+              "CardName": "防御",
+              "TargetName": "",
+              "BeforeHash": "8950037E9786CD187B841E891C8FBA990F30A9348A444BA03C311FCC0E29C4BE",
+              "Round": 1,
+              "EndTurn": false,
+              "Preference": 10,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": -1,
+              "ModelId": "",
+              "TargetId": null,
+              "CardName": "",
+              "TargetName": "",
+              "BeforeHash": "00973FF348C79FFCF5833190FCDA5D62F646C27F7C4CA6435FFB247C8D1DD697",
+              "Round": 1,
+              "EndTurn": true,
+              "Preference": 0,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "13C606AA430767C6C88086C54F2AC480350399F47BDF3D7893F6F0A96ED158F8",
+              "Round": 2,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            },
+            {
+              "HandIndex": 0,
+              "ModelId": "CARD.STRIKE_IRONCLAD",
+              "TargetId": 1,
+              "CardName": "打击",
+              "TargetName": "从左到右第 1 个敌人「缩小甲虫」",
+              "BeforeHash": "7D70B47426BFFCE721CCDA24430F4824F974542F65FF980B856D692DE57D8C14",
+              "Round": 2,
+              "EndTurn": false,
+              "Preference": 30,
+              "PotionSlot": null
+            }
+          ],
+          "Hp": 80,
+          "HpLost": 3,
+          "EnemyHp": 0,
+          "Gold": 99,
+          "MaxHp": 80,
+          "Won": true,
+          "Dead": false,
+          "RewardCoverageKnown": false,
+          "Rounds": 2,
+          "StopReason": "胜利结算完成"
+        },
+        "Duplicates": 0,
+        "BudgetPruned": 0,
+        "Victories": 2,
+        "Workers": 2,
+        "WorkerMemoryBytes": 2619158528,
+        "SearchElapsedMs": 2221,
+        "IncludePotions": false
+      }
+    },
+    {
+      "stage": "progress",
+      "frames": 125,
+      "workers": [
+        0,
+        1
+      ],
+      "phases": [
+        "准备静音工作进程",
+        "恢复当前战斗",
+        "开始试走",
+        "试走路线",
+        "执行：打出「防御」（当时手牌第 1 张）。",
+        "恢复路线起点",
+        "执行：打出「放血」（当时手牌第 1 张）。",
+        "复核最佳路线",
+        "计算完成 · 最佳路线复核通过"
+      ],
+      "max_events": 12,
+      "examples": [
+        {
+          "Id": "85cab6314cef4f23ac512597de7caa6c",
+          "SnapshotId": "255B70E7E0361CCF6E888C458A4B04740C8C19FB2A8144E68902CA9D1015B581",
+          "Worker": 1,
+          "Workers": 2,
+          "Sequence": 17,
+          "Route": 2,
+          "Evaluated": 1,
+          "MaxNodes": 4,
+          "Victories": 1,
+          "ElapsedMs": 2886,
+          "BudgetSeconds": 45,
+          "Phase": "试走路线",
+          "State": {
+            "Round": 2,
+            "Hp": 77,
+            "MaxHp": 80,
+            "Block": 0,
+            "Energy": 3,
+            "Powers": "覆甲 2、缩小 -1",
+            "Hand": [
+              "打击",
+              "打击",
+              "放血",
+              "防御",
+              "防御"
+            ],
+            "Potions": 2,
+            "Enemies": [
+              {
+                "Id": 1,
+                "Name": "缩小甲虫",
+                "Hp": 26,
+                "MaxHp": 38,
+                "Block": 0,
+                "Powers": "",
+                "Intent": "CHOMP_MOVE"
+              }
+            ]
+          },
+          "Events": [
+            {
+              "Step": 1,
+              "Round": 1,
+              "Action": "打出「放血」（当时手牌第 2 张）。",
+              "Changes": "自身生命 80→77；能量 3→5；自身状态：覆甲 3；手牌：防御、打击、防御、打击；期间实际失去生命 3"
+            },
+            {
+              "Step": 2,
+              "Round": 1,
+              "Action": "打出「打击」（当时手牌第 2 张） → 从左到右第 1 个敌人「缩小甲虫」［目标 1］。",
+              "Changes": "能量 5→4；缩小甲虫［1］生命 38→32；手牌：防御、防御、打击"
+            },
+            {
+              "Step": 3,
+              "Round": 1,
+              "Action": "打出「打击」（当时手牌第 3 张） → 从左到右第 1 个敌人「缩小甲虫」［目标 1］。",
+              "Changes": "能量 4→3；缩小甲虫［1］生命 32→26；手牌：防御、防御"
+            },
+            {
+              "Step": 4,
+              "Round": 1,
+              "Action": "使用药水「格挡药水」（药水槽 2） → 自己［目标 0］。",
+              "Changes": "格挡 0→12；药水 3→2"
+            },
+            {
+              "Step": 5,
+              "Round": 1,
+              "Action": "打出「防御」（当时手牌第 1 张）。",
+              "Changes": "格挡 12→17；能量 3→2；手牌：防御"
+            },
+            {
+              "Step": 6,
+              "Round": 1,
+              "Action": "打出「防御」（当时手牌第 1 张）。",
+              "Changes": "格挡 17→22；能量 2→1；手牌："
+            },
+            {
+              "Step": 7,
+              "Round": 1,
+              "Action": "结束回合，结算敌方行动。",
+              "Changes": "回合 1→2；格挡 22→0；能量 1→3；自身状态：覆甲 2、缩小 -1；手牌：打击、打击、放血、防御、防御"
+            }
+          ],
+          "Status": "running"
+        },
+        {
+          "Id": "85cab6314cef4f23ac512597de7caa6c",
+          "SnapshotId": "255B70E7E0361CCF6E888C458A4B04740C8C19FB2A8144E68902CA9D1015B581",
+          "Worker": 0,
+          "Workers": 2,
+          "Sequence": 20,
+          "Route": 2,
+          "Evaluated": 1,
+          "MaxNodes": 4,
+          "Victories": 1,
+          "ElapsedMs": 3358,
+          "BudgetSeconds": 45,
+          "Phase": "试走路线",
+          "State": {
+            "Round": 4,
+            "Hp": 74,
+            "MaxHp": 80,
+            "Block": 5,
+            "Energy": 0,
+            "Powers": "覆甲 3、缩小 -1",
+            "Hand": [
+              "放血",
+              "防御"
+            ],
+            "Potions": 2,
+            "Enemies": [
+              {
+                "Id": 1,
+                "Name": "缩小甲虫",
+                "Hp": 10,
+                "MaxHp": 38,
+                "Block": 0,
+                "Powers": "",
+                "Intent": "CHOMP_MOVE"
+              }
+            ]
+          },
+          "Events": [
+            {
+              "Step": 5,
+              "Round": 1,
+              "Action": "打出「防御」（当时手牌第 1 张）。",
+              "Changes": "格挡 5→10；能量 2→1；手牌："
+            },
+            {
+              "Step": 6,
+              "Round": 1,
+              "Action": "结束回合，结算敌方行动。",
+              "Changes": "回合 1→2；格挡 10→0；能量 1→3；自身状态：覆甲 2、缩小 -1；手牌：打击、打击、放血、防御、防御"
+            },
+            {
+              "Step": 7,
+              "Round": 2,
+              "Action": "打出「打击」（当时手牌第 1 张） → 从左到右第 1 个敌人「缩小甲虫」［目标 1］。",
+              "Changes": "能量 3→2；缩小甲虫［1］生命 26→22；手牌：打击、放血、防御、防御"
+            },
+            {
+              "Step": 8,
+              "Round": 2,
+              "Action": "打出「打击」（当时手牌第 1 张） → 从左到右第 1 个敌人「缩小甲虫」［目标 1］。",
+              "Changes": "能量 2→1；缩小甲虫［1］生命 22→18；手牌：放血、防御、防御"
+            },
+            {
+              "Step": 9,
+              "Round": 2,
+              "Action": "打出「放血」（当时手牌第 1 张）。",
+              "Changes": "自身生命 77→74；能量 1→3；自身状态：覆甲 5、缩小 -1；手牌：防御、防御；期间实际失去生命 3"
+            },
+            {
+              "Step": 10,
+              "Round": 2,
+              "Action": "打出「防御」（当时手牌第 1 张）。",
+              "Changes": "格挡 0→5；能量 3→2；手牌：防御"
+            },
+            {
+              "Step": 11,
+              "Round": 2,
+              "Action": "结束回合，结算敌方行动。",
+              "Changes": "回合 2→3；格挡 5→0；能量 2→3；自身状态：覆甲 4、缩小 -1；手牌：防御、打击、防御、打击、放血"
+            },
+            {
+              "Step": 12,
+              "Round": 3,
+              "Action": "使用药水「格挡药水」（药水槽 2） → 自己［目标 0］。",
+              "Changes": "格挡 0→12；药水 3→2"
+            },
+            {
+              "Step": 13,
+              "Round": 3,
+              "Action": "结束回合，结算敌方行动。",
+              "Changes": "回合 3→4；格挡 12→0；自身状态：覆甲 3、缩小 -1；手牌：防御、打击、打击、放血、防御"
+            },
+            {
+              "Step": 14,
+              "Round": 4,
+              "Action": "打出「打击」（当时手牌第 2 张） → 从左到右第 1 个敌人「缩小甲虫」［目标 1］。",
+              "Changes": "能量 3→2；缩小甲虫［1］生命 18→14；手牌：防御、打击、放血、防御"
+            },
+            {
+              "Step": 15,
+              "Round": 4,
+              "Action": "打出「打击」（当时手牌第 2 张） → 从左到右第 1 个敌人「缩小甲虫」［目标 1］。",
+              "Changes": "能量 2→1；缩小甲虫［1］生命 14→10；手牌：防御、放血、防御"
+            },
+            {
+              "Step": 16,
+              "Round": 4,
+              "Action": "打出「防御」（当时手牌第 1 张）。",
+              "Changes": "格挡 0→5；能量 1→0；手牌：放血、防御"
+            }
+          ],
+          "Status": "running"
+        },
+        {
+          "Id": "85cab6314cef4f23ac512597de7caa6c",
+          "SnapshotId": "255B70E7E0361CCF6E888C458A4B04740C8C19FB2A8144E68902CA9D1015B581",
+          "Worker": 0,
+          "Workers": 2,
+          "Sequence": 22,
+          "Route": 2,
+          "Evaluated": 1,
+          "MaxNodes": 4,
+          "Victories": 1,
+          "ElapsedMs": 3677,
+          "BudgetSeconds": 45,
+          "Phase": "试走路线",
+          "State": {
+            "Round": 5,
+            "Hp": 68,
+            "MaxHp": 80,
+            "Block": 5,
+            "Energy": 2,
+            "Powers": "覆甲 8、缩小 -1",
+            "Hand": [
+              "防御"
+            ],
+            "Potions": 2,
+            "Enemies": [
+              {
+                "Id": 1,
+                "Name": "缩小甲虫",
+                "Hp": 2,
+                "MaxHp": 38,
+                "Block": 0,
+                "Powers": "",
+                "Intent": "STOMP_MOVE"
+              }
+            ]
+          },
+          "Events": [
+            {
+              "Step": 12,
+              "Round": 3,
+              "Action": "使用药水「格挡药水」（药水槽 2） → 自己［目标 0］。",
+              "Changes": "格挡 0→12；药水 3→2"
+            },
+            {
+              "Step": 13,
+              "Round": 3,
+              "Action": "结束回合，结算敌方行动。",
+              "Changes": "回合 3→4；格挡 12→0；自身状态：覆甲 3、缩小 -1；手牌：防御、打击、打击、放血、防御"
+            },
+            {
+              "Step": 14,
+              "Round": 4,
+              "Action": "打出「打击」（当时手牌第 2 张） → 从左到右第 1 个敌人「缩小甲虫」［目标 1］。",
+              "Changes": "能量 3→2；缩小甲虫［1］生命 18→14；手牌：防御、打击、放血、防御"
+            },
+            {
+              "Step": 15,
+              "Round": 4,
+              "Action": "打出「打击」（当时手牌第 2 张） → 从左到右第 1 个敌人「缩小甲虫」［目标 1］。",
+              "Changes": "能量 2→1；缩小甲虫［1］生命 14→10；手牌：防御、放血、防御"
+            },
+            {
+              "Step": 16,
+              "Round": 4,
+              "Action": "打出「防御」（当时手牌第 1 张）。",
+              "Changes": "格挡 0→5；能量 1→0；手牌：放血、防御"
+            },
+            {
+              "Step": 17,
+              "Round": 4,
+              "Action": "打出「放血」（当时手牌第 1 张）。",
+              "Changes": "自身生命 74→71；能量 0→2；自身状态：覆甲 6、缩小 -1；手牌：防御；期间实际失去生命 3"
+            },
+            {
+              "Step": 18,
+              "Round": 4,
+              "Action": "打出「防御」（当时手牌第 1 张）。",
+              "Changes": "格挡 5→10；能量 2→1；手牌："
+            },
+            {
+              "Step": 19,
+              "Round": 4,
+              "Action": "结束回合，结算敌方行动。",
+              "Changes": "回合 4→5；格挡 10→0；能量 1→3；自身状态：覆甲 5、缩小 -1；手牌：打击、防御、防御、打击、放血"
+            },
+            {
+              "Step": 20,
+              "Round": 5,
+              "Action": "打出「打击」（当时手牌第 4 张） → 从左到右第 1 个敌人「缩小甲虫」［目标 1］。",
+              "Changes": "能量 3→2；缩小甲虫［1］生命 10→6；手牌：打击、防御、防御、放血"
+            },
+            {
+              "Step": 21,
+              "Round": 5,
+              "Action": "打出「打击」（当时手牌第 1 张） → 从左到右第 1 个敌人「缩小甲虫」［目标 1］。",
+              "Changes": "能量 2→1；缩小甲虫［1］生命 6→2；手牌：防御、防御、放血"
+            },
+            {
+              "Step": 22,
+              "Round": 5,
+              "Action": "打出「防御」（当时手牌第 1 张）。",
+              "Changes": "格挡 0→5；能量 1→0；手牌：防御、放血"
+            },
+            {
+              "Step": 23,
+              "Round": 5,
+              "Action": "打出「放血」（当时手牌第 2 张）。",
+              "Changes": "自身生命 71→68；能量 0→2；自身状态：覆甲 8、缩小 -1；手牌：防御；期间实际失去生命 3"
+            }
+          ],
+          "Status": "running"
+        },
+        {
+          "Id": "85cab6314cef4f23ac512597de7caa6c",
+          "SnapshotId": "255B70E7E0361CCF6E888C458A4B04740C8C19FB2A8144E68902CA9D1015B581",
+          "Worker": 1,
+          "Workers": 2,
+          "Sequence": 30,
+          "Route": 3,
+          "Evaluated": 2,
+          "MaxNodes": 4,
+          "Victories": 2,
+          "ElapsedMs": 4869,
+          "BudgetSeconds": 45,
+          "Phase": "试走路线",
+          "State": {
+            "Round": 6,
+            "Hp": 60,
+            "MaxHp": 80,
+            "Block": 0,
+            "Energy": 3,
+            "Powers": "缩小 -1、覆甲 16",
+            "Hand": [
+              "防御",
+              "防御",
+              "打击",
+              "打击",
+              "放血"
+            ],
+            "Potions": 2,
+            "Enemies": [
+              {
+                "Id": 1,
+                "Name": "缩小甲虫",
+                "Hp": 10,
+                "MaxHp": 38,
+                "Block": 0,
+                "Powers": "",
+                "Intent": "CHOMP_MOVE"
+              }
+            ]
+          },
+          "Events": [
+            {
+              "Step": 9,
+              "Round": 4,
+              "Action": "打出「打击」（当时手牌第 2 张） → 从左到右第 1 个敌人「缩小甲虫」［目标 1］。",
+              "Changes": "能量 2→1；缩小甲虫［1］生命 22→18；手牌：防御、放血、防御"
+            },
+            {
+              "Step": 10,
+              "Round": 4,
+              "Action": "打出「防御」（当时手牌第 1 张）。",
+              "Changes": "格挡 0→5；能量 1→0；手牌：放血、防御"
+            },
+            {
+              "Step": 11,
+              "Round": 4,
+              "Action": "打出「放血」（当时手牌第 1 张）。",
+              "Changes": "自身生命 66→63；能量 0→2；自身状态：缩小 -1、覆甲 15；手牌：防御；期间实际失去生命 3"
+            },
+            {
+              "Step": 12,
+              "Round": 4,
+              "Action": "打出「防御」（当时手牌第 1 张）。",
+              "Changes": "格挡 5→10；能量 2→1；手牌："
+            },
+            {
+              "Step": 13,
+              "Round": 4,
+              "Action": "结束回合，结算敌方行动。",
+              "Changes": "回合 4→5；格挡 10→0；能量 1→3；自身状态：缩小 -1、覆甲 14；手牌：打击、防御、防御、打击、放血"
+            },
+            {
+              "Step": 14,
+              "Round": 5,
+              "Action": "打出「打击」（当时手牌第 1 张） → 从左到右第 1 个敌人「缩小甲虫」［目标 1］。",
+              "Changes": "能量 3→2；缩小甲虫［1］生命 18→14；手牌：防御、防御、打击、放血"
+            },
+            {
+              "Step": 15,
+              "Round": 5,
+              "Action": "打出「打击」（当时手牌第 3 张） → 从左到右第 1 个敌人「缩小甲虫」［目标 1］。",
+              "Changes": "能量 2→1；缩小甲虫［1］生命 14→10；手牌：防御、防御、放血"
+            },
+            {
+              "Step": 16,
+              "Round": 5,
+              "Action": "打出「防御」（当时手牌第 1 张）。",
+              "Changes": "格挡 0→5；能量 1→0；手牌：防御、放血"
+            },
+            {
+              "Step": 17,
+              "Round": 5,
+              "Action": "使用药水「格挡药水」（药水槽 2） → 自己［目标 0］。",
+              "Changes": "格挡 5→17；药水 3→2"
+            },
+            {
+              "Step": 18,
+              "Round": 5,
+              "Action": "打出「放血」（当时手牌第 2 张）。",
+              "Changes": "自身生命 63→60；能量 0→2；自身状态：缩小 -1、覆甲 17；手牌：防御；期间实际失去生命 3"
+            },
+            {
+              "Step": 19,
+              "Round": 5,
+              "Action": "打出「防御」（当时手牌第 1 张）。",
+              "Changes": "格挡 17→22；能量 2→1；手牌："
+            },
+            {
+              "Step": 20,
+              "Round": 5,
+              "Action": "结束回合，结算敌方行动。",
+              "Changes": "回合 5→6；格挡 22→0；能量 1→3；自身状态：缩小 -1、覆甲 16；手牌：防御、防御、打击、打击、放血"
+            }
+          ],
+          "Status": "running"
+        }
+      ]
+    },
+    {
+      "stage": "cancel_and_host_audio",
+      "unchanged": true,
+      "source_audio_unchanged": true
+    }
+  ],
+  "installation": {
+    "version": "0.6.0",
+    "installed_matches_package": true,
+    "installed_matches_tested": true,
+    "settings_and_key_unchanged": true,
+    "package_sha256": "415df24a8aed5b782e86b9af7dd2bfeec4dc83556279e4b3ff094a1c86ff7a04"
+  }
+}

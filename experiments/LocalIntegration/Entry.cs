@@ -51,10 +51,23 @@ public static class Entry
             RunManager.Instance.Launch();
             NGame.Instance!.RootSceneContainer.SetCurrentScene(NRun.Create(run));
             await RunManager.Instance.GenerateMap();
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_FEATURES") == "1")
+            {
+                var owner = LocalContext.GetMe(run)!;
+                foreach (var potion in owner.Potions.ToArray()) potion.Discard();
+                foreach (var (id, slot) in new[] { ("FIRE_POTION", 0), ("BLOCK_POTION", 1), ("FAIRY_IN_A_BOTTLE", 2) })
+                    await PotionCmd.TryToProcure(ModelDb.AllPotions.Single(p => p.Id.Entry == id).ToMutable(), owner, slot);
+            }
             await RunManager.Instance.EnterMapCoord(run.Map.GetAllMapPoints().First(p => p.PointType == MapPointType.Monster).coord);
             var player = LocalContext.GetMe(run)!;
             var capture = new StateCapture();
             while (capture.Capture(true)?.CanAdvise != true) await Frame();
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_FEATURES") == "1")
+            {
+                await FeatureIntegration.Run(root, tree, pool, capture, player);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_BENCHMARK") == "1")
             {
                 var before = LocalCapture.Fingerprint();
