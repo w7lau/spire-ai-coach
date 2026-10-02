@@ -3,7 +3,7 @@
   "name": "尖塔 AI 教练 / Spire AI Coach",
   "author": "w7lau",
   "description": "Streaming, read-only current-turn AI guidance with combat context, powers, relics and local request diagnostics.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "has_dll": true,
   "has_pck": false,
   "affects_gameplay": false,

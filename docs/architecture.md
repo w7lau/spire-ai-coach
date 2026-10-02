@@ -14,6 +14,12 @@ Godot 主线程 → `StateCapture` → 独立 C# 快照 → SHA-256 指纹 → `
 
 当前回合推断包括本轮出牌及紧接的敌方行动；要求使用状态效果和遗物的描述、层数、使用状态及触发时机，解释会改变本轮决策的机制。确定性数值结论应核算资源、牌堆移动、格挡和已知触发；缺少后续轮次信息不妨碍规划已有充分证据的本轮动作。该 Prompt 是模型行为要求，没有伪装成本地模拟器校验。
 
+turn-coach-v4 将默认战斗规则集中在 system：回合开始能量重置到上限（不与余量累加）、普通抽5张、抽弃牌循环、消耗／能力牌、保留／虚无、格挡到所属方下回合开始、逐次伤害和前后触发。实际描述和有效规则例外优先。结束回合前比较剩余能量的可行用途：能量本身默认不保值；无已知代价的正收益动作不因收益小而跳过，保留或不出牌则说明实际代价／收益。不会加入“有能量就必须出牌”的硬校验。
+
+针对本机 v0.111.0 已核实的内置机制，固定说明仅对 source=sts2、相应 model_id 生效：覆甲在所属回合结束的早期给予格挡，回合开始再减层；胆小在符合条件且造成穿透伤害的卡牌攻击之后获得格挡。`StateCapture` 读取公开 `SkittishPower.HasGainedBlockThisTurn` 到 used_up；其他状态仍可为 null，不以描述猜测已触发状态。没有修改游戏状态或推进随机数。
+
+SystemPrompt 初始化一次并保留 SHA-256 指纹；不包含动态快照ID、时间、人物或模型。HTTP 两次不同状态测试直接比较第一条消息逐字相同，第二条包含各自快照。该指纹可用于诊断规则版本一致性，不是服务端缓存凭据。没有新 reviewer，输出字段、首步校验、纯文本显示和旧建议不再注入的边界保持一致。
+
 选用显式的有序操作序列，因为每一步的资源、目标、条件与后续状态可能变化；不是给模型重复生成所有牌堆。建议不会作为下一次的游戏事实重新注入，下一次始终读取真实状态。
 
 没有第二个模型 reviewer；第一版仅做本地结构、身份和首步校验。不宣称校验器能证明语义正确、后续资源充足或策略最优，不会用自然语言关键词解析模拟玩法。
@@ -44,6 +50,8 @@ JSON 顶层和每个步骤先投影到消费字段。额外字段被丢弃；非
 ## HTTP 与日志
 
 使用流式 Chat Completions。输入包含 model、messages、stream=true，Accept 为 text/event-stream，不设置温度或输出 token 上限。超时覆盖响应头和响应体读取，取消独立处理；限制完整线上的回复体 2 MiB（包括 SSE 元数据），底层按读取字节计数，没有换行的超长事件也不能绕过；不跟随重定向；默认仅允许 HTTPS，本机允许 HTTP。
+
+默认 IncludeStreamUsage=true，发送标准 stream_options.include_usage；设置关闭时整个 stream_options 键省略，遇到不兼容拒绝不会自动重试。读取可选 usage.prompt_tokens、completion_tokens 和 prompt_tokens_details.cached_tokens；缺失、类型错误或负数视为未知，明确的0保留为0。原始 usage 与规范计数都写入诊断，并在成功完成时显示。格式失败的响应若有 usage 也保留。固定前缀便于兼容服务商缓存，但客户端无法承诺命中、折扣或第三方真实账单。
 
 `StreamingResponse` 按 [WHATWG SSE 事件格式](https://html.spec.whatwg.org/multipage/server-sent-events.html#event-stream-interpretation) 解码 UTF-8，支持 BOM、LF/CRLF/CR、注释心跳与多行 data。只拼接 choices 中 index=0 的 delta.content，允许单项回复省略 index；角色和 usage 事件不当作正文，忽略其他选择的正文。finish_reason=stop 且 [DONE] 或完整事件后的正常 EOF 才算流完整；缺少结束原因、未闭合事件、异常断线或 length 均不发布建议。明确 stop 后仍追加正文视为接口结构错误。仅有正常流结束还需通过已有建议合同。
 

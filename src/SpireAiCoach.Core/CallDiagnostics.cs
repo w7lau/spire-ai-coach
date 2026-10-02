@@ -8,6 +8,7 @@ public sealed class CallDiagnostics
     public string CallId { get; } = Guid.NewGuid().ToString("N");
     public DateTimeOffset StartedUtc { get; } = DateTimeOffset.UtcNow;
     public string PromptVersion { get; } = PromptBuilder.Version;
+    public string SystemPromptHash { get; } = PromptBuilder.SystemPromptHash;
     public string? SnapshotId { get; set; }
     public string GuidanceScope => "current_turn";
     public string? RequestBody { get; set; }
@@ -18,6 +19,8 @@ public sealed class CallDiagnostics
     public string? AssistantContent { get; set; }
     public string? ProviderRequestId { get; set; }
     public string? FinishReason { get; set; }
+    public string? UsageJson { get; set; }
+    public TokenUsage TokenUsage => TokenUsage.Read(UsageJson);
     public string Outcome { get; set; } = "pending";
     public string? ErrorDetail { get; set; }
     public long ElapsedMs { get; set; }

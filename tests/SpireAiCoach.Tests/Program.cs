@@ -512,6 +512,58 @@ AsyncTest("invalid stream UTF-8 is classified and captured", async () =>
     Check(trace.ResponseBody != null && trace.Outcome == "provider_encoding" && !trace.StreamCompleted);
 });
 
+AsyncTest("different combat states reuse byte-identical system prefix and distinct user snapshots", async () =>
+{
+    var messages = new List<JsonElement>();
+    var changed = state with { Round = 2, Player = state.Player with { Energy = 1 } };
+    int call = 0;
+    using var client = new CoachClient(new FakeHandler(async (req, token) =>
+    {
+        using var body = JsonDocument.Parse(await req.Content!.ReadAsStringAsync(token));
+        messages.Add(body.RootElement.GetProperty("messages").Clone());
+        return new(HttpStatusCode.OK) { Content = new StringContent(Envelope(Reply(call++ == 0 ? state : changed).ToJsonString())) };
+    }));
+    var first = new CallDiagnostics(); var second = new CallDiagnostics();
+    await client.AnalyzeAsync(Settings(), "", state, diagnostics: first);
+    await client.AnalyzeAsync(Settings(), "", changed, diagnostics: second);
+    Check(messages[0][0].GetProperty("role").GetString() == "system" && messages[0][1].GetProperty("role").GetString() == "user");
+    var system = messages[0][0].GetProperty("content").GetString()!;
+    Check(system == messages[1][0].GetProperty("content").GetString());
+    Check(messages[0][1].GetProperty("content").GetString() != messages[1][1].GetProperty("content").GetString());
+    Check(!system.Contains(state.Fingerprint()) && !system.Contains(changed.Fingerprint()));
+    Check(first.SystemPromptHash == second.SystemPromptHash && first.SystemPromptHash == Convert.ToHexString(
+        System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(system))));
+});
+AsyncTest("stream usage option is optional and reported cached tokens survive diagnostics", async () =>
+{
+    foreach (bool enabled in new[] { true, false })
+    {
+        using var client = new CoachClient(new FakeHandler(async (req, token) =>
+        {
+            using var body = JsonDocument.Parse(await req.Content!.ReadAsStringAsync(token));
+            Check(body.RootElement.TryGetProperty("stream_options", out var options) == enabled);
+            if (enabled) Check(options.GetProperty("include_usage").GetBoolean());
+            var usage = """{"choices":[],"usage":{"prompt_tokens":4096,"completion_tokens":500,"prompt_tokens_details":{"cached_tokens":2048}}}""";
+            var wire = Event(Chunk(Reply(state).ToJsonString(), "stop")) + Event(usage) + Event("[DONE]");
+            return StreamResponse(new ScriptedStream([Encoding.UTF8.GetBytes(wire)]));
+        }));
+        var trace = new CallDiagnostics();
+        await client.AnalyzeAsync(Settings() with { IncludeStreamUsage = enabled }, "", state, diagnostics: trace);
+        Check(trace.TokenUsage.InputTokens == 4096 && trace.TokenUsage.CachedInputTokens == 2048 && trace.TokenUsage.OutputTokens == 500);
+        using var diagnostic = JsonDocument.Parse(trace.RedactedJson(""));
+        Check(diagnostic.RootElement.GetProperty("token_usage").GetProperty("cached_input_tokens").GetInt64() == 2048);
+    }
+});
+Test("cache telemetry distinguishes missing zero invalid and nonzero usage", () =>
+{
+    Check(TokenUsage.Read(null).CachedInputTokens == null);
+    Check(TokenUsage.Read("{}").Display().Contains("未返回"));
+    Check(TokenUsage.Read("""{"prompt_tokens_details":{"cached_tokens":0}}""").CachedInputTokens == 0);
+    Check(TokenUsage.Read("""{"prompt_tokens_details":{"cached_tokens":512}}""").CachedInputTokens == 512);
+    foreach (var json in new[] { "null", "[]", "bad-json", "{\"prompt_tokens_details\":{\"cached_tokens\":-1}}", "{\"prompt_tokens_details\":{\"cached_tokens\":\"0\"}}" })
+        Check(TokenUsage.Read(json).CachedInputTokens == null);
+});
+
 int failures = 0;
 foreach (var (name, test) in tests)
 {

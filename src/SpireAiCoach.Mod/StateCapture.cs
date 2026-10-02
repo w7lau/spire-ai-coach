@@ -8,6 +8,7 @@ using MegaCrit.Sts2.Core.Entities.Potions;
 using MegaCrit.Sts2.Core.HoverTips;
 using MegaCrit.Sts2.Core.Localization.DynamicVars;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Powers;
 using MegaCrit.Sts2.Core.MonsterMoves.Intents;
 using MegaCrit.Sts2.Core.MonsterMoves.MonsterMoveStateMachine;
 using SpireAiCoach.Core;
@@ -114,7 +115,8 @@ public sealed class StateCapture : IDisposable
     private EffectInfo[] Powers(Creature creature) => creature.Powers.Select(power => new EffectInfo(
         power.Id.ToString(), Source(power), power.Title.GetFormattedText(),
         Read(() => Clean(string.Join("\n", power.HoverTips.OfType<HoverTip>().Select(t => t.Description))), power.Id + ".description"),
-        power.Amount, Variables(power.DynamicVars))).ToArray();
+        power.Amount, Variables(power.DynamicVars),
+        power is SkittishPower skittish ? skittish.HasGainedBlockThisTurn : null)).ToArray();
 
     private IReadOnlyDictionary<string, decimal> Variables(DynamicVarSet variables)
     {

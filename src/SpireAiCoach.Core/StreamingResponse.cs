@@ -57,7 +57,7 @@ internal static class StreamingResponse
                     trace.ProviderRequestId ??= Text(root, "id");
                     model = Text(root, "model") ?? model;
                     if (root.TryGetProperty("usage", out var usageValue) && usageValue.ValueKind != JsonValueKind.Null)
-                        usage = usageValue.GetRawText();
+                        trace.UsageJson = usage = usageValue.GetRawText();
                     if (!root.TryGetProperty("choices", out var choices) || choices.ValueKind != JsonValueKind.Array) throw Schema();
                     bool seen = false;
                     foreach (var choice in choices.EnumerateArray())

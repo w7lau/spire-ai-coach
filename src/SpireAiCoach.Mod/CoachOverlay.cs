@@ -40,6 +40,7 @@ public sealed class CoachOverlay
     private LineEdit _apiKey = null!;
     private CheckBox _remember = null!;
     private CheckBox _reveal = null!;
+    private CheckBox _usage = null!;
     private TextEdit _diagnosticView = null!;
     private string _diagnosticJson = "暂无请求记录。";
     private int _diagnosticGeneration;
@@ -101,6 +102,8 @@ public sealed class CoachOverlay
         _settingsPanel.AddChild(_remember);
         _reveal = new CheckBox { Text = "让 AI 查看抽牌堆的真实顶部顺序", ButtonPressed = _settings.RevealDrawOrder };
         _settingsPanel.AddChild(_reveal);
+        _usage = new CheckBox { Text = "请求流式用量统计（接口不支持时可关闭）", ButtonPressed = _settings.IncludeStreamUsage };
+        _settingsPanel.AddChild(_usage);
         _settingsPanel.AddChild(Wrapped("点击分析时，会将下方战斗信息发送到你填写的服务商；每次点击调用一次，可能产生费用。支持 Chat Completions 兼容接口。"));
         var save = new Button { Text = "保存设置" }; save.Pressed += SaveSettings; _settingsPanel.AddChild(save);
         _feedback = Wrapped(loadError ?? "密钥不会写入游戏日志，也不会提交到 GitHub。"); _settingsPanel.AddChild(_feedback);
@@ -217,7 +220,8 @@ public sealed class CoachOverlay
         try
         {
             var next = _settings with { BaseUrl = _url.Text.Trim(), Model = _model.Text.Trim(),
-                RememberKey = _remember.ButtonPressed, RevealDrawOrder = _reveal.ButtonPressed };
+                RememberKey = _remember.ButtonPressed, RevealDrawOrder = _reveal.ButtonPressed,
+                IncludeStreamUsage = _usage.ButtonPressed };
             _store.Save(next, _apiKey.Text.Trim());
             Cancel("设置已保存，可以开始分析。");
             _settings = next; _key = _apiKey.Text.Trim();
@@ -264,7 +268,7 @@ public sealed class CoachOverlay
                     _adviceHash = result.Advice.SnapshotId;
                     _freshness.Text = "基于当前状态的 AI 建议；后续效果仍需在游戏中核对。";
                     _status.Text = $"分析完成 · {result.ElapsedMs / 1000.0:F1} 秒" +
-                        (trace.ResponseFormat == "json" ? "（服务商一次性返回）" : "");
+                        (trace.ResponseFormat == "json" ? "（服务商一次性返回）" : "") + "\n" + trace.TokenUsage.Display();
                     GD.Print($"[SpireAiCoach] success snapshot={_adviceHash} elapsed_ms={result.ElapsedMs} prompt={PromptBuilder.Version}");
                 });
             }

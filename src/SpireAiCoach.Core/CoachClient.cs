@@ -31,16 +31,18 @@ public sealed class CoachClient : IDisposable
             if (key.Contains('\r') || key.Contains('\n')) throw new CoachException("configuration", "API Key 不能包含换行。");
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key.Trim());
         }
-        var requestBody = Wire.Serialize(new
+        var body = new Dictionary<string, object>
         {
-            model = settings.Model.Trim(),
-            messages = new[]
+            ["model"] = settings.Model.Trim(),
+            ["messages"] = new[]
             {
                 new { role = "system", content = PromptBuilder.SystemPrompt },
                 new { role = "user", content = PromptBuilder.UserPrompt(snapshot) }
             },
-            stream = true
-        });
+            ["stream"] = true
+        };
+        if (settings.IncludeStreamUsage) body["stream_options"] = new { include_usage = true };
+        var requestBody = Wire.Serialize(body);
         diagnostics ??= new();
         diagnostics.SnapshotId = snapshot.Fingerprint();
         diagnostics.RequestBody = requestBody;
@@ -56,7 +58,8 @@ public sealed class CoachClient : IDisposable
                 var status = (int)response.StatusCode;
                 // Never display the remote body: proxies sometimes echo request headers and secrets.
                 throw new CoachException(status is 401 or 403 ? "authentication" : "http",
-                    $"AI 服务返回 HTTP {status}。请检查地址、模型、额度及密钥；本次未自动重试。");
+                    $"AI 服务返回 HTTP {status}。请检查地址、模型、额度及密钥；本次未自动重试。" +
+                    (status == 400 && settings.IncludeStreamUsage ? "若接口不支持流式用量统计，可在设置中关闭该项。" : ""));
             }
             if (response.Content.Headers.ContentLength > MaxResponseBytes)
                 throw new CoachException("response_size", "AI 回复超过 2 MiB，未显示。");
@@ -119,6 +122,8 @@ public sealed class CoachClient : IDisposable
         using (document)
         {
             var root = document.RootElement;
+            if (root.ValueKind == JsonValueKind.Object && root.TryGetProperty("usage", out var usageValue))
+                diagnostics.UsageJson = usageValue.GetRawText();
             if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("choices", out var choices) ||
                 choices.ValueKind != JsonValueKind.Array || choices.GetArrayLength() == 0)
                 throw new CoachException("provider_schema", "接口回复缺少 choices，当前仅支持 Chat Completions 兼容接口。");

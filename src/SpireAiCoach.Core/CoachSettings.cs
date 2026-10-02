@@ -6,6 +6,7 @@ public sealed record CoachSettings
     public string Model { get; init; } = "";
     public bool RevealDrawOrder { get; init; } = true;
     public bool RememberKey { get; init; }
+    public bool IncludeStreamUsage { get; init; } = true;
     public int TimeoutSeconds { get; init; } = 120;
 
     public Uri Endpoint()
