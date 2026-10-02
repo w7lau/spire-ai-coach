@@ -6,6 +6,7 @@ using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Context;
 using MegaCrit.Sts2.Core.Entities.Multiplayer;
+using MegaCrit.Sts2.Core.Entities.Models;
 using MegaCrit.Sts2.Core.GameActions;
 using MegaCrit.Sts2.Core.Modding;
 using MegaCrit.Sts2.Core.Multiplayer;
@@ -25,14 +26,19 @@ public static class LocalCapture
         ?.GetValue(RunManager.Instance.CombatReplayWriter) as CombatReplay ?? throw new InvalidOperationException("No combat replay");
 
     // The native network action encodes the combat-card instance, unlike its current hand index.
-    // Normalize only turn readiness/hook bookkeeping; unknown and choice events disallow reuse.
+    // Normalize only readiness/resume bookkeeping. Keep the exact ordered native choice results.
     public static LocalHistoryStamp History()
     {
         var player = LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!;
         var entries = new List<string>();
         foreach (var item in Replay().events)
         {
-            if (item.eventType == CombatReplayEventType.HookAction) continue;
+            if (item.eventType is CombatReplayEventType.HookAction or CombatReplayEventType.ResumeAction) continue;
+            if (item.eventType == CombatReplayEventType.PlayerChoice)
+            {
+                entries.Add($"{item.playerId}:choice:{ChoiceIndex(item)}");
+                continue;
+            }
             if (item.eventType != CombatReplayEventType.GameAction || item.action == null)
                 throw new InvalidOperationException("Unsupported replay choice for continuation");
             var action = item.action.ToGameAction(player);
@@ -92,8 +98,7 @@ public static class LocalCapture
         var replay = Replay();
         if (replay == null)
             throw new CoachException("local_replay", "这场战斗没有可用的原生重放记录，请在下一场战斗重试。");
-        if (replay.events.Any(e => e.eventType is CombatReplayEventType.PlayerChoice or CombatReplayEventType.ResumeAction))
-            throw new CoachException("local_choice", "当前战斗记录包含额外选牌或选择流程，本地重放暂不支持；可使用 AI 指导。");
+        foreach (var item in replay.events.Where(e => e.eventType == CombatReplayEventType.PlayerChoice)) ChoiceIndex(item);
         var before = Fingerprint();
         var packet = new PacketWriter();
         replay.Serialize(packet);
@@ -109,4 +114,11 @@ public static class LocalCapture
 
     public static LocalInstallation Installation() => new(
         Path.GetDirectoryName(OS.GetExecutablePath())!, ModManager.GetLoadedMods().Select(m => m.path).ToArray());
+
+    public static int ChoiceIndex(CombatReplayEvent item)
+    {
+        if (item.playerChoiceResult is not { type: PlayerChoiceType.Index, indexes.Count: 1 } result)
+            throw new CoachException("local_choice", "当前记录包含尚未适配的多选或特殊选择，可使用 AI 指导。");
+        return result.indexes![0];
+    }
 }

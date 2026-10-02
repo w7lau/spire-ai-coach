@@ -1,0 +1,79 @@
+{
+  "date": "2026-10-03",
+  "version": "0.7.1",
+  "dll_sha256": "119de511410d80164a453dd4fb89ec10596a5250ab500c26700faeb16705afe2",
+  "focused_core_tests": {
+    "passed": 9,
+    "total": 9
+  },
+  "choice_synthetic": {
+    "executed_steps": 3,
+    "recapture_replay_verified": true,
+    "unchanged_after_search": true,
+    "Evaluated": 12,
+    "Rejected": 0,
+    "ElapsedMs": 46622,
+    "Timing": {
+      "RestoreMs": 17525,
+      "ActionMs": 5909,
+      "DecisionMs": 44,
+      "VerificationMs": 1415,
+      "StartupMs": 20654,
+      "Actions": 35,
+      "Restores": 12
+    }
+  },
+  "fallback_synthetic": {
+    "Status": "partial",
+    "Evaluated": 2,
+    "Rejected": 1,
+    "ElapsedMs": 70840,
+    "Message": "本地整场计算完成。部分搜索未完成，显示已取得的可用路线。本次补充搜索未纳入：武装。预算内候选，不保证最优；未知奖励机制仍按预算搜索。",
+    "Timing": {
+      "RestoreMs": 18485,
+      "ActionMs": 6018,
+      "DecisionMs": 32,
+      "VerificationMs": 920,
+      "StartupMs": 42763,
+      "Actions": 3,
+      "Restores": 3
+    }
+  },
+  "incident_isolated_replay": {
+    "Status": "done",
+    "Evaluated": 4,
+    "Rejected": 0,
+    "Victories": 4,
+    "ElapsedMs": 43181,
+    "Timing": {
+      "RestoreMs": 10572,
+      "ActionMs": 8711,
+      "DecisionMs": 231,
+      "VerificationMs": 2212,
+      "StartupMs": 20563,
+      "Actions": 83,
+      "Restores": 4
+    },
+    "Won": true,
+    "Hp": 48,
+    "HpLost": 10,
+    "Rounds": 5,
+    "used_potion": true,
+    "choices": 1,
+    "verified_steps": 19
+  },
+  "limitations": [
+    "choice test is a one-round synthetic fixture",
+    "only generated-card choice screen supported",
+    "no benchmark demonstrating general speedup",
+    "real game not controlled during validation"
+  ],
+  "installation": {
+    "version": "0.7.1",
+    "files_equal_package": {
+      "SpireAiCoach.dll": true,
+      "SpireAiCoach.json": true
+    },
+    "installed_dll_sha256": "119de511410d80164a453dd4fb89ec10596a5250ab500c26700faeb16705afe2"
+  }
+}

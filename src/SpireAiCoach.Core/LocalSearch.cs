@@ -8,11 +8,14 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     int Partition = 0, int Partitions = 2, int MaxNodes = 32, int MaxDepth = 24,
     int BudgetSeconds = 60, string? DebugEncounter = null,
     IReadOnlyDictionary<uint, string>? TargetLabels = null, int MaxRounds = 10,
-    int Workers = 0, bool IncludePotions = false, LocalHistoryStamp? History = null);
+    int Workers = 0, bool IncludePotions = false, LocalHistoryStamp? History = null, string[]? ExcludedModels = null);
 
 public sealed record LocalAction(int HandIndex, string ModelId, uint? TargetId,
     string CardName, string TargetName, string BeforeHash, int Round = 0,
-    bool EndTurn = false, int Preference = 0, int? PotionSlot = null);
+    bool EndTurn = false, int Preference = 0, int? PotionSlot = null, LocalCardChoice[]? Choices = null);
+
+// Index is relative to this exact ordered native offer, never to a display-name lookup.
+public sealed record LocalCardChoice(string OfferHash, int Index, string ModelId, string Name);
 
 public sealed record LocalCandidate(LocalAction[] Actions, int Hp, int HpLost, int EnemyHp,
     int Gold, int MaxHp, bool Won, bool Dead, bool RewardCoverageKnown,
@@ -21,7 +24,8 @@ public sealed record LocalCandidate(LocalAction[] Actions, int Hp, int HpLost, i
 public sealed record LocalSearchResult(string Id, string SnapshotId, string Status,
     string Message, int Evaluated, int Rejected, long ElapsedMs, LocalCandidate? Best,
     int Duplicates = 0, int BudgetPruned = 0, int Victories = 0, int Workers = 1,
-    long WorkerMemoryBytes = 0, long SearchElapsedMs = 0, bool IncludePotions = false, LocalSearchTiming? Timing = null);
+    long WorkerMemoryBytes = 0, long SearchElapsedMs = 0, bool IncludePotions = false, LocalSearchTiming? Timing = null,
+    LocalAction? BlockedAction = null);
 
 public static class LocalSearchPolicy
 {
@@ -64,14 +68,15 @@ public static class LocalSearchPolicy
             lines.Add($"{i + 1}. " + Describe(action));
         }
         if (best.Won) lines.Add("模拟结果：战斗获胜。");
-        lines.Add($"最多规划 10 轮；{(result.IncludePotions ? "已纳入主动使用药水" : "未纳入主动使用药水（自动触发仍按游戏结算）")}，暂不支持额外选牌。不保证最优或兼容所有 Mod；实际状态偏离时请重新计算。" );
+        lines.Add($"最多规划 10 轮；{(result.IncludePotions ? "已纳入主动使用药水" : "未纳入主动使用药水（自动触发仍按游戏结算）")}；支持生成卡牌的三选一，其他选牌流程仍有适配限制。不保证最优或兼容所有 Mod；实际状态偏离时请重新计算。" );
         return string.Join("\n", lines);
     }
 
-    public static string Describe(LocalAction action) => action.EndTurn ? "结束回合，结算敌方行动。" :
+    public static string Describe(LocalAction action) => (action.EndTurn ? "结束回合，结算敌方行动。" :
         (action.PotionSlot is { } slot ? $"使用药水「{action.CardName}」（药水槽 {slot + 1}）" :
             $"打出「{action.CardName}」（当时手牌第 {action.HandIndex + 1} 张）") +
-        (action.TargetId is null ? "。" : $" → {action.TargetName}［目标 {action.TargetId}］。");
+        (action.TargetId is null ? "。" : $" → {action.TargetName}［目标 {action.TargetId}］。")) +
+        string.Concat((action.Choices ?? []).Select(c => c.Index < 0 ? " 选牌时跳过。" : $" 选择第 {c.Index + 1} 张「{c.Name}」。"));
 
     public static int WorkerCount(int processors, ulong availableMemory, int configured) => configured > 0
         ? Math.Clamp(configured, 1, 16)
@@ -89,7 +94,8 @@ public sealed class LocalFrontier(int capacity)
     public int BudgetPruned { get; private set; }
     public int Count => _pending.Count;
     public static string Key(IEnumerable<LocalAction> actions) => string.Join("/", actions.Select(a =>
-        $"{a.BeforeHash}:{a.Round}:{a.EndTurn}:{a.PotionSlot}:{a.HandIndex}:{a.ModelId}:{a.TargetId}"));
+        $"{a.BeforeHash}:{a.Round}:{a.EndTurn}:{a.PotionSlot}:{a.HandIndex}:{a.ModelId}:{a.TargetId}:" +
+        string.Join(",", (a.Choices ?? []).Select(c => $"{c.OfferHash}:{c.Index}:{c.ModelId}"))));
     public void MarkVisited(LocalAction[] actions) { var key = Key(actions); _seen.Add(key); _pending.Remove(key); }
     public void Add(LocalAction[] actions, double priority)
     {

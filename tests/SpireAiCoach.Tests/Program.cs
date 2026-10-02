@@ -664,6 +664,38 @@ Test("local protocol preserves instance position and pre-state identity", () =>
     Check(LocalSearchPolicy.Format(copy).Contains("42"));
     Check(LocalSearchPolicy.Format(copy).Contains("尚未找到获胜路线"));
 });
+Test("local choices preserve ordered offers and do not merge same-name options", () =>
+{
+    var first = new LocalCardChoice("offer-1", 0, "CARD.SAME", "Same");
+    var action = new LocalAction(-1, "POTION.ATTACK_POTION", 0, "Attack potion", "self", "root", PotionSlot: 0, Choices: [first]);
+    var copy = JsonSerializer.Deserialize<LocalAction>(JsonSerializer.Serialize(action))!;
+    Check(copy.Choices!.Single() == first && copy.PotionSlot == 0);
+    var frontier = new LocalFrontier(8);
+    frontier.Add([action], 0);
+    frontier.Add([copy], 0);
+    frontier.Add([action with { Choices = [first with { Index = 1 }] }], 0);
+    frontier.Add([action with { Choices = [first with { OfferHash = "offer-2" }] }], 0);
+    frontier.Add([action with { Choices = [new("offer-1", -1, "", "skip")] }], 0);
+    Check(frontier.Count == 4 && frontier.Duplicates == 1);
+    Check(LocalSearchPolicy.Describe(action).Contains("选择第 1 张"));
+});
+Test("local search explores choice siblings independently before closing the parent action", () =>
+{
+    var tree = new LocalSearchTree(1729);
+    var potion = new LocalAction(-1, "POTION", 0, "Potion", "Self", "root", PotionSlot: 0);
+    var options = Enumerable.Range(0, 3).Select(i => new LocalAction(i, "choice:SAME", null, "Same", "", "offer")).ToArray();
+    var seen = new HashSet<int>();
+    for (int i = 0; i < 3; i++)
+    {
+        Check(!tree.Exhausted);
+        var trial = tree.Begin();
+        tree.Select(trial, [potion]);
+        var choice = tree.Select(trial, options);
+        Check(seen.Add(choice.HandIndex));
+        tree.Complete(trial, new([], 80, 0, 10, 0, 80, false, false, false), 20, closeExactPrefix: true);
+    }
+    Check(tree.Exhausted && tree.CompletedTrials == 3);
+});
 Test("combat plans preserve end turn boundaries and never invent a final end turn", () =>
 {
     var end = new LocalAction(-1, "", null, "", "", "h1", Round: 3, EndTurn: true);

@@ -52,26 +52,42 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             int count = LocalSearchPolicy.WorkerCount(Environment.ProcessorCount, memory.AvailablePhysical + reusable, request.Workers);
             foreach (var idle in _workers.Skip(count)) idle.Stop();
             progress("准备计算…");
-            var results = await Task.WhenAll(_workers.Take(count).Select((worker, index) => Task.Run(() => Run(worker, index), cancellation)));
+            var results = (await Task.WhenAll(_workers.Take(count).Select((worker, index) => Task.Run(() => Run(worker, index), cancellation)))).ToList();
             cancellation.ThrowIfCancellationRequested();
+            // Pending native selectors own callbacks. Retire their processes; never reset underneath them.
+            // If every lane failed before producing a route, spend only the remaining search budget on
+            // one fresh lane excluding the reported actions. This is an explicitly incomplete fallback.
+            var blocked = results.Where(r => r.Status is "unsupported" or "partial" && r.BlockedAction is { EndTurn: false })
+                .Select(r => r.BlockedAction!).DistinctBy(a => a.ModelId).ToArray();
+            var remainingSeconds = request.BudgetSeconds - (int)Math.Ceiling(results.Max(r => r.ElapsedMs) / 1000d);
+            if (!results.Any(r => r.Status == "done" && r.Best != null) && blocked.Length > 0 && remainingSeconds >= 5)
+            {
+                progress("部分动作无法完成，正在计算其他路线…");
+                var fallback = request with { Partition = 0, Partitions = 1, BudgetSeconds = remainingSeconds,
+                    ExcludedModels = (request.ExcludedModels ?? []).Concat(blocked.Select(a => a.ModelId)).Distinct().ToArray() };
+                results.Add(await Task.Run(() => Run(_workers[0], 0, fallback), cancellation));
+            }
             var valid = results.Where(r => r.Status is "done" or "partial" && r.Best != null).ToArray();
             if (valid.Length == 0)
                 throw new CoachException("local_failed", string.Join("\n", results.Select(r => r.Message).Distinct()));
+            if (valid.Any(r => r.Status == "done")) valid = valid.Where(r => r.Status == "done").ToArray();
             var best = valid.Aggregate((a, b) => LocalSearchPolicy.Better(b.Best!, a.Best) ? b : a);
             return best with { Evaluated = results.Sum(r => r.Evaluated), Rejected = results.Sum(r => r.Rejected),
                 Duplicates = results.Sum(r => r.Duplicates), BudgetPruned = results.Sum(r => r.BudgetPruned),
                 Victories = valid.Sum(r => r.Victories), Workers = count,
-                ElapsedMs = totalTime.ElapsedMilliseconds, SearchElapsedMs = results.Max(r => r.ElapsedMs),
-                WorkerMemoryBytes = results.Sum(r => r.WorkerMemoryBytes),
+                ElapsedMs = totalTime.ElapsedMilliseconds, SearchElapsedMs = results.Take(count).Max(r => r.ElapsedMs) +
+                    (results.Count > count ? results[^1].ElapsedMs : 0),
+                WorkerMemoryBytes = (results.Count > count ? results.Skip(1) : results).Sum(r => r.WorkerMemoryBytes),
                 IncludePotions = request.IncludePotions,
                 Timing = new(results.Sum(r => r.Timing?.RestoreMs ?? 0), results.Sum(r => r.Timing?.ActionMs ?? 0),
                     results.Sum(r => r.Timing?.DecisionMs ?? 0), results.Sum(r => r.Timing?.VerificationMs ?? 0),
                     results.Sum(r => r.Timing?.StartupMs ?? 0), results.Sum(r => r.Timing?.Actions ?? 0), results.Sum(r => r.Timing?.Restores ?? 0)),
                 Status = results.All(r => r.Status == "done") ? "done" : "partial",
-                Message = "本地整场计算完成。" + (valid.Length < count ? "部分搜索未完成，显示已取得的可用路线。" : "") +
+                Message = "本地整场计算完成。" + (results.Any(r => r.Status != "done") ? "部分搜索未完成，显示已取得的可用路线。" : "") +
+                    (results.Count > count ? "本次补充搜索未纳入：" + string.Join("、", blocked.Select(a => a.CardName)) + "。" : "") +
                     "预算内候选，不保证最优；未知奖励机制仍按预算搜索。" };
 
-            async Task<LocalSearchResult> Run(Worker worker, int index)
+            async Task<LocalSearchResult> Run(Worker worker, int index, LocalSearchRequest? fallback = null)
             {
                 try
                 {
@@ -81,7 +97,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     await worker.Ensure(directory, index, installation, cancellation);
                     preparation.Stop();
                     progress("正在计算…");
-                    var command = request with { Partition = index, Partitions = count };
+                    var command = fallback ?? request with { Partition = index, Partitions = count };
                     LocalWire.Write(Path.Combine(worker.Root, "request.json"), command);
                     var timer = Stopwatch.StartNew();
                     long seenSequence = 0;
@@ -93,8 +109,9 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                         {
                             var preview = LocalWire.Read<LocalProgress>(previewPath);
                             if (preview.Id == request.Id && preview.SnapshotId == request.SnapshotId && preview.Worker == index &&
-                                preview.Workers == count && preview.Sequence > seenSequence)
-                            { seenSequence = preview.Sequence; simulationProgress(preview); }
+                                preview.Workers == command.Partitions && preview.Sequence > seenSequence)
+                            { seenSequence = preview.Sequence; simulationProgress(preview with { Workers = count,
+                                Sequence = preview.Sequence + (fallback == null ? 0 : 1_000_000) }); }
                         }
                         var file = Path.Combine(worker.Root, "result.json");
                         if (File.Exists(file))

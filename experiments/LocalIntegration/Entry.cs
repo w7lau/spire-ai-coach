@@ -43,6 +43,12 @@ public static class Entry
             while (NGame.Instance == null) await Frame();
             await NGame.Instance.GameStartupComplete;
             SaveManager.Instance.PrefsSave.FastMode = FastModeType.Instant;
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_REPLAY") is { Length: > 0 } replayPath)
+            {
+                await ReplayIntegration.Run(root, pool, replayPath, System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_REPLAY_GAME")!);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
             var save = JsonSerializer.Deserialize(File.ReadAllText(Path.Combine(root, "fixture.json")), JsonSerializationUtility.GetTypeInfo<SerializableRun>())!;
             var run = RunState.FromSerializable(save);
             await RunManager.Instance.SetUpSavedSingleplayer(run, save);
@@ -51,6 +57,18 @@ public static class Entry
             RunManager.Instance.Launch();
             NGame.Instance!.RootSceneContainer.SetCurrentScene(NRun.Create(run));
             await RunManager.Instance.GenerateMap();
+            bool fallbackFixture = System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_FALLBACK") == "1";
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_CHOICES") == "1" || fallbackFixture)
+            {
+                var owner = LocalContext.GetMe(run)!;
+                foreach (var potion in owner.Potions.ToArray()) potion.Discard();
+                if (!fallbackFixture) await PotionCmd.TryToProcure(ModelDb.AllPotions.Single(p => p.Id.Entry == "ATTACK_POTION").ToMutable(), owner, 0);
+                var choiceFixtureCards = owner.Deck.Cards.ToArray();
+                owner.Deck.Clear(silent: true);
+                foreach (var card in choiceFixtureCards) run.RemoveCard(card);
+                for (int i = 0; i < 5; i++)
+                    await CardPileCmd.Add(run.CreateCard(ModelDb.AllCards.Single(c => c.Id.Entry == (fallbackFixture ? "ARMAMENTS" : "DEFEND_IRONCLAD")), owner), owner.Deck, skipVisuals: true);
+            }
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_FEATURES") == "1")
             {
                 var owner = LocalContext.GetMe(run)!;
@@ -62,6 +80,26 @@ public static class Entry
             var player = LocalContext.GetMe(run)!;
             var capture = new StateCapture();
             while (capture.Capture(true)?.CanAdvise != true) await Frame();
+            if (fallbackFixture)
+            {
+                var request = LocalCapture.Capture(capture.Capture(true)!.Fingerprint(), true) with
+                    { Workers = 1, MaxNodes = 3, MaxRounds = 1, BudgetSeconds = 35 };
+                var installation = LocalCapture.Installation();
+                var result = await Task.Run(() => pool.Analyze(request, installation, _ => { }, CancellationToken.None));
+                LocalWire.Write(Path.Combine(root, "integration-fallback.json"), result);
+                if (result.Rejected != 1 || result.Status != "partial" || !result.Message.Contains("未纳入：武装") ||
+                    result.Best?.Continuation?.Length != result.Best?.Actions.Length || result.Best is not { Actions.Length: > 0 } ||
+                    result.Best.Actions.Any(a => !a.EndTurn) || request.NativeHash != LocalCapture.Fingerprint())
+                    throw new InvalidOperationException("Failed action did not yield a verified, disclosed fallback");
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_CHOICES") == "1")
+            {
+                await ChoiceIntegration.Run(root, tree, pool, capture, player);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_EXECUTION") == "1")
             {
                 await ExecutionIntegration.Run(root, tree, pool, capture, player);

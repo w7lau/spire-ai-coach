@@ -31,6 +31,8 @@ public static class LocalWorker
     private static bool _combatWon;
     private static IReadOnlyDictionary<uint, string>? _targetLabels;
     private static bool _includePotions;
+    private static LocalChoices? _choices;
+    private static HashSet<string> _excludedModels = [];
     private static Task Frame() => _tree.ToSignal(_tree, SceneTree.SignalName.ProcessFrame).AsTask();
 
     public static bool TryStart()
@@ -87,6 +89,7 @@ public static class LocalWorker
     {
         _targetLabels = request.TargetLabels;
         _includePotions = request.IncludePotions;
+        _excludedModels = new(request.ExcludedModels ?? [], StringComparer.Ordinal);
         var timer = Stopwatch.StartNew();
         LocalCandidate? best = null;
         int evaluated = 0, rejected = 0, victories = 0;
@@ -102,6 +105,8 @@ public static class LocalWorker
         long sequence = 0, lastProgress = -1000;
         int route = 0, bestRoute = 0;
         var events = new Queue<LocalSimEvent>();
+        LocalAction? pendingAction = null;
+        LocalAction? blockedAction = null;
         void Progress(string phase, LocalSimState? state = null, bool force = false, string status = "running")
         {
             if (!force && timer.ElapsedMilliseconds - lastProgress < 100) return;
@@ -113,7 +118,7 @@ public static class LocalWorker
         void Publish(string status, string message) => LocalWire.Write(Path.Combine(_root, "result.json"),
             new LocalSearchResult(request.Id, request.SnapshotId, status, message, evaluated, rejected, timer.ElapsedMilliseconds, best,
                 Victories: victories, IncludePotions: request.IncludePotions,
-                Timing: new(restoreMs, actionMs, decisionMs, verifyMs, Actions: executed, Restores: restores)));
+                Timing: new(restoreMs, actionMs, decisionMs, verifyMs, Actions: executed, Restores: restores), BlockedAction: blockedAction));
         try
         {
             if (request.Partitions is < 1 or > 16 || request.Partition < 0 || request.Partition >= request.Partitions ||
@@ -167,9 +172,20 @@ public static class LocalWorker
                         Progress("执行：" + LocalSearchPolicy.Describe(next), before);
                         var priorLost = lost;
                         var actionStarted = Stopwatch.GetTimestamp();
-                        try { await Play(next); }
+                        pendingAction = next;
+                        try
+                        {
+                            next = await Play(next, options =>
+                            {
+                                // A choice is a child of the actual action prefix, so siblings get independent outcomes.
+                                var selected = search.Select(trial, options.Select(c => new LocalAction(c.Index, "choice:" + c.ModelId,
+                                    null, c.Name, "", c.OfferHash, round)).ToArray());
+                                return options.Single(c => c.Index == selected.HandIndex);
+                            });
+                        }
                         finally { actionMs += (long)Stopwatch.GetElapsedTime(actionStarted).TotalMilliseconds; executed++; }
                         actions.Add(next);
+                        pendingAction = null;
                         var after = Observe(player);
                         var changes = before != null && after != null ? LocalProgressBook.Changes(before, after) : "动作已结算；状态预览暂不可用。";
                         if (lost > priorLost) changes += $"；期间实际失去生命 {lost - priorLost}";
@@ -198,11 +214,12 @@ public static class LocalWorker
                     Publish("running", $"已找到 {victories} 条整场获胜路线；已记录 {search.Nodes} 个操作树节点，按实际结算反馈选路。");
                     if (LocalSearchPolicy.CanStop(candidate, request.ContinueOptimization)) break;
                 }
-                catch (LocalChoiceException)
+                catch (LocalChoiceException ex)
                 {
                     rejected++;
+                    blockedAction = pendingAction;
                     // A pending selector may own callbacks. Retire this process instead of resetting it under them.
-                    Publish(best == null ? "unsupported" : "partial", "遇到暂不支持的选牌或特殊流程，此次搜索已停止，保留已取得的路线。");
+                    Publish(best == null ? "unsupported" : "partial", ex.Message);
                     Progress("遇到额外选择，停止搜索", force: true, status: "unsupported");
                     return false;
                 }
@@ -333,10 +350,13 @@ public static class LocalWorker
                 ModelDb.AllEncounters.Single(e => e.Id.Entry == encounter).ToMutable(), false);
         else await manager.LoadIntoLatestMapCoord(null);
         var player = LocalContext.GetMe(run)!;
+        _choices = new LocalChoices(history: replay.events.Where(e => e.eventType == CombatReplayEventType.PlayerChoice)
+            .Select(LocalCapture.ChoiceIndex));
         await StableOrTerminal(player);
         foreach (var item in replay.events)
         {
-            if (item.eventType == CombatReplayEventType.HookAction) continue; // Singleplayer re-executes native hooks itself.
+            if (item.eventType is CombatReplayEventType.HookAction or CombatReplayEventType.PlayerChoice or CombatReplayEventType.ResumeAction)
+                continue; // Native screen handlers reproduce choices and resume hooks during their owning action.
             if (item.eventType != CombatReplayEventType.GameAction || item.action == null)
                 throw new InvalidOperationException("本地重放暂不支持这场战斗中的额外选择。");
             var action = item.action.ToGameAction(player);
@@ -358,6 +378,8 @@ public static class LocalWorker
             else if (action is not ReadyToBeginEnemyTurnAction)
                 throw new InvalidOperationException("本地重放暂不支持历史操作：" + action.GetType().Name);
         }
+        _choices.Finish();
+        _choices = null;
         if (IsTerminal(player) || LocalCapture.Fingerprint() != request.NativeHash)
             throw new InvalidOperationException("后台重放与当前战斗状态不一致，未发布本地建议。可切换 AI 模式。");
     }
@@ -373,7 +395,7 @@ public static class LocalWorker
         for (var i = 0; i < hand.Count; i++)
         {
             var card = hand[i];
-            if (!card.CanPlay()) continue;
+            if (!card.CanPlay() || _excludedModels.Contains(card.Id.ToString())) continue;
             // Do not assume that attacks precede setup, or that zero damage means no value.
             if (card.IsValidTarget(null)) result.Add(new(i, card.Id.ToString(), null, card.Title, "", hash, state.RoundNumber,
                 Preference: tactics.Priority(card, null)));
@@ -387,7 +409,7 @@ public static class LocalWorker
             for (int i = 0; i < player.PotionSlots.Count; i++)
             {
                 var potion = player.PotionSlots[i];
-                if (potion == null || !PotionUsable(potion)) continue;
+                if (potion == null || !PotionUsable(potion) || _excludedModels.Contains(potion.Id.ToString())) continue;
                 if (potion.IsValidTarget(null)) result.Add(new(-1, potion.Id.ToString(), null, potion.Title.GetFormattedText(), "", hash,
                     state.RoundNumber, PotionSlot: i));
                 else foreach (var target in state.Creatures.Where(c => c.IsAlive && potion.IsValidTarget(c)))
@@ -400,7 +422,22 @@ public static class LocalWorker
         return result.ToArray();
     }
 
-    private static async Task Play(LocalAction action)
+    private static async Task<LocalAction> Play(LocalAction action, Func<LocalCardChoice[], LocalCardChoice>? choose = null)
+    {
+        var session = new LocalChoices(action.Choices, choose);
+        _choices = session;
+        try
+        {
+            await PlayNative(action);
+            session.Finish();
+            return action with { Choices = session.Completed };
+        }
+        catch (LocalChoiceException ex)
+        { throw new LocalChoiceException(LocalSearchPolicy.Describe(action) + " " + ex.Message); }
+        finally { _choices = null; }
+    }
+
+    private static async Task PlayNative(LocalAction action)
     {
         if (LocalCapture.Fingerprint() != action.BeforeHash) throw new InvalidOperationException("搜索分支状态复现不一致。");
         var state = CombatManager.Instance.DebugOnlyGetState()!;
@@ -430,8 +467,15 @@ public static class LocalWorker
 
     private static async Task WaitActionQueue()
     {
-        try { await RunManager.Instance.ActionQueueSet.BecameEmpty().WaitAsync(TimeSpan.FromSeconds(5)); }
-        catch (TimeoutException) { throw new LocalChoiceException(); }
+        var timer = Stopwatch.StartNew();
+        var pending = RunManager.Instance.ActionQueueSet.BecameEmpty();
+        while (!pending.IsCompleted)
+        {
+            _choices?.Tick();
+            if (timer.Elapsed.TotalSeconds > 5) throw new LocalChoiceException("等待动作结算超时（" + LocalChoices.PendingDescription() + "）。");
+            await Frame();
+        }
+        await pending;
     }
 
     private static bool IsTerminal(Player player) => !CombatManager.Instance.IsStarting &&
@@ -440,11 +484,12 @@ public static class LocalWorker
     private static async Task EndTurn(Player player)
     {
         var round = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
-        PlayerCmd.EndTurn(player, canBackOut: false);
+        RunManager.Instance.ActionQueueSet.EnqueueWithoutSynchronizing(new EndPlayerTurnAction(player, player.PlayerCombatState!.TurnNumber));
         var timer = Stopwatch.StartNew();
         while (!IsTerminal(player) && CombatManager.Instance.DebugOnlyGetState()!.RoundNumber <= round)
         {
-            if (timer.Elapsed.TotalSeconds > 8) throw new LocalChoiceException();
+            _choices?.Tick();
+            if (timer.Elapsed.TotalSeconds > 8) throw new LocalChoiceException("等待下一回合超时（" + LocalChoices.PendingDescription() + "）。");
             await Frame();
         }
         await StableOrTerminal(player);
@@ -468,12 +513,13 @@ public static class LocalWorker
             else if (player.PlayerCombatState?.Phase == PlayerTurnPhase.Play && !CombatManager.Instance.PlayerActionsDisabled &&
                 player.PlayerCombatState.PlayPile.IsEmpty && RunManager.Instance.ActionQueueSet.BecameEmpty().IsCompletedSuccessfully)
             { await Frame(); return; }
-            if (timer.Elapsed.TotalSeconds > 8) throw new LocalChoiceException();
+            _choices?.Tick();
+            if (timer.Elapsed.TotalSeconds > 8) throw new LocalChoiceException("等待战斗稳定超时（" + LocalChoices.PendingDescription() + "）。");
             await Frame();
         }
     }
 
-    private sealed class LocalChoiceException : Exception;
+    private sealed class LocalChoiceException(string message) : Exception(message);
 }
 
 internal static class SignalTask

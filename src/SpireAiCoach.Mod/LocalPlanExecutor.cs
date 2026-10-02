@@ -38,7 +38,8 @@ public sealed class LocalPlanExecutor(SceneTree tree)
             if (action.TargetId.HasValue && target == null) throw new InvalidOperationException("原目标已不存在，已停止执行。");
             progress($"正在执行第 {++count} 步：{LocalSearchPolicy.Describe(action)}");
             token.ThrowIfCancellationRequested();
-            if (action.EndTurn) PlayerCmd.EndTurn(player, canBackOut: false);
+            if (action.EndTurn) RunManager.Instance.ActionQueueSet.EnqueueWithoutSynchronizing(
+                new EndPlayerTurnAction(player, player.PlayerCombatState!.TurnNumber));
             else if (action.PotionSlot is { } slot)
             {
                 var potion = slot >= 0 && slot < player.PotionSlots.Count ? player.GetPotionAtSlotIndex(slot) : null;
@@ -58,6 +59,7 @@ public sealed class LocalPlanExecutor(SceneTree tree)
                 RunManager.Instance.ActionQueueSet.EnqueueWithoutSynchronizing(new PlayCardAction(card, target));
             }
             // Let the actual game process the command/animations; cancellation never undoes a committed action.
+            var choices = new LocalChoices(action.Choices);
             var timer = Stopwatch.StartNew();
             await Frame(); await Frame();
             while (true)
@@ -66,10 +68,12 @@ public sealed class LocalPlanExecutor(SceneTree tree)
                 if (!CombatManager.Instance.IsInProgress || CombatManager.Instance.IsOverOrEnding) return "战斗已结束，已停止执行。";
                 if (!ReferenceEquals(state, CombatManager.Instance.DebugOnlyGetState()))
                     throw new InvalidOperationException("已进入另一场战斗，已停止执行。");
+                choices.Tick(token);
                 if (LocalCapture.Stable() && (!action.EndTurn || CombatManager.Instance.DebugOnlyGetState()!.RoundNumber > action.Round)) break;
                 if (timer.Elapsed.TotalSeconds > 30) throw new InvalidOperationException("等待结算或额外选择超时，已停止执行，请手动处理。");
                 await Frame();
             }
+            choices.Finish();
             expected++;
             if (best.Actions.Length == 1) return "已执行完已验证的路线；战斗未结束时请重新计算。";
         }
