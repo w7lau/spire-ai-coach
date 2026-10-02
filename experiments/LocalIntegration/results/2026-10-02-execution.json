@@ -1,0 +1,20 @@
+{
+  "prepared_ms": 16471,
+  "analysis_startup_ms": 0,
+  "executed_steps": 24,
+  "expected_steps": 24,
+  "includes_end_turn": true,
+  "final_hp": 74,
+  "expected_hp": 74,
+  "rejected_wrong_combat": true,
+  "rejected_stale": true,
+  "rejected_disabled_potion": true,
+  "canceled_without_mutation": true,
+  "final": "战斗已结束，已停止执行。",
+  "version": "0.7.0",
+  "installed_sha256": "9f99d306acac8af25512039d25a00781d28c09ea723bd6d307be2c600f7eb6f0",
+  "build_sha256": "9f99d306acac8af25512039d25a00781d28c09ea723bd6d307be2c600f7eb6f0",
+  "focused_tests": "7/7",
+  "native_game_errors": 0,
+  "notes": "After native integration, final edits only changed progress/advice copy and the total elapsed timer origin. UI layout and live-player autoplay not manually tested."
+}

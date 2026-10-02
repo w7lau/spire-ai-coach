@@ -55,8 +55,7 @@ public static class LocalSearchPolicy
             $"预测结算：生命 {best.Hp}，期间失去生命 {best.HpLost}，敌人剩余生命合计 {best.EnemyHp}。" };
         if (!best.Won) lines.Add("以下仅为已模拟的部分路线，不代表能打赢本次战斗。停止原因：" + best.StopReason);
         if (best.Dead) lines.Add("注意：目前找到的路线仍会死亡，不能保证存活。");
-        if (result.Timing is { } time)
-            lines.Add($"耗时（各进程累计，非总等待）：准备 {time.StartupMs / 1000d:F1}s / 恢复 {time.RestoreMs / 1000d:F1}s / 决策 {time.DecisionMs / 1000d:F1}s / 执行 {time.ActionMs / 1000d:F1}s / 复核 {time.VerificationMs / 1000d:F1}s；模拟动作 {time.Actions} 次。");
+        lines.Add($"计算用时 {result.ElapsedMs / 1000d:F1} 秒。");
         int round = -1;
         for (var i = 0; i < best.Actions.Length; i++)
         {
@@ -64,8 +63,8 @@ public static class LocalSearchPolicy
             if (action.Round != round) { round = action.Round; lines.Add($"—— 第 {round} 回合 ——"); }
             lines.Add($"{i + 1}. " + Describe(action));
         }
-        if (best.Won) lines.Add("原生战斗胜利结算已完成。");
-        lines.Add($"最多规划 10 轮；{(result.IncludePotions ? "已纳入主动使用药水" : "未纳入主动使用药水（自动触发仍按游戏结算）")}，暂不支持额外选牌。预算裁剪可能遗漏更优路线；未证明任意 Mod 私有状态可恢复。实际出牌或随机结果有变化时请重新计算。" );
+        if (best.Won) lines.Add("模拟结果：战斗获胜。");
+        lines.Add($"最多规划 10 轮；{(result.IncludePotions ? "已纳入主动使用药水" : "未纳入主动使用药水（自动触发仍按游戏结算）")}，暂不支持额外选牌。不保证最优或兼容所有 Mod；实际状态偏离时请重新计算。" );
         return string.Join("\n", lines);
     }
 

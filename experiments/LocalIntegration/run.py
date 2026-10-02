@@ -17,6 +17,7 @@ parser.add_argument('--quick', action='store_true')
 parser.add_argument('--benchmark', action='store_true')
 parser.add_argument('--features', action='store_true')
 parser.add_argument('--optimization', action='store_true')
+parser.add_argument('--execution', action='store_true')
 args = parser.parse_args()
 root = args.workspace.resolve()
 if not (root / '.spire-native-probe-owner').is_file() or not (root / 'fixture.json').is_file():
@@ -45,6 +46,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_BENCHMARK'] = '1' if args.benchmark else '0'
     env['SPIRE_LOCAL_FEATURES'] = '1' if args.features else '0'
     env['SPIRE_LOCAL_OPTIMIZATION'] = '1' if args.optimization else '0'
+    env['SPIRE_LOCAL_EXECUTION'] = '1' if args.execution else '0'
     settings = root / 'Roaming/SlayTheSpire2/default/1/settings.save'
     settings_data = json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}
     settings_data.update(volume_master=0, volume_bgm=0, volume_sfx=0, volume_ambience=0)

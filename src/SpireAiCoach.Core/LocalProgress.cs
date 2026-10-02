@@ -21,7 +21,7 @@ public sealed class LocalProgressBook(string id, string snapshotId)
         return true;
     }
     public static double BudgetUsed(LocalProgress progress) => Math.Clamp(100d * progress.ElapsedMs / Math.Max(1000, progress.BudgetSeconds * 1000), 0, 100);
-    public static string Overview(LocalProgress progress) => $"进程 {progress.Worker + 1} · {progress.Phase} · 路线 {progress.Route} · " +
+    public static string Overview(LocalProgress progress) => $"搜索分组 {progress.Worker + 1} · {progress.Phase} · 路线 {progress.Route} · " +
         $"评估 {progress.Evaluated}/{progress.MaxNodes} · 获胜 {progress.Victories}";
     public static string StateText(LocalSimState state) =>
         $"第 {state.Round} 回合 | 生命 {state.Hp}/{state.MaxHp} | 格挡 {state.Block} | 能量 {state.Energy} | 药水 {state.Potions}\n" +

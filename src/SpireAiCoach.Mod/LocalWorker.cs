@@ -202,8 +202,8 @@ public static class LocalWorker
                 {
                     rejected++;
                     // A pending selector may own callbacks. Retire this process instead of resetting it under them.
-                    Publish(best == null ? "unsupported" : "partial", "遇到暂不支持的选牌或特殊流程，已停止这个工作进程；保留此前完整结算的路线。");
-                    Progress("遇到额外选择，停止此进程", force: true, status: "unsupported");
+                    Publish(best == null ? "unsupported" : "partial", "遇到暂不支持的选牌或特殊流程，此次搜索已停止，保留已取得的路线。");
+                    Progress("遇到额外选择，停止搜索", force: true, status: "unsupported");
                     return false;
                 }
                 finally { player.Creature.CurrentHpChanged -= HpChanged; }

@@ -37,6 +37,12 @@ public sealed class CoachOverlay
     private Button _localAnalyze = null!;
     private LocalWorkerPool _localPool = null!;
     private bool _localAnalyzing;
+    private bool _executing;
+    private CancellationTokenSource? _execution;
+    private readonly CancellationTokenSource _lifetime = new();
+    private string? _preparedCombat;
+    private Button _execute = null!;
+    private Button _stopExecution = null!;
     private LocalContinuation? _continuation;
     private bool _continuationPending;
     private SpinBox _localWorkers = null!;
@@ -90,7 +96,7 @@ public sealed class CoachOverlay
         body.AddThemeConstantOverride("separation", 10);
         scroll.AddChild(body);
         body.AddChild(new Label { Text = "尖塔教练 · AI / 本地", ThemeTypeVariation = "HeaderLarge" });
-        body.AddChild(Wrapped("自己出牌，教练帮你规划。F9 调用 AI · 本地计算无需 API · F10 设置"));
+        body.AddChild(Wrapped("F9 调用 AI · 本地计算无需 API · 算好后可点击执行方案 · F10 设置"));
         _battle = Wrapped("进入战斗后可分析当前回合。"); body.AddChild(_battle);
         _status = Wrapped("本地计算无需 API；使用 AI 时请先填写地址、模型和密钥。"); body.AddChild(_status);
         var row = new HBoxContainer(); body.AddChild(row);
@@ -104,7 +110,7 @@ public sealed class CoachOverlay
         config.Pressed += () => _settingsPanel.Visible = !_settingsPanel.Visible;
         var hide = new Button { Text = "收起" }; row.AddChild(hide);
         hide.Pressed += () => _panel.Hide();
-        body.AddChild(Wrapped("本地搜索整场战斗，最多 10 轮，共享游戏资源。找到胜利路线或显示未完成的原因；奖励识别与无伤提前停止尚未接入。"));
+        body.AddChild(Wrapped("规划整场战斗，最多 10 轮。计算完成后可手动出牌，也可执行已验证的路线。"));
         var localOptions = new HBoxContainer(); body.AddChild(localOptions);
         localOptions.AddChild(new Label { Text = "本地并发（0 自动，1–16 手动）" });
         _localWorkers = new SpinBox { MinValue = 0, MaxValue = 16, Step = 1, Value = Math.Clamp(_settings.LocalWorkers, 0, 16) };
@@ -140,6 +146,11 @@ public sealed class CoachOverlay
         var save = new Button { Text = "保存设置" }; save.Pressed += SaveSettings; _settingsPanel.AddChild(save);
         _feedback = Wrapped(loadError ?? "密钥不会写入游戏日志，也不会提交到 GitHub。"); _settingsPanel.AddChild(_feedback);
         _freshness = Wrapped(""); body.AddChild(_freshness);
+        var executionRow = new HBoxContainer(); body.AddChild(executionRow);
+        _execute = new Button { Text = "执行方案", Disabled = true }; executionRow.AddChild(_execute);
+        _execute.Pressed += ExecuteLocalPlan;
+        _stopExecution = new Button { Text = "停止执行 · Esc", Disabled = true }; executionRow.AddChild(_stopExecution);
+        _stopExecution.Pressed += () => Cancel("已停止执行；已出手的动作会正常结算。");
         _advice = new RichTextLabel
         {
             BbcodeEnabled = false, SelectionEnabled = true, FitContent = true,
@@ -188,6 +199,7 @@ public sealed class CoachOverlay
     private void OnFrame()
     {
         if (_disposed) return;
+        if (_executing && Input.IsKeyPressed(Key.Escape)) Cancel("已停止执行；已出手的动作会正常结算。");
         while (_mainThread.TryDequeue(out var action)) action();
         foreach (var worker in _pendingLocalProgress.Keys)
             if (_pendingLocalProgress.TryRemove(worker, out var local)) _localProgress.Accept(local);
@@ -232,11 +244,27 @@ public sealed class CoachOverlay
                     _freshness.Text = "旧建议已过期：手牌、目标、资源或回合状态发生了变化。";
                 RefreshPreview();
             }
-            if (_continuation != null && (changed || _continuationPending)) ContinueLocalPlan(snapshot);
+            if (!_executing && _continuation != null && (changed || _continuationPending)) ContinueLocalPlan(snapshot);
             _battle.Text = snapshot == null ? "当前不在战斗中。" :
                 $"第 {snapshot.Round} 轮 · {snapshot.Phase}\n生命 {snapshot.Player.Hp}/{snapshot.Player.MaxHp} · 格挡 {snapshot.Player.Block} · 能量 {snapshot.Player.Energy}\n手牌 {snapshot.Hand.Count} / 抽牌 {snapshot.DrawPile.Count} / 弃牌 {snapshot.DiscardPile.Count} / 消耗 {snapshot.ExhaustPile.Count}";
-            _analyze.Disabled = _request != null || snapshot?.CanAdvise != true;
+            _analyze.Disabled = _executing || _request != null || snapshot?.CanAdvise != true;
             _localAnalyze.Disabled = _analyze.Disabled;
+            _execute.Disabled = _analyze.Disabled || _continuation == null || _continuation.Invalid || !LocalCapture.Stable();
+            _stopExecution.Disabled = !_executing;
+            if (snapshot?.CanAdvise == true && _preparedCombat != snapshot.CombatId && _request == null && !_executing &&
+                MegaCrit.Sts2.Core.Runs.RunManager.Instance.NetService.Type == MegaCrit.Sts2.Core.Multiplayer.Game.NetGameType.Singleplayer &&
+                System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_INTEGRATION") == null)
+            {
+                _preparedCombat = snapshot.CombatId;
+                var installation = LocalCapture.Installation();
+                var workers = (int)_localWorkers.Value;
+                _ = Task.Run(async () =>
+                {
+                    try { await _localPool.Prepare(installation, workers, _lifetime.Token); }
+                    catch (OperationCanceledException) { }
+                    catch (Exception ex) { GD.Print($"[SpireAiCoach] preparation failed: {ex.GetType().Name}"); }
+                });
+            }
         }
         catch (Exception ex)
         {
@@ -246,6 +274,7 @@ public sealed class CoachOverlay
             _battle.Text = $"读取失败：{ex.GetType().Name}";
             _analyze.Disabled = true;
             _localAnalyze.Disabled = true;
+            _execute.Disabled = true;
         }
     }
 
@@ -305,7 +334,7 @@ public sealed class CoachOverlay
 
     private void Analyze()
     {
-        if (_request != null) return;
+        if (_request != null || _executing) return;
         RefreshSnapshot();
         if (_snapshot?.CanAdvise != true) { _status.Text = "请等待自己的出牌阶段，再分析当前回合。"; return; }
         try { _settings.Validate(); }
@@ -389,7 +418,7 @@ public sealed class CoachOverlay
 
     private void AnalyzeLocal()
     {
-        if (_request != null) return;
+        if (_request != null || _executing) return;
         RefreshSnapshot();
         if (_snapshot?.CanAdvise != true) { _status.Text = "请等待自己的出牌阶段。"; return; }
         LocalSearchRequest request;
@@ -410,6 +439,7 @@ public sealed class CoachOverlay
         _localProgress.Begin(request);
         _adviceHash = null;
         _advice.Text = "正在本地计算，不调用 AI…";
+        _status.Text = "准备计算…";
         _freshness.Text = "继续出牌会取消本次计算；候选路线仅在后台执行。";
         _analyze.Disabled = true; _localAnalyze.Disabled = true; _cancel.Disabled = false;
         _ = Task.Run(async () =>
@@ -460,7 +490,9 @@ public sealed class CoachOverlay
 
     private void Cancel(string status)
     {
+        _execution?.Cancel();
         _continuation = null; _continuationPending = false;
+        _execute.Disabled = true;
         ++_generation;
         if (_localAnalyzing)
         {
@@ -487,11 +519,44 @@ public sealed class CoachOverlay
     private void Dispose()
     {
         _disposed = true;
+        _lifetime.Cancel();
         Cancel("关闭");
         _tree.ProcessFrame -= OnFrame;
         _tree.Root.SizeChanged -= Resize;
         _capture.Dispose();
         _client.Dispose();
         _localPool.Dispose();
+    }
+
+    private async void ExecuteLocalPlan()
+    {
+        if (_executing || _request != null) return;
+        RefreshSnapshot();
+        if (_continuation == null || _snapshot?.CanAdvise != true || !LocalCapture.Stable())
+        { _status.Text = "请先计算当前战斗的方案。"; return; }
+        var plan = _continuation;
+        using var cancellation = new CancellationTokenSource();
+        _execution = cancellation; _executing = true;
+        _execute.Disabled = true; _stopExecution.Disabled = false;
+        _analyze.Disabled = true; _localAnalyze.Disabled = true;
+        _freshness.Text = "正在按方案执行。点击停止或按 Esc 可随时停止后续动作。";
+        try
+        {
+            _status.Text = await new LocalPlanExecutor(_tree).Execute(plan,
+                () => _capture.Capture(false)?.CombatId, _localPotions.ButtonPressed,
+                text => _status.Text = text, cancellation.Token);
+        }
+        catch (OperationCanceledException) { if (!_disposed) _status.Text = "已停止执行；已出手的动作会正常结算。"; }
+        catch (Exception ex) { if (!_disposed) _status.Text = ex.Message; }
+        finally
+        {
+            _execution = null; _executing = false; _continuation = null; _adviceHash = null;
+            if (!_disposed)
+            {
+                _stopExecution.Disabled = true; _execute.Disabled = true;
+                _freshness.Text = "执行已停止。若需继续，请重新计算当前状态。";
+                RefreshSnapshot();
+            }
+        }
     }
 }

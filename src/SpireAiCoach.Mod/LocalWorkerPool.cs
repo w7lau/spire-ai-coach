@@ -13,22 +13,46 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
     private readonly Worker[] _workers = Enumerable.Range(0, 16).Select(_ => new Worker()).ToArray();
     private bool _disposed;
 
+    private int Count(int configured)
+    {
+        var memory = new MemoryStatus();
+        if (!GlobalMemoryStatusEx(memory)) throw new IOException("Cannot determine available memory for local workers");
+        ulong reusable = (ulong)_workers.Where(w => w.Process?.HasExited == false).Sum(w => w.Process!.PrivateMemorySize64);
+        return LocalSearchPolicy.WorkerCount(Environment.ProcessorCount, memory.AvailablePhysical + reusable, configured);
+    }
+
+    public async Task Prepare(LocalInstallation installation, int configured, CancellationToken token)
+    {
+        await _gate.WaitAsync(token);
+        try
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            await Task.WhenAll(_workers.Take(Count(configured)).Select((worker, index) =>
+                Task.Run(async () =>
+                {
+                    try { await worker.Ensure(directory, index, installation, token); }
+                    catch { worker.Stop(); throw; }
+                }, token)));
+        }
+        finally { _gate.Release(); }
+    }
+
     public async Task<LocalSearchResult> Analyze(LocalSearchRequest request, LocalInstallation installation,
         Action<string> progress, CancellationToken cancellation, Action<LocalProgress>? simulationProgress = null)
     {
+        var totalTime = Stopwatch.StartNew();
         await _gate.WaitAsync(cancellation);
         try
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            var totalTime = Stopwatch.StartNew();
             var memory = new MemoryStatus();
             if (!GlobalMemoryStatusEx(memory)) throw new IOException("Cannot determine available memory for local workers");
             // Keep automatic sizing stable when reusing our own already allocated worker heaps.
             ulong reusable = (ulong)_workers.Where(w => w.Process?.HasExited == false).Sum(w => w.Process!.PrivateMemorySize64);
             int count = LocalSearchPolicy.WorkerCount(Environment.ProcessorCount, memory.AvailablePhysical + reusable, request.Workers);
             foreach (var idle in _workers.Skip(count)) idle.Stop();
-            progress($"正在准备 {count} 个独立工作进程，共享游戏资源文件；搜索整场战斗（最多 {request.MaxRounds} 轮）…");
-            var results = await Task.WhenAll(_workers.Take(count).Select((worker, index) => Run(worker, index)));
+            progress("准备计算…");
+            var results = await Task.WhenAll(_workers.Take(count).Select((worker, index) => Task.Run(() => Run(worker, index), cancellation)));
             cancellation.ThrowIfCancellationRequested();
             var valid = results.Where(r => r.Status is "done" or "partial" && r.Best != null).ToArray();
             if (valid.Length == 0)
@@ -44,7 +68,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     results.Sum(r => r.Timing?.DecisionMs ?? 0), results.Sum(r => r.Timing?.VerificationMs ?? 0),
                     results.Sum(r => r.Timing?.StartupMs ?? 0), results.Sum(r => r.Timing?.Actions ?? 0), results.Sum(r => r.Timing?.Restores ?? 0)),
                 Status = results.All(r => r.Status == "done") ? "done" : "partial",
-                Message = "本地整场计算完成。" + (valid.Length < count ? "部分工作进程未完成，仅保留已验证的路线。" : "") +
+                Message = "本地整场计算完成。" + (valid.Length < count ? "部分搜索未完成，显示已取得的可用路线。" : "") +
                     "预算内候选，不保证最优；未知奖励机制仍按预算搜索。" };
 
             async Task<LocalSearchResult> Run(Worker worker, int index)
@@ -52,10 +76,11 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 try
                 {
                     simulationProgress?.Invoke(new(request.Id, request.SnapshotId, index, count, 0, 0, 0, request.MaxNodes, 0,
-                        0, request.BudgetSeconds, "准备静音工作进程", null, []));
+                        0, request.BudgetSeconds, "准备计算", null, []));
                     var preparation = Stopwatch.StartNew();
                     await worker.Ensure(directory, index, installation, cancellation);
                     preparation.Stop();
+                    progress("正在计算…");
                     var command = request with { Partition = index, Partitions = count };
                     LocalWire.Write(Path.Combine(worker.Root, "request.json"), command);
                     var timer = Stopwatch.StartNew();
@@ -90,14 +115,14 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                                     if (result.Status != "done") worker.Stop();
                                     return result;
                                 }
-                                progress($"本地进程 {index + 1}/{count}：已评估 {result.Evaluated} 条路线。{result.Message}");
+                                progress($"正在计算 · 已评估 {result.Evaluated} 条路线");
                             }
                         }
                         if (worker.Process?.HasExited != false)
-                            throw new CoachException("local_exit", "本地工作进程已退出，未取得完整结果。");
+                            throw new CoachException("local_exit", "本次计算意外中断，请重试。");
                         await Task.Delay(250, cancellation);
                     }
-                    throw new CoachException("local_timeout", "本地工作进程超时，已停止；可以重试或使用 AI 模式。");
+                    throw new CoachException("local_timeout", "计算超时，已停止；可以重试或使用 AI 分析。");
                 }
                 catch (OperationCanceledException) { worker.Stop(); throw; }
                 catch (Exception ex)

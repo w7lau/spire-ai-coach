@@ -20,11 +20,11 @@ public sealed class LocalProgressPanel
 
     public LocalProgressPanel()
     {
-        var toggle = new Button { Text = "展开 / 收起后台模拟进度" };
+        var toggle = new Button { Text = "展开 / 收起计算过程" };
         toggle.Pressed += () => _details.Visible = !_details.Visible;
         View.AddChild(toggle); View.AddChild(_details);
         _details.AddChild(_caption); _details.AddChild(_overview);
-        _details.AddChild(Wrap("选择进程查看路线（后台模拟，不是最终建议）"));
+        _details.AddChild(Wrap("选择搜索分组查看正在尝试的路线"));
         _details.AddChild(_worker);
         _worker.ItemSelected += _ => Render();
         _details.AddChild(_budgetText); _details.AddChild(_budget);
@@ -48,7 +48,7 @@ public sealed class LocalProgressPanel
     public void Accept(LocalProgress progress)
     {
         if (_book?.Accept(progress) != true) return;
-        while (_worker.ItemCount < progress.Workers) _worker.AddItem($"进程 {_worker.ItemCount + 1}");
+        while (_worker.ItemCount < progress.Workers) _worker.AddItem($"搜索分组 {_worker.ItemCount + 1}");
         if (_worker.Selected < 0) _worker.Select(0);
         Render();
     }

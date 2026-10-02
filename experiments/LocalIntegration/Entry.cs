@@ -62,6 +62,12 @@ public static class Entry
             var player = LocalContext.GetMe(run)!;
             var capture = new StateCapture();
             while (capture.Capture(true)?.CanAdvise != true) await Frame();
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_EXECUTION") == "1")
+            {
+                await ExecutionIntegration.Run(root, tree, pool, capture, player);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_OPTIMIZATION") == "1")
             {
                 await OptimizationIntegration.Run(root, tree, pool, capture, player);
