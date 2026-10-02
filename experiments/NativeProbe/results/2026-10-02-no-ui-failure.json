@@ -1,0 +1,11 @@
+{
+  "experiment": "Native TestMode enabled after real Mod loading, without NRun creation",
+  "status": "failed",
+  "stage": "enter_combat",
+  "error": "System.InvalidOperationException: Backend should not be subscribing to CombatStateChanged!",
+  "wall_ms": 26105.89,
+  "exit_code": 0,
+  "completed_routes": 0,
+  "source_unchanged": true,
+  "disposition": "Rejected: native TestMode suppresses state notifications and is not presentation-only. Execution option removed."
+}

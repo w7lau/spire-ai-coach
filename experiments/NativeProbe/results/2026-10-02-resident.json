@@ -1,0 +1,2182 @@
+{
+  "scope": "Fixed synthetic singleplayer fixture; no arbitrary Mod isolation guarantee.",
+  "normal": {
+    "wall_ms": 120713.93,
+    "time_scale": 1,
+    "instant": false,
+    "keep_assets": false,
+    "skip_transitions": false,
+    "warm_cycle_median_ms": 17586.5,
+    "branches": [
+      {
+        "index": 0,
+        "route": "A",
+        "cleanup_ms": 0,
+        "cycle_ms": 24141,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 21107,
+        "godot_nodes": 3810,
+        "godot_resources": 5992,
+        "action_ms": 12821,
+        "setup_ms": 11298,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+          "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+          "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+          "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+        ]
+      },
+      {
+        "index": 1,
+        "route": "B",
+        "cleanup_ms": 1234,
+        "cycle_ms": 16333,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 20526,
+        "godot_nodes": 3742,
+        "godot_resources": 5991,
+        "action_ms": 9500,
+        "setup_ms": 5596,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+          "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+          "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+          "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E"
+        ]
+      },
+      {
+        "index": 2,
+        "route": "A",
+        "cleanup_ms": 1087,
+        "cycle_ms": 19023,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 20406,
+        "godot_nodes": 3810,
+        "godot_resources": 5992,
+        "action_ms": 13099,
+        "setup_ms": 4835,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+          "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+          "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+          "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+        ]
+      },
+      {
+        "index": 3,
+        "route": "B",
+        "cleanup_ms": 1162,
+        "cycle_ms": 15355,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 19894,
+        "godot_nodes": 3744,
+        "godot_resources": 5991,
+        "action_ms": 9449,
+        "setup_ms": 4742,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+          "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+          "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+          "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E"
+        ]
+      },
+      {
+        "index": 4,
+        "route": "A",
+        "cleanup_ms": 1115,
+        "cycle_ms": 18840,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 19768,
+        "godot_nodes": 3810,
+        "godot_resources": 5992,
+        "action_ms": 12966,
+        "setup_ms": 4757,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+          "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+          "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+          "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+        ]
+      }
+    ],
+    "runtime_errors": [],
+    "engine_errors": [
+      "ERROR: 1 RID allocations of type 'N26RendererEnvironmentStorage11EnvironmentE' were leaked at exit.",
+      "ERROR: 258 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.",
+      "ERROR: 5 RID allocations of type 'N13RendererDummy9DummyMeshE' were leaked at exit.",
+      "ERROR: 22 RID allocations of type 'N13RendererDummy15MaterialStorage13DummyMaterialE' were leaked at exit.",
+      "ERROR: 6 RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit.",
+      "ERROR: 63 RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.",
+      "ERROR: 14 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.",
+      "ERROR: 10 RID allocations of type 'PN18TextServerAdvanced27FontAdvancedLinkedVariationE' were leaked at exit.",
+      "ERROR: 308 resources still in use at exit (run with --verbose for details)."
+    ]
+  },
+  "fast": {
+    "wall_ms": 65279.3,
+    "time_scale": 4,
+    "instant": false,
+    "keep_assets": false,
+    "skip_transitions": false,
+    "warm_cycle_median_ms": 6374.5,
+    "branches": [
+      {
+        "index": 0,
+        "route": "A",
+        "cleanup_ms": 0,
+        "cycle_ms": 12946,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 21137,
+        "godot_nodes": 3812,
+        "godot_resources": 5992,
+        "action_ms": 3711,
+        "setup_ms": 9212,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+          "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+          "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+          "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+        ]
+      },
+      {
+        "index": 1,
+        "route": "B",
+        "cleanup_ms": 720,
+        "cycle_ms": 6177,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 20559,
+        "godot_nodes": 3748,
+        "godot_resources": 5991,
+        "action_ms": 2719,
+        "setup_ms": 2736,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+          "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+          "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+          "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E"
+        ]
+      },
+      {
+        "index": 2,
+        "route": "A",
+        "cleanup_ms": 551,
+        "cycle_ms": 6691,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 20427,
+        "godot_nodes": 3812,
+        "godot_resources": 5992,
+        "action_ms": 3616,
+        "setup_ms": 2522,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+          "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+          "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+          "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+        ]
+      },
+      {
+        "index": 3,
+        "route": "B",
+        "cleanup_ms": 519,
+        "cycle_ms": 5662,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 19921,
+        "godot_nodes": 3744,
+        "godot_resources": 5991,
+        "action_ms": 2716,
+        "setup_ms": 2424,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+          "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+          "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+          "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E"
+        ]
+      },
+      {
+        "index": 4,
+        "route": "A",
+        "cleanup_ms": 543,
+        "cycle_ms": 6572,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 19791,
+        "godot_nodes": 3812,
+        "godot_resources": 5992,
+        "action_ms": 3583,
+        "setup_ms": 2444,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+          "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+          "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+          "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+        ]
+      }
+    ],
+    "runtime_errors": [],
+    "engine_errors": [
+      "ERROR: Invalid Task ID",
+      "ERROR: Invalid Task ID",
+      "ERROR: Parameter \"t\" is null.",
+      "ERROR: 1 RID allocations of type 'N26RendererEnvironmentStorage11EnvironmentE' were leaked at exit.",
+      "ERROR: 258 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.",
+      "ERROR: 5 RID allocations of type 'N13RendererDummy9DummyMeshE' were leaked at exit.",
+      "ERROR: 22 RID allocations of type 'N13RendererDummy15MaterialStorage13DummyMaterialE' were leaked at exit.",
+      "ERROR: 6 RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit.",
+      "ERROR: 63 RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.",
+      "ERROR: 14 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.",
+      "ERROR: 10 RID allocations of type 'PN18TextServerAdvanced27FontAdvancedLinkedVariationE' were leaked at exit.",
+      "ERROR: 308 resources still in use at exit (run with --verbose for details)."
+    ]
+  },
+  "traces": {
+    "A": [
+      {
+        "label": "root",
+        "RoundNumber": 1,
+        "native_state_sha256": "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+        "player": {
+          "hp": 80,
+          "block": 0,
+          "energy": 3,
+          "powers": [],
+          "relics": [
+            {
+              "id": "RELIC.BURNING_BLOOD",
+              "DisplayAmount": 0,
+              "IsUsedUp": false,
+              "StackCount": 1
+            },
+            {
+              "id": "RELIC.BLOOD_ARMOR_RUNE",
+              "DisplayAmount": 0,
+              "IsUsedUp": false,
+              "StackCount": 1
+            }
+          ]
+        },
+        "piles": [
+          {
+            "type": "Hand",
+            "cards": [
+              "CARD.DEFEND_IRONCLAD",
+              "CARD.BLOODLETTING",
+              "CARD.STRIKE_IRONCLAD",
+              "CARD.DEFEND_IRONCLAD",
+              "CARD.STRIKE_IRONCLAD"
+            ]
+          },
+          {
+            "type": "Draw",
+            "cards": []
+          },
+          {
+            "type": "Discard",
+            "cards": []
+          },
+          {
+            "type": "Exhaust",
+            "cards": []
+          },
+          {
+            "type": "Play",
+            "cards": []
+          }
+        ],
+        "enemies": [
+          {
+            "id": "MONSTER.LEAF_SLIME_S",
+            "hp": 12,
+            "block": 0,
+            "powers": []
+          },
+          {
+            "id": "MONSTER.LEAF_SLIME_M",
+            "hp": 34,
+            "block": 0,
+            "powers": []
+          },
+          {
+            "id": "MONSTER.TWIG_SLIME_S",
+            "hp": 9,
+            "block": 0,
+            "powers": []
+          }
+        ]
+      },
+      {
+        "label": "BLOODLETTING",
+        "RoundNumber": 1,
+        "native_state_sha256": "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+        "player": {
+          "hp": 77,
+          "block": 0,
+          "energy": 5,
+          "powers": [
+            {
+              "id": "POWER.PLATING_POWER",
+              "Amount": 3
+            }
+          ],
+          "relics": [
+            {
+              "id": "RELIC.BURNING_BLOOD",
+              "DisplayAmount": 0,
+              "IsUsedUp": false,
+              "StackCount": 1
+            },
+            {
+              "id": "RELIC.BLOOD_ARMOR_RUNE",
+              "DisplayAmount": 0,
+              "IsUsedUp": false,
+              "StackCount": 1
+            }
+          ]
+        },
+        "piles": [
+          {
+            "type": "Hand",
+            "cards": [
+              "CARD.DEFEND_IRONCLAD",
+              "CARD.STRIKE_IRONCLAD",
+              "CARD.DEFEND_IRONCLAD",
+              "CARD.STRIKE_IRONCLAD"
+            ]
+          },
+          {
+            "type": "Draw",
+            "cards": []
+          },
+          {
+            "type": "Discard",
+            "cards": [
+              "CARD.BLOODLETTING"
+            ]
+          },
+          {
+            "type": "Exhaust",
+            "cards": []
+          },
+          {
+            "type": "Play",
+            "cards": []
+          }
+        ],
+        "enemies": [
+          {
+            "id": "MONSTER.LEAF_SLIME_S",
+            "hp": 12,
+            "block": 0,
+            "powers": []
+          },
+          {
+            "id": "MONSTER.LEAF_SLIME_M",
+            "hp": 34,
+            "block": 0,
+            "powers": []
+          },
+          {
+            "id": "MONSTER.TWIG_SLIME_S",
+            "hp": 9,
+            "block": 0,
+            "powers": []
+          }
+        ]
+      },
+      {
+        "label": "STRIKE_IRONCLAD",
+        "RoundNumber": 1,
+        "native_state_sha256": "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+        "player": {
+          "hp": 77,
+          "block": 0,
+          "energy": 4,
+          "powers": [
+            {
+              "id": "POWER.PLATING_POWER",
+              "Amount": 3
+            }
+          ],
+          "relics": [
+            {
+              "id": "RELIC.BURNING_BLOOD",
+              "DisplayAmount": 0,
+              "IsUsedUp": false,
+              "StackCount": 1
+            },
+            {
+              "id": "RELIC.BLOOD_ARMOR_RUNE",
+              "DisplayAmount": 0,
+              "IsUsedUp": false,
+              "StackCount": 1
+            }
+          ]
+        },
+        "piles": [
+          {
+            "type": "Hand",
+            "cards": [
+              "CARD.DEFEND_IRONCLAD",
+              "CARD.DEFEND_IRONCLAD",
+              "CARD.STRIKE_IRONCLAD"
+            ]
+          },
+          {
+            "type": "Draw",
+            "cards": []
+          },
+          {
+            "type": "Discard",
+            "cards": [
+              "CARD.BLOODLETTING",
+              "CARD.STRIKE_IRONCLAD"
+            ]
+          },
+          {
+            "type": "Exhaust",
+            "cards": []
+          },
+          {
+            "type": "Play",
+            "cards": []
+          }
+        ],
+        "enemies": [
+          {
+            "id": "MONSTER.LEAF_SLIME_S",
+            "hp": 6,
+            "block": 0,
+            "powers": []
+          },
+          {
+            "id": "MONSTER.LEAF_SLIME_M",
+            "hp": 34,
+            "block": 0,
+            "powers": []
+          },
+          {
+            "id": "MONSTER.TWIG_SLIME_S",
+            "hp": 9,
+            "block": 0,
+            "powers": []
+          }
+        ]
+      },
+      {
+        "label": "DEFEND_IRONCLAD",
+        "RoundNumber": 1,
+        "native_state_sha256": "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+        "player": {
+          "hp": 77,
+          "block": 5,
+          "energy": 3,
+          "powers": [
+            {
+              "id": "POWER.PLATING_POWER",
+              "Amount": 3
+            }
+          ],
+          "relics": [
+            {
+              "id": "RELIC.BURNING_BLOOD",
+              "DisplayAmount": 0,
+              "IsUsedUp": false,
+              "StackCount": 1
+            },
+            {
+              "id": "RELIC.BLOOD_ARMOR_RUNE",
+              "DisplayAmount": 0,
+              "IsUsedUp": false,
+              "StackCount": 1
+            }
+          ]
+        },
+        "piles": [
+          {
+            "type": "Hand",
+            "cards": [
+              "CARD.DEFEND_IRONCLAD",
+              "CARD.STRIKE_IRONCLAD"
+            ]
+          },
+          {
+            "type": "Draw",
+            "cards": []
+          },
+          {
+            "type": "Discard",
+            "cards": [
+              "CARD.BLOODLETTING",
+              "CARD.STRIKE_IRONCLAD",
+              "CARD.DEFEND_IRONCLAD"
+            ]
+          },
+          {
+            "type": "Exhaust",
+            "cards": []
+          },
+          {
+            "type": "Play",
+            "cards": []
+          }
+        ],
+        "enemies": [
+          {
+            "id": "MONSTER.LEAF_SLIME_S",
+            "hp": 6,
+            "block": 0,
+            "powers": []
+          },
+          {
+            "id": "MONSTER.LEAF_SLIME_M",
+            "hp": 34,
+            "block": 0,
+            "powers": []
+          },
+          {
+            "id": "MONSTER.TWIG_SLIME_S",
+            "hp": 9,
+            "block": 0,
+            "powers": []
+          }
+        ]
+      },
+      {
+        "label": "END_TURN",
+        "RoundNumber": 2,
+        "native_state_sha256": "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9",
+        "player": {
+          "hp": 77,
+          "block": 0,
+          "energy": 3,
+          "powers": [
+            {
+              "id": "POWER.PLATING_POWER",
+              "Amount": 2
+            }
+          ],
+          "relics": [
+            {
+              "id": "RELIC.BURNING_BLOOD",
+              "DisplayAmount": 0,
+              "IsUsedUp": false,
+              "StackCount": 1
+            },
+            {
+              "id": "RELIC.BLOOD_ARMOR_RUNE",
+              "DisplayAmount": 0,
+              "IsUsedUp": false,
+              "StackCount": 1
+            }
+          ]
+        },
+        "piles": [
+          {
+            "type": "Hand",
+            "cards": [
+              "CARD.STRIKE_IRONCLAD",
+              "CARD.DEFEND_IRONCLAD",
+              "CARD.STRIKE_IRONCLAD",
+              "CARD.SLIMED",
+              "CARD.SLIMED"
+            ]
+          },
+          {
+            "type": "Draw",
+            "cards": [
+              "CARD.BLOODLETTING",
+              "CARD.SLIMED",
+              "CARD.DEFEND_IRONCLAD"
+            ]
+          },
+          {
+            "type": "Discard",
+            "cards": []
+          },
+          {
+            "type": "Exhaust",
+            "cards": []
+          },
+          {
+            "type": "Play",
+            "cards": []
+          }
+        ],
+        "enemies": [
+          {
+            "id": "MONSTER.LEAF_SLIME_S",
+            "hp": 6,
+            "block": 0,
+            "powers": []
+          },
+          {
+            "id": "MONSTER.LEAF_SLIME_M",
+            "hp": 34,
+            "block": 0,
+            "powers": []
+          },
+          {
+            "id": "MONSTER.TWIG_SLIME_S",
+            "hp": 9,
+            "block": 0,
+            "powers": []
+          }
+        ]
+      }
+    ],
+    "B": [
+      {
+        "label": "root",
+        "RoundNumber": 1,
+        "native_state_sha256": "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+        "player": {
+          "hp": 80,
+          "block": 0,
+          "energy": 3,
+          "powers": [],
+          "relics": [
+            {
+              "id": "RELIC.BURNING_BLOOD",
+              "DisplayAmount": 0,
+              "IsUsedUp": false,
+              "StackCount": 1
+            },
+            {
+              "id": "RELIC.BLOOD_ARMOR_RUNE",
+              "DisplayAmount": 0,
+              "IsUsedUp": false,
+              "StackCount": 1
+            }
+          ]
+        },
+        "piles": [
+          {
+            "type": "Hand",
+            "cards": [
+              "CARD.DEFEND_IRONCLAD",
+              "CARD.BLOODLETTING",
+              "CARD.STRIKE_IRONCLAD",
+              "CARD.DEFEND_IRONCLAD",
+              "CARD.STRIKE_IRONCLAD"
+            ]
+          },
+          {
+            "type": "Draw",
+            "cards": []
+          },
+          {
+            "type": "Discard",
+            "cards": []
+          },
+          {
+            "type": "Exhaust",
+            "cards": []
+          },
+          {
+            "type": "Play",
+            "cards": []
+          }
+        ],
+        "enemies": [
+          {
+            "id": "MONSTER.LEAF_SLIME_S",
+            "hp": 12,
+            "block": 0,
+            "powers": []
+          },
+          {
+            "id": "MONSTER.LEAF_SLIME_M",
+            "hp": 34,
+            "block": 0,
+            "powers": []
+          },
+          {
+            "id": "MONSTER.TWIG_SLIME_S",
+            "hp": 9,
+            "block": 0,
+            "powers": []
+          }
+        ]
+      },
+      {
+        "label": "STRIKE_IRONCLAD",
+        "RoundNumber": 1,
+        "native_state_sha256": "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+        "player": {
+          "hp": 80,
+          "block": 0,
+          "energy": 2,
+          "powers": [],
+          "relics": [
+            {
+              "id": "RELIC.BURNING_BLOOD",
+              "DisplayAmount": 0,
+              "IsUsedUp": false,
+              "StackCount": 1
+            },
+            {
+              "id": "RELIC.BLOOD_ARMOR_RUNE",
+              "DisplayAmount": 0,
+              "IsUsedUp": false,
+              "StackCount": 1
+            }
+          ]
+        },
+        "piles": [
+          {
+            "type": "Hand",
+            "cards": [
+              "CARD.DEFEND_IRONCLAD",
+              "CARD.BLOODLETTING",
+              "CARD.DEFEND_IRONCLAD",
+              "CARD.STRIKE_IRONCLAD"
+            ]
+          },
+          {
+            "type": "Draw",
+            "cards": []
+          },
+          {
+            "type": "Discard",
+            "cards": [
+              "CARD.STRIKE_IRONCLAD"
+            ]
+          },
+          {
+            "type": "Exhaust",
+            "cards": []
+          },
+          {
+            "type": "Play",
+            "cards": []
+          }
+        ],
+        "enemies": [
+          {
+            "id": "MONSTER.LEAF_SLIME_S",
+            "hp": 6,
+            "block": 0,
+            "powers": []
+          },
+          {
+            "id": "MONSTER.LEAF_SLIME_M",
+            "hp": 34,
+            "block": 0,
+            "powers": []
+          },
+          {
+            "id": "MONSTER.TWIG_SLIME_S",
+            "hp": 9,
+            "block": 0,
+            "powers": []
+          }
+        ]
+      },
+      {
+        "label": "STRIKE_IRONCLAD",
+        "RoundNumber": 1,
+        "native_state_sha256": "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+        "player": {
+          "hp": 80,
+          "block": 0,
+          "energy": 1,
+          "powers": [],
+          "relics": [
+            {
+              "id": "RELIC.BURNING_BLOOD",
+              "DisplayAmount": 0,
+              "IsUsedUp": false,
+              "StackCount": 1
+            },
+            {
+              "id": "RELIC.BLOOD_ARMOR_RUNE",
+              "DisplayAmount": 0,
+              "IsUsedUp": false,
+              "StackCount": 1
+            }
+          ]
+        },
+        "piles": [
+          {
+            "type": "Hand",
+            "cards": [
+              "CARD.DEFEND_IRONCLAD",
+              "CARD.BLOODLETTING",
+              "CARD.DEFEND_IRONCLAD"
+            ]
+          },
+          {
+            "type": "Draw",
+            "cards": []
+          },
+          {
+            "type": "Discard",
+            "cards": [
+              "CARD.STRIKE_IRONCLAD",
+              "CARD.STRIKE_IRONCLAD"
+            ]
+          },
+          {
+            "type": "Exhaust",
+            "cards": []
+          },
+          {
+            "type": "Play",
+            "cards": []
+          }
+        ],
+        "enemies": [
+          {
+            "id": "MONSTER.LEAF_SLIME_M",
+            "hp": 34,
+            "block": 0,
+            "powers": []
+          },
+          {
+            "id": "MONSTER.TWIG_SLIME_S",
+            "hp": 9,
+            "block": 0,
+            "powers": []
+          }
+        ]
+      },
+      {
+        "label": "DEFEND_IRONCLAD",
+        "RoundNumber": 1,
+        "native_state_sha256": "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+        "player": {
+          "hp": 80,
+          "block": 5,
+          "energy": 0,
+          "powers": [],
+          "relics": [
+            {
+              "id": "RELIC.BURNING_BLOOD",
+              "DisplayAmount": 0,
+              "IsUsedUp": false,
+              "StackCount": 1
+            },
+            {
+              "id": "RELIC.BLOOD_ARMOR_RUNE",
+              "DisplayAmount": 0,
+              "IsUsedUp": false,
+              "StackCount": 1
+            }
+          ]
+        },
+        "piles": [
+          {
+            "type": "Hand",
+            "cards": [
+              "CARD.BLOODLETTING",
+              "CARD.DEFEND_IRONCLAD"
+            ]
+          },
+          {
+            "type": "Draw",
+            "cards": []
+          },
+          {
+            "type": "Discard",
+            "cards": [
+              "CARD.STRIKE_IRONCLAD",
+              "CARD.STRIKE_IRONCLAD",
+              "CARD.DEFEND_IRONCLAD"
+            ]
+          },
+          {
+            "type": "Exhaust",
+            "cards": []
+          },
+          {
+            "type": "Play",
+            "cards": []
+          }
+        ],
+        "enemies": [
+          {
+            "id": "MONSTER.LEAF_SLIME_M",
+            "hp": 34,
+            "block": 0,
+            "powers": []
+          },
+          {
+            "id": "MONSTER.TWIG_SLIME_S",
+            "hp": 9,
+            "block": 0,
+            "powers": []
+          }
+        ]
+      },
+      {
+        "label": "END_TURN",
+        "RoundNumber": 2,
+        "native_state_sha256": "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E",
+        "player": {
+          "hp": 80,
+          "block": 0,
+          "energy": 3,
+          "powers": [],
+          "relics": [
+            {
+              "id": "RELIC.BURNING_BLOOD",
+              "DisplayAmount": 0,
+              "IsUsedUp": false,
+              "StackCount": 1
+            },
+            {
+              "id": "RELIC.BLOOD_ARMOR_RUNE",
+              "DisplayAmount": 0,
+              "IsUsedUp": false,
+              "StackCount": 1
+            }
+          ]
+        },
+        "piles": [
+          {
+            "type": "Hand",
+            "cards": [
+              "CARD.DEFEND_IRONCLAD",
+              "CARD.SLIMED",
+              "CARD.STRIKE_IRONCLAD",
+              "CARD.STRIKE_IRONCLAD",
+              "CARD.BLOODLETTING"
+            ]
+          },
+          {
+            "type": "Draw",
+            "cards": [
+              "CARD.SLIMED",
+              "CARD.DEFEND_IRONCLAD"
+            ]
+          },
+          {
+            "type": "Discard",
+            "cards": []
+          },
+          {
+            "type": "Exhaust",
+            "cards": []
+          },
+          {
+            "type": "Play",
+            "cards": []
+          }
+        ],
+        "enemies": [
+          {
+            "id": "MONSTER.LEAF_SLIME_M",
+            "hp": 34,
+            "block": 0,
+            "powers": []
+          },
+          {
+            "id": "MONSTER.TWIG_SLIME_S",
+            "hp": 9,
+            "block": 0,
+            "powers": []
+          }
+        ]
+      }
+    ]
+  },
+  "all_native_traces_identical": true,
+  "instant": {
+    "wall_ms": 48192.67,
+    "time_scale": 1,
+    "instant": true,
+    "keep_assets": false,
+    "skip_transitions": false,
+    "warm_cycle_median_ms": 2987.5,
+    "branches": [
+      {
+        "index": 0,
+        "route": "A",
+        "cleanup_ms": 0,
+        "cycle_ms": 10558,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 21078,
+        "godot_nodes": 4291,
+        "godot_resources": 5992,
+        "action_ms": 779,
+        "setup_ms": 9759,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+          "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+          "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+          "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+        ]
+      },
+      {
+        "index": 1,
+        "route": "B",
+        "cleanup_ms": 455,
+        "cycle_ms": 3061,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 19964,
+        "godot_nodes": 4155,
+        "godot_resources": 5991,
+        "action_ms": 185,
+        "setup_ms": 2418,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+          "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+          "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+          "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E"
+        ]
+      },
+      {
+        "index": 2,
+        "route": "A",
+        "cleanup_ms": 315,
+        "cycle_ms": 3032,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 19916,
+        "godot_nodes": 4291,
+        "godot_resources": 5992,
+        "action_ms": 182,
+        "setup_ms": 2532,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+          "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+          "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+          "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+        ]
+      },
+      {
+        "index": 3,
+        "route": "B",
+        "cleanup_ms": 296,
+        "cycle_ms": 2851,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 19692,
+        "godot_nodes": 4155,
+        "godot_resources": 5991,
+        "action_ms": 182,
+        "setup_ms": 2371,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+          "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+          "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+          "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E"
+        ]
+      },
+      {
+        "index": 4,
+        "route": "A",
+        "cleanup_ms": 285,
+        "cycle_ms": 2943,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 19987,
+        "godot_nodes": 4291,
+        "godot_resources": 5992,
+        "action_ms": 182,
+        "setup_ms": 2474,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+          "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+          "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+          "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+        ]
+      }
+    ],
+    "runtime_errors": [],
+    "engine_errors": [
+      "ERROR: Parameter \"t\" is null.",
+      "ERROR: 1 RID allocations of type 'N26RendererEnvironmentStorage11EnvironmentE' were leaked at exit.",
+      "ERROR: 237 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.",
+      "ERROR: 1 RID allocations of type 'N13RendererDummy15MaterialStorage13DummyMaterialE' were leaked at exit.",
+      "ERROR: 1 RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit.",
+      "ERROR: 3 RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.",
+      "ERROR: 13 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.",
+      "ERROR: 8 RID allocations of type 'PN18TextServerAdvanced27FontAdvancedLinkedVariationE' were leaked at exit.",
+      "ERROR: 251 resources still in use at exit (run with --verbose for details)."
+    ]
+  },
+  "keep_assets": {
+    "wall_ms": 43371.08,
+    "time_scale": 1,
+    "instant": true,
+    "keep_assets": true,
+    "skip_transitions": false,
+    "warm_cycle_median_ms": 1506.5,
+    "branches": [
+      {
+        "index": 0,
+        "route": "A",
+        "cleanup_ms": 0,
+        "cycle_ms": 9952,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 21077,
+        "godot_nodes": 4291,
+        "godot_resources": 5992,
+        "action_ms": 736,
+        "setup_ms": 9193,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+          "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+          "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+          "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+        ]
+      },
+      {
+        "index": 1,
+        "route": "B",
+        "cleanup_ms": 162,
+        "cycle_ms": 1572,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 19909,
+        "godot_nodes": 4141,
+        "godot_resources": 5986,
+        "action_ms": 192,
+        "setup_ms": 1217,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+          "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+          "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+          "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E"
+        ]
+      },
+      {
+        "index": 2,
+        "route": "A",
+        "cleanup_ms": 42,
+        "cycle_ms": 1525,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 19866,
+        "godot_nodes": 4277,
+        "godot_resources": 5987,
+        "action_ms": 182,
+        "setup_ms": 1298,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+          "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+          "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+          "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+        ]
+      },
+      {
+        "index": 3,
+        "route": "B",
+        "cleanup_ms": 55,
+        "cycle_ms": 1460,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 19642,
+        "godot_nodes": 4142,
+        "godot_resources": 5986,
+        "action_ms": 182,
+        "setup_ms": 1221,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+          "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+          "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+          "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E"
+        ]
+      },
+      {
+        "index": 4,
+        "route": "A",
+        "cleanup_ms": 61,
+        "cycle_ms": 1488,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 19938,
+        "godot_nodes": 4278,
+        "godot_resources": 5987,
+        "action_ms": 182,
+        "setup_ms": 1243,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+          "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+          "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+          "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+        ]
+      }
+    ],
+    "runtime_errors": [],
+    "engine_errors": [
+      "ERROR: Invalid Task ID",
+      "ERROR: 1 RID allocations of type 'N26RendererEnvironmentStorage11EnvironmentE' were leaked at exit.",
+      "ERROR: 236 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.",
+      "ERROR: 1 RID allocations of type 'N13RendererDummy15MaterialStorage13DummyMaterialE' were leaked at exit.",
+      "ERROR: 1 RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit.",
+      "ERROR: 3 RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.",
+      "ERROR: 13 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.",
+      "ERROR: 8 RID allocations of type 'PN18TextServerAdvanced27FontAdvancedLinkedVariationE' were leaked at exit.",
+      "ERROR: 251 resources still in use at exit (run with --verbose for details)."
+    ]
+  },
+  "skip_transitions": {
+    "wall_ms": 46658.88,
+    "time_scale": 1,
+    "instant": true,
+    "keep_assets": true,
+    "skip_transitions": true,
+    "warm_cycle_median_ms": 1543.0,
+    "branches": [
+      {
+        "index": 0,
+        "route": "A",
+        "cleanup_ms": 0,
+        "cycle_ms": 10734,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 21077,
+        "godot_nodes": 4290,
+        "godot_resources": 5992,
+        "action_ms": 844,
+        "setup_ms": 9864,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+          "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+          "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+          "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+        ]
+      },
+      {
+        "index": 1,
+        "route": "B",
+        "cleanup_ms": 180,
+        "cycle_ms": 1648,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 19906,
+        "godot_nodes": 4141,
+        "godot_resources": 5986,
+        "action_ms": 193,
+        "setup_ms": 1273,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+          "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+          "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+          "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E"
+        ]
+      },
+      {
+        "index": 2,
+        "route": "A",
+        "cleanup_ms": 61,
+        "cycle_ms": 1547,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 19865,
+        "godot_nodes": 4278,
+        "godot_resources": 5987,
+        "action_ms": 183,
+        "setup_ms": 1302,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+          "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+          "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+          "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+        ]
+      },
+      {
+        "index": 3,
+        "route": "B",
+        "cleanup_ms": 57,
+        "cycle_ms": 1539,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 19643,
+        "godot_nodes": 4142,
+        "godot_resources": 5986,
+        "action_ms": 183,
+        "setup_ms": 1296,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+          "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+          "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+          "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E"
+        ]
+      },
+      {
+        "index": 4,
+        "route": "A",
+        "cleanup_ms": 61,
+        "cycle_ms": 1453,
+        "root_matches": true,
+        "trace_matches": true,
+        "fixture_matches": true,
+        "godot_objects": 19935,
+        "godot_nodes": 4278,
+        "godot_resources": 5987,
+        "action_ms": 186,
+        "setup_ms": 1204,
+        "native_fingerprints": [
+          "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+          "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+          "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+          "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+        ]
+      }
+    ],
+    "runtime_errors": [],
+    "engine_errors": [
+      "ERROR: Parameter \"t\" is null.",
+      "ERROR: 1 RID allocations of type 'N26RendererEnvironmentStorage11EnvironmentE' were leaked at exit.",
+      "ERROR: 236 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.",
+      "ERROR: 1 RID allocations of type 'N13RendererDummy15MaterialStorage13DummyMaterialE' were leaked at exit.",
+      "ERROR: 1 RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit.",
+      "ERROR: 3 RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.",
+      "ERROR: 13 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.",
+      "ERROR: 8 RID allocations of type 'PN18TextServerAdvanced27FontAdvancedLinkedVariationE' were leaked at exit.",
+      "ERROR: 251 resources still in use at exit (run with --verbose for details)."
+    ]
+  },
+  "parallel_pool": {
+    "parallelism": 2,
+    "total_including_setup_ms": 75988.68,
+    "workers": [
+      {
+        "wall_ms": 70079.42,
+        "time_scale": 4,
+        "instant": false,
+        "keep_assets": false,
+        "skip_transitions": false,
+        "warm_cycle_median_ms": 6568.0,
+        "branches": [
+          {
+            "index": 0,
+            "route": "A",
+            "cleanup_ms": 0,
+            "cycle_ms": 15620,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 21130,
+            "godot_nodes": 3812,
+            "godot_resources": 5992,
+            "action_ms": 3850,
+            "setup_ms": 11744,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+              "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+              "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+              "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+            ]
+          },
+          {
+            "index": 1,
+            "route": "B",
+            "cleanup_ms": 730,
+            "cycle_ms": 6351,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 20552,
+            "godot_nodes": 3740,
+            "godot_resources": 5991,
+            "action_ms": 2753,
+            "setup_ms": 2865,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+              "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+              "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+              "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E"
+            ]
+          },
+          {
+            "index": 2,
+            "route": "A",
+            "cleanup_ms": 552,
+            "cycle_ms": 6889,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 20428,
+            "godot_nodes": 3810,
+            "godot_resources": 5992,
+            "action_ms": 3665,
+            "setup_ms": 2669,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+              "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+              "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+              "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+            ]
+          },
+          {
+            "index": 3,
+            "route": "B",
+            "cleanup_ms": 549,
+            "cycle_ms": 5900,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 19920,
+            "godot_nodes": 3748,
+            "godot_resources": 5991,
+            "action_ms": 2716,
+            "setup_ms": 2633,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+              "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+              "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+              "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E"
+            ]
+          },
+          {
+            "index": 4,
+            "route": "A",
+            "cleanup_ms": 546,
+            "cycle_ms": 6785,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 19785,
+            "godot_nodes": 3810,
+            "godot_resources": 5992,
+            "action_ms": 3616,
+            "setup_ms": 2622,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+              "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+              "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+              "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+            ]
+          }
+        ],
+        "runtime_errors": [],
+        "engine_errors": [
+          "ERROR: Parameter \"t\" is null.",
+          "ERROR: 1 RID allocations of type 'N26RendererEnvironmentStorage11EnvironmentE' were leaked at exit.",
+          "ERROR: 258 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.",
+          "ERROR: 5 RID allocations of type 'N13RendererDummy9DummyMeshE' were leaked at exit.",
+          "ERROR: 22 RID allocations of type 'N13RendererDummy15MaterialStorage13DummyMaterialE' were leaked at exit.",
+          "ERROR: 6 RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit.",
+          "ERROR: 63 RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.",
+          "ERROR: 14 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.",
+          "ERROR: 10 RID allocations of type 'PN18TextServerAdvanced27FontAdvancedLinkedVariationE' were leaked at exit.",
+          "ERROR: 308 resources still in use at exit (run with --verbose for details)."
+        ]
+      },
+      {
+        "wall_ms": 70878.92,
+        "time_scale": 4,
+        "instant": false,
+        "keep_assets": false,
+        "skip_transitions": false,
+        "warm_cycle_median_ms": 6455.5,
+        "branches": [
+          {
+            "index": 0,
+            "route": "A",
+            "cleanup_ms": 0,
+            "cycle_ms": 15100,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 21125,
+            "godot_nodes": 3812,
+            "godot_resources": 5992,
+            "action_ms": 3736,
+            "setup_ms": 11314,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+              "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+              "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+              "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+            ]
+          },
+          {
+            "index": 1,
+            "route": "B",
+            "cleanup_ms": 729,
+            "cycle_ms": 6163,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 20559,
+            "godot_nodes": 3746,
+            "godot_resources": 5991,
+            "action_ms": 2704,
+            "setup_ms": 2728,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+              "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+              "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+              "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E"
+            ]
+          },
+          {
+            "index": 2,
+            "route": "A",
+            "cleanup_ms": 589,
+            "cycle_ms": 6748,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 20427,
+            "godot_nodes": 3814,
+            "godot_resources": 5992,
+            "action_ms": 3582,
+            "setup_ms": 2574,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+              "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+              "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+              "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+            ]
+          },
+          {
+            "index": 3,
+            "route": "B",
+            "cleanup_ms": 594,
+            "cycle_ms": 5887,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 19916,
+            "godot_nodes": 3744,
+            "godot_resources": 5991,
+            "action_ms": 2750,
+            "setup_ms": 2541,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+              "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+              "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+              "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E"
+            ]
+          },
+          {
+            "index": 4,
+            "route": "A",
+            "cleanup_ms": 569,
+            "cycle_ms": 6796,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 19794,
+            "godot_nodes": 3812,
+            "godot_resources": 5992,
+            "action_ms": 3616,
+            "setup_ms": 2609,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+              "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+              "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+              "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+            ]
+          }
+        ],
+        "runtime_errors": [],
+        "engine_errors": [
+          "ERROR: 1 RID allocations of type 'N26RendererEnvironmentStorage11EnvironmentE' were leaked at exit.",
+          "ERROR: 258 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.",
+          "ERROR: 5 RID allocations of type 'N13RendererDummy9DummyMeshE' were leaked at exit.",
+          "ERROR: 22 RID allocations of type 'N13RendererDummy15MaterialStorage13DummyMaterialE' were leaked at exit.",
+          "ERROR: 6 RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit.",
+          "ERROR: 63 RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.",
+          "ERROR: 14 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.",
+          "ERROR: 10 RID allocations of type 'PN18TextServerAdvanced27FontAdvancedLinkedVariationE' were leaked at exit.",
+          "ERROR: 308 resources still in use at exit (run with --verbose for details)."
+        ]
+      }
+    ]
+  },
+  "serial_pool": {
+    "parallelism": 1,
+    "total_including_setup_ms": 137419.28,
+    "workers": [
+      {
+        "wall_ms": 68068.01,
+        "time_scale": 4,
+        "instant": false,
+        "keep_assets": false,
+        "skip_transitions": false,
+        "warm_cycle_median_ms": 6434.0,
+        "branches": [
+          {
+            "index": 0,
+            "route": "A",
+            "cleanup_ms": 0,
+            "cycle_ms": 13315,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 21126,
+            "godot_nodes": 3812,
+            "godot_resources": 5992,
+            "action_ms": 3858,
+            "setup_ms": 9432,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+              "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+              "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+              "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+            ]
+          },
+          {
+            "index": 1,
+            "route": "B",
+            "cleanup_ms": 709,
+            "cycle_ms": 6110,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 20560,
+            "godot_nodes": 3750,
+            "godot_resources": 5991,
+            "action_ms": 2699,
+            "setup_ms": 2699,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+              "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+              "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+              "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E"
+            ]
+          },
+          {
+            "index": 2,
+            "route": "A",
+            "cleanup_ms": 597,
+            "cycle_ms": 6758,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 20425,
+            "godot_nodes": 3812,
+            "godot_resources": 5992,
+            "action_ms": 3599,
+            "setup_ms": 2560,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+              "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+              "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+              "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+            ]
+          },
+          {
+            "index": 3,
+            "route": "B",
+            "cleanup_ms": 576,
+            "cycle_ms": 5863,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 19921,
+            "godot_nodes": 3746,
+            "godot_resources": 5991,
+            "action_ms": 2733,
+            "setup_ms": 2552,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+              "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+              "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+              "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E"
+            ]
+          },
+          {
+            "index": 4,
+            "route": "A",
+            "cleanup_ms": 610,
+            "cycle_ms": 6980,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 19789,
+            "godot_nodes": 3812,
+            "godot_resources": 5992,
+            "action_ms": 3616,
+            "setup_ms": 2750,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+              "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+              "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+              "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+            ]
+          }
+        ],
+        "runtime_errors": [],
+        "engine_errors": [
+          "ERROR: Invalid Task ID",
+          "ERROR: Invalid Task ID",
+          "ERROR: 1 RID allocations of type 'N26RendererEnvironmentStorage11EnvironmentE' were leaked at exit.",
+          "ERROR: 258 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.",
+          "ERROR: 5 RID allocations of type 'N13RendererDummy9DummyMeshE' were leaked at exit.",
+          "ERROR: 22 RID allocations of type 'N13RendererDummy15MaterialStorage13DummyMaterialE' were leaked at exit.",
+          "ERROR: 6 RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit.",
+          "ERROR: 63 RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.",
+          "ERROR: 14 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.",
+          "ERROR: 10 RID allocations of type 'PN18TextServerAdvanced27FontAdvancedLinkedVariationE' were leaked at exit.",
+          "ERROR: 308 resources still in use at exit (run with --verbose for details)."
+        ]
+      },
+      {
+        "wall_ms": 63786.92,
+        "time_scale": 4,
+        "instant": false,
+        "keep_assets": false,
+        "skip_transitions": false,
+        "warm_cycle_median_ms": 6275.0,
+        "branches": [
+          {
+            "index": 0,
+            "route": "A",
+            "cleanup_ms": 0,
+            "cycle_ms": 13094,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 21133,
+            "godot_nodes": 3810,
+            "godot_resources": 5992,
+            "action_ms": 3732,
+            "setup_ms": 9341,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+              "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+              "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+              "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+            ]
+          },
+          {
+            "index": 1,
+            "route": "B",
+            "cleanup_ms": 594,
+            "cycle_ms": 5841,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 20554,
+            "godot_nodes": 3742,
+            "godot_resources": 5991,
+            "action_ms": 2766,
+            "setup_ms": 2479,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+              "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+              "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+              "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E"
+            ]
+          },
+          {
+            "index": 2,
+            "route": "A",
+            "cleanup_ms": 489,
+            "cycle_ms": 6709,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 20430,
+            "godot_nodes": 3814,
+            "godot_resources": 5992,
+            "action_ms": 3583,
+            "setup_ms": 2634,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+              "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+              "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+              "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+            ]
+          },
+          {
+            "index": 3,
+            "route": "B",
+            "cleanup_ms": 564,
+            "cycle_ms": 5786,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 19921,
+            "godot_nodes": 3748,
+            "godot_resources": 5991,
+            "action_ms": 2732,
+            "setup_ms": 2487,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+              "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+              "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+              "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E"
+            ]
+          },
+          {
+            "index": 4,
+            "route": "A",
+            "cleanup_ms": 580,
+            "cycle_ms": 6771,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 19802,
+            "godot_nodes": 3814,
+            "godot_resources": 5992,
+            "action_ms": 3599,
+            "setup_ms": 2590,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+              "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+              "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+              "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+            ]
+          }
+        ],
+        "runtime_errors": [],
+        "engine_errors": [
+          "ERROR: Parameter \"t\" is null.",
+          "ERROR: 1 RID allocations of type 'N26RendererEnvironmentStorage11EnvironmentE' were leaked at exit.",
+          "ERROR: 259 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.",
+          "ERROR: 5 RID allocations of type 'N13RendererDummy9DummyMeshE' were leaked at exit.",
+          "ERROR: 22 RID allocations of type 'N13RendererDummy15MaterialStorage13DummyMaterialE' were leaked at exit.",
+          "ERROR: 6 RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit.",
+          "ERROR: 63 RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.",
+          "ERROR: 14 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.",
+          "ERROR: 10 RID allocations of type 'PN18TextServerAdvanced27FontAdvancedLinkedVariationE' were leaked at exit.",
+          "ERROR: 308 resources still in use at exit (run with --verbose for details)."
+        ]
+      }
+    ]
+  },
+  "instant_pool": {
+    "parallelism": 2,
+    "total_including_setup_ms": 48579.7,
+    "workers": [
+      {
+        "wall_ms": 45416.78,
+        "time_scale": 1,
+        "instant": true,
+        "keep_assets": true,
+        "skip_transitions": false,
+        "warm_cycle_median_ms": 1589.0,
+        "branches": [
+          {
+            "index": 0,
+            "route": "A",
+            "cleanup_ms": 0,
+            "cycle_ms": 11641,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 21075,
+            "godot_nodes": 4290,
+            "godot_resources": 5992,
+            "action_ms": 1282,
+            "setup_ms": 10330,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+              "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+              "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+              "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+            ]
+          },
+          {
+            "index": 1,
+            "route": "B",
+            "cleanup_ms": 206,
+            "cycle_ms": 1784,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 19902,
+            "godot_nodes": 4141,
+            "godot_resources": 5986,
+            "action_ms": 199,
+            "setup_ms": 1376,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+              "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+              "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+              "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E"
+            ]
+          },
+          {
+            "index": 2,
+            "route": "A",
+            "cleanup_ms": 69,
+            "cycle_ms": 1591,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 19861,
+            "godot_nodes": 4277,
+            "godot_resources": 5987,
+            "action_ms": 186,
+            "setup_ms": 1333,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+              "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+              "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+              "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+            ]
+          },
+          {
+            "index": 3,
+            "route": "B",
+            "cleanup_ms": 61,
+            "cycle_ms": 1556,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 19639,
+            "godot_nodes": 4141,
+            "godot_resources": 5986,
+            "action_ms": 182,
+            "setup_ms": 1311,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+              "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+              "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+              "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E"
+            ]
+          },
+          {
+            "index": 4,
+            "route": "A",
+            "cleanup_ms": 59,
+            "cycle_ms": 1587,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 19933,
+            "godot_nodes": 4277,
+            "godot_resources": 5987,
+            "action_ms": 182,
+            "setup_ms": 1344,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+              "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+              "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+              "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+            ]
+          }
+        ],
+        "runtime_errors": [],
+        "engine_errors": [
+          "ERROR: Invalid Task ID",
+          "ERROR: Parameter \"t\" is null.",
+          "ERROR: 1 RID allocations of type 'N26RendererEnvironmentStorage11EnvironmentE' were leaked at exit.",
+          "ERROR: 236 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.",
+          "ERROR: 1 RID allocations of type 'N13RendererDummy15MaterialStorage13DummyMaterialE' were leaked at exit.",
+          "ERROR: 1 RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit.",
+          "ERROR: 3 RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.",
+          "ERROR: 13 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.",
+          "ERROR: 8 RID allocations of type 'PN18TextServerAdvanced27FontAdvancedLinkedVariationE' were leaked at exit.",
+          "ERROR: 251 resources still in use at exit (run with --verbose for details)."
+        ]
+      },
+      {
+        "wall_ms": 45713.74,
+        "time_scale": 1,
+        "instant": true,
+        "keep_assets": true,
+        "skip_transitions": false,
+        "warm_cycle_median_ms": 1600.0,
+        "branches": [
+          {
+            "index": 0,
+            "route": "A",
+            "cleanup_ms": 0,
+            "cycle_ms": 11715,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 21076,
+            "godot_nodes": 4290,
+            "godot_resources": 5992,
+            "action_ms": 1126,
+            "setup_ms": 10558,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+              "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+              "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+              "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+            ]
+          },
+          {
+            "index": 1,
+            "route": "B",
+            "cleanup_ms": 224,
+            "cycle_ms": 1863,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 19902,
+            "godot_nodes": 4141,
+            "godot_resources": 5986,
+            "action_ms": 217,
+            "setup_ms": 1419,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+              "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+              "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+              "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E"
+            ]
+          },
+          {
+            "index": 2,
+            "route": "A",
+            "cleanup_ms": 67,
+            "cycle_ms": 1617,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 19861,
+            "godot_nodes": 4277,
+            "godot_resources": 5987,
+            "action_ms": 183,
+            "setup_ms": 1365,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+              "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+              "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+              "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+            ]
+          },
+          {
+            "index": 3,
+            "route": "B",
+            "cleanup_ms": 64,
+            "cycle_ms": 1583,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 19639,
+            "godot_nodes": 4141,
+            "godot_resources": 5986,
+            "action_ms": 223,
+            "setup_ms": 1293,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+              "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+              "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+              "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E"
+            ]
+          },
+          {
+            "index": 4,
+            "route": "A",
+            "cleanup_ms": 75,
+            "cycle_ms": 1555,
+            "root_matches": true,
+            "trace_matches": true,
+            "fixture_matches": true,
+            "godot_objects": 19933,
+            "godot_nodes": 4277,
+            "godot_resources": 5987,
+            "action_ms": 193,
+            "setup_ms": 1284,
+            "native_fingerprints": [
+              "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+              "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+              "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+              "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+              "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9"
+            ]
+          }
+        ],
+        "runtime_errors": [],
+        "engine_errors": [
+          "ERROR: Attempting to initialize the wrong RID",
+          "ERROR: Parameter \"mem\" is null.",
+          "ERROR: Parameter \"material\" is null.",
+          "ERROR: Parameter \"material\" is null.",
+          "ERROR: 1 RID allocations of type 'N26RendererEnvironmentStorage11EnvironmentE' were leaked at exit.",
+          "ERROR: 236 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.",
+          "ERROR: 2 RID allocations of type 'N13RendererDummy15MaterialStorage13DummyMaterialE' were leaked at exit.",
+          "ERROR: 1 RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit.",
+          "ERROR: 3 RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.",
+          "ERROR: 13 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.",
+          "ERROR: 8 RID allocations of type 'PN18TextServerAdvanced27FontAdvancedLinkedVariationE' were leaked at exit.",
+          "ERROR: 251 resources still in use at exit (run with --verbose for details)."
+        ]
+      }
+    ]
+  },
+  "measured_pool_speedup_including_setup": 1.808
+}

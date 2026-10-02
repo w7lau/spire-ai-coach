@@ -7,6 +7,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import time
+from worker_lock import worker_lock
 
 
 def digest(path):
@@ -21,9 +22,14 @@ def main():
     parser.add_argument('--ritsu', required=True, type=Path)
     parser.add_argument('--workspace', required=True, type=Path)
     parser.add_argument('--name', default='inventory')
-    parser.add_argument('--mode', choices=['inventory', 'route'], default='inventory')
+    parser.add_argument('--mode', choices=['inventory', 'route', 'resident'], default='inventory')
+    parser.add_argument('--time-scale', choices=[1, 4], type=int, default=1)
+    parser.add_argument('--instant', action='store_true', help='Use the native FastModeType.Instant presentation setting')
+    parser.add_argument('--keep-assets', action='store_true', help='Reset run state without reloading the main menu between branches')
+    parser.add_argument('--skip-transitions', action='store_true', help='Use the native room-entry option that disables fades')
     parser.add_argument('--blood-armor', action='store_true')
     parser.add_argument('--restore-fixture', action='store_true')
+    parser.add_argument('--fixture-from', type=Path, help='Copy fixture.json from another owned synthetic worker')
     parser.add_argument('--encounter', default='SLIMES_WEAK')
     parser.add_argument('--actions', nargs='*', default=[])
     args = parser.parse_args()
@@ -36,7 +42,20 @@ def main():
     if root.exists() and any(root.iterdir()) and not (root / '.spire-native-probe-owner').is_file():
         raise ValueError('Refusing an existing unowned directory')
     root.mkdir(parents=True, exist_ok=True)
+    with worker_lock(root):
+        return execute(args, root, source)
+
+
+def execute(args, root, source):
     (root / '.spire-native-probe-owner').write_text('spire-ai-coach native feasibility v1', encoding='utf-8')
+    if args.fixture_from:
+        fixture = args.fixture_from.resolve()
+        if fixture.name != 'fixture.json' or not (fixture.parent / '.spire-native-probe-owner').is_file():
+            raise ValueError('Fixture must come from an owned synthetic worker')
+        if not args.restore_fixture:
+            raise ValueError('--fixture-from requires --restore-fixture')
+        if fixture != root / 'fixture.json':
+            shutil.copy2(fixture, root / 'fixture.json')
     game = root / 'game'
     game.mkdir(exist_ok=True)
     # Actual copies, never writable hardlinks into the user's installation.
@@ -69,11 +88,12 @@ def main():
     progress.write_text(json.dumps(progress_data), encoding='utf-8')
     local.mkdir(exist_ok=True)
     request = dict(mode=args.mode, blood_armor=args.blood_armor, restore_fixture=args.restore_fixture,
-                   encounter=args.encounter, actions=args.actions)
+                   encounter=args.encounter, actions=args.actions, time_scale=args.time_scale,
+                   instant=args.instant, keep_assets=args.keep_assets, skip_transitions=args.skip_transitions)
     (root / 'request.json').write_text(json.dumps(request), encoding='utf-8')
     evidence = root / 'evidence' / args.name
     evidence.mkdir(parents=True, exist_ok=False)
-    for filename in ['result.json', 'inventory.json']:
+    for filename in ['result.json', 'inventory.json', 'progress.json', 'branches.json']:
         if (root / filename).exists():
             (root / filename).unlink()  # Exact owned outputs, never a recursive deletion.
     env = dict(os.environ, APPDATA=str(roaming), LOCALAPPDATA=str(local), SPIRE_NATIVE_PROBE_ROOT=str(root))
@@ -86,7 +106,7 @@ def main():
                                    stdout=stdout, stderr=stderr, creationflags=subprocess.CREATE_NO_WINDOW)
         timed_out = False
         try:
-            process.wait(timeout=100)
+            process.wait(timeout=240 if args.mode == 'resident' else 100)
         except subprocess.TimeoutExpired:
             timed_out = True
             process.kill()  # Only the child created and owned by this invocation.
@@ -99,15 +119,16 @@ def main():
                                  if '[ERROR]' in line] if log_path.exists() else ['Missing game log']
     summary['engine_errors'] = [line for line in log_path.read_text(encoding='utf-8', errors='replace').splitlines()
                                 if line.startswith('ERROR:')] if log_path.exists() else []
-    for name in ['result.json', 'inventory.json']:
+    for name in ['result.json', 'inventory.json', 'progress.json', 'branches.json']:
         if (root / name).exists():
             shutil.copy2(root / name, evidence / name)
     if (evidence / 'result.json').exists():
         summary['result'] = json.loads((evidence / 'result.json').read_text(encoding='utf-8'))
     (evidence / 'summary.json').write_text(json.dumps(summary, ensure_ascii=False, indent=2), encoding='utf-8')
-    print(json.dumps(summary, ensure_ascii=False))
+    print(json.dumps({k: v for k, v in summary.items() if k != 'result'}, ensure_ascii=False))
+    print(json.dumps({k: v for k, v in summary.get('result', {}).items() if k not in {'checkpoints', 'branches'}}, ensure_ascii=False))
     return 0 if (not timed_out and process.returncode == 0 and summary['source_unchanged'] and not summary['runtime_errors']
-                 and summary.get('result', {}).get('status') in {'inventory_ready', 'native_route_complete'}) else 1
+                 and summary.get('result', {}).get('status') in {'inventory_ready', 'native_route_complete', 'native_resident_complete'}) else 1
 
 
 if __name__ == '__main__':
