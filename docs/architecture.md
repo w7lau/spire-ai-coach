@@ -10,7 +10,9 @@ Godot 主线程 → `StateCapture` → 独立 C# 快照 → SHA-256 指纹 → `
 
 ## Prompt
 
-`PromptBuilder.SystemPrompt` 是稳定规则：游戏基础机制、例外优先级、证据、不确定性、指导范围解释。`UserPrompt` 包含任务、guidance_scope、max_rounds、快照指纹和完整快照。`AdviceContract.Instructions` 是输出字段与动作枚举的唯一权威，并被系统 Prompt 引用。请求冻结设置中的范围；切换范围取消旧请求，回复必须回显相同范围。
+`PromptBuilder.SystemPrompt` 是稳定规则：游戏基础机制、例外优先级、证据、不确定性、本回合指导职责。`UserPrompt` 包含任务、快照指纹和完整快照。`AdviceContract.Instructions` 是输出字段与动作枚举的唯一权威，并被系统 Prompt 引用。0.2.1 移除多轮 UI、设置和输出合同，旧配置中的范围字段按未知字段忽略。诊断的 guidance_scope 恒为 current_turn，仅用于记录，不由模型生成。
+
+当前回合推断包括本轮出牌及紧接的敌方行动；要求使用状态效果和遗物的描述、层数、使用状态及触发时机，解释会改变本轮决策的机制。确定性数值结论应核算资源、牌堆移动、格挡和已知触发；缺少后续轮次信息不妨碍规划已有充分证据的本轮动作。该 Prompt 是模型行为要求，没有伪装成本地模拟器校验。
 
 选用显式的有序操作序列，因为每一步的资源、目标、条件与后续状态可能变化；不是给模型重复生成所有牌堆。建议不会作为下一次的游戏事实重新注入，下一次始终读取真实状态。
 
@@ -24,12 +26,6 @@ Godot 主线程 → `StateCapture` → 独立 C# 快照 → SHA-256 指纹 → `
 | --- | --- | --- |
 | snapshot_id | 必填字符串，最长128 | 必须等于输入指纹；显示前再核对当前指纹 |
 | summary | 必填非空字符串，最长4000 | 纯文本战术摘要 |
-| guidance_scope | current_turn / combat | 必须与本次请求相同 |
-| horizon_note | 必填非空字符串，最长4000 | 说明胜利预期、未知、当前轮结束或10轮上限等规划终点 |
-| future_turns | 必填数组，0–9；current_turn 时必须空 | 本轮之外的条件规划；最多含当前轮在内10轮 |
-| future_turns[].turn_offset | 整数，从1连续递增 | 相对当前轮；不允许缺号或重复 |
-| future_turns[].plan | 必填非空字符串，最长4000 | 后续轮次的策略，不是游戏已发生的事实 |
-| future_turns[].assumptions | 必填非空字符串，最长2000 | 成立条件；内容不会被本地模拟器验证 |
 | steps | 必填数组，1–64 | 保留原始顺序，溢出拒绝、不截断 |
 | steps[].action | play_card / use_potion / end_turn / reassess | 每种均有消费出口 |
 | steps[].card_id | play_card 时必填有效实例字符串 | 属于快照某个牌堆；首步必须在手牌且可打出 |
@@ -49,7 +45,7 @@ JSON 顶层和每个步骤先投影到消费字段。额外字段被丢弃；非
 
 使用非流式 Chat Completions。输入包含 model、messages、stream=false，不设置温度或输出 token 上限。超时和取消独立处理；限制回复体 2 MiB；不跟随重定向，防止 Authorization 被交给另一个地址；默认仅允许 HTTPS，本机允许 HTTP。
 
-分类包括 configuration、phase、authentication、http、transport、timeout、provider_json、provider_schema、empty_response、truncated、finish_reason、invalid_json、schema、contract、identity、condition、illegal_first_action、stale_snapshot、scope、horizon。
+分类包括 configuration、phase、authentication、http、transport、timeout、provider_json、provider_schema、empty_response、truncated、finish_reason、invalid_json、schema、contract、identity、condition、illegal_first_action、stale_snapshot。
 
 `CallDiagnostics` 在解析前捕获成功 HTTP 的原始响应体，并在格式校验前捕获 AI 正文、finish_reason、请求 ID。校验失败也保留精确冻结输入、响应和具体首步错误。非成功 HTTP 不读取响应体；截断、取消、传输错误分别记录，不补造 AI 建议。原始响应在保留本次密钥脱敏后写入本地 diagnostics，最多保留20个本组件命名的文件。UI 最近记录用请求序号防止被旧请求覆盖；实时预览明确标注尚未发送。游戏日志仅记分类、调用ID及快照等摘要；完整诊断只能通过本地文件或用户复制分享。
 

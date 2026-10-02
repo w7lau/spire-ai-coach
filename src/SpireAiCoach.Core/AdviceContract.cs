@@ -4,26 +4,20 @@ namespace SpireAiCoach.Core;
 
 public sealed record AdviceStep(string Action, string? CardId, string? PotionId, string? TargetId,
     string Condition, string Reason);
-public sealed record FutureTurn(int TurnOffset, string Plan, string Assumptions);
 public sealed record Advice(string SnapshotId, string Summary, IReadOnlyList<AdviceStep> Steps,
-    IReadOnlyList<string> Uncertainties, string GuidanceScope, IReadOnlyList<FutureTurn> FutureTurns, string HorizonNote);
+    IReadOnlyList<string> Uncertainties);
 
 public static class AdviceContract
 {
     public const int MaxSteps = 64;
     public const int MaxUncertainties = 32;
     public static readonly string[] Actions = ["play_card", "use_potion", "end_turn", "reassess"];
-    public static readonly string[] RootFields = ["snapshot_id", "summary", "steps", "uncertainties", "guidance_scope", "future_turns", "horizon_note"];
+    public static readonly string[] RootFields = ["snapshot_id", "summary", "steps", "uncertainties"];
     public static readonly string[] StepFields = ["action", "card_id", "potion_id", "target_id", "condition", "reason"];
 
     public static string Instructions => $$"""
         Return one JSON object with exactly these consumed fields: {{string.Join(", ", RootFields)}}.
         snapshot_id: copy the input snapshot_id string. summary: nonempty short Chinese tactical summary.
-        guidance_scope: copy the input guidance_scope. horizon_note: nonempty Chinese explanation of
-        where the plan ends (expected victory, uncertainty, current-turn limit, or the 10-round cap).
-        future_turns: array of 0..9 objects with turn_offset (integer, consecutive starting at 1),
-        plan (nonempty Chinese tactical plan), assumptions (nonempty Chinese conditions/uncertainties).
-        For current_turn this array must be empty. Current round counts as round 1 of the horizon.
         steps: ordered array of 1..{{MaxSteps}} objects, each containing {{string.Join(", ", StepFields)}}.
         action is one of {{string.Join(", ", Actions)}}.
         card_id is a snapshot card instance_id for play_card, otherwise null.
@@ -39,7 +33,7 @@ public static class AdviceContract
         """;
 
     // Construct a new allowlisted tree before validation. Extra fields never reach the UI.
-    public static Advice Parse(string text, CombatSnapshot state, string scope = GuidanceScopes.CurrentTurn)
+    public static Advice Parse(string text, CombatSnapshot state)
     {
         text = text.Trim();
         if (text.StartsWith("```", StringComparison.Ordinal) && text.EndsWith("```", StringComparison.Ordinal))
@@ -55,18 +49,6 @@ public static class AdviceContract
             var root = Project(doc.RootElement, RootFields);
             var snapshotId = String(root, "snapshot_id", 128);
             if (snapshotId != state.Fingerprint()) throw Invalid("stale_snapshot", "AI 回复与本次战斗快照不一致。");
-            var returnedScope = String(root, "guidance_scope", 32);
-            if (returnedScope != scope) throw Invalid("scope", "AI 回复的指导范围与本次请求不一致。");
-            var horizonNote = String(root, "horizon_note", 4000);
-            var future = new List<FutureTurn>();
-            foreach (var element in Array(root, "future_turns", 0, scope == GuidanceScopes.Combat ? GuidanceScopes.MaxRounds - 1 : 0).EnumerateArray())
-            {
-                var turn = Project(element, ["turn_offset", "plan", "assumptions"]);
-                var offset = Required(turn, "turn_offset");
-                if (offset.ValueKind != JsonValueKind.Number || !offset.TryGetInt32(out var number) || number != future.Count + 1)
-                    throw Invalid("horizon", "后续轮次必须从下一轮开始连续编号，最多包含当前轮在内的 10 轮。");
-                future.Add(new(number, String(turn, "plan", 4000), String(turn, "assumptions", 2000)));
-            }
             var summary = String(root, "summary", 4000);
             var stepsArray = Array(root, "steps", 1, MaxSteps);
             var steps = new List<AdviceStep>();
@@ -117,7 +99,7 @@ public static class AdviceContract
                 throw Invalid("contract", "建议缺少结束回合或重新评估的收尾。");
             var uncertainties = Array(root, "uncertainties", 0, MaxUncertainties).EnumerateArray()
                 .Select(x => ReadString(x, 2000, false)).ToArray();
-            return new(snapshotId, summary, steps, uncertainties, returnedScope, future, horizonNote);
+            return new(snapshotId, summary, steps, uncertainties);
         }
     }
 

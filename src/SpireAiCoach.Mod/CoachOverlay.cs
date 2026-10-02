@@ -40,7 +40,6 @@ public sealed class CoachOverlay
     private LineEdit _apiKey = null!;
     private CheckBox _remember = null!;
     private CheckBox _reveal = null!;
-    private OptionButton _scope = null!;
     private TextEdit _diagnosticView = null!;
     private string _diagnosticJson = "暂无请求记录。";
     private int _diagnosticGeneration;
@@ -77,16 +76,11 @@ public sealed class CoachOverlay
         body.AddThemeConstantOverride("separation", 10);
         scroll.AddChild(body);
         body.AddChild(new Label { Text = "尖塔 AI 教练", ThemeTypeVariation = "HeaderLarge" });
-        body.AddChild(Wrapped("自己出牌，AI 帮你规划。F9 按所选范围分析 · F10 设置"));
+        body.AddChild(Wrapped("自己出牌，AI 帮你规划。F9 分析本回合 · F10 设置"));
         _battle = Wrapped("进入战斗后可分析当前回合。"); body.AddChild(_battle);
         _status = Wrapped("先填写 API 地址、模型和密钥。"); body.AddChild(_status);
-        _scope = new OptionButton();
-        _scope.AddItem("指导本回合");
-        _scope.AddItem("指导到本次战斗结束（最多 10 轮，含当前轮）");
-        _scope.Selected = _settings.GuidanceScope == GuidanceScopes.Combat ? 1 : 0;
-        body.AddChild(_scope);
         var row = new HBoxContainer(); body.AddChild(row);
-        _analyze = new Button { Text = "开始分析 · F9", Disabled = true }; row.AddChild(_analyze);
+        _analyze = new Button { Text = "分析本回合 · F9", Disabled = true }; row.AddChild(_analyze);
         _analyze.Pressed += Analyze;
         _cancel = new Button { Text = "取消", Disabled = true }; row.AddChild(_cancel);
         _cancel.Pressed += () => Cancel("已取消分析。");
@@ -130,15 +124,6 @@ public sealed class CoachOverlay
         diagnosticButton.Pressed += () => _diagnosticView.Visible = !_diagnosticView.Visible;
         var copy = new Button { Text = "复制最近诊断记录（含战斗信息，已隐藏本次密钥）" }; body.AddChild(copy);
         copy.Pressed += () => DisplayServer.ClipboardSet(_diagnosticJson);
-        _scope.ItemSelected += index =>
-        {
-            Cancel("指导范围已切换，请重新分析。");
-            _settings = _settings with { GuidanceScope = index == 1 ? GuidanceScopes.Combat : GuidanceScopes.CurrentTurn };
-            _freshness.Text = "指导范围已变化，旧建议不适用。";
-            RefreshPreview();
-            try { if (!string.IsNullOrWhiteSpace(_settings.Model)) _store.Save(_settings, _key); }
-            catch (Exception ex) { _feedback.Text = $"指导范围已切换，但未能保存（{ex.GetType().Name}）。"; }
-        };
         _tree.ProcessFrame += OnFrame;
         _layer.TreeExiting += Dispose;
         Resize();
@@ -211,7 +196,7 @@ public sealed class CoachOverlay
 
     private void RefreshPreview()
     {
-        if (_context.Visible) _context.Text = _snapshot == null ? "无战斗快照" : PromptBuilder.UserPrompt(_snapshot, _settings.GuidanceScope);
+        if (_context.Visible) _context.Text = _snapshot == null ? "无战斗快照" : PromptBuilder.UserPrompt(_snapshot);
     }
 
     private void SaveSettings()

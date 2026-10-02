@@ -9,7 +9,7 @@ public sealed class CallDiagnostics
     public DateTimeOffset StartedUtc { get; } = DateTimeOffset.UtcNow;
     public string PromptVersion { get; } = PromptBuilder.Version;
     public string? SnapshotId { get; set; }
-    public string? GuidanceScope { get; set; }
+    public string GuidanceScope => "current_turn";
     public string? RequestBody { get; set; }
     public int? HttpStatus { get; set; }
     public string? ResponseBody { get; set; }

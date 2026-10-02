@@ -11,7 +11,7 @@ public static class AdviceFormatter
         var names = snapshot.Enemies.Concat(snapshot.Allies).Concat(snapshot.Player.Pets)
             .ToDictionary(x => x.InstanceId, x => x.Name);
         names[snapshot.Player.InstanceId] = "自己";
-        var output = new StringBuilder(advice.GuidanceScope == GuidanceScopes.Combat ? "本次战斗 · 最多 10 轮（含当前轮）" : "本回合指导")
+        var output = new StringBuilder("本回合指导")
             .AppendLine().AppendLine(advice.Summary).AppendLine().AppendLine($"当前第 {snapshot.Round} 轮：");
         for (int i = 0; i < advice.Steps.Count; i++)
         {
@@ -30,10 +30,6 @@ public static class AdviceFormatter
             if (step.Condition.Length != 0) output.Append("条件：").AppendLine(step.Condition);
             output.AppendLine(step.Reason).AppendLine();
         }
-        foreach (var turn in advice.FutureTurns)
-            output.AppendLine($"第 {snapshot.Round + turn.TurnOffset} 轮（后续推演）")
-                .AppendLine(turn.Plan).Append("成立条件：").AppendLine(turn.Assumptions).AppendLine();
-        output.Append("规划边界：").AppendLine(advice.HorizonNote).AppendLine();
         if (advice.Uncertainties.Count > 0)
         {
             output.AppendLine("需要留意");

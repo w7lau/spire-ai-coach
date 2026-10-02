@@ -37,13 +37,12 @@ public sealed class CoachClient : IDisposable
             messages = new[]
             {
                 new { role = "system", content = PromptBuilder.SystemPrompt },
-                new { role = "user", content = PromptBuilder.UserPrompt(snapshot, settings.GuidanceScope) }
+                new { role = "user", content = PromptBuilder.UserPrompt(snapshot) }
             },
             stream = false
         });
         diagnostics ??= new();
         diagnostics.SnapshotId = snapshot.Fingerprint();
-        diagnostics.GuidanceScope = settings.GuidanceScope;
         diagnostics.RequestBody = requestBody;
         request.Content = new StringContent(requestBody, Encoding.UTF8, "application/json");
         var timer = Stopwatch.StartNew();
@@ -90,7 +89,7 @@ public sealed class CoachClient : IDisposable
                 if (finish == "length") throw new CoachException("truncated", "AI 回复被服务端截断，请调整服务端设置后重新分析。");
                 if (finish != "stop") throw new CoachException("finish_reason", $"AI 未正常完成回复（{SafeTag(finish)}）。");
                 if (string.IsNullOrWhiteSpace(content)) throw new CoachException("empty_response", "AI 没有返回可显示的建议。");
-                var advice = AdviceContract.Parse(content, snapshot, settings.GuidanceScope);
+                var advice = AdviceContract.Parse(content, snapshot);
                 diagnostics.Outcome = "validated";
                 return new(advice, GetString(root, "model") ?? settings.Model, GetString(root, "id"), finish,
                     timer.ElapsedMilliseconds, root.TryGetProperty("usage", out var usage) ? usage.GetRawText() : null);

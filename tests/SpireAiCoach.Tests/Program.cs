@@ -33,8 +33,7 @@ JsonObject Reply(CombatSnapshot state) => new()
 {
     ["snapshot_id"] = state.Fingerprint(), ["summary"] = "集中攻击一个敌人。",
     ["steps"] = new JsonArray(Step("play_card", "card-1", target: "enemy-1"), Step("end_turn")),
-    ["uncertainties"] = new JsonArray(), ["guidance_scope"] = GuidanceScopes.CurrentTurn,
-    ["future_turns"] = new JsonArray(), ["horizon_note"] = "本回合结束后重新观察。"
+    ["uncertainties"] = new JsonArray()
 };
 JsonObject First(JsonObject reply) => reply["steps"]![0]!.AsObject();
 var state = Snapshot();
@@ -251,51 +250,6 @@ Test("star sentinel becomes zero spend and X cost remains explicit", () =>
     using var json = JsonDocument.Parse(Wire.Serialize(card));
     Check(json.RootElement.GetProperty("star_cost").GetInt32() == 0 && json.RootElement.GetProperty("star_cost_x").GetBoolean());
 });
-JsonObject CombatReply(int count)
-{
-    var json = Reply(state); json["guidance_scope"] = GuidanceScopes.Combat;
-    json["future_turns"] = new JsonArray(Enumerable.Range(1, count).Select(i => (JsonNode)new JsonObject
-        { ["turn_offset"] = i, ["plan"] = "优先防御并寻找斩杀机会。", ["assumptions"] = "若抽到防御牌且敌人攻击；否则重新分析。", ["ignored"] = 7 }).ToArray());
-    return json;
-}
-Test("combat plan accepts current plus nine rounds and formats absolute rounds", () =>
-{
-    var advice = AdviceContract.Parse(CombatReply(9).ToJsonString(), state, GuidanceScopes.Combat);
-    Check(advice.FutureTurns.Count == 9 && AdviceFormatter.Format(advice, state).Contains("第 10 轮"));
-    Check(!Wire.Serialize(advice).Contains("ignored"));
-    Check(AdviceContract.Parse(CombatReply(0).ToJsonString(), state, GuidanceScopes.Combat).FutureTurns.Count == 0);
-});
-Test("combat horizon cannot exceed ten or skip repeat and fractional offsets", () =>
-{
-    Reject(() => AdviceContract.Parse(CombatReply(10).ToJsonString(), state, GuidanceScopes.Combat), "schema");
-    foreach (var offset in new[] { 0m, 2m, 1.5m })
-    {
-        var json = CombatReply(1); json["future_turns"]![0]!["turn_offset"] = offset;
-        Reject(() => AdviceContract.Parse(json.ToJsonString(), state, GuidanceScopes.Combat), "horizon");
-    }
-    var duplicate = CombatReply(2); duplicate["future_turns"]![1]!["turn_offset"] = 1;
-    Reject(() => AdviceContract.Parse(duplicate.ToJsonString(), state, GuidanceScopes.Combat), "horizon");
-});
-Test("scope mismatch future plans in current mode and empty assumptions rejected", () =>
-{
-    Reject(() => AdviceContract.Parse(CombatReply(1).ToJsonString(), state), "scope");
-    var json = CombatReply(1); json["guidance_scope"] = GuidanceScopes.CurrentTurn;
-    Reject(() => AdviceContract.Parse(json.ToJsonString(), state), "schema");
-    json = CombatReply(1); json["future_turns"]![0]!["assumptions"] = "";
-    Reject(() => AdviceContract.Parse(json.ToJsonString(), state, GuidanceScopes.Combat), "schema");
-});
-AsyncTest("combat scope travels through frozen request and response validation", async () =>
-{
-    using var client = new CoachClient(new FakeHandler(async (req, _) =>
-    {
-        using var body = JsonDocument.Parse(await req.Content!.ReadAsStringAsync());
-        using var prompt = JsonDocument.Parse(body.RootElement.GetProperty("messages")[1].GetProperty("content").GetString()!);
-        Check(prompt.RootElement.GetProperty("guidance_scope").GetString() == GuidanceScopes.Combat);
-        Check(prompt.RootElement.GetProperty("max_rounds").GetInt32() == 10);
-        return new(HttpStatusCode.OK) { Content = new StringContent(Envelope(CombatReply(2).ToJsonString())) };
-    }));
-    Check((await client.AnalyzeAsync(Settings() with { GuidanceScope = GuidanceScopes.Combat }, "", state)).Advice.FutureTurns.Count == 2);
-});
 AsyncTest("invalid first action keeps exact frozen input original output and reason", async () =>
 {
     var json = Reply(state); First(json)["target_id"] = null;
@@ -342,6 +296,58 @@ Test("diagnostic retention keeps twenty owned records and leaves unrelated files
         Check(Directory.GetFiles(directory).Length == 21 && File.ReadAllText(unrelated) == "user");
     }
     finally { foreach (var file in Directory.GetFiles(directory)) File.Delete(file); Directory.Delete(directory); }
+});
+
+Test("old combat setting loads without losing connection settings", () =>
+{
+    var directory = Path.GetFullPath(Path.Combine("work", "migration-test-" + Guid.NewGuid().ToString("N")));
+    Directory.CreateDirectory(directory);
+    var path = Path.Combine(directory, "config.json");
+    File.WriteAllText(path, """{"base_url":"https://example.org/v1","model":"test-model","guidance_scope":"combat","reveal_draw_order":false,"timeout_seconds":90}""");
+    try
+    {
+        var loaded = new SettingsStore(directory).Load();
+        loaded.Settings.Validate();
+        Check(loaded.Settings.Model == "test-model" && loaded.Settings.BaseUrl == "https://example.org/v1");
+        Check(!loaded.Settings.RevealDrawOrder && loaded.Settings.TimeoutSeconds == 90);
+        Check(!Wire.Serialize(loaded.Settings).Contains("guidance_scope"));
+    }
+    finally { File.Delete(path); Directory.Delete(directory); }
+});
+Test("unused future output cannot enter current turn display", () =>
+{
+    var json = Reply(state);
+    json["future_turns"] = new JsonArray(new JsonObject { ["plan"] = "unused-future-plan" });
+    json["horizon_note"] = "unused-horizon";
+    json["guidance_scope"] = "combat";
+    var advice = AdviceContract.Parse(json.ToJsonString(), state);
+    Check(advice.Steps.Count == 2 && !AdviceFormatter.Format(advice, state).Contains("unused"));
+    Check(!Wire.Serialize(advice).Contains("future_turns"));
+});
+AsyncTest("current turn HTTP input preserves powers relic descriptions amounts and usage", async () =>
+{
+    var sample = state with { Player = state.Player with
+    {
+        Powers = [new("POWER.TEST", "test-mod", "测试状态", "回合结束触发效果。", 3)],
+        Relics = [new("RELIC.TEST", "test-mod", "测试遗物", "失去生命时触发效果。", 2,
+            new Dictionary<string, decimal> { ["Amount"] = 2 }, true, 1)]
+    }};
+    using var client = new CoachClient(new FakeHandler(async (req, _) =>
+    {
+        using var body = JsonDocument.Parse(await req.Content!.ReadAsStringAsync());
+        using var prompt = JsonDocument.Parse(body.RootElement.GetProperty("messages")[1].GetProperty("content").GetString()!);
+        var root = prompt.RootElement;
+        Check(!root.TryGetProperty("max_rounds", out var unusedRounds) && !root.TryGetProperty("guidance_scope", out var unusedScope));
+        var player = root.GetProperty("snapshot").GetProperty("player");
+        var power = player.GetProperty("powers")[0]; var relic = player.GetProperty("relics")[0];
+        Check(power.GetProperty("amount").GetDecimal() == 3 && power.GetProperty("description").GetString() == "回合结束触发效果。");
+        Check(relic.GetProperty("description").GetString() == "失去生命时触发效果。" && relic.GetProperty("used_up").GetBoolean());
+        Check(relic.GetProperty("variables").GetProperty("Amount").GetInt32() == 2);
+        return new(HttpStatusCode.OK) { Content = new StringContent(Envelope(Reply(sample).ToJsonString())) };
+    }));
+    var trace = new CallDiagnostics();
+    var result = await client.AnalyzeAsync(Settings(), "", sample, diagnostics: trace);
+    Check(result.Advice.Steps.Count == 2 && trace.GuidanceScope == "current_turn");
 });
 
 int failures = 0;
