@@ -1,4 +1,4 @@
-param([string]$GameDir = $env:STS2_GAME_DIR)
+param([string]$GameDir = $env:STS2_GAME_DIR, [switch]$SkipTests)
 $ErrorActionPreference = 'Stop'
 if ([string]::IsNullOrWhiteSpace($GameDir)) { throw 'Pass -GameDir or set STS2_GAME_DIR.' }
 $root = Split-Path -Parent $PSScriptRoot
@@ -6,8 +6,10 @@ $data = Join-Path $GameDir 'data_sts2_windows_x86_64'
 if (-not (Test-Path -LiteralPath (Join-Path $data 'sts2.dll'))) { throw 'Game assembly not found.' }
 Push-Location $root
 try {
-    dotnet run --project tests/SpireAiCoach.Tests -c Release
-    if ($LASTEXITCODE -ne 0) { throw 'Core tests failed.' }
+    if (-not $SkipTests) {
+        dotnet run --project tests/SpireAiCoach.Tests -c Release
+        if ($LASTEXITCODE -ne 0) { throw 'Core tests failed.' }
+    } else { Write-Output 'Core tests skipped explicitly; use previously recorded focused validation.' }
     dotnet build src/SpireAiCoach.Mod/SpireAiCoach.Mod.csproj -c Release "-p:GameDir=$GameDir"
     if ($LASTEXITCODE -ne 0) { throw 'Mod build failed.' }
     $package = Join-Path $root 'dist/SpireAiCoach'

@@ -1,0 +1,13 @@
+{
+  "version": "0.6.1",
+  "date": "2026-10-02",
+  "algorithm_commit": "080802b",
+  "focused_tests": "6/6 from algorithm commit; not rerun during packaging",
+  "full_suite_run": false,
+  "native_integration_run": false,
+  "installed_matches_package": true,
+  "installed_matches_build": true,
+  "settings_and_key_unchanged": true,
+  "dll_sha256": "4ab8ca4ba3b551c859866ff299fa3bc99c8e936616d357ef8b5531c15493c93e",
+  "package_sha256": "866992ecada40da70af71c8817a89ecd525c0443732100fd7b8d3da79dc6f5ed"
+}
