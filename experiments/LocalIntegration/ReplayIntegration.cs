@@ -29,8 +29,8 @@ public static class ReplayIntegration
                 }
                 catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException) { return false; }
             })).Append(coach).ToArray();
-        var request = original with { Id = Guid.NewGuid().ToString("N"), LoadedMods = loaded, Workers = 1,
-            MaxNodes = 4, BudgetSeconds = 20, IncludePotions = true };
+        // Preserve the frozen user's search/potion settings; only raise the old turn horizon.
+        var request = original with { Id = Guid.NewGuid().ToString("N"), LoadedMods = loaded, MaxRounds = 64 };
         var result = await Task.Run(() => pool.Analyze(request, new(game, directories), _ => { }, CancellationToken.None));
         LocalWire.Write(Path.Combine(root, "integration-replay-private.json"), result);
         if (result.Best == null || result.Rejected != 0 || result.Best.Continuation?.Length != result.Best.Actions.Length)
@@ -38,7 +38,9 @@ public static class ReplayIntegration
         LocalWire.Write(Path.Combine(root, "integration-replay-summary.json"), new
         {
             result.Status, result.Evaluated, result.Rejected, result.Victories, result.ElapsedMs, result.Timing,
+            result.Workers, result.MaxRounds, request.BudgetSeconds, request.MaxNodes, request.IncludePotions,
             result.Best.Won, result.Best.Hp, result.Best.HpLost, result.Best.Rounds,
+            result.Best.EnemyHp, result.Best.StopReason,
             used_potion = result.Best.Actions.Any(a => a.PotionSlot.HasValue),
             choices = result.Best.Actions.Sum(a => a.Choices?.Length ?? 0),
             verified_steps = result.Best.Continuation!.Length

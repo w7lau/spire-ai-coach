@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Reflection;
+using HarmonyLib;
 using Godot;
 using MegaCrit.Sts2.Core.Assets;
 using MegaCrit.Sts2.Core.Combat;
@@ -33,6 +35,7 @@ public static class LocalWorker
     private static bool _includePotions;
     private static LocalChoices? _choices;
     private static HashSet<string> _excludedModels = [];
+    private static string? _assetsRequest;
     private static Task Frame() => _tree.ToSignal(_tree, SceneTree.SignalName.ProcessFrame).AsTask();
 
     public static bool TryStart()
@@ -43,6 +46,9 @@ public static class LocalWorker
         if (!File.Exists(Path.Combine(_root, ".coach-worker")) ||
             !string.Equals(Path.GetFullPath(OS.GetExecutablePath()), Path.Combine(_root, "game", "SlayTheSpire2.exe"), StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Refusing a worker outside its isolated installation");
+        var harmony = new Harmony("SpireAiCoach.owned-worker");
+        LocalReplayChoices.Install(harmony);
+        LocalWorkerResources.Install(harmony);
         Callable.From(Run).CallDeferred();
         return true;
     }
@@ -54,6 +60,7 @@ public static class LocalWorker
         {
             while (NGame.Instance == null) await Frame();
             await NGame.Instance.GameStartupComplete;
+            await WaitAssets();
             Silence();
             long nextMute = 0;
             _tree.ProcessFrame += () => { if (System.Environment.TickCount64 >= nextMute) { nextMute = System.Environment.TickCount64 + 1000; Silence(); } };
@@ -94,6 +101,10 @@ public static class LocalWorker
         LocalCandidate? best = null;
         int evaluated = 0, rejected = 0, victories = 0;
         var search = new LocalSearchTree(1729 + request.Partition);
+        var refiner = new LocalRouteRefiner();
+        LocalCandidate? refinementSeed = null;
+        int refinements = 0;
+        LocalWorkerResources.Retain = true;
         long restoreMs = 0, actionMs = 0, decisionMs = 0, verifyMs = 0;
         int executed = 0, restores = 0;
         async Task RestoreMeasured()
@@ -118,12 +129,13 @@ public static class LocalWorker
         void Publish(string status, string message) => LocalWire.Write(Path.Combine(_root, "result.json"),
             new LocalSearchResult(request.Id, request.SnapshotId, status, message, evaluated, rejected, timer.ElapsedMilliseconds, best,
                 Victories: victories, IncludePotions: request.IncludePotions,
-                Timing: new(restoreMs, actionMs, decisionMs, verifyMs, Actions: executed, Restores: restores), BlockedAction: blockedAction));
+                Timing: new(restoreMs, actionMs, decisionMs, verifyMs, Actions: executed, Restores: restores),
+                BlockedAction: blockedAction, MaxRounds: request.MaxRounds));
         try
         {
             if (request.Partitions is < 1 or > 16 || request.Partition < 0 || request.Partition >= request.Partitions ||
                 request.MaxNodes is < 1 or > 128 || request.MaxDepth is < 1 or > 64 || request.BudgetSeconds is < 1 or > 120 ||
-                request.MaxRounds is < 1 or > 10)
+                request.MaxRounds is < 1 or > 128)
                 throw new InvalidDataException("Invalid search limits");
             if (request.ModelHash != ModelIdSerializationCache.Hash || !request.LoadedMods.SequenceEqual(LocalCapture.LoadedMods()))
                 throw new InvalidOperationException("后台的游戏模型或 Mod 清单与当前游戏不一致，请重启游戏后重试。");
@@ -137,8 +149,29 @@ public static class LocalWorker
             // More workers than first moves explore different continuations of the same first move.
             if (roots.Length == 0) roots = [first[request.Partition % first.Length]];
             var initialEnemyHp = CombatManager.Instance.DebugOnlyGetState()!.Enemies.Sum(e => Math.Max(0, e.CurrentHp));
-            while (evaluated < request.MaxNodes && timer.Elapsed.TotalSeconds < request.BudgetSeconds && !search.Exhausted)
+            while (evaluated < request.MaxNodes && timer.Elapsed.TotalSeconds < request.BudgetSeconds && (!search.Exhausted || refiner.Count > 0))
             {
+                // Other workers' candidates seed exploration only. Their results are never adopted without
+                // executing the proposed line in this worker, including all native effects and choices.
+                foreach (var peer in Directory.EnumerateDirectories(Path.GetDirectoryName(_root)!, "worker-*"))
+                {
+                    var file = Path.Combine(peer, "result.json");
+                    if (peer == _root || !File.Exists(file)) continue;
+                    try
+                    {
+                        var result = LocalWire.Read<LocalSearchResult>(file);
+                        if (result.Id == request.Id && result.SnapshotId == request.SnapshotId && result.Best is { } seed &&
+                            LocalSearchPolicy.Better(seed, refinementSeed)) refinementSeed = seed;
+                    }
+                    catch (IOException) { /* Peer can be replacing its private IPC file. */ }
+                }
+                if (best != null && LocalSearchPolicy.Better(best, refinementSeed)) refinementSeed = best;
+                if (refinementSeed != null) refiner.Offer(refinementSeed, request.Partition, request.Partitions);
+                LocalAction[]? planned = null;
+                if (evaluated == 0 && request.InitialPlan is { Length: > 0 }) planned = request.InitialPlan;
+                if ((evaluated % 2 == 1 || search.Exhausted) && refiner.TryTake(out var proposal))
+                { planned = proposal; refinements++; }
+                if (search.Exhausted && planned == null) break;
                 route = evaluated + 1;
                 events.Clear();
                 Progress("恢复路线起点", force: true);
@@ -147,6 +180,7 @@ public static class LocalWorker
                 var startRound = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
                 var actions = new List<LocalAction>();
                 var trial = search.Begin();
+                int planIndex = 0;
                 int lost = 0;
                 void HpChanged(int oldHp, int newHp) => lost += Math.Max(0, oldHp - newHp);
                 player.Creature.CurrentHpChanged += HpChanged;
@@ -166,7 +200,16 @@ public static class LocalWorker
                             stop = "达到单回合操作上限"; break;
                         }
                         decisionStarted = Stopwatch.GetTimestamp();
-                        var next = search.Select(trial, actions.Count == 0 ? roots : EnumerateActions());
+                        var legal = EnumerateActions();
+                        LocalAction? preferred = null;
+                        if (planned != null)
+                        {
+                            while (planIndex < planned.Length && preferred == null)
+                                preferred = LocalRouteRefiner.Resolve(planned[planIndex++], legal);
+                        }
+                        else if (evaluated == 0 && actions.Count == 0)
+                            preferred = roots.OrderByDescending(a => a.Preference).First();
+                        var next = search.Select(trial, legal, preferred);
                         decisionMs += (long)Stopwatch.GetElapsedTime(decisionStarted).TotalMilliseconds;
                         var before = Observe(player);
                         Progress("执行：" + LocalSearchPolicy.Describe(next), before);
@@ -245,7 +288,7 @@ public static class LocalWorker
             }
             else Progress("未取得可用路线", force: true, status: "unsupported");
             Publish(best == null ? "unsupported" : "done", best == null ? "没有找到可完整结算的路线。" :
-                $"已完成当前预算，操作树 {search.Nodes} 个节点；按模拟结果选路，未证明最优，奖励机制覆盖尚不完整。");
+                $"已完成当前预算，操作树 {search.Nodes} 个节点，比较了 {refinements} 条调整牌序的路线。");
             await Cleanup();
             return true;
         }
@@ -257,6 +300,7 @@ public static class LocalWorker
             Publish("failed", ex.Message);
             return false;
         }
+        finally { LocalWorkerResources.Retain = false; }
     }
 
     private static void Silence()
@@ -328,6 +372,19 @@ public static class LocalWorker
         _combatSettled = false; _combatWon = false;
     }
 
+    private static async Task WaitAssets()
+    {
+        // GameStartupComplete precedes the background Common session finishing. Drain it before
+        // run preloading can unload/replace its resources and trigger a Godot GC-handle race.
+        var timer = Stopwatch.StartNew();
+        await Frame(); await Frame();
+        while (NAssetLoader.Instance.IsProcessing())
+        {
+            if (timer.Elapsed.TotalSeconds > 60) throw new IOException("游戏资源准备超时。");
+            await Frame();
+        }
+    }
+
     private static async Task Restore(LocalSearchRequest request)
     {
         await Cleanup();
@@ -336,12 +393,21 @@ public static class LocalWorker
         var run = RunState.FromSerializable(replay.serializableRun);
         await RunManager.Instance.SetUpSavedSingleplayer(run, replay.serializableRun);
         var manager = RunManager.Instance;
+        // This owned simulation has no persistent run to advance. Native death/victory otherwise
+        // deletes its repeatedly restored save/backup, producing storage errors unrelated to combat.
+        typeof(RunManager).GetProperty(nameof(RunManager.ShouldSave))!.SetValue(manager, false);
         manager.ActionQueueSet.FastForwardNextActionId(replay.nextActionId);
         manager.ActionQueueSynchronizer.FastForwardHookId(replay.nextHookId);
         manager.PlayerChoiceSynchronizer.FastForwardChoiceIds(replay.choiceIds);
         manager.RewardsSetSynchronizer.FastForwardRewardIds(replay.rewardIds);
-        await PreloadManager.LoadRunAssets(run.Players.Select(p => p.Character));
-        await PreloadManager.LoadActAssets(run.Acts[run.CurrentActIndex]);
+        using var historical = new LocalReplayChoices(replay.events);
+        if (_assetsRequest != request.Id)
+        {
+            await WaitAssets();
+            await PreloadManager.LoadRunAssets(run.Players.Select(p => p.Character));
+            await PreloadManager.LoadActAssets(run.Acts[run.CurrentActIndex]);
+            _assetsRequest = request.Id;
+        }
         manager.Launch();
         NGame.Instance!.RootSceneContainer.SetCurrentScene(NRun.Create(run));
         await manager.GenerateMap();
@@ -350,13 +416,11 @@ public static class LocalWorker
                 ModelDb.AllEncounters.Single(e => e.Id.Entry == encounter).ToMutable(), false);
         else await manager.LoadIntoLatestMapCoord(null);
         var player = LocalContext.GetMe(run)!;
-        _choices = new LocalChoices(history: replay.events.Where(e => e.eventType == CombatReplayEventType.PlayerChoice)
-            .Select(LocalCapture.ChoiceIndex));
         await StableOrTerminal(player);
         foreach (var item in replay.events)
         {
             if (item.eventType is CombatReplayEventType.HookAction or CombatReplayEventType.PlayerChoice or CombatReplayEventType.ResumeAction)
-                continue; // Native screen handlers reproduce choices and resume hooks during their owning action.
+                continue; // The native synchronization path restores completed choices without a UI.
             if (item.eventType != CombatReplayEventType.GameAction || item.action == null)
                 throw new InvalidOperationException("本地重放暂不支持这场战斗中的额外选择。");
             var action = item.action.ToGameAction(player);
@@ -378,8 +442,7 @@ public static class LocalWorker
             else if (action is not ReadyToBeginEnemyTurnAction)
                 throw new InvalidOperationException("本地重放暂不支持历史操作：" + action.GetType().Name);
         }
-        _choices.Finish();
-        _choices = null;
+        historical.Finish();
         if (IsTerminal(player) || LocalCapture.Fingerprint() != request.NativeHash)
             throw new InvalidOperationException("后台重放与当前战斗状态不一致，未发布本地建议。可切换 AI 模式。");
     }
@@ -398,11 +461,11 @@ public static class LocalWorker
             if (!card.CanPlay() || _excludedModels.Contains(card.Id.ToString())) continue;
             // Do not assume that attacks precede setup, or that zero damage means no value.
             if (card.IsValidTarget(null)) result.Add(new(i, card.Id.ToString(), null, card.Title, "", hash, state.RoundNumber,
-                Preference: tactics.Priority(card, null)));
+                Preference: tactics.Priority(card, null), CombatCardIndex: NetCombatCard.FromModel(card).CombatCardIndex));
             else foreach (var target in state.Creatures.Where(c => c.IsAlive && card.IsValidTarget(c)))
                 result.Add(new(i, card.Id.ToString(), target.CombatId, card.Title,
                     target.CombatId is { } id && _targetLabels?.TryGetValue(id, out var label) == true ? label : target.Name,
-                    hash, state.RoundNumber, Preference: tactics.Priority(card, target)));
+                    hash, state.RoundNumber, Preference: tactics.Priority(card, target), CombatCardIndex: NetCombatCard.FromModel(card).CombatCardIndex));
         }
         if (_includePotions)
         {

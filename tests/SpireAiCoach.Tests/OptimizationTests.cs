@@ -5,6 +5,30 @@ static class OptimizationTests
     public static void Register(Action<string, Action> test)
     {
         void Check(bool ok, string message) { if (!ok) throw new Exception(message); }
+        test("optimization reorders native card instances without name type or hand-position rules", () =>
+        {
+            var a = new LocalAction(0, "mod-attack", 1, "same-name", "", "root", 1, CombatCardIndex: 10);
+            var b = a with { HandIndex = 1, CombatCardIndex = 11 };
+            var c = a with { HandIndex = 2, ModelId = "unknown-mod-effect", CombatCardIndex = 12, TargetId = null };
+            var end = new LocalAction(-1, "", null, "", "", "after", 1, EndTurn: true);
+            var refiner = new LocalRouteRefiner();
+            refiner.Offer(new([a,b,c,end], 60, 20, 50, 0, 80, false, false, false));
+            Check(refiner.TryTake(out var proposed) && proposed[0] == c && proposed[1] == a && proposed[2] == b,
+                "Delayed effect should be tested before both earlier cards");
+            var legal = new[] { b with { HandIndex = 0, BeforeHash = "changed" }, a with { HandIndex = 3, BeforeHash = "changed" } };
+            Check(LocalRouteRefiner.Resolve(a, legal)?.HandIndex == 3, "Two same-name copies must retain native identity");
+            Check(LocalRouteRefiner.Resolve(c, legal) == null, "Unavailable proposal must not guess another instance");
+            Check(LocalRouteRefiner.Resolve(a, legal.Select(x => x with { Round = 2 }).ToArray()) == null, "Round must match");
+        });
+        test("optimization selection branches cover empty single and multiple choices within native limits", () =>
+        {
+            var choices = LocalSelectionBranches.Generate(4, 0, 2);
+            Check(choices.Length == 11 && choices.Any(c => c.Length == 0) && choices.Count(c => c.Length == 2) == 6, "All combinations");
+            Check(choices.All(c => c.Distinct().Count() == c.Length && c.All(i => i >= 0 && i < 4)), "Valid instances");
+            var bounded = LocalSelectionBranches.Generate(100, 0, 100, 64);
+            Check(bounded.Length == 64 && bounded.Any(c => c.Length > 1), "Large branching must be bounded without enumerating its powerset");
+            Check(new LocalSearchRequest("", "", [], "", 0, [], false).MaxRounds == 64, "Ten-round cutoff must be removed");
+        });
         test("optimization tactical priors depend on lethal threat and followup rather than card type", () =>
         {
             var hit = new LocalTacticalFeatures(Damage: 6, EnemyHp: 30, Known: true);

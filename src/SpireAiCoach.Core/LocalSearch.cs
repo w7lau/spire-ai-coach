@@ -7,15 +7,18 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     string NativeHash, uint ModelHash, string[] LoadedMods, bool ContinueOptimization,
     int Partition = 0, int Partitions = 2, int MaxNodes = 32, int MaxDepth = 24,
     int BudgetSeconds = 60, string? DebugEncounter = null,
-    IReadOnlyDictionary<uint, string>? TargetLabels = null, int MaxRounds = 10,
-    int Workers = 0, bool IncludePotions = false, LocalHistoryStamp? History = null, string[]? ExcludedModels = null);
+    IReadOnlyDictionary<uint, string>? TargetLabels = null, int MaxRounds = 64,
+    int Workers = 0, bool IncludePotions = false, LocalHistoryStamp? History = null, string[]? ExcludedModels = null,
+    LocalAction[]? InitialPlan = null);
 
 public sealed record LocalAction(int HandIndex, string ModelId, uint? TargetId,
     string CardName, string TargetName, string BeforeHash, int Round = 0,
-    bool EndTurn = false, int Preference = 0, int? PotionSlot = null, LocalCardChoice[]? Choices = null);
+    bool EndTurn = false, int Preference = 0, int? PotionSlot = null, LocalCardChoice[]? Choices = null,
+    uint? CombatCardIndex = null);
 
 // Index is relative to this exact ordered native offer, never to a display-name lookup.
-public sealed record LocalCardChoice(string OfferHash, int Index, string ModelId, string Name);
+public sealed record LocalCardChoice(string OfferHash, int Index, string ModelId, string Name,
+    int[]? Indices = null, string Kind = "offer");
 
 public sealed record LocalCandidate(LocalAction[] Actions, int Hp, int HpLost, int EnemyHp,
     int Gold, int MaxHp, bool Won, bool Dead, bool RewardCoverageKnown,
@@ -25,7 +28,7 @@ public sealed record LocalSearchResult(string Id, string SnapshotId, string Stat
     string Message, int Evaluated, int Rejected, long ElapsedMs, LocalCandidate? Best,
     int Duplicates = 0, int BudgetPruned = 0, int Victories = 0, int Workers = 1,
     long WorkerMemoryBytes = 0, long SearchElapsedMs = 0, bool IncludePotions = false, LocalSearchTiming? Timing = null,
-    LocalAction? BlockedAction = null);
+    LocalAction? BlockedAction = null, int MaxRounds = 64);
 
 public static class LocalSearchPolicy
 {
@@ -48,6 +51,7 @@ public static class LocalSearchPolicy
         var potions = candidate.Actions.Count(a => a.PotionSlot.HasValue);
         var priorPotions = prior.Actions.Count(a => a.PotionSlot.HasValue);
         if (potions != priorPotions) return potions < priorPotions;
+        if (candidate.Rounds != prior.Rounds) return candidate.Rounds < prior.Rounds;
         return candidate.Actions.Length < prior.Actions.Length;
     }
 
@@ -68,7 +72,7 @@ public static class LocalSearchPolicy
             lines.Add($"{i + 1}. " + Describe(action));
         }
         if (best.Won) lines.Add("模拟结果：战斗获胜。");
-        lines.Add($"最多规划 10 轮；{(result.IncludePotions ? "已纳入主动使用药水" : "未纳入主动使用药水（自动触发仍按游戏结算）")}；支持生成卡牌的三选一，其他选牌流程仍有适配限制。不保证最优或兼容所有 Mod；实际状态偏离时请重新计算。" );
+        lines.Add($"最多规划 {result.MaxRounds} 轮；{(result.IncludePotions ? "已纳入主动使用药水" : "未纳入主动使用药水（自动触发仍按游戏结算）")}；选牌组合受搜索预算限制。实际状态偏离时请重新计算。" );
         return string.Join("\n", lines);
     }
 
@@ -76,7 +80,9 @@ public static class LocalSearchPolicy
         (action.PotionSlot is { } slot ? $"使用药水「{action.CardName}」（药水槽 {slot + 1}）" :
             $"打出「{action.CardName}」（当时手牌第 {action.HandIndex + 1} 张）") +
         (action.TargetId is null ? "。" : $" → {action.TargetName}［目标 {action.TargetId}］。")) +
-        string.Concat((action.Choices ?? []).Select(c => c.Index < 0 ? " 选牌时跳过。" : $" 选择第 {c.Index + 1} 张「{c.Name}」。"));
+        string.Concat((action.Choices ?? []).Select(c => c.Kind != "offer" ?
+            (c.Indices is { Length: 0 } ? " 不选择卡牌。" : $" 选牌时选择「{c.Name}」。") :
+            c.Index < 0 ? " 选牌时跳过。" : $" 选择第 {c.Index + 1} 张「{c.Name}」。"));
 
     public static int WorkerCount(int processors, ulong availableMemory, int configured) => configured > 0
         ? Math.Clamp(configured, 1, 16)

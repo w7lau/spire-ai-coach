@@ -3,7 +3,6 @@ using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Models;
-using MegaCrit.Sts2.Core.Models.Cards;
 using MegaCrit.Sts2.Core.MonsterMoves.Intents;
 using SpireAiCoach.Core;
 
@@ -49,11 +48,8 @@ internal sealed class LocalTacticalPreview(Player player)
             int affordable = Math.Min(attacks, energyAfter + others.Count(c => baseDamage(c) > 0 && c.EnergyCost.GetAmountToSpend() == 0));
             var followup = others.Select(baseDamage).OrderDescending().Take(affordable).Sum();
             var repeat = Math.Max(1, Value("Repeat"));
-            // Built-in Armaments+ directly upgrades the hand without a selector. Ordinary Armaments
-            // still requires unsupported choices; do not pretend its choice has been simulated.
-            var upgrades = card is Armaments && card.IsUpgraded ? others.Count(c => c.IsUpgradable) : 0;
             bool known = vars.Keys.Any(k => k is "Damage" or "CalculatedDamage" or "Block" or "CalculatedBlock" or
-                "StrengthPower" or "VulnerablePower" or "WeakPower" or "Energy" or "HpLoss") || upgrades > 0;
+                "StrengthPower" or "VulnerablePower" or "WeakPower" or "Energy" or "HpLoss");
             return LocalTactics.Priority(new(
                 Damage: enemy ? Math.Max(Value("Damage"), Value("CalculatedDamage")) * repeat : 0,
                 EnemyHp: enemy ? target!.CurrentHp : 0, EnemyBlock: enemy ? target!.Block : 0,
@@ -63,7 +59,7 @@ internal sealed class LocalTacticalPreview(Player player)
                 Vulnerable: enemy ? Value("VulnerablePower") : 0, Weak: enemy ? Value("WeakPower") : 0,
                 // "Cards" can mean discard/exhaust/selection count, so it is not a generic draw hint.
                 EnergyGain: Value("Energy"), HpCost: Value("HpLoss"),
-                FollowupAttacks: affordable, FollowupDamage: followup, Upgrades: upgrades, Known: known));
+                FollowupAttacks: affordable, FollowupDamage: followup, Known: known));
         }
         catch { return 0; }
     }

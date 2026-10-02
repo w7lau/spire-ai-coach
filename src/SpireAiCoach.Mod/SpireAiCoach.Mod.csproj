@@ -2,7 +2,7 @@
   <Import Project="../../GamePath.props" Condition="Exists('../../GamePath.props')" />
   <PropertyGroup>
     <AssemblyName>SpireAiCoach</AssemblyName>
-    <Version>0.7.1</Version>
+    <Version>0.7.2</Version>
     <EnableDynamicLoading>true</EnableDynamicLoading>
     <GenerateDependencyFile>false</GenerateDependencyFile>
     <GenerateRuntimeConfigurationFiles>false</GenerateRuntimeConfigurationFiles>
@@ -13,6 +13,7 @@
     <Compile Include="../SpireAiCoach.Core/*.cs" Link="Core/%(Filename)%(Extension)" />
     <Reference Include="sts2" HintPath="$(GameDataDir)/sts2.dll" Private="false" />
     <Reference Include="GodotSharp" HintPath="$(GameDataDir)/GodotSharp.dll" Private="false" />
+    <Reference Include="0Harmony" HintPath="$(GameDataDir)/0Harmony.dll" Private="false" />
     <None Include="../../SpireAiCoach.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="CheckGameAssemblies" BeforeTargets="ResolveReferences">

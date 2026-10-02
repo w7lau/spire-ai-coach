@@ -110,7 +110,7 @@ public sealed class CoachOverlay
         config.Pressed += () => _settingsPanel.Visible = !_settingsPanel.Visible;
         var hide = new Button { Text = "收起" }; row.AddChild(hide);
         hide.Pressed += () => _panel.Hide();
-        body.AddChild(Wrapped("规划整场战斗，最多 10 轮。计算完成后可手动出牌，也可执行已验证的路线。"));
+        body.AddChild(Wrapped("规划整场战斗，最多 64 轮。计算完成后可手动出牌，也可执行已验证的路线。"));
         var localOptions = new HBoxContainer(); body.AddChild(localOptions);
         localOptions.AddChild(new Label { Text = "本地并发（0 自动，1–16 手动）" });
         _localWorkers = new SpinBox { MinValue = 0, MaxValue = 16, Step = 1, Value = Math.Clamp(_settings.LocalWorkers, 0, 16) };

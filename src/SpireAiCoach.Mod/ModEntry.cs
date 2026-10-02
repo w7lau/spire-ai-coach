@@ -10,6 +10,7 @@ public static class ModEntry
     public static void Initialize()
     {
         if (LocalWorker.TryStart()) return;
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_INTEGRATION") != null) return;
         if (_overlay != null) return;
         Callable.From(() =>
         {

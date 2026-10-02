@@ -42,6 +42,8 @@ public static class Entry
         {
             while (NGame.Instance == null) await Frame();
             await NGame.Instance.GameStartupComplete;
+            await Frame(); await Frame();
+            while (NAssetLoader.Instance.IsProcessing()) await Frame();
             SaveManager.Instance.PrefsSave.FastMode = FastModeType.Instant;
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_REPLAY") is { Length: > 0 } replayPath)
             {
@@ -50,6 +52,12 @@ public static class Entry
                 return;
             }
             var save = JsonSerializer.Deserialize(File.ReadAllText(Path.Combine(root, "fixture.json")), JsonSerializationUtility.GetTypeInfo<SerializableRun>())!;
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_MECHANICS") == "1")
+            {
+                await MechanicsIntegration.Run(root, tree, pool, save);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
             var run = RunState.FromSerializable(save);
             await RunManager.Instance.SetUpSavedSingleplayer(run, save);
             await PreloadManager.LoadRunAssets(run.Players.Select(p => p.Character));
@@ -87,10 +95,12 @@ public static class Entry
                 var installation = LocalCapture.Installation();
                 var result = await Task.Run(() => pool.Analyze(request, installation, _ => { }, CancellationToken.None));
                 LocalWire.Write(Path.Combine(root, "integration-fallback.json"), result);
-                if (result.Rejected != 1 || result.Status != "partial" || !result.Message.Contains("未纳入：武装") ||
+                // The old --fallback case used Armaments as an unsupported action. Native hand
+                // selection now supports it, so this fixture must no longer exclude the card.
+                if (result.Rejected != 0 || result.Status != "done" || result.Message.Contains("未纳入") ||
                     result.Best?.Continuation?.Length != result.Best?.Actions.Length || result.Best is not { Actions.Length: > 0 } ||
-                    result.Best.Actions.Any(a => !a.EndTurn) || request.NativeHash != LocalCapture.Fingerprint())
-                    throw new InvalidOperationException("Failed action did not yield a verified, disclosed fallback");
+                    !result.Best.Actions.Any(a => a.Choices is { Length: > 0 }) || request.NativeHash != LocalCapture.Fingerprint())
+                    throw new InvalidOperationException("Native hand selection was excluded or did not yield a verified result");
                 File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
                 return;
             }

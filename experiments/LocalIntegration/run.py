@@ -20,6 +20,8 @@ parser.add_argument('--optimization', action='store_true')
 parser.add_argument('--execution', action='store_true')
 parser.add_argument('--choices', action='store_true')
 parser.add_argument('--fallback', action='store_true')
+parser.add_argument('--mechanics', action='store_true')
+parser.add_argument('--mechanic-cases')
 parser.add_argument('--replay', type=Path)
 parser.add_argument('--game', type=Path)
 parser.add_argument('--mods', type=Path)
@@ -36,6 +38,7 @@ with worker_lock(root):
     integration = root / 'game/mods/SpireLocalIntegration'
     integration.mkdir(exist_ok=True)
     shutil.copy2(here / 'bin/Release/net9.0/SpireLocalIntegration.dll', integration)
+    shutil.copy2(here / 'bin/Release/net9.0/SpireLocalIntegration.pdb', integration)
     (integration / 'SpireLocalIntegration.json').write_text(json.dumps(dict(
         id='SpireLocalIntegration', name='Isolated local integration test', author='w7lau',
         description='Synthetic capture, search and read-only integration verification', version='0.0.1',
@@ -54,6 +57,9 @@ with worker_lock(root):
     env['SPIRE_LOCAL_EXECUTION'] = '1' if args.execution else '0'
     env['SPIRE_LOCAL_CHOICES'] = '1' if args.choices else '0'
     env['SPIRE_LOCAL_FALLBACK'] = '1' if args.fallback else '0'
+    env['SPIRE_LOCAL_MECHANICS'] = '1' if args.mechanics else '0'
+    if args.mechanic_cases:
+        env['SPIRE_LOCAL_MECHANICS_CASES'] = args.mechanic_cases
     env['SPIRE_LOCAL_REPLAY'] = str(args.replay.resolve()) if args.replay else ''
     env['SPIRE_LOCAL_REPLAY_GAME'] = str(args.game.resolve()) if args.game else ''
     env['SPIRE_LOCAL_REPLAY_MODS'] = str(args.mods.resolve()) if args.mods else ''

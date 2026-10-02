@@ -1,0 +1,192 @@
+{
+  "version": "0.7.2",
+  "game_version": "v0.111.0",
+  "focused_core": {
+    "optimization": "6/6",
+    "search_feedback": "6/6",
+    "local": "9/9"
+  },
+  "observed_native_cases": [
+    {
+      "case": "ordering",
+      "evaluated": 8,
+      "rejected": 0,
+      "seed_order": [
+        "Strike",
+        "Strike",
+        "Armaments+"
+      ],
+      "verified_order": [
+        "Armaments+",
+        "Strike",
+        "Strike"
+      ],
+      "passed": true
+    },
+    {
+      "case": "exhaust",
+      "card": "True Grit+",
+      "native_hand_selection": true,
+      "execute_and_reanalyse_completed_history": true,
+      "passed": true
+    },
+    {
+      "case": "upgrade",
+      "card": "Armaments",
+      "native_upgrade_selection": true,
+      "execute_and_reanalyse_completed_history": true,
+      "passed": true
+    },
+    {
+      "case": "multi",
+      "card": "Prepared+",
+      "native_selected_count": 2,
+      "execute_and_reanalyse_completed_history": true,
+      "passed": true
+    }
+  ],
+  "pile_selection": {
+    "Status": "done",
+    "Evaluated": 1,
+    "Rejected": 0,
+    "Victories": 0,
+    "ElapsedMs": 29692,
+    "Timing": {
+      "RestoreMs": 4614,
+      "ActionMs": 821,
+      "DecisionMs": 35,
+      "VerificationMs": 1447,
+      "StartupMs": 22352,
+      "Actions": 4,
+      "Restores": 1
+    },
+    "Won": false,
+    "Dead": false,
+    "Hp": 75,
+    "HpLost": 5,
+    "EnemyHp": 165,
+    "Rounds": 1,
+    "StopReason": "达到轮数上限",
+    "steps": 4,
+    "verified_steps": 4,
+    "choice_kinds": [
+      "pile"
+    ],
+    "execute_and_reanalyse_completed_history": true
+  },
+  "long_horizon": {
+    "Status": "done",
+    "Evaluated": 1,
+    "Rejected": 0,
+    "Victories": 1,
+    "ElapsedMs": 34630,
+    "Timing": {
+      "RestoreMs": 4011,
+      "ActionMs": 3996,
+      "DecisionMs": 47,
+      "VerificationMs": 4464,
+      "StartupMs": 21540,
+      "Actions": 32,
+      "Restores": 1
+    },
+    "Won": true,
+    "Dead": false,
+    "Hp": 942,
+    "HpLost": 64,
+    "EnemyHp": 0,
+    "Rounds": 20,
+    "StopReason": "胜利结算完成",
+    "steps": 32,
+    "verified_steps": 32,
+    "choice_kinds": [],
+    "synthetic_max_hp": 1000,
+    "deliberate_end_turn_prefix": 11,
+    "purpose": "Verify a native win after the old ten-turn cutoff; not a strategy benchmark"
+  },
+  "generated_choice_regression": {
+    "Status": "done",
+    "Evaluated": 12,
+    "Rejected": 0,
+    "Victories": 0,
+    "ElapsedMs": 37889,
+    "Timing": {
+      "RestoreMs": 8352,
+      "ActionMs": 5550,
+      "DecisionMs": 33,
+      "VerificationMs": 1126,
+      "StartupMs": 22044,
+      "Actions": 37,
+      "Restores": 12
+    },
+    "Won": false,
+    "Dead": false,
+    "Hp": 80,
+    "HpLost": 0,
+    "EnemyHp": 25,
+    "Rounds": 1,
+    "StopReason": "达到轮数上限",
+    "steps": 5,
+    "verified_steps": 5,
+    "choice_kinds": [
+      "offer"
+    ],
+    "executed_steps": 5,
+    "history_replay_verified": true,
+    "unchanged_after_search": true
+  },
+  "frozen_incident_replay": {
+    "Status": "done",
+    "Evaluated": 17,
+    "Rejected": 0,
+    "Victories": 9,
+    "ElapsedMs": 84810,
+    "Timing": {
+      "RestoreMs": 31935,
+      "ActionMs": 142941,
+      "DecisionMs": 3031,
+      "VerificationMs": 32746,
+      "StartupMs": 121014,
+      "Actions": 579,
+      "Restores": 17
+    },
+    "Workers": 4,
+    "MaxRounds": 64,
+    "BudgetSeconds": 45,
+    "MaxNodes": 32,
+    "IncludePotions": true,
+    "Won": true,
+    "Hp": 87,
+    "HpLost": 14,
+    "Rounds": 9,
+    "EnemyHp": 0,
+    "StopReason": "胜利结算完成",
+    "used_potion": true,
+    "choices": 0,
+    "verified_steps": 34
+  },
+  "smaller_budget_incident_replay": {
+    "Status": "done",
+    "Evaluated": 4,
+    "Rejected": 0,
+    "Victories": 0,
+    "ElapsedMs": 56134,
+    "Timing": {
+      "RestoreMs": 6512,
+      "ActionMs": 22844,
+      "DecisionMs": 431,
+      "VerificationMs": 2141,
+      "StartupMs": 23502,
+      "Actions": 103,
+      "Restores": 4
+    },
+    "Won": false,
+    "Hp": 81,
+    "HpLost": 8,
+    "Rounds": 3,
+    "used_potion": false,
+    "choices": 0,
+    "verified_steps": 8
+  },
+  "privacy": "Native replay, player IDs, hashes, filesystem paths and complete private logs omitted",
+  "limits": "Focused samples; no proof of global optimality, arbitrary mod state restoration or custom selection screens"
+}

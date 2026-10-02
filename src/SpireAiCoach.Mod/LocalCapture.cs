@@ -36,7 +36,10 @@ public static class LocalCapture
             if (item.eventType is CombatReplayEventType.HookAction or CombatReplayEventType.ResumeAction) continue;
             if (item.eventType == CombatReplayEventType.PlayerChoice)
             {
-                entries.Add($"{item.playerId}:choice:{ChoiceIndex(item)}");
+                if (item.playerChoiceResult is not { } choice || item.choiceId == null)
+                    throw new InvalidOperationException("Incomplete native choice history");
+                var packet = new PacketWriter(); choice.Serialize(packet);
+                entries.Add($"{item.playerId}:choice:{item.choiceId}:{Convert.ToHexString(packet.Buffer.AsSpan(0, (packet.BitPosition + 7) / 8))}");
                 continue;
             }
             if (item.eventType != CombatReplayEventType.GameAction || item.action == null)
@@ -98,7 +101,6 @@ public static class LocalCapture
         var replay = Replay();
         if (replay == null)
             throw new CoachException("local_replay", "这场战斗没有可用的原生重放记录，请在下一场战斗重试。");
-        foreach (var item in replay.events.Where(e => e.eventType == CombatReplayEventType.PlayerChoice)) ChoiceIndex(item);
         var before = Fingerprint();
         var packet = new PacketWriter();
         replay.Serialize(packet);
@@ -115,10 +117,4 @@ public static class LocalCapture
     public static LocalInstallation Installation() => new(
         Path.GetDirectoryName(OS.GetExecutablePath())!, ModManager.GetLoadedMods().Select(m => m.path).ToArray());
 
-    public static int ChoiceIndex(CombatReplayEvent item)
-    {
-        if (item.playerChoiceResult is not { type: PlayerChoiceType.Index, indexes.Count: 1 } result)
-            throw new CoachException("local_choice", "当前记录包含尚未适配的多选或特殊选择，可使用 AI 指导。");
-        return result.indexes![0];
-    }
 }
