@@ -1,0 +1,1 @@
+{"id":"SpireNativeProbe","name":"Isolated native feasibility probe","author":"w7lau","description":"Synthetic tests in a private worker only. Not a player-facing mod.","version":"0.0.1","has_dll":true,"has_pck":false,"affects_gameplay":true,"dependencies":[]}

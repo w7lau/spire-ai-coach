@@ -1,0 +1,1630 @@
+{
+  "scope": "Synthetic singleplayer fixture only; no arbitrary mid-combat restoration or global optimum proof.",
+  "native_replay_identical": true,
+  "hextech_delta": {
+    "hp": -3,
+    "energy": 2,
+    "plating": 3
+  },
+  "control_delta": {
+    "hp": -3,
+    "energy": 2,
+    "plating": 0
+  },
+  "experiments": [
+    {
+      "name": "source",
+      "wall_ms": 55037.28,
+      "action_ms": 13079,
+      "restored_fixture": false,
+      "fixture_sha256": "B01954C3D180A828E57E84C695C01EDE37114EC301F564D645AEF767E17E9D33",
+      "request": {
+        "mode": "route",
+        "blood_armor": true,
+        "restore_fixture": false,
+        "encounter": "SLIMES_WEAK",
+        "actions": [
+          "BLOODLETTING",
+          "STRIKE_IRONCLAD",
+          "DEFEND_IRONCLAD",
+          "END_TURN"
+        ]
+      },
+      "checkpoints": [
+        {
+          "label": "root",
+          "RoundNumber": 1,
+          "native_state_sha256": "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "player": {
+            "hp": 80,
+            "block": 0,
+            "energy": 3,
+            "powers": [],
+            "relics": [
+              {
+                "id": "RELIC.BURNING_BLOOD",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              },
+              {
+                "id": "RELIC.BLOOD_ARMOR_RUNE",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              }
+            ]
+          },
+          "piles": [
+            {
+              "type": "Hand",
+              "cards": [
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.BLOODLETTING",
+                "CARD.STRIKE_IRONCLAD",
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.STRIKE_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Draw",
+              "cards": []
+            },
+            {
+              "type": "Discard",
+              "cards": []
+            },
+            {
+              "type": "Exhaust",
+              "cards": []
+            },
+            {
+              "type": "Play",
+              "cards": []
+            }
+          ],
+          "enemies": [
+            {
+              "id": "MONSTER.LEAF_SLIME_S",
+              "hp": 12,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.LEAF_SLIME_M",
+              "hp": 34,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.TWIG_SLIME_S",
+              "hp": 9,
+              "block": 0,
+              "powers": []
+            }
+          ]
+        },
+        {
+          "label": "BLOODLETTING",
+          "RoundNumber": 1,
+          "native_state_sha256": "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+          "player": {
+            "hp": 77,
+            "block": 0,
+            "energy": 5,
+            "powers": [
+              {
+                "id": "POWER.PLATING_POWER",
+                "Amount": 3
+              }
+            ],
+            "relics": [
+              {
+                "id": "RELIC.BURNING_BLOOD",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              },
+              {
+                "id": "RELIC.BLOOD_ARMOR_RUNE",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              }
+            ]
+          },
+          "piles": [
+            {
+              "type": "Hand",
+              "cards": [
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.STRIKE_IRONCLAD",
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.STRIKE_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Draw",
+              "cards": []
+            },
+            {
+              "type": "Discard",
+              "cards": [
+                "CARD.BLOODLETTING"
+              ]
+            },
+            {
+              "type": "Exhaust",
+              "cards": []
+            },
+            {
+              "type": "Play",
+              "cards": []
+            }
+          ],
+          "enemies": [
+            {
+              "id": "MONSTER.LEAF_SLIME_S",
+              "hp": 12,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.LEAF_SLIME_M",
+              "hp": 34,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.TWIG_SLIME_S",
+              "hp": 9,
+              "block": 0,
+              "powers": []
+            }
+          ]
+        },
+        {
+          "label": "STRIKE_IRONCLAD",
+          "RoundNumber": 1,
+          "native_state_sha256": "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+          "player": {
+            "hp": 77,
+            "block": 0,
+            "energy": 4,
+            "powers": [
+              {
+                "id": "POWER.PLATING_POWER",
+                "Amount": 3
+              }
+            ],
+            "relics": [
+              {
+                "id": "RELIC.BURNING_BLOOD",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              },
+              {
+                "id": "RELIC.BLOOD_ARMOR_RUNE",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              }
+            ]
+          },
+          "piles": [
+            {
+              "type": "Hand",
+              "cards": [
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.STRIKE_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Draw",
+              "cards": []
+            },
+            {
+              "type": "Discard",
+              "cards": [
+                "CARD.BLOODLETTING",
+                "CARD.STRIKE_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Exhaust",
+              "cards": []
+            },
+            {
+              "type": "Play",
+              "cards": []
+            }
+          ],
+          "enemies": [
+            {
+              "id": "MONSTER.LEAF_SLIME_S",
+              "hp": 6,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.LEAF_SLIME_M",
+              "hp": 34,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.TWIG_SLIME_S",
+              "hp": 9,
+              "block": 0,
+              "powers": []
+            }
+          ]
+        },
+        {
+          "label": "DEFEND_IRONCLAD",
+          "RoundNumber": 1,
+          "native_state_sha256": "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+          "player": {
+            "hp": 77,
+            "block": 5,
+            "energy": 3,
+            "powers": [
+              {
+                "id": "POWER.PLATING_POWER",
+                "Amount": 3
+              }
+            ],
+            "relics": [
+              {
+                "id": "RELIC.BURNING_BLOOD",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              },
+              {
+                "id": "RELIC.BLOOD_ARMOR_RUNE",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              }
+            ]
+          },
+          "piles": [
+            {
+              "type": "Hand",
+              "cards": [
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.STRIKE_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Draw",
+              "cards": []
+            },
+            {
+              "type": "Discard",
+              "cards": [
+                "CARD.BLOODLETTING",
+                "CARD.STRIKE_IRONCLAD",
+                "CARD.DEFEND_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Exhaust",
+              "cards": []
+            },
+            {
+              "type": "Play",
+              "cards": []
+            }
+          ],
+          "enemies": [
+            {
+              "id": "MONSTER.LEAF_SLIME_S",
+              "hp": 6,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.LEAF_SLIME_M",
+              "hp": 34,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.TWIG_SLIME_S",
+              "hp": 9,
+              "block": 0,
+              "powers": []
+            }
+          ]
+        },
+        {
+          "label": "END_TURN",
+          "RoundNumber": 2,
+          "native_state_sha256": "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9",
+          "player": {
+            "hp": 77,
+            "block": 0,
+            "energy": 3,
+            "powers": [
+              {
+                "id": "POWER.PLATING_POWER",
+                "Amount": 2
+              }
+            ],
+            "relics": [
+              {
+                "id": "RELIC.BURNING_BLOOD",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              },
+              {
+                "id": "RELIC.BLOOD_ARMOR_RUNE",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              }
+            ]
+          },
+          "piles": [
+            {
+              "type": "Hand",
+              "cards": [
+                "CARD.STRIKE_IRONCLAD",
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.STRIKE_IRONCLAD",
+                "CARD.SLIMED",
+                "CARD.SLIMED"
+              ]
+            },
+            {
+              "type": "Draw",
+              "cards": [
+                "CARD.BLOODLETTING",
+                "CARD.SLIMED",
+                "CARD.DEFEND_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Discard",
+              "cards": []
+            },
+            {
+              "type": "Exhaust",
+              "cards": []
+            },
+            {
+              "type": "Play",
+              "cards": []
+            }
+          ],
+          "enemies": [
+            {
+              "id": "MONSTER.LEAF_SLIME_S",
+              "hp": 6,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.LEAF_SLIME_M",
+              "hp": 34,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.TWIG_SLIME_S",
+              "hp": 9,
+              "block": 0,
+              "powers": []
+            }
+          ]
+        }
+      ],
+      "runtime_errors": [],
+      "engine_errors": [
+        "ERROR: 1 RID allocations of type 'N26RendererEnvironmentStorage11EnvironmentE' were leaked at exit.",
+        "ERROR: 258 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.",
+        "ERROR: 25 RID allocations of type 'N13RendererDummy9DummyMeshE' were leaked at exit.",
+        "ERROR: 82 RID allocations of type 'N13RendererDummy15MaterialStorage13DummyMaterialE' were leaked at exit.",
+        "ERROR: 6 RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit.",
+        "ERROR: 303 RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.",
+        "ERROR: 14 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.",
+        "ERROR: 10 RID allocations of type 'PN18TextServerAdvanced27FontAdvancedLinkedVariationE' were leaked at exit.",
+        "ERROR: 307 resources still in use at exit (run with --verbose for details)."
+      ]
+    },
+    {
+      "name": "restored_replay",
+      "wall_ms": 55321.0,
+      "action_ms": 13161,
+      "restored_fixture": true,
+      "fixture_sha256": "B01954C3D180A828E57E84C695C01EDE37114EC301F564D645AEF767E17E9D33",
+      "request": {
+        "mode": "route",
+        "blood_armor": true,
+        "restore_fixture": true,
+        "encounter": "SLIMES_WEAK",
+        "actions": [
+          "BLOODLETTING",
+          "STRIKE_IRONCLAD",
+          "DEFEND_IRONCLAD",
+          "END_TURN"
+        ]
+      },
+      "checkpoints": [
+        {
+          "label": "root",
+          "RoundNumber": 1,
+          "native_state_sha256": "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "player": {
+            "hp": 80,
+            "block": 0,
+            "energy": 3,
+            "powers": [],
+            "relics": [
+              {
+                "id": "RELIC.BURNING_BLOOD",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              },
+              {
+                "id": "RELIC.BLOOD_ARMOR_RUNE",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              }
+            ]
+          },
+          "piles": [
+            {
+              "type": "Hand",
+              "cards": [
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.BLOODLETTING",
+                "CARD.STRIKE_IRONCLAD",
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.STRIKE_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Draw",
+              "cards": []
+            },
+            {
+              "type": "Discard",
+              "cards": []
+            },
+            {
+              "type": "Exhaust",
+              "cards": []
+            },
+            {
+              "type": "Play",
+              "cards": []
+            }
+          ],
+          "enemies": [
+            {
+              "id": "MONSTER.LEAF_SLIME_S",
+              "hp": 12,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.LEAF_SLIME_M",
+              "hp": 34,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.TWIG_SLIME_S",
+              "hp": 9,
+              "block": 0,
+              "powers": []
+            }
+          ]
+        },
+        {
+          "label": "BLOODLETTING",
+          "RoundNumber": 1,
+          "native_state_sha256": "4B28FB47B641735F936DD6F66733E7BB9AAA7D12BB07B100923C7998B9988235",
+          "player": {
+            "hp": 77,
+            "block": 0,
+            "energy": 5,
+            "powers": [
+              {
+                "id": "POWER.PLATING_POWER",
+                "Amount": 3
+              }
+            ],
+            "relics": [
+              {
+                "id": "RELIC.BURNING_BLOOD",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              },
+              {
+                "id": "RELIC.BLOOD_ARMOR_RUNE",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              }
+            ]
+          },
+          "piles": [
+            {
+              "type": "Hand",
+              "cards": [
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.STRIKE_IRONCLAD",
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.STRIKE_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Draw",
+              "cards": []
+            },
+            {
+              "type": "Discard",
+              "cards": [
+                "CARD.BLOODLETTING"
+              ]
+            },
+            {
+              "type": "Exhaust",
+              "cards": []
+            },
+            {
+              "type": "Play",
+              "cards": []
+            }
+          ],
+          "enemies": [
+            {
+              "id": "MONSTER.LEAF_SLIME_S",
+              "hp": 12,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.LEAF_SLIME_M",
+              "hp": 34,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.TWIG_SLIME_S",
+              "hp": 9,
+              "block": 0,
+              "powers": []
+            }
+          ]
+        },
+        {
+          "label": "STRIKE_IRONCLAD",
+          "RoundNumber": 1,
+          "native_state_sha256": "72F75423749B2A1D53B1D235C7B4FB369A816449A9828DF908A2DB0BB9378EDF",
+          "player": {
+            "hp": 77,
+            "block": 0,
+            "energy": 4,
+            "powers": [
+              {
+                "id": "POWER.PLATING_POWER",
+                "Amount": 3
+              }
+            ],
+            "relics": [
+              {
+                "id": "RELIC.BURNING_BLOOD",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              },
+              {
+                "id": "RELIC.BLOOD_ARMOR_RUNE",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              }
+            ]
+          },
+          "piles": [
+            {
+              "type": "Hand",
+              "cards": [
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.STRIKE_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Draw",
+              "cards": []
+            },
+            {
+              "type": "Discard",
+              "cards": [
+                "CARD.BLOODLETTING",
+                "CARD.STRIKE_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Exhaust",
+              "cards": []
+            },
+            {
+              "type": "Play",
+              "cards": []
+            }
+          ],
+          "enemies": [
+            {
+              "id": "MONSTER.LEAF_SLIME_S",
+              "hp": 6,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.LEAF_SLIME_M",
+              "hp": 34,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.TWIG_SLIME_S",
+              "hp": 9,
+              "block": 0,
+              "powers": []
+            }
+          ]
+        },
+        {
+          "label": "DEFEND_IRONCLAD",
+          "RoundNumber": 1,
+          "native_state_sha256": "529A834CC93B27396FB8CD1D9FF0E4B9A978E6EF95367C8ADB93CAEEAEE03A8A",
+          "player": {
+            "hp": 77,
+            "block": 5,
+            "energy": 3,
+            "powers": [
+              {
+                "id": "POWER.PLATING_POWER",
+                "Amount": 3
+              }
+            ],
+            "relics": [
+              {
+                "id": "RELIC.BURNING_BLOOD",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              },
+              {
+                "id": "RELIC.BLOOD_ARMOR_RUNE",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              }
+            ]
+          },
+          "piles": [
+            {
+              "type": "Hand",
+              "cards": [
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.STRIKE_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Draw",
+              "cards": []
+            },
+            {
+              "type": "Discard",
+              "cards": [
+                "CARD.BLOODLETTING",
+                "CARD.STRIKE_IRONCLAD",
+                "CARD.DEFEND_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Exhaust",
+              "cards": []
+            },
+            {
+              "type": "Play",
+              "cards": []
+            }
+          ],
+          "enemies": [
+            {
+              "id": "MONSTER.LEAF_SLIME_S",
+              "hp": 6,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.LEAF_SLIME_M",
+              "hp": 34,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.TWIG_SLIME_S",
+              "hp": 9,
+              "block": 0,
+              "powers": []
+            }
+          ]
+        },
+        {
+          "label": "END_TURN",
+          "RoundNumber": 2,
+          "native_state_sha256": "EA805A7D184B2839D593A7A302FA961675B28347A01780FDB9C4EFC28DB964E9",
+          "player": {
+            "hp": 77,
+            "block": 0,
+            "energy": 3,
+            "powers": [
+              {
+                "id": "POWER.PLATING_POWER",
+                "Amount": 2
+              }
+            ],
+            "relics": [
+              {
+                "id": "RELIC.BURNING_BLOOD",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              },
+              {
+                "id": "RELIC.BLOOD_ARMOR_RUNE",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              }
+            ]
+          },
+          "piles": [
+            {
+              "type": "Hand",
+              "cards": [
+                "CARD.STRIKE_IRONCLAD",
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.STRIKE_IRONCLAD",
+                "CARD.SLIMED",
+                "CARD.SLIMED"
+              ]
+            },
+            {
+              "type": "Draw",
+              "cards": [
+                "CARD.BLOODLETTING",
+                "CARD.SLIMED",
+                "CARD.DEFEND_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Discard",
+              "cards": []
+            },
+            {
+              "type": "Exhaust",
+              "cards": []
+            },
+            {
+              "type": "Play",
+              "cards": []
+            }
+          ],
+          "enemies": [
+            {
+              "id": "MONSTER.LEAF_SLIME_S",
+              "hp": 6,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.LEAF_SLIME_M",
+              "hp": 34,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.TWIG_SLIME_S",
+              "hp": 9,
+              "block": 0,
+              "powers": []
+            }
+          ]
+        }
+      ],
+      "runtime_errors": [],
+      "engine_errors": [
+        "ERROR: Invalid Task ID",
+        "ERROR: Invalid Task ID",
+        "ERROR: 1 RID allocations of type 'N26RendererEnvironmentStorage11EnvironmentE' were leaked at exit.",
+        "ERROR: 258 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.",
+        "ERROR: 25 RID allocations of type 'N13RendererDummy9DummyMeshE' were leaked at exit.",
+        "ERROR: 82 RID allocations of type 'N13RendererDummy15MaterialStorage13DummyMaterialE' were leaked at exit.",
+        "ERROR: 6 RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit.",
+        "ERROR: 303 RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.",
+        "ERROR: 14 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.",
+        "ERROR: 10 RID allocations of type 'PN18TextServerAdvanced27FontAdvancedLinkedVariationE' were leaked at exit.",
+        "ERROR: 307 resources still in use at exit (run with --verbose for details)."
+      ]
+    },
+    {
+      "name": "without_blood_armor",
+      "wall_ms": 52999.87,
+      "action_ms": 12216,
+      "restored_fixture": false,
+      "fixture_sha256": "114264C0E341126C4B9159A9C48D3D35FD0669890593E155E1439C68CD2E52B8",
+      "request": {
+        "mode": "route",
+        "blood_armor": false,
+        "restore_fixture": false,
+        "encounter": "SLIMES_WEAK",
+        "actions": [
+          "BLOODLETTING",
+          "STRIKE_IRONCLAD",
+          "DEFEND_IRONCLAD",
+          "END_TURN"
+        ]
+      },
+      "checkpoints": [
+        {
+          "label": "root",
+          "RoundNumber": 1,
+          "native_state_sha256": "28EFD7B1A271FF139726C469C24D0B0F18084B65D250FDF6E1EA5D8B2445AD73",
+          "player": {
+            "hp": 80,
+            "block": 0,
+            "energy": 3,
+            "powers": [],
+            "relics": [
+              {
+                "id": "RELIC.BURNING_BLOOD",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              }
+            ]
+          },
+          "piles": [
+            {
+              "type": "Hand",
+              "cards": [
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.BLOODLETTING",
+                "CARD.STRIKE_IRONCLAD",
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.STRIKE_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Draw",
+              "cards": []
+            },
+            {
+              "type": "Discard",
+              "cards": []
+            },
+            {
+              "type": "Exhaust",
+              "cards": []
+            },
+            {
+              "type": "Play",
+              "cards": []
+            }
+          ],
+          "enemies": [
+            {
+              "id": "MONSTER.LEAF_SLIME_S",
+              "hp": 12,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.LEAF_SLIME_M",
+              "hp": 34,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.TWIG_SLIME_S",
+              "hp": 9,
+              "block": 0,
+              "powers": []
+            }
+          ]
+        },
+        {
+          "label": "BLOODLETTING",
+          "RoundNumber": 1,
+          "native_state_sha256": "3830D547352341762921D9EB365CA00EB60E9EE2F5AE682037C308F23101A5E6",
+          "player": {
+            "hp": 77,
+            "block": 0,
+            "energy": 5,
+            "powers": [],
+            "relics": [
+              {
+                "id": "RELIC.BURNING_BLOOD",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              }
+            ]
+          },
+          "piles": [
+            {
+              "type": "Hand",
+              "cards": [
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.STRIKE_IRONCLAD",
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.STRIKE_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Draw",
+              "cards": []
+            },
+            {
+              "type": "Discard",
+              "cards": [
+                "CARD.BLOODLETTING"
+              ]
+            },
+            {
+              "type": "Exhaust",
+              "cards": []
+            },
+            {
+              "type": "Play",
+              "cards": []
+            }
+          ],
+          "enemies": [
+            {
+              "id": "MONSTER.LEAF_SLIME_S",
+              "hp": 12,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.LEAF_SLIME_M",
+              "hp": 34,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.TWIG_SLIME_S",
+              "hp": 9,
+              "block": 0,
+              "powers": []
+            }
+          ]
+        },
+        {
+          "label": "STRIKE_IRONCLAD",
+          "RoundNumber": 1,
+          "native_state_sha256": "D3DFE588CD90A7E2B93AE575E158871D26D36CF65FB8D21437E9A3DB34243B3F",
+          "player": {
+            "hp": 77,
+            "block": 0,
+            "energy": 4,
+            "powers": [],
+            "relics": [
+              {
+                "id": "RELIC.BURNING_BLOOD",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              }
+            ]
+          },
+          "piles": [
+            {
+              "type": "Hand",
+              "cards": [
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.STRIKE_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Draw",
+              "cards": []
+            },
+            {
+              "type": "Discard",
+              "cards": [
+                "CARD.BLOODLETTING",
+                "CARD.STRIKE_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Exhaust",
+              "cards": []
+            },
+            {
+              "type": "Play",
+              "cards": []
+            }
+          ],
+          "enemies": [
+            {
+              "id": "MONSTER.LEAF_SLIME_S",
+              "hp": 6,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.LEAF_SLIME_M",
+              "hp": 34,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.TWIG_SLIME_S",
+              "hp": 9,
+              "block": 0,
+              "powers": []
+            }
+          ]
+        },
+        {
+          "label": "DEFEND_IRONCLAD",
+          "RoundNumber": 1,
+          "native_state_sha256": "0DD7BEFAEEA2969C4A9D3E43AC266B0457518BA6B6FA7066145BE224E31DA833",
+          "player": {
+            "hp": 77,
+            "block": 5,
+            "energy": 3,
+            "powers": [],
+            "relics": [
+              {
+                "id": "RELIC.BURNING_BLOOD",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              }
+            ]
+          },
+          "piles": [
+            {
+              "type": "Hand",
+              "cards": [
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.STRIKE_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Draw",
+              "cards": []
+            },
+            {
+              "type": "Discard",
+              "cards": [
+                "CARD.BLOODLETTING",
+                "CARD.STRIKE_IRONCLAD",
+                "CARD.DEFEND_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Exhaust",
+              "cards": []
+            },
+            {
+              "type": "Play",
+              "cards": []
+            }
+          ],
+          "enemies": [
+            {
+              "id": "MONSTER.LEAF_SLIME_S",
+              "hp": 6,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.LEAF_SLIME_M",
+              "hp": 34,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.TWIG_SLIME_S",
+              "hp": 9,
+              "block": 0,
+              "powers": []
+            }
+          ]
+        },
+        {
+          "label": "END_TURN",
+          "RoundNumber": 2,
+          "native_state_sha256": "90A8E8519C0ED162C391D7DD121614751523C2DDF4B95D1D0E393D24F4822AA9",
+          "player": {
+            "hp": 77,
+            "block": 0,
+            "energy": 3,
+            "powers": [],
+            "relics": [
+              {
+                "id": "RELIC.BURNING_BLOOD",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              }
+            ]
+          },
+          "piles": [
+            {
+              "type": "Hand",
+              "cards": [
+                "CARD.STRIKE_IRONCLAD",
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.STRIKE_IRONCLAD",
+                "CARD.SLIMED",
+                "CARD.SLIMED"
+              ]
+            },
+            {
+              "type": "Draw",
+              "cards": [
+                "CARD.BLOODLETTING",
+                "CARD.SLIMED",
+                "CARD.DEFEND_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Discard",
+              "cards": []
+            },
+            {
+              "type": "Exhaust",
+              "cards": []
+            },
+            {
+              "type": "Play",
+              "cards": []
+            }
+          ],
+          "enemies": [
+            {
+              "id": "MONSTER.LEAF_SLIME_S",
+              "hp": 6,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.LEAF_SLIME_M",
+              "hp": 34,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.TWIG_SLIME_S",
+              "hp": 9,
+              "block": 0,
+              "powers": []
+            }
+          ]
+        }
+      ],
+      "runtime_errors": [],
+      "engine_errors": [
+        "ERROR: Invalid Task ID",
+        "ERROR: 1 RID allocations of type 'N26RendererEnvironmentStorage11EnvironmentE' were leaked at exit.",
+        "ERROR: 258 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.",
+        "ERROR: 25 RID allocations of type 'N13RendererDummy9DummyMeshE' were leaked at exit.",
+        "ERROR: 82 RID allocations of type 'N13RendererDummy15MaterialStorage13DummyMaterialE' were leaked at exit.",
+        "ERROR: 6 RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit.",
+        "ERROR: 303 RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.",
+        "ERROR: 14 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.",
+        "ERROR: 10 RID allocations of type 'PN18TextServerAdvanced27FontAdvancedLinkedVariationE' were leaked at exit.",
+        "ERROR: 307 resources still in use at exit (run with --verbose for details)."
+      ]
+    },
+    {
+      "name": "alternative",
+      "wall_ms": 47491.59,
+      "action_ms": 9470,
+      "restored_fixture": true,
+      "fixture_sha256": "B01954C3D180A828E57E84C695C01EDE37114EC301F564D645AEF767E17E9D33",
+      "request": {
+        "mode": "route",
+        "blood_armor": true,
+        "restore_fixture": true,
+        "encounter": "SLIMES_WEAK",
+        "actions": [
+          "STRIKE_IRONCLAD",
+          "STRIKE_IRONCLAD",
+          "DEFEND_IRONCLAD",
+          "END_TURN"
+        ]
+      },
+      "checkpoints": [
+        {
+          "label": "root",
+          "RoundNumber": 1,
+          "native_state_sha256": "76991F2B35ED479C100DD7BB348D8DF3751EDF20936E0869D24DB50F1BE1920F",
+          "player": {
+            "hp": 80,
+            "block": 0,
+            "energy": 3,
+            "powers": [],
+            "relics": [
+              {
+                "id": "RELIC.BURNING_BLOOD",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              },
+              {
+                "id": "RELIC.BLOOD_ARMOR_RUNE",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              }
+            ]
+          },
+          "piles": [
+            {
+              "type": "Hand",
+              "cards": [
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.BLOODLETTING",
+                "CARD.STRIKE_IRONCLAD",
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.STRIKE_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Draw",
+              "cards": []
+            },
+            {
+              "type": "Discard",
+              "cards": []
+            },
+            {
+              "type": "Exhaust",
+              "cards": []
+            },
+            {
+              "type": "Play",
+              "cards": []
+            }
+          ],
+          "enemies": [
+            {
+              "id": "MONSTER.LEAF_SLIME_S",
+              "hp": 12,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.LEAF_SLIME_M",
+              "hp": 34,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.TWIG_SLIME_S",
+              "hp": 9,
+              "block": 0,
+              "powers": []
+            }
+          ]
+        },
+        {
+          "label": "STRIKE_IRONCLAD",
+          "RoundNumber": 1,
+          "native_state_sha256": "DCD7FE20C700B844E9F1F75D74957FCC4C48EB2132E842FB76CECBD77E2C6C8F",
+          "player": {
+            "hp": 80,
+            "block": 0,
+            "energy": 2,
+            "powers": [],
+            "relics": [
+              {
+                "id": "RELIC.BURNING_BLOOD",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              },
+              {
+                "id": "RELIC.BLOOD_ARMOR_RUNE",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              }
+            ]
+          },
+          "piles": [
+            {
+              "type": "Hand",
+              "cards": [
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.BLOODLETTING",
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.STRIKE_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Draw",
+              "cards": []
+            },
+            {
+              "type": "Discard",
+              "cards": [
+                "CARD.STRIKE_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Exhaust",
+              "cards": []
+            },
+            {
+              "type": "Play",
+              "cards": []
+            }
+          ],
+          "enemies": [
+            {
+              "id": "MONSTER.LEAF_SLIME_S",
+              "hp": 6,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.LEAF_SLIME_M",
+              "hp": 34,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.TWIG_SLIME_S",
+              "hp": 9,
+              "block": 0,
+              "powers": []
+            }
+          ]
+        },
+        {
+          "label": "STRIKE_IRONCLAD",
+          "RoundNumber": 1,
+          "native_state_sha256": "459CE3D34A2158D63B3C7E1AA9220B95C6E53B45834F12086BDE5F2515D60B81",
+          "player": {
+            "hp": 80,
+            "block": 0,
+            "energy": 1,
+            "powers": [],
+            "relics": [
+              {
+                "id": "RELIC.BURNING_BLOOD",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              },
+              {
+                "id": "RELIC.BLOOD_ARMOR_RUNE",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              }
+            ]
+          },
+          "piles": [
+            {
+              "type": "Hand",
+              "cards": [
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.BLOODLETTING",
+                "CARD.DEFEND_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Draw",
+              "cards": []
+            },
+            {
+              "type": "Discard",
+              "cards": [
+                "CARD.STRIKE_IRONCLAD",
+                "CARD.STRIKE_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Exhaust",
+              "cards": []
+            },
+            {
+              "type": "Play",
+              "cards": []
+            }
+          ],
+          "enemies": [
+            {
+              "id": "MONSTER.LEAF_SLIME_M",
+              "hp": 34,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.TWIG_SLIME_S",
+              "hp": 9,
+              "block": 0,
+              "powers": []
+            }
+          ]
+        },
+        {
+          "label": "DEFEND_IRONCLAD",
+          "RoundNumber": 1,
+          "native_state_sha256": "1831E65256A3D566694AB1B990D0DC5B6ED657FCF30F7852820ACA7B20427A62",
+          "player": {
+            "hp": 80,
+            "block": 5,
+            "energy": 0,
+            "powers": [],
+            "relics": [
+              {
+                "id": "RELIC.BURNING_BLOOD",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              },
+              {
+                "id": "RELIC.BLOOD_ARMOR_RUNE",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              }
+            ]
+          },
+          "piles": [
+            {
+              "type": "Hand",
+              "cards": [
+                "CARD.BLOODLETTING",
+                "CARD.DEFEND_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Draw",
+              "cards": []
+            },
+            {
+              "type": "Discard",
+              "cards": [
+                "CARD.STRIKE_IRONCLAD",
+                "CARD.STRIKE_IRONCLAD",
+                "CARD.DEFEND_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Exhaust",
+              "cards": []
+            },
+            {
+              "type": "Play",
+              "cards": []
+            }
+          ],
+          "enemies": [
+            {
+              "id": "MONSTER.LEAF_SLIME_M",
+              "hp": 34,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.TWIG_SLIME_S",
+              "hp": 9,
+              "block": 0,
+              "powers": []
+            }
+          ]
+        },
+        {
+          "label": "END_TURN",
+          "RoundNumber": 2,
+          "native_state_sha256": "160B11D79F203DD206C08E8DCC5F8AD80ADE7246D37203C7B5083FEEC6D78E3E",
+          "player": {
+            "hp": 80,
+            "block": 0,
+            "energy": 3,
+            "powers": [],
+            "relics": [
+              {
+                "id": "RELIC.BURNING_BLOOD",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              },
+              {
+                "id": "RELIC.BLOOD_ARMOR_RUNE",
+                "DisplayAmount": 0,
+                "IsUsedUp": false,
+                "StackCount": 1
+              }
+            ]
+          },
+          "piles": [
+            {
+              "type": "Hand",
+              "cards": [
+                "CARD.DEFEND_IRONCLAD",
+                "CARD.SLIMED",
+                "CARD.STRIKE_IRONCLAD",
+                "CARD.STRIKE_IRONCLAD",
+                "CARD.BLOODLETTING"
+              ]
+            },
+            {
+              "type": "Draw",
+              "cards": [
+                "CARD.SLIMED",
+                "CARD.DEFEND_IRONCLAD"
+              ]
+            },
+            {
+              "type": "Discard",
+              "cards": []
+            },
+            {
+              "type": "Exhaust",
+              "cards": []
+            },
+            {
+              "type": "Play",
+              "cards": []
+            }
+          ],
+          "enemies": [
+            {
+              "id": "MONSTER.LEAF_SLIME_M",
+              "hp": 34,
+              "block": 0,
+              "powers": []
+            },
+            {
+              "id": "MONSTER.TWIG_SLIME_S",
+              "hp": 9,
+              "block": 0,
+              "powers": []
+            }
+          ]
+        }
+      ],
+      "runtime_errors": [],
+      "engine_errors": [
+        "ERROR: 1 RID allocations of type 'N26RendererEnvironmentStorage11EnvironmentE' were leaked at exit.",
+        "ERROR: 258 RID allocations of type 'PN13RendererDummy14TextureStorage12DummyTextureE' were leaked at exit.",
+        "ERROR: 25 RID allocations of type 'N13RendererDummy9DummyMeshE' were leaked at exit.",
+        "ERROR: 82 RID allocations of type 'N13RendererDummy15MaterialStorage13DummyMaterialE' were leaked at exit.",
+        "ERROR: 6 RID allocations of type 'N13RendererDummy15MaterialStorage11DummyShaderE' were leaked at exit.",
+        "ERROR: 303 RID allocations of type 'PN18TextServerAdvanced22ShapedTextDataAdvancedE' were leaked at exit.",
+        "ERROR: 14 RID allocations of type 'PN18TextServerAdvanced12FontAdvancedE' were leaked at exit.",
+        "ERROR: 10 RID allocations of type 'PN18TextServerAdvanced27FontAdvancedLinkedVariationE' were leaked at exit.",
+        "ERROR: 307 resources still in use at exit (run with --verbose for details)."
+      ]
+    }
+  ]
+}

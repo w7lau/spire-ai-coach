@@ -14,3 +14,5 @@ GamePath.props
 *.dll
 *.pdb
 *.pck
+**/__pycache__/
+*.pyc
