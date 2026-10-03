@@ -122,17 +122,27 @@ public static class LocalWorker
         using var session = Trace(request.VerifyCandidate == null ? "session" : "verify", depth: 0);
         _targetLabels = request.TargetLabels;
         _includePotions = false;
+        bool systematic = request.SearchOrder != LocalSearchOrder.MonteCarlo;
+        bool turnMode = request.SearchOrder == LocalSearchOrder.TurnFrontier;
         _excludedModels = new(request.ExcludedModels ?? [], StringComparer.Ordinal);
         var timer = Stopwatch.StartNew();
         var budget = new Stopwatch();
         LocalCandidate? best = null;
-        int evaluated = 0, rejected = 0, victories = 0;
-        var noPotionSearch = new LocalSearchTree(1729 + request.Partition);
-        var potionSearch = new LocalSearchTree(2718 + request.Partition);
+        int evaluated = 0, rejected = 0, victories = 0, attempts = 0, probes = 0, boundPruned = 0, unknownRecoveryChecks = 0;
+        var treeOrder = turnMode ? LocalSearchOrder.MonteCarlo : request.SearchOrder;
+        var noPotionSearch = new LocalSearchTree(1729 + request.Partition, order: treeOrder);
+        var potionSearch = new LocalSearchTree(2718 + request.Partition, order: treeOrder);
+        string healthRoot = request.SnapshotId + ":" + request.NativeHash;
+        var turns = turnMode ? new LocalTurnSearch(1729 + request.Partition, healthRoot) : null;
+        LocalTurnSearchStats? TurnStats() => turns == null ? null :
+            new(probes, boundPruned, turns.Offered, turns.DuplicateOffers, turns.Count, unknownRecoveryChecks);
         var search = noPotionSearch;
         var refiner = new LocalRouteRefiner();
         LocalCandidate? refinementSeed = null;
-        LocalSearchWork? work = request.ShareSearchWork && request.Partitions > 1 && request.VerifyCandidate == null
+        // The experimental tree owns a complete observed-prefix frontier. Do not overwrite
+        // its order with the old bounded expansion/refinement proposal queue. Workers still
+        // partition first actions; every continuation remains in its owning native process.
+        LocalSearchWork? work = !systematic && request.ShareSearchWork && request.Partitions > 1 && request.VerifyCandidate == null
             ? new(Path.GetDirectoryName(_root)!, request) : null;
         int refinements = 0;
         LocalWorkerResources.Retain = true;
@@ -161,7 +171,7 @@ public static class LocalWorker
             lastProgress = timer.ElapsedMilliseconds;
             LocalWire.Write(Path.Combine(_root, "progress.json"), new LocalProgress(request.Id, request.SnapshotId,
                 request.Partition, request.Partitions, ++sequence, route, evaluated, request.MaxNodes, victories,
-                budget.ElapsedMilliseconds, request.BudgetSeconds, phase, state, events.ToArray(), status));
+                budget.ElapsedMilliseconds, request.BudgetSeconds, phase, state, events.ToArray(), status, probes, boundPruned));
         }
         void Publish(string status, string message)
         {
@@ -178,7 +188,7 @@ public static class LocalWorker
                 Victories: victories, IncludePotions: request.IncludePotions,
                 Timing: new(restoreMs, actionMs, decisionMs, verifyMs, Actions: executed, Restores: restores, Verifications: verifyMs > 0 ? 1 : 0),
                 BlockedAction: blockedAction, MaxRounds: request.MaxRounds,
-                Trace: status == "running" ? null : _timeline!.Snapshot()));
+                Trace: status == "running" ? null : _timeline!.Snapshot(), TurnSearch: TurnStats()));
         }
         try
         {
@@ -259,6 +269,10 @@ public static class LocalWorker
                 return true;
             }
             Publish("running", "正在恢复并核对当前战斗…");
+            // Keep the legal set stable for exact-history worker ownership. A
+            // baseline continuation still chooses no potion; reserve moves are
+            // offered as alternatives, never forced at the beginning of a trial.
+            if (turnMode) _includePotions = request.IncludePotions;
             Progress("恢复当前战斗", force: true);
             await RestoreMeasured();
             // Cold asset loading and root restoration are preparation, not tactical exploration.
@@ -278,13 +292,22 @@ public static class LocalWorker
                 if (request.InitialPlan is { Length: > 0 }) work.Offer("improve", [request.InitialPlan]);
             }
             var initialEnemyHp = CombatManager.Instance.DebugOnlyGetState()!.Enemies.Sum(e => Math.Max(0, e.CurrentHp));
+            LocalTurnHint TurnHint(Player p, int hp, IReadOnlyList<LocalAction> line) =>
+                new(p.Creature.CurrentHp, hp, CombatManager.Instance.DebugOnlyGetState()?.Enemies.Sum(e => Math.Max(0, e.CurrentHp)) ?? 0,
+                    initialEnemyHp, p.Creature.Block, line.Count(a => a.PotionSlot.HasValue));
+            if (turns != null)
+            {
+                if (request.InitialPlan is { Length: > 0 }) throw new InvalidDataException("Turn frontier requires an unseeded frozen root");
+                var rootPlayer = LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!;
+                turns.Offer([], CombatManager.Instance.DebugOnlyGetState()!.RoundNumber, TurnHint(rootPlayer, rootPlayer.Creature.CurrentHp, []));
+            }
             while (evaluated < request.MaxNodes && budget.Elapsed.TotalSeconds < request.BudgetSeconds &&
-                (work != null || !noPotionSearch.Exhausted || request.IncludePotions && !potionSearch.Exhausted || refiner.Count > 0))
+                (turns != null ? turns.Count > 0 : work != null || !noPotionSearch.Exhausted || request.IncludePotions && !potionSearch.Exhausted || refiner.Count > 0))
             {
                 using var refining = Trace("refine");
                 // Other workers' candidates seed exploration only. Their results are never adopted without
                 // executing the proposed line in this worker, including all native effects and choices.
-                foreach (var peer in Directory.EnumerateDirectories(Path.GetDirectoryName(_root)!, "worker-*"))
+                if (!systematic || turnMode) foreach (var peer in Directory.EnumerateDirectories(Path.GetDirectoryName(_root)!, "worker-*"))
                 {
                     var file = Path.Combine(peer, "result.json");
                     if (peer == _root || !File.Exists(file)) continue;
@@ -297,11 +320,21 @@ public static class LocalWorker
                     catch (IOException) { /* Peer can be replacing its private IPC file. */ }
                 }
                 if (best != null && LocalSearchPolicy.Better(best, refinementSeed)) refinementSeed = best;
-                if (refinementSeed != null) refiner.Offer(refinementSeed, work == null ? request.Partition : 0,
+                if (!systematic && refinementSeed != null) refiner.Offer(refinementSeed, work == null ? request.Partition : 0,
                     work == null ? request.Partitions : 1);
                 LocalAction[]? planned = null;
+                LocalTurnTask? turnTask = null;
+                bool fullRollout = !turnMode || attempts % 4 == 0;
                 LocalWorkTask? sharedTask = null;
-                if (work != null)
+                if (turns != null)
+                {
+                    // Only this worker's completed native victory supplies a bound.
+                    // Peer results may suggest a continuation, never certify a cut.
+                    boundPruned += turns.DiscardProvenExpenses(LocalWinningBound.From(healthRoot, best));
+                    if (!turns.TryTake(out turnTask)) break;
+                    planned = turnTask.Prefix;
+                }
+                else if (work != null)
                 {
                     using var scheduling = Trace("schedule");
                     var proposals = new List<LocalAction[]>();
@@ -316,24 +349,26 @@ public static class LocalWorker
                 else
                 {
                     if (evaluated == 0 && request.InitialPlan is { Length: > 0 }) planned = request.InitialPlan;
-                    if ((evaluated % 2 == 1 || search.Exhausted) && refiner.TryTake(out var proposal))
+                    if (!systematic && (evaluated % 2 == 1 || search.Exhausted) && refiner.TryTake(out var proposal))
                     { planned = proposal; refinements++; }
                 }
-                route = evaluated + 1;
+                route = ++attempts;
                 _traceRoute = route; _traceStep = 0;
+                using var turnTiming = turns == null ? null : Trace(fullRollout ? "rollout" : "turn-probe",
+                    $"round={turnTask!.SearchRound};prefix={planned!.Length}");
                 refining?.Dispose();
                 events.Clear();
                 Progress("恢复路线起点", force: true);
-                if (evaluated > 0) await RestoreMeasured();
+                if (attempts > 1) await RestoreMeasured();
                 var player = LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!;
                 var startRound = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
                 var startingHp = player.Creature.CurrentHp;
                 // Always establish a no-potion baseline. Then interleave reserve-potion searches,
                 // unless a preferred candidate explicitly needs one. Both classes get fresh trials.
-                _includePotions = request.IncludePotions && (planned?.Any(a => a.PotionSlot.HasValue) == true ||
+                _includePotions = turnMode ? request.IncludePotions : request.IncludePotions && (planned?.Any(a => a.PotionSlot.HasValue) == true ||
                     evaluated > 0 && evaluated % 3 == 2);
                 search = _includePotions ? potionSearch : noPotionSearch;
-                if (search.Exhausted && planned == null)
+                if (!turnMode && search.Exhausted && planned == null)
                 {
                     if (!request.IncludePotions || (_includePotions ? noPotionSearch : potionSearch).Exhausted) break;
                     _includePotions = !_includePotions;
@@ -341,7 +376,11 @@ public static class LocalWorker
                 }
                 var actions = new List<LocalAction>();
                 var decisions = new List<LocalDecision>();
+                var partition = systematic ? new LocalBranchPartition(request.Partition, request.Partitions) : null;
                 var trial = search.Begin();
+                var winningBound = LocalWinningBound.From(healthRoot, best);
+                var continuation = turnMode && fullRollout && refinementSeed?.Won == true ? refinementSeed.Actions : null;
+                int continuationIndex = 0;
                 int planIndex = 0;
                 int lost = 0;
                 void HpChanged(int oldHp, int newHp) => lost += Math.Max(0, oldHp - newHp);
@@ -351,11 +390,14 @@ public static class LocalWorker
                     Progress("开始试走", Observe(player), true);
                     int plays = 0;
                     string stop = "";
+                    bool turnProbed = false, cut = false;
                     while (!IsTerminal(player))
                     {
                         var round = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
                         if (round - startRound >= request.MaxRounds) { stop = "达到轮数上限"; break; }
                         if (budget.Elapsed.TotalSeconds >= request.BudgetSeconds) { stop = "达到时间预算"; break; }
+                        if (turnTask != null && !fullRollout && planIndex >= planned!.Length && round > turnTask.SearchRound)
+                        { turnProbed = true; stop = "本回合及敌方结算完成"; break; }
                         if (plays >= request.MaxDepth)
                         {
                             // Infinite/very long zero-cost cycles are bounded, not assumed equivalent or worthless.
@@ -364,9 +406,26 @@ public static class LocalWorker
                         decisionStarted = Stopwatch.GetTimestamp();
                         using var deciding = Trace("decision");
                         var legal = EnumerateActions();
+                        if (partition != null) legal = partition.Assign(legal);
+                        if (turns != null && winningBound?.NetHpLoss == 0)
+                        {
+                            int spent = actions.Count(a => a.PotionSlot.HasValue);
+                            var admissible = legal.Where(a => !LocalHealthBound.CannotImprove(new(healthRoot, startingHp,
+                                player.Creature.CurrentHp, spent + (a.PotionSlot.HasValue ? 1 : 0)), winningBound)).ToArray();
+                            boundPruned += legal.Length - admissible.Length;
+                            legal = admissible;
+                            if (legal.Length == 0) { cut = true; stop = "该操作前缀的所有后续均已无法改进"; break; }
+                        }
                         LocalAction? preferred = null;
                         LocalAction? plannedAction = null;
-                        if (planned != null)
+                        bool exactAction = false;
+                        if (turnMode && planIndex < planned!.Length)
+                        {
+                            plannedAction = planned[planIndex++];
+                            preferred = LocalTurnSearch.ResolveExact(plannedAction, legal);
+                            exactAction = true;
+                        }
+                        else if (!turnMode && planned != null)
                         {
                             while (planIndex < planned.Length && preferred == null)
                             {
@@ -378,18 +437,39 @@ public static class LocalWorker
                                 preferred = LocalRouteRefiner.Resolve(plannedAction, legal);
                             }
                         }
-                        else if (evaluated == 0 && actions.Count == 0)
+                        if (turnMode && preferred == null && continuation != null)
+                        {
+                            // A native winning line supplies continuation proposals, not
+                            // transferred outcomes. Changed early plays/choices are still
+                            // executed and the resulting full battle decides their merit.
+                            while (continuationIndex < continuation.Length && preferred == null)
+                            {
+                                plannedAction = continuation[continuationIndex];
+                                if (plannedAction.Round > round) { plannedAction = null; break; }
+                                continuationIndex++;
+                                preferred = LocalRouteRefiner.Resolve(plannedAction, legal);
+                            }
+                            // Newly drawn cards or additional energy can make the old
+                            // end-turn proposal premature; retain the actual legal prior.
+                            if (preferred?.EndTurn == true && legal.Any(a => !a.EndTurn && a.Preference > preferred.Preference))
+                            { preferred = null; plannedAction = null; }
+                        }
+                        else if (!systematic && evaluated == 0 && actions.Count == 0)
                             preferred = roots.OrderByDescending(a => a.Preference).First();
                         // Explore explicit branch proposals, then continue most trials coherently.
                         // Randomizing every card in a long rollout almost never preserves a combo.
                         // One quarter of complete trials retain broad stochastic exploration.
-                        bool coherent = request.StrategicRollouts && evaluated % 4 != 3;
-                        var next = search.Select(trial, legal, preferred, greedy: coherent);
+                        bool coherent = request.StrategicRollouts && (turnMode ? attempts : evaluated) % 4 != 3;
+                        var continuations = turnMode && attempts % 3 != 0 ? legal.Where(a => a.PotionSlot == null).ToArray() : legal;
+                        if (continuations.Length == 0) continuations = legal;
+                        var next = turns != null ? preferred ?? turns.Choose(continuations, coherent) :
+                            search.Select(trial, legal, preferred, greedy: coherent);
                         var choiceDecisions = new List<LocalChoiceDecision>();
                         decisions.Add(new(actions.Count, legal));
                         decisionMs += (long)Stopwatch.GetElapsedTime(decisionStarted).TotalMilliseconds;
                         deciding?.Dispose();
                         var before = Observe(player);
+                        var beforeHint = turns == null ? null : TurnHint(player, startingHp, actions);
                         var learned = !next.EndTurn && next.PotionSlot == null
                             ? _nativeLearning?.Before(player.PlayerCombatState!.Hand.Cards[next.HandIndex], player) : null;
                         Progress("执行：" + LocalSearchPolicy.Describe(next), before);
@@ -402,7 +482,6 @@ public static class LocalWorker
                             int choiceIndex = 0;
                             next = await Play(next, options =>
                             {
-                                choiceDecisions.Add(new(choiceDecisions.Count, options));
                                 // A choice is a child of the actual action prefix, so siblings get independent outcomes.
                                 var expected = preferred != null ? plannedAction?.Choices?.ElementAtOrDefault(choiceIndex++) : null;
                                 var match = expected == null ? null : options.SingleOrDefault(c => c.OfferHash == expected.OfferHash &&
@@ -410,15 +489,29 @@ public static class LocalWorker
                                     (c.Indices ?? []).SequenceEqual(expected.Indices ?? []));
                                 var choices = options.Select(c => new LocalAction(c.Index, "choice:" + c.ModelId,
                                     null, c.Name, "", c.OfferHash, round, Preference: c.Preference)).ToArray();
-                                var selected = search.Select(trial, choices, match == null ? null : choices.Single(c => c.HandIndex == match.Index),
-                                    greedy: coherent);
+                                if (partition != null) choices = partition.Assign(choices);
+                                var ownedOptions = options.Where(c => choices.Any(a => a.HandIndex == c.Index)).ToArray();
+                                choiceDecisions.Add(new(choiceDecisions.Count, ownedOptions));
+                                var fixedChoice = match == null ? null : choices.SingleOrDefault(c => c.HandIndex == match.Index);
+                                if (exactAction && expected != null && fixedChoice == null)
+                                    throw new InvalidOperationException("Exact native selection prefix diverged");
+                                var selected = turns != null ? fixedChoice ?? turns.Choose(choices, coherent) :
+                                    search.Select(trial, choices, fixedChoice, greedy: coherent);
                                 return options.Single(c => c.Index == selected.HandIndex);
                             });
                         }
                         finally { actionMs += (long)Stopwatch.GetElapsedTime(actionStarted).TotalMilliseconds; executed++; }
                         actions.Add(next);
+                        if (exactAction && plannedAction != null)
+                        {
+                            int expectedChoices = plannedAction.Choices?.Length ?? 0, actualChoices = next.Choices?.Length ?? 0;
+                            if (actualChoices < expectedChoices || planIndex < planned!.Length && actualChoices != expectedChoices)
+                                throw new InvalidOperationException("Exact native selection history changed");
+                        }
                         _nativeLearning?.After(learned, player);
                         decisions[^1] = decisions[^1] with { Choices = choiceDecisions.ToArray() };
+                        if (turns != null && actions.Count >= planned!.Length)
+                            turns.OfferAlternatives(actions, decisions[^1], beforeHint!);
                         pendingAction = null;
                         var after = Observe(player);
                         var changes = before != null && after != null ? LocalProgressBook.Changes(before, after) : "动作已结算；状态预览暂不可用。";
@@ -427,6 +520,23 @@ public static class LocalWorker
                         while (events.Count > 12) events.Dequeue();
                         Progress("试走路线", after);
                         plays = next.EndTurn ? 0 : plays + 1;
+                        if (turns != null && !IsTerminal(player) &&
+                            (next.PotionSlot.HasValue || CombatManager.Instance.DebugOnlyGetState()!.RoundNumber > round))
+                        {
+                            // Native learning/preview cannot certify that no future generated
+                            // effect can heal. Keep that ceiling unknown in this adapter.
+                            if (winningBound != null) unknownRecoveryChecks++;
+                            var envelope = new LocalHealthEnvelope(healthRoot, startingHp, player.Creature.CurrentHp,
+                                actions.Count(a => a.PotionSlot.HasValue));
+                            if (LocalHealthBound.CannotImprove(envelope, winningBound))
+                            {
+                                cut = true; boundPruned += 1 + turns.DiscardDescendants(actions);
+                                stop = "分支已无法优于现有获胜路线"; break;
+                            }
+                            int nextRound = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
+                            if (nextRound > round && actions.Count >= planned!.Length)
+                                turns.Offer(actions.ToArray(), nextRound, TurnHint(player, startingHp, actions));
+                        }
                     }
                     await StableOrTerminal(player);
                     var state = CombatManager.Instance.DebugOnlyGetState();
@@ -439,10 +549,16 @@ public static class LocalWorker
                         Rounds: actions.Select(a => a.Round).Distinct().Count(),
                         StopReason: won ? "胜利结算完成" : player.Creature.IsDead ? "玩家死亡" :
                             string.IsNullOrEmpty(stop) ? "战斗结束但未确认胜利" : stop, Decisions: decisions.ToArray(), StartingHp: startingHp);
-                    evaluated++;
+                    if (turnTask != null && stop == "达到时间预算")
+                        turns!.ReturnInterrupted(turnTask, TurnHint(player, startingHp, actions));
+                    if (turnMode && IsTerminal(player) && planIndex < planned!.Length)
+                        throw new InvalidOperationException("Exact native search prefix terminated early");
+                    bool completeAttempt = !turnProbed && !cut && (fullRollout || IsTerminal(player));
+                    if (turnProbed) probes++;
+                    else if (completeAttempt) evaluated++;
                     if (won) victories++;
                     Progress(won ? "路线获胜" : candidate.StopReason, Observe(player), true);
-                    if (LocalSearchPolicy.Better(candidate, best)) { best = candidate; bestRoute = route; }
+                    if (completeAttempt && LocalSearchPolicy.Better(candidate, best)) { best = candidate; bestRoute = route; }
                     if (work != null)
                     {
                         using var scheduling = Trace("schedule");
@@ -450,8 +566,9 @@ public static class LocalWorker
                         if (sharedTask != null && stop != "达到时间预算") work.Complete(sharedTask);
                     }
                     // A wall-clock interruption says nothing about the strength of this continuation.
-                    if (stop != "达到时间预算") search.Complete(trial, candidate, initialEnemyHp, closeExactPrefix: true);
-                    Publish("running", $"已找到 {victories} 条整场获胜路线；已记录 {noPotionSearch.Nodes + (request.IncludePotions ? potionSearch.Nodes : 0)} 个操作树节点，按实际结算反馈选路。");
+                    if (!turnMode && stop != "达到时间预算") search.Complete(trial, candidate, initialEnemyHp, closeExactPrefix: true);
+                    Publish("running", turns != null ? $"已找到 {victories} 条整场获胜路线；另探查 {probes} 个回合组合，剪枝 {boundPruned} 次，等待 {turns.Count} 个操作前缀。" :
+                        $"已找到 {victories} 条整场获胜路线；已记录 {noPotionSearch.Nodes + (request.IncludePotions ? potionSearch.Nodes : 0)} 个操作树节点，按实际结算反馈选路。");
                     if (LocalSearchPolicy.CanStop(candidate, request.ContinueOptimization)) break;
                 }
                 catch (LocalChoiceException ex)
@@ -489,6 +606,7 @@ public static class LocalWorker
             await Cleanup();
             session?.Dispose();
             Publish(best == null ? "unsupported" : request.DeferVerification ? "searched" : "done", best == null ? "没有找到可完整结算的路线。" :
+                turns != null ? $"已完成当前预算；评估 {evaluated} 条整场路线，另探查 {probes} 个回合组合，剪枝 {boundPruned} 次；尚未证明全局最优。" :
                 $"已完成当前预算，操作树 {noPotionSearch.Nodes + (request.IncludePotions ? potionSearch.Nodes : 0)} 个节点，比较了 {refinements} 条补牌、删牌、换牌和选牌路线。");
             return true;
         }

@@ -38,6 +38,15 @@ public static class ReplayIntegration
             request = request with { Workers = workers };
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SHARED_WORK") is { Length: > 0 } sharing)
             request = request with { ShareSearchWork = sharing == "on" };
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEARCH_ORDER") is { Length: > 0 } ordering)
+        {
+            if (request.InitialPlan is { Length: > 0 } || request.VerifyCandidate != null || request.RecordedReplayProbe != null)
+                throw new InvalidOperationException("Search-order comparison requires an unseeded frozen search request");
+            if (!Enum.TryParse<LocalSearchOrder>(ordering, out var searchOrder) || !Enum.IsDefined(searchOrder))
+                throw new InvalidOperationException("Unknown experimental search order");
+            request = request with { SearchOrder = searchOrder,
+                ShareSearchWork = searchOrder == LocalSearchOrder.MonteCarlo && request.ShareSearchWork };
+        }
         // Frozen execution controls retain the same startup; bootstrap has its own paired
         // cold measurements. Ordinary integration fixtures use the product's default.
         var installation = new LocalInstallation(game, directories, MinimalWorkerBootstrap: false);
@@ -367,7 +376,7 @@ public static class ReplayIntegration
             result.Workers, result.MaxRounds, request.BudgetSeconds, request.MaxNodes, request.IncludePotions,
             request.FastCardPresentation, request.FastNativeWaits,
             request.FastStateSettling, request.FastAssetCollection,
-            request.ShareSearchWork, result.Work,
+            request.ShareSearchWork, request.SearchOrder, result.Work, result.TurnSearch,
             result.Best.Won, result.Best.StartingHp, result.Best.Hp, result.Best.NetHpLoss, result.Best.HpLost, result.Best.Rounds,
             result.Best.EnemyHp, result.Best.StopReason,
             used_potion = result.Best.Actions.Any(a => a.PotionSlot.HasValue),

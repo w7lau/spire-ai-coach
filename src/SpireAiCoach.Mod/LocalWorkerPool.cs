@@ -124,7 +124,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             var best = verifiedBest;
             var allRuns = results.Concat(verificationResults).ToArray();
             LocalWorkStats? workStats = null;
-            if (request.ShareSearchWork && count > 1)
+            if (request.ShareSearchWork && request.SearchOrder == LocalSearchOrder.MonteCarlo && count > 1)
             {
                 using var scheduling = timeline.Measure(-1, "main", "schedule", "释放已结束的分支提案", depth: 1);
                 var work = new LocalSearchWork(Path.GetDirectoryName(_workers[0].Root)!, request);
@@ -142,6 +142,10 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 IncludePotions = request.IncludePotions,
                 Id = request.Id,
                 Work = workStats,
+                TurnSearch = request.SearchOrder != LocalSearchOrder.TurnFrontier ? null : new(
+                    results.Sum(r => r.TurnSearch?.Probes ?? 0), results.Sum(r => r.TurnSearch?.BoundPruned ?? 0),
+                    results.Sum(r => r.TurnSearch?.Offered ?? 0), results.Sum(r => r.TurnSearch?.DuplicateOffers ?? 0),
+                    results.Sum(r => r.TurnSearch?.Pending ?? 0), results.Sum(r => r.TurnSearch?.UnknownRecoveryChecks ?? 0)),
                 Timing = new(allRuns.Sum(r => r.Timing?.RestoreMs ?? 0), allRuns.Sum(r => r.Timing?.ActionMs ?? 0),
                     allRuns.Sum(r => r.Timing?.DecisionMs ?? 0), allRuns.Sum(r => r.Timing?.VerificationMs ?? 0),
                     allRuns.Sum(r => r.Timing?.StartupMs ?? 0), allRuns.Sum(r => r.Timing?.Actions ?? 0), allRuns.Sum(r => r.Timing?.Restores ?? 0),

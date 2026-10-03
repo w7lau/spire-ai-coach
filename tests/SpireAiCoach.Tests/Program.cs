@@ -873,6 +873,8 @@ Test("local telemetry atomically replaces a snapshot held by an external shared 
 SearchAlgorithmTests.Register(Test);
 SearchWorkTests.Register(Test);
 OptimizationTests.Register(Test);
+DiscrepancyTests.Register(Test);
+TurnSearchTests.Register(Test);
 TimelineTests.Register(Test);
 var filter = args.Length == 2 && args[0] == "--filter" ? args[1] : null;
 if (args.Length != 0 && filter == null) { Console.Error.WriteLine("Usage: [--filter substring]"); return 2; }
