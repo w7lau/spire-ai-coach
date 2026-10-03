@@ -14,12 +14,13 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
     private bool _disposed;
     private LocalTrace? _lastPreparation;
 
-    private int Count(int configured)
+    private int Count(int configured, bool adaptive = true)
     {
         var memory = new MemoryStatus();
         if (!GlobalMemoryStatusEx(memory)) throw new IOException("Cannot determine available memory for local workers");
-        ulong reusable = (ulong)_workers.Where(w => w.Process?.HasExited == false).Sum(w => w.Process!.PrivateMemorySize64);
-        return LocalSearchPolicy.WorkerCount(Environment.ProcessorCount, memory.AvailablePhysical + reusable, configured);
+        ulong reusable = (ulong)_workers.Sum(w => w.MemoryBytes);
+        return adaptive ? LocalConcurrency.Limit(Environment.ProcessorCount, memory.AvailablePhysical + reusable, configured)
+            : LocalSearchPolicy.WorkerCount(Environment.ProcessorCount, memory.AvailablePhysical + reusable, configured);
     }
 
     public async Task Prepare(LocalInstallation installation, int configured, CancellationToken token)
@@ -29,12 +30,10 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
         try
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            await Task.WhenAll(_workers.Take(Count(configured)).Select((worker, index) =>
-                Task.Run(async () =>
-                {
-                    try { await worker.Ensure(directory, index, installation, token, timeline); }
-                    catch { worker.Stop(); throw; }
-                }, token)));
+            // Prewarm only the first instance. The setting caps later admissions;
+            // it must not create eight cold heaps before any branch is available.
+            try { await _workers[0].Ensure(directory, 0, installation, token, timeline); }
+            catch { _workers[0].Stop(); throw; }
         }
         finally { _lastPreparation = timeline.Snapshot(); _gate.Release(); }
     }
@@ -75,16 +74,19 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
         try
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            var memory = new MemoryStatus();
-            if (!GlobalMemoryStatusEx(memory)) throw new IOException("Cannot determine available memory for local workers");
-            // Keep automatic sizing stable when reusing our own already allocated worker heaps.
-            ulong reusable = (ulong)_workers.Where(w => w.Process?.HasExited == false).Sum(w => w.Process!.PrivateMemorySize64);
-            int count = LocalSearchPolicy.WorkerCount(Environment.ProcessorCount, memory.AvailablePhysical + reusable, request.Workers);
+            int count = Count(request.Workers, request.AdaptiveWorkers);
             foreach (var idle in _workers.Skip(count)) idle.Stop();
             using var goalReached = new CancellationTokenSource();
             int goalWorker = -1;
+            var rootBranches = new int[count];
+            var starting = new int[count];
+            bool shared = request.ShareSearchWork && request.SearchOrder == LocalSearchOrder.MonteCarlo && count > 1;
+            LocalSearchWork? schedulingWork = null;
+            int launched = 0;
             progress("准备计算…");
-            var results = (await Task.WhenAll(_workers.Take(count).Select((worker, index) => Task.Run(() => Run(worker, index), cancellation)))).ToList();
+            var results = (await LocalConcurrency.Run(count, request.AdaptiveWorkers, shared, Launch, Demand,
+                () => goalReached.IsCancellationRequested, cancellation)).ToList();
+            int used = results.Count;
             cancellation.ThrowIfCancellationRequested();
             if (request.DataOnlyCombat && !goalReached.IsCancellationRequested && results.Any(r => r.Status is "failed" or "unsupported" or "partial"))
                 throw new CoachException("local_data_unavailable", string.Join("\n", results.Select(r => r.Message).Distinct()));
@@ -117,7 +119,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             while (selectedBest == null && valid.Length > 0)
             {
                 var proposed = valid.Aggregate((a, b) => LocalSearchPolicy.Better(b.Best!, a.Best) ? b : a);
-                int index = Math.Clamp(results.IndexOf(proposed), 0, count - 1);
+                int index = Math.Clamp(results.IndexOf(proposed), 0, used - 1);
                 var verify = request with { Id = request.Id + "-verify-" + verificationResults.Count,
                     Partition = index, Partitions = count, DeferVerification = false, VerifyCandidate = proposed.Best };
                 progress("正在复核最终路线…");
@@ -145,10 +147,10 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             }
             return best with { Evaluated = results.Sum(r => r.Evaluated), Rejected = results.Sum(r => r.Rejected),
                 Duplicates = results.Sum(r => r.Duplicates), BudgetPruned = results.Sum(r => r.BudgetPruned),
-                Victories = valid.Sum(r => r.Victories), Workers = count,
-                ElapsedMs = (long)timeline.ElapsedMs, Trace = timeline.Snapshot(), SearchElapsedMs = results.Take(count).Max(r => r.ElapsedMs) +
-                    (results.Count > count ? results[^1].ElapsedMs : 0),
-                WorkerMemoryBytes = (results.Count > count ? results.Skip(1) : results).Sum(r => r.WorkerMemoryBytes),
+                Victories = valid.Sum(r => r.Victories), Workers = used, WorkerLimit = count,
+                ElapsedMs = (long)timeline.ElapsedMs, Trace = timeline.Snapshot(), SearchElapsedMs = results.Take(used).Max(r => r.ElapsedMs) +
+                    (results.Count > used ? results[^1].ElapsedMs : 0),
+                WorkerMemoryBytes = (results.Count > used ? results.Skip(1) : results).Sum(r => r.WorkerMemoryBytes),
                 IncludePotions = request.IncludePotions,
                 VerificationSkipped = request.SkipFinalVerification,
                 StoppedEarly = goalReached.IsCancellationRequested,
@@ -169,8 +171,35 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     "本地整场计算完成。" + (request.SkipFinalVerification ? "已跳过最终复核，供手动对照。" : "") +
                     (results.Any(r => r.Status is not ("searched" or "done")) || verificationResults.Any(r => r.Status != "done") ?
                         request.SkipFinalVerification ? "部分搜索未完成，显示已取得的模拟路线。" : "部分搜索未完成，显示已复核的可用路线。" : "") +
-                    (results.Count > count ? "本次补充搜索未纳入：" + string.Join("、", blocked.Select(a => a.CardName)) + "。" : "") +
+                    (results.Count > used ? "本次补充搜索未纳入：" + string.Join("、", blocked.Select(a => a.CardName)) + "。" : "") +
                     "按战后净生命损失选路，同等净损失优先保留药水；预算内候选，未证明全局最优。" };
+
+            Task<LocalSearchResult> Launch(int index)
+            {
+                Volatile.Write(ref launched, index + 1);
+                Volatile.Write(ref starting[index], 1);
+                using (timeline.Measure(index, "main", "admit_worker", $"计算 {index + 1}；上限 {count}")) { }
+                return Task.Run(async () =>
+                {
+                    try { return await Run(_workers[index], index); }
+                    finally { Volatile.Write(ref starting[index], 0); }
+                }, cancellation);
+            }
+
+            LocalWorkerDemand Demand(int admitted)
+            {
+                int roots = Volatile.Read(ref rootBranches[0]);
+                int pending = 0;
+                if (shared && roots > 0 && _workers[0].Root.Length > 0)
+                {
+                    schedulingWork ??= new LocalSearchWork(Path.GetDirectoryName(_workers[0].Root)!, request);
+                    pending = schedulingWork.Stats().Pending;
+                }
+                // Systematic workers all retain the root-derived fixed partition;
+                // changing it mid-search could silently omit a worker's histories.
+                int allowed = shared ? Count(request.Workers) : count;
+                return new(pending, Enumerable.Range(0, admitted).Count(i => Volatile.Read(ref starting[i]) != 0), roots, allowed);
+            }
 
             async Task<LocalSearchResult> Run(Worker worker, int index, LocalSearchRequest? fallback = null)
             {
@@ -210,12 +239,15 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                             stopping = Stopwatch.StartNew();
                         }
                         var previewPath = Path.Combine(worker.Root, "progress.json");
-                        if (simulationProgress != null && File.Exists(previewPath))
+                        if (File.Exists(previewPath))
                         {
                             var preview = LocalWire.Read<LocalProgress>(previewPath);
                             if (preview.Id == command.Id && preview.SnapshotId == request.SnapshotId && preview.Worker == index &&
                                 preview.Workers == command.Partitions && preview.Sequence > seenSequence)
-                            { seenSequence = preview.Sequence; simulationProgress(preview with { Id = request.Id, Workers = count,
+                            { seenSequence = preview.Sequence;
+                                if (!verifying && preview.RootBranches > 0)
+                                { Volatile.Write(ref rootBranches[index], preview.RootBranches); Volatile.Write(ref starting[index], 0); }
+                                simulationProgress?.Invoke(preview with { Id = request.Id, Workers = count,
                                 Sequence = preview.Sequence + (verifying ? 2_000_000 : fallback == null ? 0 : 1_000_000) }); }
                         }
                         var file = Path.Combine(worker.Root, "result.json");
@@ -225,6 +257,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                             if (result.Id == command.Id && result.SnapshotId == request.SnapshotId)
                             {
                                 lastResult = result;
+                                if (!verifying && result.RootBranches > 0)
+                                { Volatile.Write(ref rootBranches[index], result.RootBranches); Volatile.Write(ref starting[index], 0); }
                                 if (result.Status != "running")
                                 {
                                     if (result.Trace?.Spans is { Length: > 0 } spans)
@@ -265,7 +299,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                                     }
                                     return result;
                                 }
-                                if (!goalReached.IsCancellationRequested) progress($"正在计算 · 已评估 {result.Evaluated} 条路线");
+                                if (!goalReached.IsCancellationRequested) progress($"正在计算 · 已启用 {Volatile.Read(ref launched)}/{count} 路 · 当前实例已评估 {result.Evaluated} 条路线");
                             }
                         }
                         // Normally the native action settles and acknowledges within one poll.
@@ -315,6 +349,15 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
     {
         public string Root { get; private set; } = "";
         public Process? Process { get; private set; }
+        public long MemoryBytes
+        {
+            get
+            {
+                var process = Process;
+                try { return process?.HasExited == false ? Math.Max(0, process.PrivateMemorySize64) : 0; }
+                catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { return 0; }
+            }
+        }
         private FileStream? _lock;
         private string? _configuration;
         private long _logPosition;
