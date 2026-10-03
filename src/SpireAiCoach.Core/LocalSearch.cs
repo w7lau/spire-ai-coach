@@ -17,7 +17,8 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     bool DataOnlyRun = true, bool NumericalExecution = true, bool StopOnZeroLoss = true, bool TrimWorkerOverhead = true,
     LocalSearchOrder SearchOrder = LocalSearchOrder.MonteCarlo, bool FastVerification = true,
     bool SkipFinalVerification = false, bool AdaptiveWorkers = true, bool CorrelatedRollouts = false,
-    bool LeanSearchChecksums = false, string? TurnWorkPipe = null);
+    bool LeanSearchChecksums = false, string? TurnWorkPipe = null,
+    int? TargetVictoryRounds = null, int? TargetPotionUses = null, bool RequireKnownZeroEnemyDamage = false);
 
 // A stop belongs to one frozen request, never to another battle or final verification.
 public sealed record LocalSearchStop(string Id, string SnapshotId, string NativeHash)
@@ -82,8 +83,23 @@ public static class LocalSearchPolicy
         return true;
     }
 
-    public static bool CanStop(LocalCandidate? candidate, bool stopOnZeroLoss) =>
-        stopOnZeroLoss && candidate is { Won: true, Dead: false, NetHpLoss: 0 };
+    public static bool CanStop(LocalCandidate? candidate, bool stopOnZeroLoss, int? targetRounds = null,
+        int? targetPotions = null, bool requireKnownZeroEnemyDamage = false) =>
+        stopOnZeroLoss && candidate is { Won: true, Dead: false, NetHpLoss: 0 } &&
+        (!targetRounds.HasValue || candidate.Rounds <= targetRounds.Value) &&
+        (!targetPotions.HasValue || candidate.Actions.Count(a => a.PotionSlot.HasValue) <= targetPotions.Value) &&
+        (!requireKnownZeroEnemyDamage || candidate.DamageSources is { Complete: true, Enemy: 0 });
+
+    public static bool HasSpecificGoal(LocalSearchRequest request) => request.TargetVictoryRounds.HasValue ||
+        request.TargetPotionUses.HasValue || request.RequireKnownZeroEnemyDamage;
+    public static bool MeetsGoal(LocalCandidate? candidate, LocalSearchRequest request) =>
+        CanStop(candidate, true, request.TargetVictoryRounds, request.TargetPotionUses, request.RequireKnownZeroEnemyDamage);
+    public static bool BetterForGoal(LocalCandidate candidate, LocalCandidate? prior, LocalSearchRequest request)
+    {
+        if (prior != null && HasSpecificGoal(request) && MeetsGoal(candidate, request) != MeetsGoal(prior, request))
+            return MeetsGoal(candidate, request);
+        return Better(candidate, prior);
+    }
 
     // Same root, completed native victory: net HP loss first, potions are a reserve resource.
     public static bool Better(LocalCandidate candidate, LocalCandidate? prior)

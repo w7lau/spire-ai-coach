@@ -1,5 +1,13 @@
 # 设计与合同
 
+## 0.7.20 原生依赖与可选返回目标
+
+LocalNativeLearning 只读观察原生出牌前后的手牌实例预览、费用和 Hook.ShouldDraw 许可，学习来源模型对后续模型的正向变化及阻断抽牌的顺序风险。准备策略据此调度当前仍合法、可支付的操作；提示不代替真实效果或原生选牌，也不证明状态等价。每次新搜索重建学习器；持续效果、强攻击的数值差别及回合间公平调度都保留完整结算反馈。
+
+LocalTurnSearch 用父操作下的准确 StepKey 结构共享历史键，包括 BeforeHash、回合、CombatCardIndex、目标、药水及完整选择身份。只减少整段 JSON 键的重复分配，不共享原生状态。获胜反馈仅提升已观察且仍待搜索的替代前缀，可附原获胜路线的后续操作作为当前合法提案；新状态及新选择必须重新产生，前缀重放和最终复核仍严格一致。
+
+LocalCalculation 将可选目标回合冻结为 TargetVictoryRounds、TargetPotionUses=0 与 RequireKnownZeroEnemyDamage，不改变 MaxRounds 或预算。BetterForGoal 优先保留满足明确目标的实际获胜候选；CanStop、父池收尾与最终复核均检查相同目标，伤害来源不完整不能证明敌方伤害零。LocalDamageAccounting 按原生历史区分 Enemy/Self/Unknown，再与实际累计扣血核对；目标缺省时仍按原战后净生命损失、药水、生命/金币/回合/步数排序，已经回复的自身代价不额外受罚。具名目标尚未达标时暂停原目标的消耗剪枝证明，保留待探索分支。
+
 ## 0.7.18 共享原生回合前缀任务
 
 TurnFrontier 在父池创建 LocalTurnWork，使用仅当前用户可访问的私有命名管道连接各已验证的 worker。管道只传递同一 Id、SnapshotId、NativeHash、ModelHash 和 LoadedMods 下的实际观察前缀、选牌及排序提示；完整原生对象、RNG 和结算结果仍由各 worker 执行。中央 LocalTurnSearch 保留去重、生命/伤害优先、连续深入及 FIFO 调度；每个任务至多有一个当前领取者，连接中断或预算中断归还尚未完成的任务。小批量提交避免每个前缀写文件或反复序列化全部队列。复核不使用此队列。

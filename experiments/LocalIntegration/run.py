@@ -54,6 +54,7 @@ parser.add_argument('--results-dir', type=Path)
 parser.add_argument('--overhead-benchmark', action='store_true')
 parser.add_argument('--verification-benchmark', action='store_true')
 parser.add_argument('--algorithm-test', action='store_true')
+parser.add_argument('--algorithm-goal-test', action='store_true')
 parser.add_argument('--final-verification-test', action='store_true')
 parser.add_argument('--concurrency-test', action='store_true')
 parser.add_argument('--incident-verification', action='store_true')
@@ -65,7 +66,7 @@ if args.final_verification_test and (not args.replay or not args.seed_result):
 
 if args.verification_benchmark and (not args.replay or not args.seed_result):
     parser.error('--verification-benchmark requires --replay and --seed-result')
-if args.algorithm_test and (not args.replay or args.seed_result or args.recorded_replay):
+if (args.algorithm_test or args.algorithm_goal_test) and (not args.replay or args.seed_result or args.recorded_replay):
     parser.error('--algorithm-test requires an unseeded --replay')
 if args.overhead_benchmark and (not args.replay or not args.seed_result):
     parser.error('--overhead-benchmark requires --replay and --seed-result')
@@ -124,6 +125,10 @@ with worker_lock(root):
     for name in ['integration-success', 'integration-error.txt', 'integration-result.json',
                  'integration-algorithm-private.json', 'integration-algorithm-summary.json']:
         (root / name).unlink(missing_ok=True)
+    if args.algorithm_goal_test:
+        for name in ['integration-algorithm-goal-summary.json', 'integration-algorithm-goal-private-0.json',
+                     'integration-algorithm-goal-private-1.json']:
+            (root / name).unlink(missing_ok=True)
     if args.incident_verification:
         for name in ['integration-incident-summary.json', 'integration-incident-private.json',
                      'integration-incident-rejection-private.json']:
@@ -182,7 +187,8 @@ with worker_lock(root):
     env['SPIRE_LOCAL_EARLY_STOP_TEST'] = '1' if args.early_stop_test else '0'
     env['SPIRE_LOCAL_OVERHEAD_BENCHMARK'] = '1' if args.overhead_benchmark else '0'
     env['SPIRE_LOCAL_VERIFICATION_BENCHMARK'] = '1' if args.verification_benchmark else '0'
-    env['SPIRE_LOCAL_ALGORITHM_TEST'] = '1' if args.algorithm_test else '0'
+    env['SPIRE_LOCAL_ALGORITHM_TEST'] = '1' if args.algorithm_test or args.algorithm_goal_test else '0'
+    env['SPIRE_LOCAL_ALGORITHM_GOAL_TEST'] = '1' if args.algorithm_goal_test else '0'
     env['SPIRE_LOCAL_FINAL_VERIFICATION_TEST'] = '1' if args.final_verification_test else '0'
     env['SPIRE_LOCAL_CONCURRENCY_TEST'] = '1' if args.concurrency_test else '0'
     env['SPIRE_LOCAL_INCIDENT_VERIFICATION'] = '1' if args.incident_verification else '0'
@@ -209,6 +215,7 @@ with worker_lock(root):
         args.results_dir.mkdir(parents=True, exist_ok=True)
         names = ['integration-replay-private.json', 'integration-replay-summary.json',
                      'integration-algorithm-private.json', 'integration-algorithm-summary.json',
+                     'integration-algorithm-goal-summary.json', 'integration-algorithm-goal-private-0.json', 'integration-algorithm-goal-private-1.json',
                      'integration-concurrency-summary.json', 'integration-concurrency-MonteCarlo-private.json',
                      'integration-concurrency-TurnFrontier-private.json',
                      'integration-error.txt', 'integration-stdout.log', 'integration-game.log']

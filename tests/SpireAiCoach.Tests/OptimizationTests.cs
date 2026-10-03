@@ -108,6 +108,15 @@ static class OptimizationTests
                 LocalRolloutStyle.Preparation) == -40, "A setup prior must not overwrite lethal end-turn risk");
         });
 
+        test("optimization previews retain marginal gains of strong attacks", () =>
+        {
+            var hit = new LocalTacticalFeatures(Damage: 80, EnemyHp: 500, Known: true);
+            Check(LocalTactics.Priority(hit with { Damage = 90 }) > LocalTactics.Priority(hit),
+                "A score ceiling hid additional block, strength or upgrade damage");
+            Check(LocalTactics.Priority(hit with { EnemyBlock = 20 }) < LocalTactics.Priority(hit),
+                "Blocked damage must retain its native marginal cost");
+        });
+
         test("optimization tactical previews never exclude unknown or low priority actions", () =>
         {
             var tree = new LocalSearchTree(1);

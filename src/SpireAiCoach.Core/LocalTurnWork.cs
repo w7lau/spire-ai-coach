@@ -16,7 +16,7 @@ public sealed class LocalTurnWork : IDisposable
         LocalTurnHint? Hint = null, LocalWinningBound? Bound = null, string? TerminalDigest = null,
         LocalCandidate? Outcome = null);
     internal sealed record Reply(LocalTurnTask? Task, int Pending, int Active,
-        int Offered, int Duplicates, int Affected = 0, string? Error = null);
+        int Offered, int Duplicates, int Affected = 0, string? Error = null, bool RootReady = false);
 
     private readonly object _gate = new();
     private readonly LocalTurnSearch _frontier;
@@ -31,6 +31,7 @@ public sealed class LocalTurnWork : IDisposable
     private readonly int _maximum;
     private int _taken;
     private int _rollouts;
+    private bool _rootReady;
     public string PipeName { get; } = "SpireAiCoach-turn-" + Guid.NewGuid().ToString("N");
     public int Pending { get { lock (_gate) return _frontier.Count; } }
     public int Offered { get { lock (_gate) return _frontier.Offered; } }
@@ -103,20 +104,22 @@ public sealed class LocalTurnWork : IDisposable
     }
 
     private Reply Snapshot(LocalTurnTask? task = null, int affected = 0, string? error = null) =>
-        new(task, _frontier.Count, _active.Count, _frontier.Offered, _frontier.DuplicateOffers, affected, error);
+        new(task, _frontier.Count, _active.Count, _frontier.Offered, _frontier.DuplicateOffers, affected, error, _rootReady);
 
     private Reply Apply(Command command)
     {
         foreach (var offer in command.Offers ?? []) _frontier.Offer(offer.Prefix, offer.SearchRound, offer.Hint);
+        if (command.Offers is { Length: > 0 }) _rootReady = true;
         switch (command.Operation)
         {
             case "offer": return Snapshot();
             case "take":
                 if (_active.ContainsKey(command.Owner)) throw new InvalidOperationException("Worker already owns a turn task");
                 if (!_frontier.TryTake(out var task)) return Snapshot();
-                task = task with { FullRollout = LocalTurnSearch.IsFullRollout(_taken++),
+                task = task with { FullRollout = LocalTurnSearch.IsFullRollout(_taken++) || task.Prefix.Length == 1,
                     Lane = _frontier.LastLane, Focused = _frontier.LastFocused };
-                if (task.FullRollout) task = task with { Style = (LocalRolloutStyle)(_rollouts++ % 3) };
+                if (task.FullRollout) task = task with { Style = task.Prefix.Length <= 1 ?
+                    LocalRolloutStyle.Preparation : (LocalRolloutStyle)(_rollouts++ % 4) };
                 _active.Add(command.Owner, task); return Snapshot(task);
             case "focus":
                 var focused = RequireOwner(command);
@@ -182,6 +185,7 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
     private long _lastFlush = Environment.TickCount64;
     public int Count => _last.Pending + _offers.Count;
     public int Active => _last.Active;
+    public bool RootReady => _last.RootReady;
     public int Offered => _last.Offered;
     public int DuplicateOffers => _last.Duplicates;
     public int LastLane { get; private set; }

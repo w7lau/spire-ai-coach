@@ -11,6 +11,7 @@ public sealed record CoachSettings
     public int LocalWorkers { get; init; } = 0;
     public bool LocalIncludePotions { get; init; }
     public bool LocalStopOnZeroLoss { get; init; } = true;
+    public int LocalTargetVictoryRounds { get; init; }
 
     public Uri Endpoint()
     {

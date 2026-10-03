@@ -1,6 +1,6 @@
 namespace SpireAiCoach.Core;
 
-public enum LocalRolloutStyle { Balanced, Preparation, Attack }
+public enum LocalRolloutStyle { Balanced, Preparation, Attack, Correlated }
 
 // Preview values are hints for exploration, never a substitute for native execution or a prune.
 public sealed record LocalTacticalFeatures(double Damage = 0, double EnemyHp = 0, double EnemyBlock = 0,
@@ -60,6 +60,8 @@ public static class LocalTactics
         }
         else if (style == LocalRolloutStyle.Attack)
             score += Math.Min(f.EnemyHp, effective) * 2 + Math.Max(0, f.Strength) * f.FollowupAttacks * 2;
-        return (int)Math.Clamp(score, -40, style == LocalRolloutStyle.Balanced ? 100 : 200);
+        // Preserve marginal gains in strong attacks. A low hard ceiling hid
+        // the effect of block, strength and upgrades on a following attack.
+        return (int)Math.Clamp(score, -40, 1_000_000);
     }
 }

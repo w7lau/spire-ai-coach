@@ -82,7 +82,9 @@ public static class ReplayIntegration
         }
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_ALGORITHM_TEST") == "1")
         {
-            await AlgorithmIntegration.Run(root, pool, request, installation);
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_ALGORITHM_GOAL_TEST") == "1")
+                await AlgorithmIntegration.RunGoal(root, pool, request, installation);
+            else await AlgorithmIntegration.Run(root, pool, request, installation);
             return;
         }
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_EARLY_STOP_TEST") == "1")

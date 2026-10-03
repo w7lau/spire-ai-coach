@@ -6,7 +6,7 @@ public sealed record LocalTurnHint(int Hp, int StartingHp, int EnemyHp, int Init
     int Block = 0, int PotionsUsed = 0);
 public sealed record LocalTurnTask(int Id, LocalAction[] Prefix, int SearchRound,
     bool FullRollout = false, int Lane = 0, bool Focused = false, LocalTurnHint? Hint = null,
-    LocalRolloutStyle Style = LocalRolloutStyle.Balanced);
+    LocalRolloutStyle Style = LocalRolloutStyle.Balanced, LocalAction[]? Continuation = null);
 public sealed record LocalTurnOutcome(int Worker, int Attempt, double CompletedMs, bool Won,
     int Hp, int GrossLoss, int Rounds, int Potions, LocalRolloutStyle Style, LocalDamageSources? DamageSources);
 public sealed record LocalTurnSearchStats(int Probes = 0, int BoundPruned = 0, int Offered = 0,
@@ -43,13 +43,17 @@ public sealed record LocalTurnOffer(LocalAction[] Prefix, int SearchRound, Local
 public sealed class LocalTurnSearch : ILocalTurnFrontier
 {
     private readonly Dictionary<int, Entry> _pending = new();
-    private readonly Dictionary<string, int> _seen = new(StringComparer.Ordinal);
+    private readonly Dictionary<(int Round, int Prefix), int> _seen = new();
+    private readonly List<Dictionary<StepKey, int>> _prefixes = [new()];
+    private readonly record struct StepKey(string Before, int Round, bool End, int? Potion, uint? Target,
+        string Model, uint? Card, int? Hand, string Choices);
     private readonly PriorityQueue<int, (double, int)> _health = new();
     private readonly PriorityQueue<int, (double, int)> _damage = new();
     private readonly Queue<int> _fair = new();
     private readonly Stack<int[]> _focus = new();
     private readonly Stack<int[]> _descent = new();
-    private readonly Queue<int> _winner = new();
+    private readonly Queue<(int Id, LocalAction[] Tail)> _winner = new();
+    private LocalAction[]? _lastContinuation;
     private LocalCandidate? _winningOutcome;
     private readonly SortedDictionary<int, RoundQueue> _rounds = new();
     private readonly Dictionary<int, int> _roundClaims = new();
@@ -76,11 +80,35 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
     public void Offer(LocalAction[] prefix, int searchRound, LocalTurnHint hint)
     {
         if (searchRound < 1) throw new ArgumentOutOfRangeException(nameof(searchRound));
-        var key = searchRound + ":" + HistoryKey(prefix);
+        var key = (searchRound, PrefixId(prefix, true));
         if (_seen.ContainsKey(key)) { DuplicateOffers++; return; }
         var task = new LocalTurnTask(_next++, prefix.ToArray(), searchRound, Hint: hint);
         _seen.Add(key, task.Id);
         Queue(new(task with { Hint = hint }, hint));
+    }
+
+    private int PrefixId(IReadOnlyList<LocalAction> actions, bool create)
+    {
+        // Intern exact action identities under their exact parents. This shares
+        // immutable history structure, never native states, RNG or Mod objects.
+        // Typed fields avoid serializing and storing the whole prefix per fork.
+        int parent = 0;
+        foreach (var action in actions)
+        {
+            string choices = action.Choices is not { Length: > 0 } ? "" : JsonSerializer.Serialize(
+                action.Choices.Select(c => new { c.OfferHash, c.Kind, c.Index, c.ModelId, Indices = c.Indices ?? [] }));
+            var step = new StepKey(action.BeforeHash, action.Round, action.EndTurn, action.PotionSlot,
+                action.TargetId, action.ModelId, action.CombatCardIndex,
+                action.CombatCardIndex.HasValue ? null : action.HandIndex, choices);
+            var children = _prefixes[parent];
+            if (!children.TryGetValue(step, out int next))
+            {
+                if (!create) return -1;
+                next = _prefixes.Count; children.Add(step, next); _prefixes.Add(new());
+            }
+            parent = next;
+        }
+        return parent;
     }
 
     private void Queue(Entry entry)
@@ -115,6 +143,7 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         int lane = _taken++ % 4;
         LastLane = lane;
         LastFocused = false;
+        _lastContinuation = null;
         int id;
         if (lane == 2 && TryFocus(out id)) { FocusedTakes++; LastFocused = true; }
         else if (lane == 1 && TryWinner(out id)) { }
@@ -129,7 +158,7 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
             var queue = lane == 1 ? _damage : _health;
             do { id = queue.Dequeue(); } while (!_pending.ContainsKey(id));
         }
-        task = _pending[id].Task;
+        task = _pending[id].Task with { Continuation = _lastContinuation };
         _pending.Remove(id);
         _roundClaims[task.SearchRound] = _roundClaims.GetValueOrDefault(task.SearchRound) + 1;
         return true;
@@ -154,7 +183,9 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
 
     private bool TryWinner(out int id)
     {
-        while (_winner.TryDequeue(out id)) if (_pending.ContainsKey(id)) return true;
+        while (_winner.TryDequeue(out var improvement))
+            if (_pending.ContainsKey(improvement.Id))
+            { id = improvement.Id; _lastContinuation = improvement.Tail; return true; }
         id = -1; return false;
     }
 
@@ -166,7 +197,7 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         // Complete native outcomes guide exploration around the actual incumbent.
         // Its exact alternatives have already been offered; no legal prefix is
         // invented, reopened, merged, or discarded by this scheduling hint.
-        var alternatives = new List<(int Id, int Round, int Step, int Rank)>();
+        var alternatives = new List<(int Id, int Round, int Step, int Rank, LocalAction[] Tail)>();
         foreach (var decision in candidate.Decisions ?? [])
         {
             if (decision.BeforeStep < 0 || decision.BeforeStep >= candidate.Actions.Length) continue;
@@ -174,13 +205,14 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
             var hint = new LocalTurnHint(candidate.Hp, candidate.StartingHp ?? candidate.Hp, candidate.EnemyHp, 1);
             foreach (var offer in Alternatives(candidate.Actions, decision, hint))
             {
-                var key = offer.SearchRound + ":" + HistoryKey(offer.Prefix);
+                var key = (offer.SearchRound, PrefixId(offer.Prefix, false));
                 if (_seen.TryGetValue(key, out int id) && _pending.ContainsKey(id))
-                    alternatives.Add((id, actual.Round, decision.BeforeStep, offer.Prefix[^1].Preference));
+                    alternatives.Add((id, actual.Round, decision.BeforeStep, offer.Prefix[^1].Preference,
+                        candidate.Actions.Skip(decision.BeforeStep).ToArray()));
             }
         }
         foreach (var item in alternatives.OrderBy(x => x.Round).ThenBy(x => x.Step).ThenByDescending(x => x.Rank))
-            _winner.Enqueue(item.Id);
+            _winner.Enqueue((item.Id, item.Tail));
     }
 
     private bool TryFocus(out int id)
@@ -225,7 +257,7 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         var prefix = actions.Take(step).ToArray();
         var ids = decision.Legal.OrderByDescending(a => a.Preference)
             .Where(a => !SameAction(a, actions[step]))
-            .Select(a => _seen.GetValueOrDefault(task.SearchRound + ":" + HistoryKey([..prefix, a]), -1))
+            .Select(a => _seen.GetValueOrDefault((task.SearchRound, PrefixId([..prefix, a], false)), -1))
             .Where(id => _pending.ContainsKey(id)).ToArray();
         if (ids.Length > 0) (focused ? _descent : _focus).Push(ids);
     }

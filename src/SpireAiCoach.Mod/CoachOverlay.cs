@@ -41,6 +41,7 @@ public sealed class CoachOverlay
     private LocalWorkerPool _localPool = null!;
     private bool _localAnalyzing;
     private CheckBox _localStopOnZeroLoss = null!;
+    private SpinBox _localTargetVictoryRounds = null!;
     private Button _localSkipVerification = null!;
     private bool _executing;
     private CancellationTokenSource? _execution;
@@ -128,7 +129,7 @@ public sealed class CoachOverlay
         var saveLocal = new Button { Text = "保存本地设置" }; localOptions.AddChild(saveLocal);
         saveLocal.Pressed += () =>
         {
-            try { _store.SaveLocalOptions((int)_localWorkers.Value, _localPotions.ButtonPressed, _localStopOnZeroLoss.ButtonPressed); _settings = _settings with { LocalWorkers = (int)_localWorkers.Value, LocalIncludePotions = _localPotions.ButtonPressed, LocalStopOnZeroLoss = _localStopOnZeroLoss.ButtonPressed }; _status.Text = "本地设置已保存，下次计算生效。"; }
+            try { _store.SaveLocalOptions((int)_localWorkers.Value, _localPotions.ButtonPressed, _localStopOnZeroLoss.ButtonPressed, (int)_localTargetVictoryRounds.Value); _settings = _settings with { LocalWorkers = (int)_localWorkers.Value, LocalIncludePotions = _localPotions.ButtonPressed, LocalStopOnZeroLoss = _localStopOnZeroLoss.ButtonPressed, LocalTargetVictoryRounds = (int)_localTargetVictoryRounds.Value }; _status.Text = "本地设置已保存，下次计算生效。"; }
             catch (Exception ex) { _status.Text = "本地并发保存失败：" + ex.GetType().Name; }
         };
         _localPotions = new CheckBox { Text = "必要时考虑药水（优先保留）", ButtonPressed = _settings.LocalIncludePotions };
@@ -145,10 +146,21 @@ public sealed class CoachOverlay
         {
             _settings = _settings with { LocalStopOnZeroLoss = enabled };
             if (_localAnalyzing) Cancel("停止条件已改变，请重新计算。");
-            try { _store.SaveLocalOptions((int)_localWorkers.Value, _localPotions.ButtonPressed, enabled); }
+            try { _store.SaveLocalOptions((int)_localWorkers.Value, _localPotions.ButtonPressed, enabled, (int)_localTargetVictoryRounds.Value); }
             catch (Exception ex) { _status.Text = "选项本次已生效，保存失败：" + ex.GetType().Name; }
         };
         body.AddChild(_localStopOnZeroLoss);
+        var targetOptions = new HBoxContainer(); body.AddChild(targetOptions);
+        targetOptions.AddChild(new Label { Text = "提前返回目标回合（0 不限）" });
+        _localTargetVictoryRounds = new SpinBox { Name = "LocalTargetVictoryRounds", MinValue = 0, MaxValue = LocalCalculation.Rounds,
+            Step = 1, Value = Math.Clamp(_settings.LocalTargetVictoryRounds, 0, LocalCalculation.Rounds),
+            TooltipText = "填 6：只有六回合内获胜、战后生命不低于起点、不主动用药且确认敌方伤害为 0，才提前返回。允许自身扣血后回复。0 沿用原无伤条件；搜索仍可走到 64 回合，预算不变。" };
+        targetOptions.AddChild(_localTargetVictoryRounds);
+        _localTargetVictoryRounds.ValueChanged += value =>
+        {
+            _settings = _settings with { LocalTargetVictoryRounds = (int)value };
+            if (_localAnalyzing) Cancel("目标回合已改变，请重新计算。");
+        };
         _localSkipVerification = new Button { Name = "LocalSkipVerification", Text = "跳过最终复核：关闭", ToggleMode = true,
             TooltipText = "默认关闭。开启后省去最终路线的独立重放，仍可点击执行方案；执行时逐步核对首次模拟记录，偏离即停止。" };
         _localSkipVerification.Toggled += enabled =>
@@ -469,7 +481,7 @@ public sealed class CoachOverlay
         {
             request = LocalCalculation.Configure(LocalCapture.Capture(_snapshotHash!, continueOptimization), order,
                 (int)_localWorkers.Value, _localPotions.ButtonPressed, _localStopOnZeroLoss.ButtonPressed,
-                _localSkipVerification.ButtonPressed);
+                _localSkipVerification.ButtonPressed, (int)_localTargetVictoryRounds.Value);
             // Reuse only the suffix matching this combat, mods, native state and complete history.
             // It is an exploration seed; the worker re-executes and verifies it, never copies its score.
             if (order == LocalSearchOrder.MonteCarlo && _continuation != null && request.History != null)
@@ -517,6 +529,10 @@ public sealed class CoachOverlay
                     { Cancel("原生战斗状态已变化，请重新计算。"); return; }
                     displaying.Dispose();
                     result = result with { ElapsedMs = (long)complete.ElapsedMs, Trace = complete.Snapshot() };
+                    if (request.TargetVictoryRounds is { } target)
+                        result = result with { Message = (LocalSearchPolicy.MeetsGoal(result.Best, request) ?
+                            $"已达到 {target} 回合内获胜、净损失 0、无药且敌方伤害 0 的目标。" :
+                            $"未达到 {target} 回合目标，显示预算内已取得的可用路线。") + "\n" + result.Message };
                     _advice.Text = LocalSearchPolicy.Format(result);
                     _localTiming.Text = LocalTimeline.Format(result);
                     var timingPath = ProjectSettings.GlobalizePath("user://spire_ai_coach/diagnostics/local-timing-latest.json");
@@ -525,8 +541,9 @@ public sealed class CoachOverlay
                         try
                         {
                             Directory.CreateDirectory(Path.GetDirectoryName(timingPath)!);
-                            LocalWire.Write(timingPath, new { version = "0.7.18", request.SearchOrder, request.MaxNodes, request.BudgetSeconds,
-                                request.SkipFinalVerification, result.VerificationSkipped, result.ElapsedMs, result.Workers,
+                            LocalWire.Write(timingPath, new { version = typeof(ModEntry).Assembly.GetName().Version!.ToString(3), request.SearchOrder, request.MaxNodes, request.BudgetSeconds,
+                                request.SkipFinalVerification, request.StopOnZeroLoss, request.TargetVictoryRounds,
+                                request.TargetPotionUses, request.RequireKnownZeroEnemyDamage, result.VerificationSkipped, result.ElapsedMs, result.Workers,
                                 result.Evaluated, result.Victories, result.Timing, result.Trace });
                         }
                         catch (Exception ex) { GD.Print("[SpireAiCoach] Timing save failed: " + ex.GetType().Name); }

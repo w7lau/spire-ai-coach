@@ -10,6 +10,47 @@ static class TurnSearchTests
 
     public static void Register(Action<string, Action> test)
     {
+        test("turn optimization explicit goals require known enemy damage and prefer a certified matching candidate", () =>
+        {
+            var captured = new LocalSearchRequest("job", "root", [], "native", 1, [], false);
+            var request = LocalCalculation.Configure(captured, LocalSearchOrder.TurnFrontier, 4, true, true,
+                targetVictoryRounds: 6);
+            Check(request.MaxNodes == 64 && request.MaxRounds == 64 && request.BudgetSeconds == 60,
+                "A six-round return target must not shorten the native search horizon or budget");
+            Check(!LocalSearchPolicy.HasSpecificGoal(LocalCalculation.Configure(captured,
+                LocalSearchOrder.TurnFrontier, 4, true, true)), "Default settings unexpectedly impose a six-round goal");
+            var known = Win(50, 50) with { Rounds = 6, HpLost = 11, DamageSources = new(0, 11, 0, 0, true) };
+            var unknown = known with { Rounds = 5, DamageSources = new(0, 10, 1, 0, true) };
+            Check(LocalSearchPolicy.MeetsGoal(known, request) && !LocalSearchPolicy.MeetsGoal(unknown, request),
+                "Unknown damage cannot certify an enemy-damage-free target");
+            Check(!LocalSearchPolicy.MeetsGoal(known with { Rounds = 7 }, request) &&
+                !LocalSearchPolicy.MeetsGoal(known with { Actions = [Move(1) with { PotionSlot = 0 }] }, request),
+                "The target's rounds and potion constraints were ignored");
+            Check(LocalSearchPolicy.BetterForGoal(known, unknown, request) &&
+                !LocalSearchPolicy.BetterForGoal(unknown, known, request), "Uncertain short lines displaced a certified target");
+            var healed = known with { HpLost = 17, Actions = [Move(1)] };
+            var longer = known with { HpLost = 7, Actions = [Move(1), Move(2)] };
+            Check(LocalSearchPolicy.Better(healed, longer), "Already healed self costs must not displace an equivalent completed outcome");
+        });
+
+        test("turn optimization interned histories retain native choices targets and parent identity", () =>
+        {
+            var search = new LocalTurnSearch(1);
+            var hint = new LocalTurnHint(50, 50, 100, 100);
+            var prefix = Enumerable.Range(0, 32).Select(i => Move(i, "native:" + i)).ToArray();
+            var choice = new LocalCardChoice("offer:[]", 1, "model,\"quoted\"", "display", [1, 2], "hand");
+            var last = Move(90, "final") with { TargetId = 1, Choices = [choice] };
+            search.Offer([..prefix, last], 2, hint);
+            search.Offer([..prefix, last with { HandIndex = 8, Preference = 200, CardName = "renamed" }], 2, hint);
+            search.Offer([..prefix, last with { TargetId = 2 }], 2, hint);
+            search.Offer([..prefix, last with { Choices = [choice with { Indices = [2, 1] }] }], 2, hint);
+            search.Offer([..prefix, last with { Choices = [choice with { OfferHash = "other offer" }] }], 2, hint);
+            search.Offer([..prefix, last], 3, hint);
+            search.Offer([..prefix.Take(31), prefix[31] with { BeforeHash = "other native RNG" }, last], 2, hint);
+            Check(search.Count == 6 && search.DuplicateOffers == 1,
+                "History interning aliased a distinct native parent, target, choice order, offer, or search round");
+        });
+
         test("turn optimization native winning feedback promotes observed alternatives without deleting other work", () =>
         {
             var search = new LocalTurnSearch(1);
@@ -21,9 +62,15 @@ static class TurnSearchTests
             var decision = new LocalDecision(1, [attack, setup]);
             search.OfferAlternatives([root, attack], decision, hint);
             search.ObserveOutcome(Win(actions: [root, attack]) with { Decisions = [decision] });
-            Check(search.TryTake(out _) && search.TryTake(out var task) && task.Prefix.Length == 2 &&
+            Check(search.TryTake(out _), "Missing broad task");
+            Check(search.TryTake(out var task) && task.Prefix.Length == 2 &&
                 task.Prefix[1].CombatCardIndex == 2, "Completed native feedback was buried behind shallow proposals");
             Check(search.Count == 4999, "Winning feedback must only reorder the retained exact frontier");
+            Check(task.Continuation is { Length: 1 } && task.Continuation[0].CombatCardIndex == 1,
+                "An improved prefix lost the native incumbent's remaining combination");
+            var now = attack with { BeforeHash = "new native state", HandIndex = 8 };
+            Check(LocalRouteRefiner.Resolve(task.Continuation![0], [now]) == now,
+                "A continuation is a newly legal proposal, not an old native state checkpoint");
         });
 
         test("turn optimization shares exploration across later rounds despite a large shallow frontier", () =>

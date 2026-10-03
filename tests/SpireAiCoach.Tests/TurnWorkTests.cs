@@ -51,8 +51,22 @@ static class TurnWorkTests
             })));
             Check(keys.Count == 96 && keys.Distinct().Count() == 96 && broker.Pending == 0,
                 "Later branches were lost or claimed by two workers");
-            Check(styles.Count == 48 && Enum.GetValues<LocalRolloutStyle>().All(s => styles.Count(x => x == s) == 16),
+            Check(styles.Count == 48 && Enum.GetValues<LocalRolloutStyle>().All(s => styles.Count(x => x == s) == 12),
                 "Concurrent owners must share an even portfolio of complete native rollouts");
+        });
+
+        test("shared turn work distinguishes a root not yet submitted from an exhausted frontier", () =>
+        {
+            var captured = Request(); using var broker = new LocalTurnWork(captured, 2);
+            var command = captured with { TurnWorkPipe = broker.PipeName };
+            using var waiting = new LocalTurnWorkClient(command with { Partition = 1 });
+            Check(!waiting.TryTake(out _) && !waiting.RootReady && waiting.Active == 0,
+                "A faster owner must wait for the initial native root");
+            using (var root = new LocalTurnWorkClient(command)) root.Offer([], 1, Hint());
+            Check(waiting.TryTake(out var task) && waiting.RootReady, "The later root was lost");
+            waiting.Finish(task);
+            Check(!waiting.TryTake(out _) && waiting.RootReady && waiting.Active == 0,
+                "An actually exhausted native frontier must remain distinguishable");
         });
 
         test("shared turn work retains its listener with all sixteen owners connected", () =>
