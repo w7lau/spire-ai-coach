@@ -15,7 +15,7 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     bool FastStateSettling = true, bool FastAssetCollection = false, bool StrategicRollouts = true,
     bool ExperimentalNativeData = false, byte[]? RecordedReplayProbe = null, bool DataOnlyCombat = true,
     bool DataOnlyRun = true, bool NumericalExecution = true, bool StopOnZeroLoss = true, bool TrimWorkerOverhead = true,
-    LocalSearchOrder SearchOrder = LocalSearchOrder.MonteCarlo);
+    LocalSearchOrder SearchOrder = LocalSearchOrder.MonteCarlo, bool SkipFinalVerification = false);
 
 // A stop belongs to one frozen request, never to another battle or final verification.
 public sealed record LocalSearchStop(string Id, string SnapshotId, string NativeHash)
@@ -51,7 +51,7 @@ public sealed record LocalSearchResult(string Id, string SnapshotId, string Stat
     int Duplicates = 0, int BudgetPruned = 0, int Victories = 0, int Workers = 1,
     long WorkerMemoryBytes = 0, long SearchElapsedMs = 0, bool IncludePotions = false, LocalSearchTiming? Timing = null,
     LocalAction? BlockedAction = null, int MaxRounds = 64, LocalTrace? Trace = null, LocalWorkStats? Work = null,
-    bool StoppedEarly = false, LocalTurnSearchStats? TurnSearch = null);
+    bool StoppedEarly = false, LocalTurnSearchStats? TurnSearch = null, bool VerificationSkipped = false);
 
 public static class LocalSearchPolicy
 {
@@ -90,6 +90,8 @@ public static class LocalSearchPolicy
                 $"{(best.Won ? "预测战后生命" : "已模拟到的生命")} {best.Hp}/{best.MaxHp}。",
             $"过程累计扣血 {best.HpLost}" + (best.StartingHp is { } start ? $"，已恢复或增加生命 {Math.Max(0, best.Hp - start + best.HpLost)}" : "") +
                 $"；敌人剩余生命合计 {best.EnemyHp}。" };
+        if (result.VerificationSkipped)
+            lines.Insert(1, "未复核：直接显示后台模拟结果，供手动对照；自动执行与路线续用不可用。");
         if (best.Won && best.NetHpLoss == 0 && !best.Actions.Any(a => a.PotionSlot.HasValue))
             lines.Add("已达到战后净损失 0 且不消耗药水的目标；其他收益和最短路线未证明最优。");
         if (!best.Won) lines.Add("以下仅为已模拟的部分路线，不代表能打赢本次战斗。停止原因：" + best.StopReason);

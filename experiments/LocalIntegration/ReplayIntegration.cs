@@ -50,6 +50,13 @@ public static class ReplayIntegration
         // Frozen execution controls retain the same startup; bootstrap has its own paired
         // cold measurements. Ordinary integration fixtures use the product's default.
         var installation = new LocalInstallation(game, directories, MinimalWorkerBootstrap: false);
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_FINAL_VERIFICATION_TEST") == "1")
+        {
+            await FinalVerificationIntegration.Run(root, pool, request, installation,
+                System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT")
+                    ?? throw new InvalidOperationException("A fixed native route is required"));
+            return;
+        }
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_ALGORITHM_TEST") == "1")
         {
             await AlgorithmIntegration.Run(root, pool, request, installation);
