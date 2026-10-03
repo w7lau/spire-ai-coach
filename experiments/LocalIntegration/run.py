@@ -53,7 +53,10 @@ parser.add_argument('--verification-benchmark', action='store_true')
 parser.add_argument('--algorithm-test', action='store_true')
 parser.add_argument('--final-verification-test', action='store_true')
 parser.add_argument('--concurrency-test', action='store_true')
+parser.add_argument('--incident-verification', action='store_true')
 args = parser.parse_args()
+if args.incident_verification and (not args.replay or not args.seed_result):
+    parser.error('--incident-verification requires --replay and --seed-result')
 if args.final_verification_test and (not args.replay or not args.seed_result):
     parser.error('--final-verification-test requires --replay and --seed-result')
 
@@ -111,6 +114,10 @@ with worker_lock(root):
         dependencies=[dict(id='SpireAiCoach', min_version='0.4.0')])), encoding='utf-8')
     for name in ['integration-success', 'integration-error.txt', 'integration-result.json']:
         (root / name).unlink(missing_ok=True)
+    if args.incident_verification:
+        for name in ['integration-incident-summary.json', 'integration-incident-private.json',
+                     'integration-incident-rejection-private.json']:
+            (root / name).unlink(missing_ok=True)
     env = dict(os.environ, APPDATA=str(root / 'Roaming'), LOCALAPPDATA=str(root / 'Local'),
                SPIRE_LOCAL_INTEGRATION=str(root))
     env.pop('SPIRE_NATIVE_PROBE_ROOT', None)
@@ -159,6 +166,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_ALGORITHM_TEST'] = '1' if args.algorithm_test else '0'
     env['SPIRE_LOCAL_FINAL_VERIFICATION_TEST'] = '1' if args.final_verification_test else '0'
     env['SPIRE_LOCAL_CONCURRENCY_TEST'] = '1' if args.concurrency_test else '0'
+    env['SPIRE_LOCAL_INCIDENT_VERIFICATION'] = '1' if args.incident_verification else '0'
     settings = root / 'Roaming/SlayTheSpire2/default/1/settings.save'
     settings_data = json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}
     settings_data.update(volume_master=0, volume_bgm=0, volume_sfx=0, volume_ambience=0)
@@ -180,10 +188,15 @@ with worker_lock(root):
         # Preserve this run while the workspace lock is still held. Other local
         # experiments may reuse the host immediately after it exits.
         args.results_dir.mkdir(parents=True, exist_ok=True)
-        for name in ['integration-replay-private.json', 'integration-replay-summary.json',
+        names = ['integration-replay-private.json', 'integration-replay-summary.json',
                      'integration-concurrency-summary.json', 'integration-concurrency-MonteCarlo-private.json',
                      'integration-concurrency-TurnFrontier-private.json',
-                     'integration-error.txt', 'integration-stdout.log', 'integration-game.log']:
+                     'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.incident_verification:
+            names = ['integration-incident-summary.json', 'integration-incident-private.json',
+                     'integration-incident-rejection-private.json', 'integration-success',
+                     'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        for name in names:
             if (root / name).is_file():
                 shutil.copy2(root / name, args.results_dir / name)
     print(json.dumps(dict(exit_code=process.returncode, passed=passed)))

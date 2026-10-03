@@ -525,7 +525,7 @@ public sealed class CoachOverlay
                         try
                         {
                             Directory.CreateDirectory(Path.GetDirectoryName(timingPath)!);
-                            LocalWire.Write(timingPath, new { version = "0.7.16", request.SearchOrder, request.MaxNodes, request.BudgetSeconds,
+                            LocalWire.Write(timingPath, new { version = "0.7.17", request.SearchOrder, request.MaxNodes, request.BudgetSeconds,
                                 request.SkipFinalVerification, result.VerificationSkipped, result.ElapsedMs, result.Workers,
                                 result.Evaluated, result.Victories, result.Timing, result.Trace });
                         }

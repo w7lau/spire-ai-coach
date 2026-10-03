@@ -150,5 +150,41 @@
     }
   ],
   "initial_execution_host_failed": "Old isolated host profile triggered NCombatRulesFtue.Start NullReferenceException before automatic execution; rerun in the established synthetic host passed.",
-  "scope": "Targeted single-attempt checkpoint and guarded execution tests, not a search-quality benchmark or universal Mod compatibility proof."
+  "scope": "Targeted single-attempt checkpoint and guarded execution tests, not a search-quality benchmark or universal Mod compatibility proof.",
+  "final_merged_build": {
+    "version": "0.7.17",
+    "core_checks_passed": 168,
+    "core_checks_total": 168,
+    "native_build_warnings": 0,
+    "native_build_errors": 0,
+    "mod_dll_sha256": "774882301080A6832E8AD5A8FBB619384A2A452255C982E286066C018CDFE3F8",
+    "preserves_main_0_7_16": true,
+    "guarded_execution": {
+      "prepared_ms": 11588,
+      "analysis_startup_ms": 0,
+      "executed_steps": 23,
+      "expected_steps": 23,
+      "includes_end_turn": true,
+      "final_hp": 74,
+      "expected_hp": 74,
+      "rejected_wrong_combat": true,
+      "rejected_stale": true,
+      "VerificationSkipped": true,
+      "Timing": {
+        "RestoreMs": 771,
+        "ActionMs": 414,
+        "DecisionMs": 47,
+        "VerificationMs": 0,
+        "StartupMs": 0,
+        "Actions": 23,
+        "Restores": 1,
+        "Verifications": 0
+      },
+      "ContinuationFromSearch": true,
+      "rejected_wrong_instance": true,
+      "rejected_disabled_potion": true,
+      "canceled_without_mutation": true,
+      "final": "战斗已结束，已停止执行。"
+    }
+  }
 }

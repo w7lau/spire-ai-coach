@@ -18,7 +18,7 @@ internal static class EarlyStopIntegration
         {
             var command = request with { Id = Guid.NewGuid().ToString("N"), Workers = 2, Partitions = 2,
                 VerifyCandidate = null, RecordedReplayProbe = null, InitialPlan = seed.Actions, DeferVerification = false,
-                ShareSearchWork = true, ContinueOptimization = true, StopOnZeroLoss = enabled,
+                ShareSearchWork = true, ContinueOptimization = true, StopOnZeroLoss = enabled, AdaptiveWorkers = false,
                 MaxNodes = enabled ? 32 : 2, BudgetSeconds = 60, TimelineOrigin = 0, InitialTrace = null };
             var result = await Task.Run(() => pool.Analyze(command, installation, _ => { }, CancellationToken.None));
             LocalWire.Write(Path.Combine(root, $"integration-early-stop-{enabled}-private.json"), result);

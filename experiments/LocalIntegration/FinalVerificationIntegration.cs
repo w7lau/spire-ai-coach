@@ -59,7 +59,7 @@ internal static class FinalVerificationIntegration
                 verification_spans = result.Trace!.Spans.Count(s => s.Stage == "verify"), result.Trace.Dropped });
         }
         LocalWire.Write(Path.Combine(root, "integration-final-verification-summary.json"), new
-            { version = "0.7.16", ui_toggle_mounted = true, default_verification = true,
+            { version = "0.7.17", ui_toggle_mounted = true, default_verification = true,
                 same_frozen_root = true, supplied_initial_plan = true, same_observed_route = true, results = summaries });
     }
 }
