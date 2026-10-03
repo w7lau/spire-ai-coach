@@ -526,8 +526,11 @@ public static class LocalWorker
                             next = await Play(next, options =>
                             {
                                 // A choice is a child of the actual action prefix, so siblings get independent outcomes.
-                                var expected = preferred != null ? plannedAction?.Choices?.ElementAtOrDefault(choiceIndex++) : null;
-                                var match = expected == null ? null : options.SingleOrDefault(c => c.OfferHash == expected.OfferHash &&
+                                var expected = exactAction && preferred != null ? plannedAction?.Choices?.ElementAtOrDefault(choiceIndex++) : null;
+                                var match = !exactAction ?
+                                    preferred != null && plannedAction?.Choices is { } intended
+                                        ? LocalRouteRefiner.ProposeNextChoice(intended, options, ref choiceIndex) : null :
+                                    expected == null ? null : options.SingleOrDefault(c => c.OfferHash == expected.OfferHash &&
                                     c.Kind == expected.Kind && c.Index == expected.Index && c.ModelId == expected.ModelId &&
                                     (c.Indices ?? []).SequenceEqual(expected.Indices ?? []));
                                 var choices = options.Select(c => LocalRouteCoverage.ChoiceAction(c, round)).ToArray();

@@ -40,7 +40,7 @@ internal static class AlgorithmIntegration
             throw new InvalidOperationException("New-mode native search/coverage/final verification failed: " + result.Message);
         LocalWire.Write(Path.Combine(root, "integration-algorithm-summary.json"), new
         {
-            version = "0.7.11", ui_controls_mounted = true, outside_combat_guard_passed = true,
+            version = "0.7.12", ui_controls_mounted = true, outside_combat_guard_passed = true,
             request.SearchOrder, request.Workers, request.MaxNodes, request.BudgetSeconds, request.MaxRounds,
             request.IncludePotions, request.StopOnZeroLoss, request.NumericalExecution, request.TrimWorkerOverhead,
             manual_seed = false, result.Status, result.Evaluated, result.Victories, result.Rejected, result.ElapsedMs,

@@ -13,6 +13,7 @@ internal sealed class LocalTacticalPreview(Player player)
 {
     private readonly Dictionary<Creature, double> _threats = new();
     private double _incoming;
+    private double _handEndHpLoss;
     private bool _retainsBlock;
     private CardModel[] _playable = [];
 
@@ -20,6 +21,15 @@ internal sealed class LocalTacticalPreview(Player player)
     {
         var result = new LocalTacticalPreview(player);
         result._playable = playable;
+        foreach (var card in player.PlayerCombatState!.Hand.Cards)
+        {
+            try
+            {
+                if (card.HasTurnEndInHandEffect && card.DynamicVars.TryGetValue("HpLoss", out var loss))
+                    result._handEndHpLoss += Math.Max(0, (double)loss.PreviewValue);
+            }
+            catch { /* A Mod's unknown end effect remains for native execution to evaluate. */ }
+        }
         try { result._retainsBlock = !Hook.ShouldClearBlock(player.Creature.CombatState!, player.Creature, out _); }
         catch { /* Unknown retention keeps the neutral prior; native execution remains authoritative. */ }
         foreach (var enemy in CombatManager.Instance.DebugOnlyGetState()!.Enemies)
@@ -36,7 +46,8 @@ internal sealed class LocalTacticalPreview(Player player)
     }
 
     public int EndTurnPriority => LocalTactics.Priority(new(Incoming: _incoming,
-        CurrentBlock: player.Creature.Block, Hp: player.Creature.CurrentHp, EndTurn: true, Known: true));
+        CurrentBlock: player.Creature.Block, Hp: player.Creature.CurrentHp, EndTurn: true, Known: true,
+        HandEndHpLoss: _handEndHpLoss));
 
     public int Priority(CardModel card, Creature? target)
     {
@@ -53,6 +64,10 @@ internal sealed class LocalTacticalPreview(Player player)
             int affordable = Math.Min(attacks, energyAfter + others.Count(c => baseDamage(c) > 0 && c.EnergyCost.GetAmountToSpend() == 0));
             var followup = others.Select(baseDamage).OrderDescending().Take(affordable).Sum();
             var repeat = Math.Max(1, Value("Repeat"));
+            // HpLoss alone does not identify a payment made by OnPlay. The native
+            // in-hand trigger flag places this preview in the turn-end risk instead.
+            // No model/name allowlist or effect replacement is involved.
+            var handEndHpLoss = card.HasTurnEndInHandEffect ? Value("HpLoss") : 0;
             bool known = vars.Keys.Any(k => k is "Damage" or "CalculatedDamage" or "Block" or "CalculatedBlock" or
                 "StrengthPower" or "VulnerablePower" or "WeakPower" or "Energy" or "HpLoss");
             return LocalTactics.Priority(new(
@@ -63,8 +78,9 @@ internal sealed class LocalTacticalPreview(Player player)
                 Hp: player.Creature.CurrentHp, Strength: Value("StrengthPower"),
                 Vulnerable: enemy ? Value("VulnerablePower") : 0, Weak: enemy ? Value("WeakPower") : 0,
                 // "Cards" can mean discard/exhaust/selection count, so it is not a generic draw hint.
-                EnergyGain: Value("Energy"), HpCost: Value("HpLoss"),
-                FollowupAttacks: affordable, FollowupDamage: followup, Known: known, RetainsBlock: _retainsBlock));
+                EnergyGain: Value("Energy"), HpCost: card.HasTurnEndInHandEffect ? 0 : Value("HpLoss"),
+                FollowupAttacks: affordable, FollowupDamage: followup, Known: known, RetainsBlock: _retainsBlock,
+                HandEndHpLoss: handEndHpLoss));
         }
         catch { return 0; }
     }
