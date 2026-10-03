@@ -893,6 +893,7 @@ DiscrepancyTests.Register(Test);
 TurnSearchTests.Register(Test);
 RouteCoverageTests.Register(Test);
 TimelineTests.Register(Test);
+FinalVerificationTests.Register(Test);
 var filter = args.Length == 2 && args[0] == "--filter" ? args[1] : null;
 if (args.Length != 0 && filter == null) { Console.Error.WriteLine("Usage: [--filter substring]"); return 2; }
 var selected = tests.Where(t => filter == null || t.Item1.Contains(filter, StringComparison.OrdinalIgnoreCase)).ToArray();

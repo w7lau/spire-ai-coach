@@ -52,6 +52,25 @@ static class TimelineTests
             var text = LocalTimeline.Format(legacy with { Trace = trace });
             Check(text.Contains("0.08s") && !text.Contains("0.06s"), "Nested waits must not be added again to parent action totals");
         });
+        test("timeline preserves late verification and display when action detail capacity is exhausted", () =>
+        {
+            var worker = new LocalTimeline(1000, 512, frequency: 1000);
+            for (int i = 0; i < 1000; i++) worker.Add(new(0, "search", "card", "", i, 1, Depth: 1));
+            worker.Add(new(0, "search", "session", "", 0, 1000));
+            worker.Add(new(0, "search", "result_transfer", "", 1000, 10, Depth: 1));
+            var parent = new LocalTimeline(1000, 512, frequency: 1000);
+            parent.Import(worker.Snapshot());
+            parent.Add(new(0, "verify", "verify", "", 1010, 100));
+            parent.Add(new(-1, "main", "display", "", 1110, 2));
+            var trace = JsonSerializer.Deserialize<LocalTrace>(JsonSerializer.Serialize(parent.Snapshot()))!;
+            Check(trace.Spans.Length <= 512 && trace.Dropped > 0, "Recording must remain bounded across IPC imports");
+            Check(trace.Spans.Any(s => s.Phase == "session") && trace.Spans.Any(s => s.Phase == "result_transfer") &&
+                trace.Spans.Any(s => s.Phase == "verify" && s.DurationMs == 100) && trace.Spans.Any(s => s.Phase == "display"),
+                "Detailed actions cannot crowd out end-of-search, final verification or display time");
+            var text = LocalTimeline.Format(new("id", "state", "done", "", 1, 0, 1112, null, Trace: trace));
+            Check(text.Contains("独立复核最终路线") && text.Contains("核对并显示结果") && text.Contains("记录上限"),
+                "The player must see finalization intervals and the detail truncation notice");
+        });
         test("timeline partial routes never describe incomplete combat as final HP settlement", () =>
         {
             var candidate = new LocalCandidate([],60,20,30,0,80,false,false,false,StartingHp:80);

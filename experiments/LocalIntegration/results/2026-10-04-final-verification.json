@@ -1,0 +1,66 @@
+{
+  "version": "0.7.14",
+  "ui_toggle_mounted": true,
+  "default_verification": true,
+  "same_frozen_root": true,
+  "supplied_initial_plan": true,
+  "same_observed_route": true,
+  "results": [
+    {
+      "skip": true,
+      "Status": "done",
+      "VerificationSkipped": true,
+      "Evaluated": 1,
+      "ElapsedMs": 6136,
+      "SearchElapsedMs": 5818,
+      "Timing": {
+        "RestoreMs": 2118,
+        "ActionMs": 2514,
+        "DecisionMs": 670,
+        "VerificationMs": 0,
+        "StartupMs": 0,
+        "Actions": 96,
+        "Restores": 1,
+        "Verifications": 0
+      },
+      "Won": true,
+      "StartingHp": 87,
+      "Hp": 21,
+      "HpLost": 86,
+      "NetHpLoss": 66,
+      "Rounds": 22,
+      "steps": 96,
+      "verified_steps": 0,
+      "verification_spans": 0,
+      "Dropped": 0
+    },
+    {
+      "skip": false,
+      "Status": "done",
+      "VerificationSkipped": false,
+      "Evaluated": 1,
+      "ElapsedMs": 13473,
+      "SearchElapsedMs": 2768,
+      "Timing": {
+        "RestoreMs": 212,
+        "ActionMs": 1573,
+        "DecisionMs": 600,
+        "VerificationMs": 10148,
+        "StartupMs": 0,
+        "Actions": 96,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "Won": true,
+      "StartingHp": 87,
+      "Hp": 21,
+      "HpLost": 86,
+      "NetHpLoss": 66,
+      "Rounds": 22,
+      "steps": 96,
+      "verified_steps": 96,
+      "verification_spans": 619,
+      "Dropped": 0
+    }
+  ]
+}
