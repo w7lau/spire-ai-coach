@@ -13,6 +13,7 @@ internal static class NumericalIntegration
     public static async Task Run(string root, LocalWorkerPool pool, LocalSearchRequest request,
         LocalInstallation installation, string recordedPath)
     {
+        if (!request.NumericalExecution) throw new InvalidOperationException("The default numerical request mode must be enabled");
         await Task.Run(() => pool.Prepare(installation, 1, CancellationToken.None));
         var worker = ((Array)typeof(LocalWorkerPool).GetField("_workers", BindingFlags.NonPublic | BindingFlags.Instance)!
             .GetValue(pool)!).GetValue(0)!;
@@ -25,7 +26,8 @@ internal static class NumericalIntegration
         {
             var command = request with { Id = Guid.NewGuid().ToString("N"), Partition = 0, Partitions = 1,
                 RecordedReplayProbe = replay, VerifyCandidate = null, InitialPlan = null,
-                DataOnlyCombat = true, DataOnlyRun = true, NumericalExecution = numerical };
+                DataOnlyCombat = true, DataOnlyRun = true };
+            if (!numerical) command = command with { NumericalExecution = false };
             LocalWire.Write(Path.Combine(workerRoot, "request.json"), command);
             var timer = Stopwatch.StartNew();
             LocalSearchResult? result = null;
@@ -70,8 +72,9 @@ internal static class NumericalIntegration
             // optimization search or evidence of better search coverage/quality.
             var command = request with { Id = Guid.NewGuid().ToString("N"), Partition = 0, Partitions = 1,
                 RecordedReplayProbe = null, VerifyCandidate = null, InitialPlan = seed,
-                DataOnlyCombat = true, DataOnlyRun = true, NumericalExecution = numerical,
+                DataOnlyCombat = true, DataOnlyRun = true,
                 MaxNodes = 1, DeferVerification = true, ShareSearchWork = false };
+            if (!numerical) command = command with { NumericalExecution = false };
             var result = await Submit(command);
             LocalWire.Write(Path.Combine(root, $"integration-numerical-search-private-{records.Count}.json"), result);
             var best = result.Best;

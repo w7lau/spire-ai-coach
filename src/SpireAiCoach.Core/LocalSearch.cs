@@ -14,7 +14,7 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     bool FastCardPresentation = true, bool FastNativeWaits = true, bool ShareSearchWork = true,
     bool FastStateSettling = true, bool FastAssetCollection = false, bool StrategicRollouts = true,
     bool ExperimentalNativeData = false, byte[]? RecordedReplayProbe = null, bool DataOnlyCombat = true,
-    bool DataOnlyRun = true, bool NumericalExecution = false);
+    bool DataOnlyRun = true, bool NumericalExecution = true);
 
 public sealed record LocalAction(int HandIndex, string ModelId, uint? TargetId,
     string CardName, string TargetName, string BeforeHash, int Round = 0,

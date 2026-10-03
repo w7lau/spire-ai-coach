@@ -1,6 +1,6 @@
-# Direct native rule execution prototype
+# Direct native rule execution
 
-`NumericalExecution` is an internal, default-off request flag. In an owned worker with `DataOnlyCombat` and `DataOnlyRun`, it executes native effects through a serial continuation queue instead of frame polling. There are no card-name adapters. Card/monster effects, native action events, choice synchronization, history, RNG, recalculation and final settlement retain their original code.
+`NumericalExecution` is an internal request flag, enabled by default in 0.7.8, including older IPC requests that omit it. In an owned worker with `DataOnlyCombat` and `DataOnlyRun`, it executes native effects through a serial continuation queue instead of frame polling. There are no card-name adapters. Card/monster effects, native action events, choice synchronization, history, RNG, recalculation and final settlement retain their original code. An explicit false flag remains available for controlled comparisons.
 
 The native executor's direct Task-await branch is selected only inside this scope. Its usual before/after completion callbacks are retained, including paused choices; global `NonInteractiveMode` is not enabled. State notifications coalesce changes and run the original recalculation/subscribers at a logical boundary without an `NRun`/`NGame` frame owner. `Task.Yield` continuations run on the worker's owning thread.
 
@@ -22,4 +22,4 @@ Earlier prototype reuse stranded late continuations: a repeated restore took abo
 
 These are fixed-route execution measurements, excluding worker startup and the final ordinary-scene check. They do not prove that unseeded search discovers the human six-round plan, that all paths can be exhausted quickly, or that every possible Mod is compatible. The worker still hosts the native game models/Godot runtime; this prototype is not a standalone reimplementation of combat arithmetic. The tested cards and Mod hooks run their original code.
 
-Run the existing owned-fixture integration runner with `--numerical-benchmark`, `--replay`, `--recorded-replay` and optional `--seed-result`. Real inputs, game binaries, decompiled source and complete outputs remain local. Product installation is unchanged by the experiment.
+Run the existing owned-fixture integration runner with `--numerical-benchmark`, `--replay`, `--recorded-replay` and optional `--seed-result`. Real inputs, game binaries, decompiled source and complete outputs remain local. New samples exercise the default request mode; baseline samples explicitly disable it. Only the final selected candidate uses ordinary-scene verification.
