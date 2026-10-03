@@ -1,0 +1,19 @@
+{
+  "Status": "done",
+  "ElapsedMs": 7605,
+  "Rounds": 18,
+  "steps": 96,
+  "checked_steps": 96,
+  "Won": true,
+  "StartingHp": 64,
+  "Hp": 64,
+  "NetHpLoss": 0,
+  "parent_error_gate_passed": true,
+  "wrong_settlement_rejected": true,
+  "searches": 0,
+  "version": "0.7.16",
+  "core_tests": "166/166",
+  "source": "frozen player candidate; all original mods loaded; owned worker only",
+  "dll_sha256": "3ad022636a795191b19104fa823e2b7047c570b6f827da50856db5378c79654d",
+  "not_measured": "unseeded full search speed or optimality"
+}

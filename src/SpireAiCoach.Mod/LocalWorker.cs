@@ -354,7 +354,11 @@ public static class LocalWorker
                     catch (IOException) { /* Peer can be replacing its private IPC file. */ }
                 }
                 if (best != null && LocalSearchPolicy.Better(best, refinementSeed)) refinementSeed = best;
-                if (!systematic && refinementSeed != null && (work == null || ReferenceEquals(best, refinementSeed))) refiner.Offer(refinementSeed, work == null ? request.Partition : 0,
+                // Each producer submits improvements of its own measured best.
+                // Retain distinct local seeds, rather than regenerating one peer's
+                // plan on every worker or deleting all weaker-looking seeds.
+                var proposalSeed = work == null ? refinementSeed : best;
+                if (!systematic && proposalSeed != null) refiner.Offer(proposalSeed, work == null ? request.Partition : 0,
                     work == null ? request.Partitions : 1);
                 LocalAction[]? planned = null;
                 LocalTurnTask? turnTask = null;
