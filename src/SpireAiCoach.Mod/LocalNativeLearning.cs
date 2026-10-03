@@ -3,17 +3,26 @@ using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Entities.Powers;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Entities.Multiplayer;
+using SpireAiCoach.Core;
 
 namespace SpireAiCoach.Mod;
 
 // Learn exploration hints from effects actually executed in this frozen search.
 // This is not an effect mirror: native hooks still execute every proposed line.
-internal sealed class LocalNativeLearning
+internal sealed class LocalNativeLearning(bool trackCosts = false)
 {
     internal sealed record Observation(string Card, int Round, decimal Energy, int PaidEnergy, int Hand,
-        int Upgrades, int Statuses, int Buffs, int Hp, bool HasHandEndEffect);
+        int Upgrades, int Statuses, int Buffs, int Hp, uint Played,
+        IReadOnlyDictionary<uint, int>? HandCosts, bool HasHandEndEffect);
     private readonly Dictionary<string, (double Total, int Samples)> _bonuses = new(StringComparer.Ordinal);
     private static string Key(CardModel card) => $"{card.Id}:{card.CurrentUpgradeLevel}";
+
+    private static Dictionary<uint, int> Costs(Player player) => player.PlayerCombatState!.Hand.Cards
+        // Spending energy makes an X card's spending amount fall; that is not a
+        // reduction of its cost. Keep X cards out of this optional observation.
+        .Where(c => !c.EnergyCost.CostsX)
+        .ToDictionary(c => NetCombatCard.FromModel(c).CombatCardIndex, c => c.EnergyCost.GetAmountToSpend());
 
     public Observation? Before(CardModel card, Player player)
     {
@@ -25,7 +34,7 @@ internal sealed class LocalNativeLearning
                 pcs.AllPiles.Where(p => p.Type != PileType.Exhaust).SelectMany(p => p.Cards)
                     .Count(c => c.Type is CardType.Status or CardType.Curse),
                 player.Creature.Powers.Count(p => p.TypeForCurrentAmount == PowerType.Buff), player.Creature.CurrentHp,
-                card.HasTurnEndInHandEffect);
+                NetCombatCard.FromModel(card).CombatCardIndex, trackCosts ? Costs(player) : null, card.HasTurnEndInHandEffect);
         }
         catch { return null; }
     }
@@ -51,6 +60,8 @@ internal sealed class LocalNativeLearning
             double bonus = Math.Min(36, drawn * 6) + Math.Min(40, (double)energy * 12) +
                 Math.Min(40, upgrades * 6) + Math.Min(24, removed * 6) + Math.Min(40, buffs * 20) + Math.Min(24, healed * 3) -
                 Math.Min(40, handEffectPlayCost * 3);
+            if (before.HandCosts != null)
+                bonus += Math.Min(80d, (double)LocalResourceEffects.HandCostSavings(before.HandCosts, Costs(player), before.Played) * 12);
             var old = _bonuses.GetValueOrDefault(before.Card);
             _bonuses[before.Card] = (old.Total + bonus, old.Samples + 1);
         }

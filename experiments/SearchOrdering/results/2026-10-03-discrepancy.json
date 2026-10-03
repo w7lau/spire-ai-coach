@@ -1,0 +1,83 @@
+{
+  "date": "2026-10-03",
+  "scope": "Synthetic search-order comparison, not native game performance",
+  "testResult": "12/12",
+  "regressionResult": "search 15/15 (one overlapping oracle test)",
+  "nativeGame": false,
+  "elapsedMs": 585,
+  "baseline": "existing tree selection with its 3-of-4 coherent rollout schedule; no shared queue or refiner",
+  "measurements": [
+    {
+      "problem": "three-early-mistakes",
+      "order": "MonteCarlo",
+      "seeds": 30,
+      "limit": 64,
+      "solved": 4,
+      "medianTrialsAmongSolved": 40,
+      "maxTrialsAmongSolved": 40
+    },
+    {
+      "problem": "three-early-mistakes",
+      "order": "LimitedDiscrepancy",
+      "seeds": 30,
+      "limit": 64,
+      "solved": 0,
+      "medianTrialsAmongSolved": null,
+      "maxTrialsAmongSolved": null
+    },
+    {
+      "problem": "three-early-mistakes",
+      "order": "DepthDiscrepancy",
+      "seeds": 30,
+      "limit": 64,
+      "solved": 30,
+      "medianTrialsAmongSolved": 8,
+      "maxTrialsAmongSolved": 8
+    },
+    {
+      "problem": "three-early-mistakes",
+      "order": "DiscrepancyPortfolio",
+      "seeds": 30,
+      "limit": 64,
+      "solved": 30,
+      "medianTrialsAmongSolved": 11,
+      "maxTrialsAmongSolved": 11
+    },
+    {
+      "problem": "one-late-mistake",
+      "order": "MonteCarlo",
+      "seeds": 30,
+      "limit": 64,
+      "solved": 0,
+      "medianTrialsAmongSolved": null,
+      "maxTrialsAmongSolved": null
+    },
+    {
+      "problem": "one-late-mistake",
+      "order": "LimitedDiscrepancy",
+      "seeds": 30,
+      "limit": 64,
+      "solved": 30,
+      "medianTrialsAmongSolved": 22,
+      "maxTrialsAmongSolved": 22
+    },
+    {
+      "problem": "one-late-mistake",
+      "order": "DepthDiscrepancy",
+      "seeds": 30,
+      "limit": 64,
+      "solved": 0,
+      "medianTrialsAmongSolved": null,
+      "maxTrialsAmongSolved": null
+    },
+    {
+      "problem": "one-late-mistake",
+      "order": "DiscrepancyPortfolio",
+      "seeds": 30,
+      "limit": 64,
+      "solved": 30,
+      "medianTrialsAmongSolved": 40,
+      "maxTrialsAmongSolved": 40
+    }
+  ]
+}

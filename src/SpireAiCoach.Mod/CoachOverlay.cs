@@ -35,6 +35,8 @@ public sealed class CoachOverlay
     private TextEdit _context = null!;
     private Button _analyze = null!;
     private Button _localAnalyze = null!;
+    private Button _turnAnalyze = null!;
+    private LocalSearchOrder _lastLocalOrder = LocalSearchOrder.MonteCarlo;
     private Button _continueOptimize = null!;
     private LocalWorkerPool _localPool = null!;
     private bool _localAnalyzing;
@@ -105,14 +107,18 @@ public sealed class CoachOverlay
         var row = new HBoxContainer(); body.AddChild(row);
         _analyze = new Button { Text = "AI 分析 · F9", Disabled = true }; row.AddChild(_analyze);
         _analyze.Pressed += Analyze;
-        _localAnalyze = new Button { Text = "本地整场计算（实验）", Disabled = true }; row.AddChild(_localAnalyze);
-        _localAnalyze.Pressed += AnalyzeLocal;
         _cancel = new Button { Text = "取消", Disabled = true }; row.AddChild(_cancel);
         _cancel.Pressed += () => Cancel("已取消分析。");
         var config = new Button { Text = "设置" }; row.AddChild(config);
         config.Pressed += () => _settingsPanel.Visible = !_settingsPanel.Visible;
         var hide = new Button { Text = "收起" }; row.AddChild(hide);
         hide.Pressed += () => _panel.Hide();
+        var localRow = new HBoxContainer(); body.AddChild(localRow);
+        _localAnalyze = new Button { Name = "LocalBattleSearch", Text = "本地整场计算（实验）", Disabled = true }; localRow.AddChild(_localAnalyze);
+        _localAnalyze.Pressed += () => AnalyzeLocal(LocalSearchOrder.MonteCarlo);
+        _turnAnalyze = new Button { Name = "LocalTurnSearch", Text = "新算法整场计算（实验）", Disabled = true }; localRow.AddChild(_turnAnalyze);
+        _turnAnalyze.Pressed += () => AnalyzeLocal(LocalSearchOrder.TurnFrontier);
+        body.AddChild(Wrapped("两种算法共用后台模拟。每路最多 64 次整场尝试、60 秒搜索，先达到一项即结束；准备和最终复核另计。"));
         body.AddChild(Wrapped("规划整场战斗，最多 64 轮，优先减少战后净生命损失、保留药水。关闭“无伤通关后立即返回”可继续优化无伤路线。"));
         var localOptions = new HBoxContainer(); body.AddChild(localOptions);
         localOptions.AddChild(new Label { Text = "本地并发（0 自动，1–16 手动）" });
@@ -166,7 +172,7 @@ public sealed class CoachOverlay
         _freshness = Wrapped(""); body.AddChild(_freshness);
         var executionRow = new HBoxContainer(); body.AddChild(executionRow);
         _continueOptimize = new Button { Text = "继续优化", Disabled = true }; executionRow.AddChild(_continueOptimize);
-        _continueOptimize.Pressed += () => AnalyzeLocal(true);
+        _continueOptimize.Pressed += () => AnalyzeLocal(_lastLocalOrder, true);
         _execute = new Button { Text = "执行方案", Disabled = true }; executionRow.AddChild(_execute);
         _execute.Pressed += ExecuteLocalPlan;
         _stopExecution = new Button { Text = "停止执行 · Esc", Disabled = true }; executionRow.AddChild(_stopExecution);
@@ -268,7 +274,7 @@ public sealed class CoachOverlay
             _battle.Text = snapshot == null ? "当前不在战斗中。" :
                 $"第 {snapshot.Round} 轮 · {snapshot.Phase}\n生命 {snapshot.Player.Hp}/{snapshot.Player.MaxHp} · 格挡 {snapshot.Player.Block} · 能量 {snapshot.Player.Energy}\n手牌 {snapshot.Hand.Count} / 抽牌 {snapshot.DrawPile.Count} / 弃牌 {snapshot.DiscardPile.Count} / 消耗 {snapshot.ExhaustPile.Count}";
             _analyze.Disabled = _executing || _request != null || snapshot?.CanAdvise != true;
-            _localAnalyze.Disabled = _analyze.Disabled;
+            _localAnalyze.Disabled = _turnAnalyze.Disabled = _analyze.Disabled;
             _execute.Disabled = _analyze.Disabled || _continuation == null || _continuation.Invalid || !LocalCapture.Stable();
             _continueOptimize.Disabled = _execute.Disabled;
             _stopExecution.Disabled = !_executing;
@@ -296,7 +302,7 @@ public sealed class CoachOverlay
             _freshness.Text = "当前状态不可用，旧建议不适用。";
             _battle.Text = $"读取失败：{ex.GetType().Name}";
             _analyze.Disabled = true;
-            _localAnalyze.Disabled = true;
+            _localAnalyze.Disabled = _turnAnalyze.Disabled = true;
             _execute.Disabled = true;
             _continueOptimize.Disabled = true;
         }
@@ -376,7 +382,7 @@ public sealed class CoachOverlay
         _adviceHash = null;
         _advice.Text = "等待 AI 开始回复…";
         _freshness.Text = "接收中的内容尚未完成，请等待整理后的出牌建议。";
-        _analyze.Disabled = true; _localAnalyze.Disabled = true; _cancel.Disabled = false;
+        _analyze.Disabled = true; _localAnalyze.Disabled = _turnAnalyze.Disabled = true; _cancel.Disabled = false;
         _status.Text = "正在分析… 可以取消；继续出牌会使本次分析失效。";
         _ = Task.Run(async () =>
         {
@@ -432,7 +438,7 @@ public sealed class CoachOverlay
                     {
                         _request = null; _cancel.Disabled = true;
                         _analyze.Disabled = _snapshot?.CanAdvise != true;
-                        _localAnalyze.Disabled = _analyze.Disabled;
+                        _localAnalyze.Disabled = _turnAnalyze.Disabled = _analyze.Disabled;
                     }
                 });
                 cancellation.Dispose();
@@ -440,9 +446,7 @@ public sealed class CoachOverlay
         });
     }
 
-    private void AnalyzeLocal() => AnalyzeLocal(false);
-
-    private void AnalyzeLocal(bool continueOptimization)
+    private void AnalyzeLocal(LocalSearchOrder order, bool continueOptimization = false)
     {
         if (_request != null || _executing) return;
         var timeline = new LocalTimeline(capacity: 65536);
@@ -453,12 +457,11 @@ public sealed class CoachOverlay
         LocalInstallation installation;
         try
         {
-            request = LocalCapture.Capture(_snapshotHash!, continueOptimization) with
-                { Workers = (int)_localWorkers.Value, IncludePotions = _localPotions.ButtonPressed,
-                    BudgetSeconds = 60, StopOnZeroLoss = _localStopOnZeroLoss.ButtonPressed };
+            request = LocalCalculation.Configure(LocalCapture.Capture(_snapshotHash!, continueOptimization), order,
+                (int)_localWorkers.Value, _localPotions.ButtonPressed, _localStopOnZeroLoss.ButtonPressed);
             // Reuse only the suffix matching this combat, mods, native state and complete history.
             // It is an exploration seed; the worker re-executes and verifies it, never copies its score.
-            if (_continuation != null && request.History != null)
+            if (order == LocalSearchOrder.MonteCarlo && _continuation != null && request.History != null)
             {
                 var seed = _continuation.Advance(_snapshot!.CombatId, request.LoadedMods, request.NativeHash, request.History);
                 if (seed?.IncludePotions == request.IncludePotions) request = request with { InitialPlan = seed.Best?.Actions };
@@ -471,15 +474,16 @@ public sealed class CoachOverlay
         var generation = ++_generation;
         var cancellation = new CancellationTokenSource();
         _request = cancellation;
+        _lastLocalOrder = order;
         _localAnalyzing = true;
         _continuation = null;
         _pendingLocalProgress.Clear();
         _localProgress.Begin(request);
         _adviceHash = null;
-        _advice.Text = "正在本地计算，不调用 AI…";
+        _advice.Text = LocalCalculation.Name(order) + "进行中，不调用 AI…";
         _status.Text = "准备计算…";
         _freshness.Text = "继续出牌会取消本次计算；候选路线仅在后台执行。";
-        _analyze.Disabled = true; _localAnalyze.Disabled = true; _cancel.Disabled = false;
+        _analyze.Disabled = true; _localAnalyze.Disabled = _turnAnalyze.Disabled = true; _cancel.Disabled = false;
         _continueOptimize.Disabled = true; _execute.Disabled = true;
         _ = Task.Run(async () =>
         {
@@ -510,14 +514,14 @@ public sealed class CoachOverlay
                         try
                         {
                             Directory.CreateDirectory(Path.GetDirectoryName(timingPath)!);
-                            LocalWire.Write(timingPath, new { version = "0.7.6", result.ElapsedMs, result.Workers,
+                            LocalWire.Write(timingPath, new { version = "0.7.12", request.SearchOrder, request.MaxNodes, request.BudgetSeconds, result.ElapsedMs, result.Workers,
                                 result.Evaluated, result.Victories, result.Trace });
                         }
                         catch (Exception ex) { GD.Print("[SpireAiCoach] Timing save failed: " + ex.GetType().Name); }
                     });
                     _adviceHash = request.SnapshotId;
                     _freshness.Text = "路线已复核；按建议操作可续用。当前为预算内最佳候选，尚未证明全局最优。";
-                    _status.Text = "本地计算完成 · 不消耗 API";
+                    _status.Text = LocalCalculation.Name(order) + "完成 · 不消耗 API";
                     if (result.Best?.Continuation is { Length: > 0 })
                     {
                         _continuation = new(_snapshot!.CombatId, request.LoadedMods, result);
@@ -539,7 +543,7 @@ public sealed class CoachOverlay
                 {
                     if (generation != _generation) return;
                     _localAnalyzing = false; _request = null; _cancel.Disabled = true;
-                    _analyze.Disabled = _snapshot?.CanAdvise != true; _localAnalyze.Disabled = _analyze.Disabled;
+                    _analyze.Disabled = _snapshot?.CanAdvise != true; _localAnalyze.Disabled = _turnAnalyze.Disabled = _analyze.Disabled;
                 });
                 cancellation.Dispose();
             }
@@ -598,7 +602,7 @@ public sealed class CoachOverlay
         _execution = cancellation; _executing = true;
         _execute.Disabled = true; _stopExecution.Disabled = false;
         _continueOptimize.Disabled = true;
-        _analyze.Disabled = true; _localAnalyze.Disabled = true;
+        _analyze.Disabled = true; _localAnalyze.Disabled = _turnAnalyze.Disabled = true;
         _freshness.Text = "正在按方案执行。点击停止或按 Esc 可随时停止后续动作。";
         try
         {

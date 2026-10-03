@@ -1,0 +1,90 @@
+{
+  "date": "2026-10-03",
+  "nativeGame": true,
+  "input": "same frozen incident, no route seed, matching native root and loaded Mod identities",
+  "controls": {
+    "workers": 4,
+    "budgetSecondsPerWorker": 60,
+    "maxTrialsPerWorker": 32,
+    "maxRounds": 64,
+    "includePotions": true,
+    "dataOnlyCombat": true,
+    "dataOnlyRun": true,
+    "minimalWorkerBootstrap": false,
+    "independentFinalVerifications": 1,
+    "installedModChanged": false
+  },
+  "limitations": [
+    "One old/new run, in this order; not a statistical speed comparison.",
+    "Pool elapsed time excludes the integration host's startup and exit.",
+    "These cold full-bootstrap integration runs do not measure the installed UI's prepared-worker latency.",
+    "Trial interval medians include mixed battle lengths and budget-interrupted attempts, excluding worker startup and final verification.",
+    "Trace prefix diagnosis uses displayed card labels, not a verified executable plan or full native choice equivalence.",
+    "Gross HP loss has no enemy/self-cost attribution.",
+    "No global optimum proof; neither search discovered a six-round no-potion zero-net-loss winner."
+  ],
+  "monteCarlo": {
+    "status": "done",
+    "evaluated": 63,
+    "rejected": 0,
+    "victories": 30,
+    "poolElapsedMs": 107102,
+    "trialMedianMs": 3665.43,
+    "won": true,
+    "startingHp": 87,
+    "finalHp": 87,
+    "netHpLoss": 0,
+    "grossHpLoss": 15,
+    "rounds": 10,
+    "usedPotion": false,
+    "verifiedSteps": 58,
+    "finalVerificationMs": 8579,
+    "manualDisplayPrefixMax": 1
+  },
+  "discrepancyPortfolio": {
+    "status": "done",
+    "evaluated": 61,
+    "rejected": 0,
+    "victories": 36,
+    "poolElapsedMs": 105010,
+    "runnerElapsedMs": 143473,
+    "trialMedianMs": 3671.13,
+    "won": true,
+    "startingHp": 87,
+    "finalHp": 87,
+    "netHpLoss": 0,
+    "grossHpLoss": 14,
+    "rounds": 9,
+    "usedPotion": false,
+    "verifiedSteps": 54,
+    "finalVerificationMs": 8993,
+    "manualDisplayPrefixMax": 2,
+    "thirdActionInMatchingTrials": "CARD.FLAME_BARRIER",
+    "manualThirdAction": "CARD.CRIMSON_MANTLE",
+    "firstZeroNetLossObserved": {
+      "runnerElapsedMs": 76978,
+      "laneElapsedMs": 6074,
+      "rounds": 13,
+      "samplingResolutionMs": 1000
+    },
+    "cumulativeSearchPhaseMsAcrossFourWorkers": {
+      "card": 124537.82,
+      "endTurn": 51138.82,
+      "potion": 739.63,
+      "decision": 35058.54,
+      "restore": 10948.63,
+      "publish": 21889.41,
+      "refine": 6.8
+    }
+  },
+  "previousRecordedHumanDiagnostic": {
+    "autonomousDiscovery": false,
+    "rounds": 6,
+    "startingHp": 87,
+    "finalHp": 87,
+    "netHpLoss": 0,
+    "grossHpLoss": 11,
+    "processingElapsedMsExcludingColdStartup": 3374
+  },
+  "conclusion": "The new ordering improved the selected winner from ten to nine rounds in this case, without measurable per-trial acceleration. Consecutive early-turn alternatives remain underexplored. Reuse these records for later comparisons; do not repeat the old algorithm for each iteration."
+}
