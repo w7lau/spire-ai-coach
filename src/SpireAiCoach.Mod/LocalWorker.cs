@@ -114,7 +114,6 @@ public static class LocalWorker
 
     private static async Task<bool> Search(LocalSearchRequest request)
     {
-        _nativeLearning = request.StrategicRollouts ? new() : null;
         LocalWorkerLogic.ResetCounters();
         _timeline = new(request.TimelineOrigin);
         _traceWorker = request.Partition; _traceRoute = _traceStep = _restoreDepth = 0;
@@ -124,6 +123,7 @@ public static class LocalWorker
         _includePotions = false;
         bool systematic = request.SearchOrder != LocalSearchOrder.MonteCarlo;
         bool turnMode = request.SearchOrder == LocalSearchOrder.TurnFrontier;
+        _nativeLearning = request.StrategicRollouts ? new(trackCosts: turnMode) : null;
         _excludedModels = new(request.ExcludedModels ?? [], StringComparer.Ordinal);
         var timer = Stopwatch.StartNew();
         var budget = new Stopwatch();
@@ -324,7 +324,7 @@ public static class LocalWorker
                     work == null ? request.Partitions : 1);
                 LocalAction[]? planned = null;
                 LocalTurnTask? turnTask = null;
-                bool fullRollout = !turnMode || attempts % 4 == 0;
+                bool fullRollout = !turnMode || LocalTurnSearch.IsFullRollout(attempts);
                 LocalWorkTask? sharedTask = null;
                 if (turns != null)
                 {
@@ -355,7 +355,7 @@ public static class LocalWorker
                 route = ++attempts;
                 _traceRoute = route; _traceStep = 0;
                 using var turnTiming = turns == null ? null : Trace(fullRollout ? "rollout" : "turn-probe",
-                    $"round={turnTask!.SearchRound};prefix={planned!.Length}");
+                    $"round={turnTask!.SearchRound};lane={turns!.LastLane};prefix={planned!.Length}");
                 refining?.Dispose();
                 events.Clear();
                 Progress("恢复路线起点", force: true);
@@ -379,7 +379,11 @@ public static class LocalWorker
                 var partition = systematic ? new LocalBranchPartition(request.Partition, request.Partitions) : null;
                 var trial = search.Begin();
                 var winningBound = LocalWinningBound.From(healthRoot, best);
-                var continuation = turnMode && fullRollout && refinementSeed?.Won == true ? refinementSeed.Actions : null;
+                // Interleave measured winning-tail proposals with fresh native
+                // continuations. Borrowing a slower winner every time prevents
+                // changed setup from replacing its old defensive ordering.
+                var continuation = turnMode && fullRollout && (attempts / 4) % 4 == 0 && refinementSeed?.Won == true
+                    ? refinementSeed.Actions : null;
                 int continuationIndex = 0;
                 int planIndex = 0;
                 int lost = 0;
@@ -458,8 +462,9 @@ public static class LocalWorker
                             preferred = roots.OrderByDescending(a => a.Preference).First();
                         // Explore explicit branch proposals, then continue most trials coherently.
                         // Randomizing every card in a long rollout almost never preserves a combo.
-                        // One quarter of complete trials retain broad stochastic exploration.
-                        bool coherent = request.StrategicRollouts && (turnMode ? attempts : evaluated) % 4 != 3;
+                        // Monte Carlo retains stochastic trials. The turn frontier
+                        // retains exact legal siblings and explores those explicitly.
+                        bool coherent = request.StrategicRollouts && (turnMode || evaluated % 4 != 3);
                         var continuations = turnMode && attempts % 3 != 0 ? legal.Where(a => a.PotionSlot == null).ToArray() : legal;
                         if (continuations.Length == 0) continuations = legal;
                         var next = turns != null ? preferred ?? turns.Choose(continuations, coherent) :
@@ -554,6 +559,10 @@ public static class LocalWorker
                     if (turnMode && IsTerminal(player) && planIndex < planned!.Length)
                         throw new InvalidOperationException("Exact native search prefix terminated early");
                     bool completeAttempt = !turnProbed && !cut && (fullRollout || IsTerminal(player));
+                    using (Trace("trial-result", $"won={won};hp={candidate.Hp};loss={candidate.NetHpLoss};potions={actions.Count(a => a.PotionSlot.HasValue)};" +
+                        $"rounds={candidate.Rounds};complete={completeAttempt};probe={turnProbed};cut={cut};limited={stop == "达到时间预算"}")) { }
+                    if (turnTask != null && stop != "达到时间预算" && !cut)
+                        turns!.FocusNext(turnTask, actions, decisions);
                     if (turnProbed) probes++;
                     else if (completeAttempt) evaluated++;
                     if (won) victories++;

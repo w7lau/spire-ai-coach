@@ -14,16 +14,21 @@ public sealed record LocalTurnSearchStats(int Probes = 0, int BoundPruned = 0, i
 public sealed class LocalTurnSearch
 {
     private readonly Dictionary<int, Entry> _pending = new();
-    private readonly HashSet<string> _seen = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> _seen = new(StringComparer.Ordinal);
     private readonly PriorityQueue<int, (double, int)> _health = new();
     private readonly PriorityQueue<int, (double, int)> _damage = new();
     private readonly Queue<int> _fair = new();
+    private readonly Stack<int[]> _focus = new();
+    private readonly Stack<int[]> _descent = new();
     private readonly Random _random;
     private readonly string? _root;
-    private int _next, _taken;
+    private int _next, _taken, _descentTakes;
     public int Count => _pending.Count;
     public int Offered => _next;
     public int DuplicateOffers { get; private set; }
+    public int FocusedTakes { get; private set; }
+    public int LastLane { get; private set; }
+    public bool LastFocused { get; private set; }
     private sealed record Entry(LocalTurnTask Task, LocalTurnHint Hint);
 
     public LocalTurnSearch(int seed, string? root = null) { _random = new(seed); _root = root; }
@@ -32,8 +37,9 @@ public sealed class LocalTurnSearch
     {
         if (searchRound < 1) throw new ArgumentOutOfRangeException(nameof(searchRound));
         var key = searchRound + ":" + HistoryKey(prefix);
-        if (!_seen.Add(key)) { DuplicateOffers++; return; }
+        if (_seen.ContainsKey(key)) { DuplicateOffers++; return; }
         var task = new LocalTurnTask(_next++, prefix.ToArray(), searchRound);
+        _seen.Add(key, task.Id);
         Queue(new(task, hint));
     }
 
@@ -57,11 +63,16 @@ public sealed class LocalTurnSearch
     {
         task = null!;
         if (_pending.Count == 0) return false;
-        // Alternate HP and damage priorities, with FIFO work every fourth take.
+        // One lane deepens the next decision of a recently executed exact prefix.
+        // Otherwise short replays keep pushing compound alternatives behind a
+        // large shallow frontier. Other lanes and FIFO preserve broad coverage.
         // An inaccurate prior cannot permanently hide a previously offered task.
         int lane = _taken++ % 4;
+        LastLane = lane;
+        LastFocused = false;
         int id;
-        if (lane == 3)
+        if (lane == 2 && TryFocus(out id)) { FocusedTakes++; LastFocused = true; }
+        else if (lane == 3)
         {
             do { id = _fair.Dequeue(); } while (!_pending.ContainsKey(id));
         }
@@ -74,6 +85,55 @@ public sealed class LocalTurnSearch
         _pending.Remove(id);
         return true;
     }
+
+    private bool TryFocus(out int id)
+    {
+        // Broad scheduling occurs between focused takes. It must not overwrite
+        // the active descent with its own newest shallow sibling. Reserve four
+        // successive focused takes, then admit a different observed family.
+        if (_descentTakes < 4 && TryStack(_descent, out id)) { _descentTakes++; return true; }
+        if (TryStack(_focus, out id)) { _descentTakes = 0; return true; }
+        if (TryStack(_descent, out id)) { _descentTakes = 1; return true; }
+        id = -1; return false;
+    }
+
+    private bool TryStack(Stack<int[]> stack, out int id)
+    {
+        while (stack.TryPop(out var siblings))
+        {
+            int next = Array.FindIndex(siblings, _pending.ContainsKey);
+            if (next < 0) continue;
+            id = siblings[next];
+            if (next + 1 < siblings.Length) stack.Push(siblings[(next + 1)..]);
+            return true;
+        }
+        id = -1; return false;
+    }
+
+    // The action at the frontier is a native decision already executed in this
+    // trial. Its legal siblings are proposals, not transferred outcomes. Change
+    // one more decision under that exact prefix rather than repeatedly changing
+    // the root. Never promote across an enemy-turn boundary or by display name.
+    public void FocusNext(LocalTurnTask task, IReadOnlyList<LocalAction> actions,
+        IReadOnlyList<LocalDecision> decisions)
+    {
+        int step = task.Prefix.Length;
+        if (step >= actions.Count || actions[step].Round != task.SearchRound) return;
+        var decision = decisions.SingleOrDefault(d => d.BeforeStep == step);
+        if (decision == null) return;
+        var prefix = actions.Take(step).ToArray();
+        var ids = decision.Legal.OrderByDescending(a => a.Preference)
+            .Where(a => !SameAction(a, actions[step]))
+            .Select(a => _seen.GetValueOrDefault(task.SearchRound + ":" + HistoryKey([..prefix, a]), -1))
+            .Where(id => _pending.ContainsKey(id)).ToArray();
+        if (ids.Length > 0) (LastFocused ? _descent : _focus).Push(ids);
+    }
+
+    // Taking a full rollout every fourth trial used to align permanently with
+    // the health lane. Rotate its position so all four scheduling lanes receive
+    // full-battle feedback without changing the one-in-four allocation.
+    public static bool IsFullRollout(int completedAttempts) =>
+        completedAttempts % 4 == completedAttempts / 4 % 4;
 
     public void ReturnInterrupted(LocalTurnTask task, LocalTurnHint hint)
     {

@@ -10,6 +10,103 @@ static class TurnSearchTests
 
     public static void Register(Action<string, Action> test)
     {
+        test("turn optimization complete feedback rotates across all scheduling lanes", () =>
+        {
+            var counts = new int[4];
+            for (int block = 0; block < 16; block++)
+            {
+                int complete = 0;
+                for (int lane = 0; lane < 4; lane++)
+                    if (LocalTurnSearch.IsFullRollout(block * 4 + lane)) { complete++; counts[lane]++; }
+                Check(complete == 1, "The full-battle allocation must stay one in four");
+            }
+            Check(counts.All(n => n == 4), "A fixed scheduler lane must not monopolize complete feedback");
+        });
+
+        test("turn optimization focused work deepens combinations despite a large shallow frontier", () =>
+        {
+            var search = new LocalTurnSearch(1);
+            var start = Move(0);
+            var hint = new LocalTurnHint(50, 50, 100, 100);
+            search.Offer([start], 1, hint);
+            Check(search.TryTake(out var parent), "Missing owned prefix");
+            for (int i = 10; i < 1010; i++) search.Offer([Move(i)], 1, hint);
+            var actual = Move(1, "native child", preference: 80);
+            var setup = Move(2, "native child", preference: 30);
+            var other = Move(3, "native child", preference: 10);
+            var actions = new[] { start, actual };
+            var decision = new LocalDecision(1, [actual, other, setup]);
+            search.OfferAlternatives(actions, decision, hint);
+            search.FocusNext(parent, actions, [decision]);
+            Check(search.TryTake(out _), "Missing broad work");
+            Check(search.TryTake(out var nested) && nested.Prefix.Length == 2 &&
+                nested.Prefix[0].CombatCardIndex == 0 && nested.Prefix[1].CombatCardIndex == 2,
+                "The next compound alternative was buried behind shallow tasks");
+            Check(search.FocusedTakes == 1 && search.Count == 1000, "Focused work must not delete other legal proposals");
+        });
+
+        test("turn optimization focused proposals retain native targets and completed choices", () =>
+        {
+            var search = new LocalTurnSearch(1);
+            var choice = new LocalCardChoice("native offer", 1, "opaque", "same name");
+            var root = Move(0) with { Choices = [choice] };
+            var hint = new LocalTurnHint(50, 50, 100, 100);
+            search.Offer([root], 1, hint); search.TryTake(out var task);
+            var actual = Move(1, "child") with { TargetId = 1 };
+            var changed = actual with { TargetId = 2 };
+            var decision = new LocalDecision(1, [actual, changed]);
+            search.OfferAlternatives([root, actual], decision, hint);
+            search.FocusNext(task, [root, actual], [decision]);
+            Check(search.TryTake(out var proposal) && proposal.Prefix[1].TargetId == 2 &&
+                LocalTurnSearch.SameChoice(proposal.Prefix[0].Choices![0], choice),
+                "Focus cannot alias targets or discard earlier native choices");
+        });
+
+        test("turn optimization interposed broad probes cannot steal an active compound descent", () =>
+        {
+            var search = new LocalTurnSearch(1);
+            var hint = new LocalTurnHint(50, 50, 100, 100);
+            var start = Move(0);
+            search.Offer([start], 1, hint); search.TryTake(out var parent);
+            for (int i = 10; i < 50; i++) search.Offer([Move(i)], 1, hint);
+            var actual = Move(1, "after root", preference: 80);
+            var alternate = Move(2, "after root", preference: 30);
+            var point = new LocalDecision(1, [actual, alternate]);
+            search.OfferAlternatives([start, actual], point, hint);
+            search.FocusNext(parent, [start, actual], [point]);
+            search.TryTake(out _);
+            Check(search.TryTake(out var nested) && search.LastFocused, "Missing focused sibling");
+            var next = Move(3, "after alternate", preference: 80);
+            var combined = Move(4, "after alternate", preference: 30);
+            var nextPoint = new LocalDecision(2, [next, combined]);
+            search.OfferAlternatives([start, alternate, next], nextPoint, hint);
+            search.FocusNext(nested, [start, alternate, next], [nextPoint]);
+            for (int i = 0; i < 3; i++)
+            {
+                Check(search.TryTake(out var broad), "Missing interposed broad task");
+                var newPoint = new LocalDecision(1, [actual, alternate]);
+                search.OfferAlternatives([broad.Prefix[0], actual], newPoint, hint);
+                search.FocusNext(broad, [broad.Prefix[0], actual], [newPoint]);
+            }
+            Check(search.TryTake(out var deeper) && search.LastFocused && deeper.Prefix.Length == 3 &&
+                deeper.Prefix[0].CombatCardIndex == 0 && deeper.Prefix[1].CombatCardIndex == 2 && deeper.Prefix[2].CombatCardIndex == 4,
+                "A newer shallow family hijacked the native compound continuation");
+        });
+
+        test("turn optimization resource savings compare surviving native hand instances", () =>
+        {
+            Dictionary<uint, int> before = new() { [1] = 3, [2] = 2, [3] = 5, [4] = 1 };
+            Dictionary<uint, int> after = new() { [1] = 0, [2] = 1, [4] = 2, [5] = 0 };
+            Check(LocalResourceEffects.HandCostSavings(before, after, 1) == 1,
+                "Played/removed/new cards and increased costs are not a surviving-hand reduction");
+            Check(LocalResourceEffects.HandCostSavings(new Dictionary<uint, int> { [1] = 2 },
+                new Dictionary<uint, int> { [2] = 0 }, 9) == 0,
+                "A same-model replacement cannot inherit another native instance's cost");
+            Check(LocalResourceEffects.HandCostSavings(new Dictionary<uint, int> { [1] = -1, [2] = 4 },
+                new Dictionary<uint, int> { [1] = 0, [2] = -1 }, 9) == 0,
+                "Unknown negative costs must not establish savings");
+        });
+
         test("turn optimization health bounds prune only a proven inferior completed outcome", () =>
         {
             var incumbent = LocalWinningBound.From("battle", Win());
