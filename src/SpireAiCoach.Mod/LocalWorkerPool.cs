@@ -99,6 +99,16 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             var best = verifiedBest;
             var allRuns = results.Concat(verificationResults).ToArray();
             foreach (var run in allRuns) timeline.Import(run.Trace);
+            LocalWorkStats? workStats = null;
+            if (request.ShareSearchWork && count > 1)
+            {
+                using var scheduling = timeline.Measure(-1, "main", "schedule", "释放已结束的分支提案", depth: 1);
+                var work = new LocalSearchWork(Path.GetDirectoryName(_workers[0].Root)!, request);
+                workStats = work.Stats();
+                try { work.ReleasePlans(); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                { /* Completed native result remains valid if private diagnostic cleanup is busy. */ }
+            }
             return best with { Evaluated = results.Sum(r => r.Evaluated), Rejected = results.Sum(r => r.Rejected),
                 Duplicates = results.Sum(r => r.Duplicates), BudgetPruned = results.Sum(r => r.BudgetPruned),
                 Victories = valid.Sum(r => r.Victories), Workers = count,
@@ -107,6 +117,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 WorkerMemoryBytes = (results.Count > count ? results.Skip(1) : results).Sum(r => r.WorkerMemoryBytes),
                 IncludePotions = request.IncludePotions,
                 Id = request.Id,
+                Work = workStats,
                 Timing = new(allRuns.Sum(r => r.Timing?.RestoreMs ?? 0), allRuns.Sum(r => r.Timing?.ActionMs ?? 0),
                     allRuns.Sum(r => r.Timing?.DecisionMs ?? 0), allRuns.Sum(r => r.Timing?.VerificationMs ?? 0),
                     allRuns.Sum(r => r.Timing?.StartupMs ?? 0), allRuns.Sum(r => r.Timing?.Actions ?? 0), allRuns.Sum(r => r.Timing?.Restores ?? 0),

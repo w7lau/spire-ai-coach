@@ -82,6 +82,7 @@ public sealed class LocalTimeline
         "cleanup" => "清理上次模拟", "decode" => "解码战斗记录", "setup" => "建立运行状态",
         "assets" => "准备角色与地图资源", "scene" => "建立战斗场景", "history" => "恢复已完成操作",
         "fingerprint" => "核对状态", "decision" => "枚举与选择动作", "refine" => "生成改进路线",
+        "schedule" => "分配搜索分支",
         "card" => "出牌并结算", "potion" => "药水并结算", "end_turn" => "敌方行动与下回合",
         "action_queue" => "等待原生动作结算", "settle" => "等待状态与胜利结算",
         "observe" => "读取过程预览", "publish" => "写入进度与候选", "ipc" => "传递计算请求",

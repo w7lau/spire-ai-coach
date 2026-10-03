@@ -117,6 +117,8 @@ public static class LocalWorker
         var search = noPotionSearch;
         var refiner = new LocalRouteRefiner();
         LocalCandidate? refinementSeed = null;
+        LocalSearchWork? work = request.ShareSearchWork && request.Partitions > 1 && request.VerifyCandidate == null
+            ? new(Path.GetDirectoryName(_root)!, request) : null;
         int refinements = 0;
         LocalWorkerResources.Retain = true;
         var originalScale = Engine.TimeScale;
@@ -200,9 +202,15 @@ public static class LocalWorker
             var roots = first.Where((_, i) => i % request.Partitions == request.Partition).ToArray();
             // More workers than first moves explore different continuations of the same first move.
             if (roots.Length == 0) roots = [first[request.Partition % first.Length]];
+            if (work != null)
+            {
+                using var scheduling = Trace("schedule");
+                work.Offer("expand", first.OrderByDescending(a => a.Preference).Select(a => new[] { a }));
+                if (request.InitialPlan is { Length: > 0 }) work.Offer("improve", [request.InitialPlan]);
+            }
             var initialEnemyHp = CombatManager.Instance.DebugOnlyGetState()!.Enemies.Sum(e => Math.Max(0, e.CurrentHp));
             while (evaluated < request.MaxNodes && budget.Elapsed.TotalSeconds < request.BudgetSeconds &&
-                (!noPotionSearch.Exhausted || request.IncludePotions && !potionSearch.Exhausted || refiner.Count > 0))
+                (work != null || !noPotionSearch.Exhausted || request.IncludePotions && !potionSearch.Exhausted || refiner.Count > 0))
             {
                 using var refining = Trace("refine");
                 // Other workers' candidates seed exploration only. Their results are never adopted without
@@ -220,11 +228,28 @@ public static class LocalWorker
                     catch (IOException) { /* Peer can be replacing its private IPC file. */ }
                 }
                 if (best != null && LocalSearchPolicy.Better(best, refinementSeed)) refinementSeed = best;
-                if (refinementSeed != null) refiner.Offer(refinementSeed, request.Partition, request.Partitions);
+                if (refinementSeed != null) refiner.Offer(refinementSeed, work == null ? request.Partition : 0,
+                    work == null ? request.Partitions : 1);
                 LocalAction[]? planned = null;
-                if (evaluated == 0 && request.InitialPlan is { Length: > 0 }) planned = request.InitialPlan;
-                if ((evaluated % 2 == 1 || search.Exhausted) && refiner.TryTake(out var proposal))
-                { planned = proposal; refinements++; }
+                LocalWorkTask? sharedTask = null;
+                if (work != null)
+                {
+                    using var scheduling = Trace("schedule");
+                    var proposals = new List<LocalAction[]>();
+                    while (refiner.TryTake(out var proposal)) proposals.Add(proposal);
+                    work.Offer("improve", proposals);
+                    bool improving = evaluated % 2 == 1 || evaluated == 0 && request.InitialPlan is { Length: > 0 };
+                    sharedTask = work.Take(improving ? "improve" : "expand", request.Partition, evaluated % 3 == 2)
+                        ?? work.Take(improving ? "expand" : "improve", request.Partition, evaluated % 3 == 2);
+                    planned = sharedTask?.Plan;
+                    if (sharedTask?.Kind == "improve") refinements++;
+                }
+                else
+                {
+                    if (evaluated == 0 && request.InitialPlan is { Length: > 0 }) planned = request.InitialPlan;
+                    if ((evaluated % 2 == 1 || search.Exhausted) && refiner.TryTake(out var proposal))
+                    { planned = proposal; refinements++; }
+                }
                 route = evaluated + 1;
                 _traceRoute = route; _traceStep = 0;
                 refining?.Dispose();
@@ -337,6 +362,12 @@ public static class LocalWorker
                     if (won) victories++;
                     Progress(won ? "路线获胜" : candidate.StopReason, Observe(player), true);
                     if (LocalSearchPolicy.Better(candidate, best)) { best = candidate; bestRoute = route; }
+                    if (work != null)
+                    {
+                        using var scheduling = Trace("schedule");
+                        work.Offer("expand", ExpansionPrefixes(candidate).Take(96));
+                        if (sharedTask != null && stop != "达到时间预算") work.Complete(sharedTask);
+                    }
                     // A wall-clock interruption says nothing about the strength of this continuation.
                     if (stop != "达到时间预算") search.Complete(trial, candidate, initialEnemyHp, closeExactPrefix: true);
                     Publish("running", $"已找到 {victories} 条整场获胜路线；已记录 {noPotionSearch.Nodes + (request.IncludePotions ? potionSearch.Nodes : 0)} 个操作树节点，按实际结算反馈选路。");
@@ -390,6 +421,28 @@ public static class LocalWorker
             return false;
         }
         finally { LocalWorkerVisuals.Reset(); _fastNativeWaits = false; LocalWorkerResources.Retain = false; Engine.TimeScale = originalScale; Engine.MaxFps = originalFps; _timeline = null; }
+    }
+
+    private static IEnumerable<LocalAction[]> ExpansionPrefixes(LocalCandidate candidate)
+    {
+        foreach (var point in candidate.Decisions ?? [])
+        {
+            if (point.BeforeStep < 0 || point.BeforeStep >= candidate.Actions.Length) continue;
+            var actual = candidate.Actions[point.BeforeStep];
+            var prefix = candidate.Actions.Take(point.BeforeStep).ToArray();
+            foreach (var alternate in point.Legal)
+                if (LocalSearchWork.Key("expand", [alternate]) != LocalSearchWork.Key("expand", [actual]))
+                    yield return prefix.Append(alternate).ToArray();
+            foreach (var choice in point.Choices ?? [])
+                foreach (var alternate in choice.Legal)
+                {
+                    var original = actual.Choices;
+                    if (original == null || choice.AtChoice >= original.Length ||
+                        alternate.OfferHash != original[choice.AtChoice].OfferHash) continue;
+                    var choices = original.ToArray(); choices[choice.AtChoice] = alternate;
+                    yield return prefix.Append(actual with { Choices = choices }).ToArray();
+                }
+        }
     }
 
     private static void Silence()

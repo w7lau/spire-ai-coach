@@ -110,6 +110,10 @@ public static class MechanicsIntegration
                 { Workers = 1, MaxNodes = kind == "ordering" || kind == "carry" ? 8 : 1, MaxRounds = kind == "longfight" || kind == "carry" ? 64 : 1,
                     BudgetSeconds = kind == "longfight" || kind == "carry" ? 40 : 25, InitialPlan = initial,
                     DebugEncounter = "SLUMBERING_BEETLE_NORMAL" };
+            if (int.TryParse(System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_WORKERS"), out var workers))
+                request = request with { Workers = workers };
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SHARED_WORK") is { Length: > 0 } sharing)
+                request = request with { ShareSearchWork = sharing == "on" };
             LocalSearchResult? baseline = null;
             if (kind == "carry") baseline = await Task.Run(() => pool.Analyze(request with { Id = Guid.NewGuid().ToString("N"), MaxNodes = 1 }, LocalCapture.Installation(), _ => { }, CancellationToken.None));
             var result = await Task.Run(() => pool.Analyze(request, LocalCapture.Installation(), _ => { }, CancellationToken.None));
@@ -168,6 +172,7 @@ public static class MechanicsIntegration
                     after.NativeHash != LocalCapture.Fingerprint()) throw new InvalidOperationException(kind + ": completed choice continuation failed");
             }
             records.Add(new { kind, result.Status, result.Evaluated, result.Rejected, result.ElapsedMs, result.Timing,
+                result.Workers, request.ShareSearchWork, result.Work,
                 best.EnemyHp, best.StartingHp, best.Hp, best.NetHpLoss, best.HpLost, best.Rounds, best.Won,
                 baseline = baseline?.Best is { } previous ? new { previous.Hp, previous.HpLost, previous.Rounds, previous.Won } : null,
                 actions = best.Actions.Select(a => new { a.ModelId, a.CombatCardIndex,

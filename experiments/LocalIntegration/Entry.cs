@@ -66,7 +66,8 @@ public static class Entry
             NGame.Instance!.RootSceneContainer.SetCurrentScene(NRun.Create(run));
             await RunManager.Instance.GenerateMap();
             bool fallbackFixture = System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_FALLBACK") == "1";
-            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_CHOICES") == "1" || fallbackFixture)
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_CHOICES") == "1" || fallbackFixture ||
+                System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_CHECKPOINT") == "1")
             {
                 var owner = LocalContext.GetMe(run)!;
                 foreach (var potion in owner.Potions.ToArray()) potion.Discard();
@@ -88,6 +89,12 @@ public static class Entry
             var player = LocalContext.GetMe(run)!;
             var capture = new StateCapture();
             while (capture.Capture(true)?.CanAdvise != true) await Frame();
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_CHECKPOINT") == "1")
+            {
+                await CheckpointIntegration.Run(root, tree, pool, capture, player);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
             if (fallbackFixture)
             {
                 var request = LocalCapture.Capture(capture.Capture(true)!.Fingerprint(), true) with

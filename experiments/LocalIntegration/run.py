@@ -28,7 +28,15 @@ parser.add_argument('--mods', type=Path)
 parser.add_argument('--seed-result', type=Path)
 parser.add_argument('--speed-benchmark', action='store_true')
 parser.add_argument('--visual-benchmark', action='store_true')
+parser.add_argument('--checkpoint', action='store_true')
+parser.add_argument('--workers', type=int)
+parser.add_argument('--shared-work', choices=['on', 'off'])
+parser.add_argument('--work-benchmark', action='store_true')
 args = parser.parse_args()
+if args.workers is not None and not 1 <= args.workers <= 16:
+    parser.error('--workers must be between 1 and 16')
+if args.work_benchmark and (not args.replay or not args.seed_result):
+    parser.error('--work-benchmark requires --replay and --seed-result')
 if args.visual_benchmark and (not args.replay or not args.seed_result or args.speed_benchmark):
     parser.error('--visual-benchmark requires --replay and --seed-result, without --speed-benchmark')
 root = args.workspace.resolve()
@@ -71,6 +79,10 @@ with worker_lock(root):
     env['SPIRE_LOCAL_SEED_RESULT'] = str(args.seed_result.resolve()) if args.seed_result else ''
     env['SPIRE_LOCAL_SPEED_BENCHMARK'] = '1' if args.speed_benchmark else '0'
     env['SPIRE_LOCAL_VISUAL_BENCHMARK'] = '1' if args.visual_benchmark else '0'
+    env['SPIRE_LOCAL_CHECKPOINT'] = '1' if args.checkpoint else '0'
+    env['SPIRE_LOCAL_WORKERS'] = str(args.workers) if args.workers is not None else ''
+    env['SPIRE_LOCAL_SHARED_WORK'] = args.shared_work or ''
+    env['SPIRE_LOCAL_WORK_BENCHMARK'] = '1' if args.work_benchmark else '0'
     settings = root / 'Roaming/SlayTheSpire2/default/1/settings.save'
     settings_data = json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}
     settings_data.update(volume_master=0, volume_bgm=0, volume_sfx=0, volume_ambience=0)

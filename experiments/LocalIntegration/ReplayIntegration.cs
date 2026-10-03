@@ -31,7 +31,38 @@ public static class ReplayIntegration
             })).Append(coach).ToArray();
         // Preserve the frozen user's search/potion settings; only raise the old turn horizon.
         var request = original with { Id = Guid.NewGuid().ToString("N"), LoadedMods = loaded, MaxRounds = 64 };
+        if (int.TryParse(System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_WORKERS"), out var workers))
+            request = request with { Workers = workers };
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SHARED_WORK") is { Length: > 0 } sharing)
+            request = request with { ShareSearchWork = sharing == "on" };
         var installation = new LocalInstallation(game, directories);
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_WORK_BENCHMARK") == "1")
+        {
+            var warmupSeedPath = System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT")
+                ?? throw new InvalidOperationException("A warmup line is required");
+            // The fixed seed and one-route limit apply only to warmup. Every measured
+            // search keeps the original full route/time budgets and has no added seed.
+            var warm = request with { Id = Guid.NewGuid().ToString("N"), MaxNodes = 1,
+                InitialPlan = LocalWire.Read<LocalSearchResult>(warmupSeedPath).Best!.Actions, ShareSearchWork = false };
+            await Task.Run(() => pool.Analyze(warm, installation, _ => { }, CancellationToken.None));
+            var records = new List<object>();
+            foreach (var shareWork in new[] { true, false, false, true })
+            {
+                var sample = await Task.Run(() => pool.Analyze(request with
+                    { Id = Guid.NewGuid().ToString("N"), ShareSearchWork = shareWork }, installation, _ => { }, CancellationToken.None));
+                var best = sample.Best ?? throw new InvalidOperationException("Shared search returned no route");
+                if (sample.Status != "done" || sample.Rejected != 0 || !best.Won ||
+                    best.Continuation?.Length != best.Actions.Length || sample.Timing?.Verifications != 1)
+                    throw new InvalidOperationException("Shared search did not complete all lanes and verify its victory");
+                LocalWire.Write(Path.Combine(root, $"integration-work-private-{records.Count}.json"), sample);
+                records.Add(new { share_search_work = shareWork, sample.Workers, request.BudgetSeconds, request.MaxNodes,
+                    sample.Evaluated, sample.Victories, sample.Rejected, sample.ElapsedMs, sample.Timing, sample.Work,
+                    sample.WorkerMemoryBytes, best.Won, best.StartingHp, best.Hp, best.NetHpLoss, best.HpLost, best.Rounds,
+                    used_potion = best.Actions.Any(a => a.PotionSlot.HasValue), verified_steps = best.Continuation.Length });
+            }
+            LocalWire.Write(Path.Combine(root, "integration-work-summary.json"), records);
+            return;
+        }
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT") is { Length: > 0 } seedPath)
             request = request with { InitialPlan = LocalWire.Read<LocalSearchResult>(seedPath).Best!.Actions };
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_VISUAL_BENCHMARK") == "1")
@@ -106,6 +137,7 @@ public static class ReplayIntegration
             result.Status, result.Evaluated, result.Rejected, result.Victories, result.ElapsedMs, result.Timing,
             result.Workers, result.MaxRounds, request.BudgetSeconds, request.MaxNodes, request.IncludePotions,
             request.FastCardPresentation, request.FastNativeWaits,
+            request.ShareSearchWork, result.Work,
             result.Best.Won, result.Best.StartingHp, result.Best.Hp, result.Best.NetHpLoss, result.Best.HpLost, result.Best.Rounds,
             result.Best.EnemyHp, result.Best.StopReason,
             used_potion = result.Best.Actions.Any(a => a.PotionSlot.HasValue),

@@ -11,7 +11,7 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     int Workers = 0, bool IncludePotions = false, LocalHistoryStamp? History = null, string[]? ExcludedModels = null,
     LocalAction[]? InitialPlan = null, int SimulationSpeed = 8, bool DeferVerification = false,
     LocalCandidate? VerifyCandidate = null, long TimelineOrigin = 0, LocalTrace? InitialTrace = null,
-    bool FastCardPresentation = true, bool FastNativeWaits = true);
+    bool FastCardPresentation = true, bool FastNativeWaits = true, bool ShareSearchWork = true);
 
 public sealed record LocalAction(int HandIndex, string ModelId, uint? TargetId,
     string CardName, string TargetName, string BeforeHash, int Round = 0,
@@ -39,7 +39,7 @@ public sealed record LocalSearchResult(string Id, string SnapshotId, string Stat
     string Message, int Evaluated, int Rejected, long ElapsedMs, LocalCandidate? Best,
     int Duplicates = 0, int BudgetPruned = 0, int Victories = 0, int Workers = 1,
     long WorkerMemoryBytes = 0, long SearchElapsedMs = 0, bool IncludePotions = false, LocalSearchTiming? Timing = null,
-    LocalAction? BlockedAction = null, int MaxRounds = 64, LocalTrace? Trace = null);
+    LocalAction? BlockedAction = null, int MaxRounds = 64, LocalTrace? Trace = null, LocalWorkStats? Work = null);
 
 public static class LocalSearchPolicy
 {
@@ -84,6 +84,7 @@ public static class LocalSearchPolicy
             lines.Add("已达到战后净损失 0 且不消耗药水的目标；其他收益和最短路线未证明最优。");
         if (!best.Won) lines.Add("以下仅为已模拟的部分路线，不代表能打赢本次战斗。停止原因：" + best.StopReason);
         if (best.Dead) lines.Add("注意：目前找到的路线仍会死亡，不能保证存活。");
+        if (result.Work is { } work) lines.Add($"分支分工：领取 {work.Claimed} 项任务，合并 {work.DuplicateOffers} 次重复提交。");
         lines.Add($"计算用时 {result.ElapsedMs / 1000d:F1} 秒。");
         int round = -1;
         for (var i = 0; i < best.Actions.Length; i++)

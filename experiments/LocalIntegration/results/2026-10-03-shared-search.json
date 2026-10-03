@@ -1,0 +1,2210 @@
+{
+  "version": "0.7.5",
+  "date": "2026-10-03",
+  "game_version": "v0.111.0",
+  "scope": "Owned isolated native host; no real player combat actions or saves were changed.",
+  "builds": {
+    "prototype_dll_sha256": "38c540a98829909c7661288bc300be38d549a37ac1980bb3f17cd205ab52abcf",
+    "second_prototype_dll_sha256": "5bf9c638d32cefd3a73ae5c1c06c3e820c6315af0da5aa8dd4eb57695637f26f",
+    "final_dll_sha256": "619a6524f0153f6dd92e2acf01545372fa44523719335af5e823a3ce94685cce"
+  },
+  "product_search_budget_unchanged_seconds": 60,
+  "core_focused_tests": {
+    "search work": "7/7",
+    "local": "9/9",
+    "optimization": "10/10",
+    "search feedback": "6/6",
+    "timeline": "5/5"
+  },
+  "prototype_cold_comparison": [
+    {
+      "name": "shared-4",
+      "summary": {
+        "Status": "done",
+        "Evaluated": 35,
+        "Rejected": 0,
+        "Victories": 7,
+        "ElapsedMs": 91845,
+        "Timing": {
+          "RestoreMs": 42458,
+          "ActionMs": 147728,
+          "DecisionMs": 6028,
+          "VerificationMs": 8969,
+          "StartupMs": 121619,
+          "Actions": 1072,
+          "Restores": 35,
+          "Verifications": 1
+        },
+        "Workers": 4,
+        "MaxRounds": 64,
+        "BudgetSeconds": 45,
+        "MaxNodes": 32,
+        "IncludePotions": true,
+        "FastCardPresentation": true,
+        "FastNativeWaits": true,
+        "ShareSearchWork": true,
+        "Work": {
+          "Submitted": 512,
+          "Claimed": 35,
+          "Completed": 31,
+          "DuplicateOffers": 532
+        },
+        "Won": true,
+        "StartingHp": 87,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "HpLost": 14,
+        "Rounds": 9,
+        "EnemyHp": 0,
+        "StopReason": "胜利结算完成",
+        "used_potion": false,
+        "choices": 0,
+        "verified_steps": 35
+      },
+      "timeline": {
+        "spans": 7884,
+        "dropped": 0,
+        "top_intervals": [
+          {
+            "Worker": -1,
+            "Stage": "main",
+            "Phase": "queue",
+            "StartMs": 0.976,
+            "DurationMs": 0.339
+          },
+          {
+            "Worker": 2,
+            "Stage": "prepare",
+            "Phase": "prepare",
+            "StartMs": 23.741,
+            "DurationMs": 30319.137
+          },
+          {
+            "Worker": 0,
+            "Stage": "prepare",
+            "Phase": "prepare",
+            "StartMs": 23.741,
+            "DurationMs": 30377.006
+          },
+          {
+            "Worker": 3,
+            "Stage": "prepare",
+            "Phase": "prepare",
+            "StartMs": 23.741,
+            "DurationMs": 30512.647
+          },
+          {
+            "Worker": 1,
+            "Stage": "prepare",
+            "Phase": "prepare",
+            "StartMs": 23.748,
+            "DurationMs": 30376.994
+          },
+          {
+            "Worker": 2,
+            "Stage": "search",
+            "Phase": "session",
+            "StartMs": 30455.01,
+            "DurationMs": 51533.829
+          },
+          {
+            "Worker": 0,
+            "Stage": "search",
+            "Phase": "session",
+            "StartMs": 30470.461,
+            "DurationMs": 51178.664
+          },
+          {
+            "Worker": 1,
+            "Stage": "search",
+            "Phase": "session",
+            "StartMs": 30511.916,
+            "DurationMs": 51381.299
+          },
+          {
+            "Worker": 3,
+            "Stage": "search",
+            "Phase": "session",
+            "StartMs": 30692.946,
+            "DurationMs": 51244.456
+          },
+          {
+            "Worker": 0,
+            "Stage": "prepare",
+            "Phase": "reuse",
+            "StartMs": 82270.955,
+            "DurationMs": 0.003
+          },
+          {
+            "Worker": 0,
+            "Stage": "verify",
+            "Phase": "verify",
+            "StartMs": 82349.861,
+            "DurationMs": 9197.477
+          }
+        ],
+        "phase_accumulated_ms": {
+          "prepare/files": 1485.052,
+          "prepare/launch": 5216.725,
+          "prepare/engine": 114883.995,
+          "search/ipc": 18.379,
+          "search/dispatch": 430.229,
+          "search/publish": 2582.757,
+          "search/restore": 42425.282,
+          "search/decision": 6573.262,
+          "search/schedule": 2542.139,
+          "search/refine": 1009.218,
+          "search/observe": 169.249,
+          "search/card": 66703.986,
+          "search/end_turn": 80462.792,
+          "search/potion": 1072.59,
+          "search/cleanup": 278.016,
+          "search/result_transfer": 520.344,
+          "search/receive": 545.37,
+          "verify/ipc": 46.37,
+          "verify/dispatch": 32.529,
+          "verify/publish": 174.281,
+          "verify/restore": 520.74,
+          "verify/observe": 4.938,
+          "verify/card": 4135.554,
+          "verify/end_turn": 2026.769,
+          "verify/cleanup": 145.583,
+          "verify/result_transfer": 125.328,
+          "verify/receive": 167.628
+        },
+        "note": "Concurrent and nested durations must not be added to derive total waiting time."
+      }
+    },
+    {
+      "name": "independent-4",
+      "summary": {
+        "Status": "done",
+        "Evaluated": 30,
+        "Rejected": 0,
+        "Victories": 14,
+        "ElapsedMs": 91953,
+        "Timing": {
+          "RestoreMs": 40254,
+          "ActionMs": 150695,
+          "DecisionMs": 6045,
+          "VerificationMs": 4528,
+          "StartupMs": 138827,
+          "Actions": 934,
+          "Restores": 30,
+          "Verifications": 1
+        },
+        "Workers": 4,
+        "MaxRounds": 64,
+        "BudgetSeconds": 45,
+        "MaxNodes": 32,
+        "IncludePotions": true,
+        "FastCardPresentation": true,
+        "FastNativeWaits": true,
+        "ShareSearchWork": false,
+        "Work": null,
+        "Won": true,
+        "StartingHp": 87,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "HpLost": 14,
+        "Rounds": 9,
+        "EnemyHp": 0,
+        "StopReason": "胜利结算完成",
+        "used_potion": false,
+        "choices": 0,
+        "verified_steps": 33
+      },
+      "timeline": {
+        "spans": 6882,
+        "dropped": 0,
+        "top_intervals": [
+          {
+            "Worker": -1,
+            "Stage": "main",
+            "Phase": "queue",
+            "StartMs": 0.954,
+            "DurationMs": 0.3
+          },
+          {
+            "Worker": 2,
+            "Stage": "prepare",
+            "Phase": "prepare",
+            "StartMs": 28.763,
+            "DurationMs": 33108.152
+          },
+          {
+            "Worker": 1,
+            "Stage": "prepare",
+            "Phase": "prepare",
+            "StartMs": 28.763,
+            "DurationMs": 35228.73
+          },
+          {
+            "Worker": 3,
+            "Stage": "prepare",
+            "Phase": "prepare",
+            "StartMs": 28.766,
+            "DurationMs": 34774.623
+          },
+          {
+            "Worker": 0,
+            "Stage": "prepare",
+            "Phase": "prepare",
+            "StartMs": 28.766,
+            "DurationMs": 35676.03
+          },
+          {
+            "Worker": 2,
+            "Stage": "search",
+            "Phase": "session",
+            "StartMs": 33330.897,
+            "DurationMs": 50820.879
+          },
+          {
+            "Worker": 3,
+            "Stage": "search",
+            "Phase": "session",
+            "StartMs": 34903.084,
+            "DurationMs": 51023.277
+          },
+          {
+            "Worker": 1,
+            "Stage": "search",
+            "Phase": "session",
+            "StartMs": 35406.67,
+            "DurationMs": 51234.024
+          },
+          {
+            "Worker": 0,
+            "Stage": "search",
+            "Phase": "session",
+            "StartMs": 35879.487,
+            "DurationMs": 50956.436
+          },
+          {
+            "Worker": 3,
+            "Stage": "prepare",
+            "Phase": "reuse",
+            "StartMs": 87018.99,
+            "DurationMs": 0.003
+          },
+          {
+            "Worker": 3,
+            "Stage": "verify",
+            "Phase": "verify",
+            "StartMs": 87077.145,
+            "DurationMs": 4595.865
+          }
+        ],
+        "phase_accumulated_ms": {
+          "prepare/files": 1354.234,
+          "prepare/launch": 6890.45,
+          "prepare/engine": 130542.838,
+          "search/ipc": 21.226,
+          "search/dispatch": 595.008,
+          "search/publish": 2770.88,
+          "search/restore": 40210.228,
+          "search/decision": 6496.825,
+          "search/refine": 354.759,
+          "search/observe": 172.558,
+          "search/card": 67791.005,
+          "search/end_turn": 81933.447,
+          "search/potion": 1435.018,
+          "search/cleanup": 318.416,
+          "search/result_transfer": 477.447,
+          "search/receive": 483.717,
+          "verify/ipc": 50.325,
+          "verify/dispatch": 7.825,
+          "verify/publish": 57.241,
+          "verify/restore": 654.216,
+          "verify/observe": 4.226,
+          "verify/card": 1828.916,
+          "verify/end_turn": 1914.725,
+          "verify/cleanup": 59.364,
+          "verify/result_transfer": 184.876,
+          "verify/receive": 94.856
+        },
+        "note": "Concurrent and nested durations must not be added to derive total waiting time."
+      }
+    },
+    {
+      "name": "shared-2",
+      "summary": {
+        "Status": "done",
+        "Evaluated": 17,
+        "Rejected": 0,
+        "Victories": 4,
+        "ElapsedMs": 92414,
+        "Timing": {
+          "RestoreMs": 19076,
+          "ActionMs": 74047,
+          "DecisionMs": 2893,
+          "VerificationMs": 4370,
+          "StartupMs": 72262,
+          "Actions": 563,
+          "Restores": 17,
+          "Verifications": 1
+        },
+        "Workers": 2,
+        "MaxRounds": 64,
+        "BudgetSeconds": 45,
+        "MaxNodes": 32,
+        "IncludePotions": true,
+        "FastCardPresentation": true,
+        "FastNativeWaits": true,
+        "ShareSearchWork": true,
+        "Work": {
+          "Submitted": 512,
+          "Claimed": 17,
+          "Completed": 15,
+          "DuplicateOffers": 271
+        },
+        "Won": true,
+        "StartingHp": 87,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "HpLost": 15,
+        "Rounds": 10,
+        "EnemyHp": 0,
+        "StopReason": "胜利结算完成",
+        "used_potion": false,
+        "choices": 0,
+        "verified_steps": 35
+      },
+      "timeline": {
+        "spans": 4187,
+        "dropped": 0,
+        "top_intervals": [
+          {
+            "Worker": -1,
+            "Stage": "main",
+            "Phase": "queue",
+            "StartMs": 0.918,
+            "DurationMs": 0.372
+          },
+          {
+            "Worker": 1,
+            "Stage": "prepare",
+            "Phase": "prepare",
+            "StartMs": 30.557,
+            "DurationMs": 36871.677
+          },
+          {
+            "Worker": 0,
+            "Stage": "prepare",
+            "Phase": "prepare",
+            "StartMs": 30.557,
+            "DurationMs": 35368.056
+          },
+          {
+            "Worker": 0,
+            "Stage": "search",
+            "Phase": "session",
+            "StartMs": 35488.581,
+            "DurationMs": 50582.089
+          },
+          {
+            "Worker": 1,
+            "Stage": "search",
+            "Phase": "session",
+            "StartMs": 37057.757,
+            "DurationMs": 50401.915
+          },
+          {
+            "Worker": 0,
+            "Stage": "prepare",
+            "Phase": "reuse",
+            "StartMs": 87673.573,
+            "DurationMs": 0.003
+          },
+          {
+            "Worker": 0,
+            "Stage": "verify",
+            "Phase": "verify",
+            "StartMs": 87737.577,
+            "DurationMs": 4454.891
+          }
+        ],
+        "phase_accumulated_ms": {
+          "prepare/files": 634.732,
+          "prepare/launch": 8353.948,
+          "prepare/engine": 63250.98,
+          "search/ipc": 11.525,
+          "search/dispatch": 233.111,
+          "search/publish": 1243.24,
+          "search/restore": 19058.192,
+          "search/decision": 3183.332,
+          "search/schedule": 1603.056,
+          "search/refine": 705.986,
+          "search/observe": 84.763,
+          "search/card": 32866.295,
+          "search/end_turn": 40924.103,
+          "search/potion": 544.248,
+          "search/cleanup": 154.593,
+          "search/result_transfer": 240.433,
+          "search/receive": 308.143,
+          "verify/ipc": 62.711,
+          "verify/dispatch": 1.289,
+          "verify/publish": 57.82,
+          "verify/restore": 593.493,
+          "verify/observe": 4.349,
+          "verify/card": 1653.877,
+          "verify/end_turn": 1988.861,
+          "verify/cleanup": 72.605,
+          "verify/result_transfer": 85.311,
+          "verify/receive": 135.52
+        },
+        "note": "Concurrent and nested durations must not be added to derive total waiting time."
+      }
+    },
+    {
+      "name": "independent-2",
+      "summary": {
+        "Status": "done",
+        "Evaluated": 18,
+        "Rejected": 0,
+        "Victories": 8,
+        "ElapsedMs": 85070,
+        "Timing": {
+          "RestoreMs": 20571,
+          "ActionMs": 74954,
+          "DecisionMs": 3140,
+          "VerificationMs": 4433,
+          "StartupMs": 57562,
+          "Actions": 554,
+          "Restores": 18,
+          "Verifications": 1
+        },
+        "Workers": 2,
+        "MaxRounds": 64,
+        "BudgetSeconds": 45,
+        "MaxNodes": 32,
+        "IncludePotions": true,
+        "FastCardPresentation": true,
+        "FastNativeWaits": true,
+        "ShareSearchWork": false,
+        "Work": null,
+        "Won": true,
+        "StartingHp": 87,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "HpLost": 15,
+        "Rounds": 10,
+        "EnemyHp": 0,
+        "StopReason": "胜利结算完成",
+        "used_potion": false,
+        "choices": 0,
+        "verified_steps": 35
+      },
+      "timeline": {
+        "spans": 4137,
+        "dropped": 0,
+        "top_intervals": [
+          {
+            "Worker": -1,
+            "Stage": "main",
+            "Phase": "queue",
+            "StartMs": 1.152,
+            "DurationMs": 0.522
+          },
+          {
+            "Worker": 1,
+            "Stage": "prepare",
+            "Phase": "prepare",
+            "StartMs": 25.397,
+            "DurationMs": 28771.588
+          },
+          {
+            "Worker": 0,
+            "Stage": "prepare",
+            "Phase": "prepare",
+            "StartMs": 25.397,
+            "DurationMs": 28771.567
+          },
+          {
+            "Worker": 1,
+            "Stage": "search",
+            "Phase": "session",
+            "StartMs": 28916.399,
+            "DurationMs": 51125.334
+          },
+          {
+            "Worker": 0,
+            "Stage": "search",
+            "Phase": "session",
+            "StartMs": 28963.494,
+            "DurationMs": 51009.475
+          },
+          {
+            "Worker": 0,
+            "Stage": "prepare",
+            "Phase": "reuse",
+            "StartMs": 80392.399,
+            "DurationMs": 0.003
+          },
+          {
+            "Worker": 0,
+            "Stage": "verify",
+            "Phase": "verify",
+            "StartMs": 80440.695,
+            "DurationMs": 4498.901
+          }
+        ],
+        "phase_accumulated_ms": {
+          "prepare/files": 554.229,
+          "prepare/launch": 2412.518,
+          "prepare/engine": 54576.402,
+          "search/ipc": 20.533,
+          "search/dispatch": 263.129,
+          "search/publish": 1322.962,
+          "search/restore": 20555.235,
+          "search/decision": 3414.405,
+          "search/refine": 309.921,
+          "search/observe": 92.46,
+          "search/card": 34716.471,
+          "search/end_turn": 39892.918,
+          "search/potion": 618.364,
+          "search/cleanup": 119.258,
+          "search/result_transfer": 317.363,
+          "search/receive": 381.903,
+          "verify/ipc": 10.56,
+          "verify/dispatch": 37.732,
+          "verify/publish": 55.841,
+          "verify/restore": 592.775,
+          "verify/observe": 4.387,
+          "verify/card": 1718.303,
+          "verify/end_turn": 2004.823,
+          "verify/cleanup": 57.07,
+          "verify/result_transfer": 6.118,
+          "verify/receive": 123.816
+        },
+        "note": "Concurrent and nested durations must not be added to derive total waiting time."
+      }
+    }
+  ],
+  "second_prototype_cold_comparison": [
+    {
+      "name": "final-shared-4",
+      "summary": {
+        "Status": "done",
+        "Evaluated": 31,
+        "Rejected": 0,
+        "Victories": 7,
+        "ElapsedMs": 92457,
+        "Timing": {
+          "RestoreMs": 43836,
+          "ActionMs": 149382,
+          "DecisionMs": 6145,
+          "VerificationMs": 4754,
+          "StartupMs": 138854,
+          "Actions": 914,
+          "Restores": 31,
+          "Verifications": 1
+        },
+        "Workers": 4,
+        "MaxRounds": 64,
+        "BudgetSeconds": 45,
+        "MaxNodes": 32,
+        "IncludePotions": true,
+        "FastCardPresentation": true,
+        "FastNativeWaits": true,
+        "ShareSearchWork": true,
+        "Work": {
+          "Submitted": 576,
+          "Claimed": 31,
+          "Completed": 27,
+          "DuplicateOffers": 508
+        },
+        "Won": true,
+        "StartingHp": 87,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "HpLost": 14,
+        "Rounds": 9,
+        "EnemyHp": 0,
+        "StopReason": "胜利结算完成",
+        "used_potion": false,
+        "choices": 0,
+        "verified_steps": 35
+      },
+      "timeline": {
+        "spans": 6845,
+        "dropped": 0,
+        "top_intervals": [
+          {
+            "Worker": -1,
+            "Stage": "main",
+            "Phase": "queue",
+            "StartMs": 0.832,
+            "DurationMs": 0.267
+          },
+          {
+            "Worker": 1,
+            "Stage": "prepare",
+            "Phase": "prepare",
+            "StartMs": 29.203,
+            "DurationMs": 34827.955
+          },
+          {
+            "Worker": 0,
+            "Stage": "prepare",
+            "Phase": "prepare",
+            "StartMs": 29.203,
+            "DurationMs": 34828.001
+          },
+          {
+            "Worker": 2,
+            "Stage": "prepare",
+            "Phase": "prepare",
+            "StartMs": 29.204,
+            "DurationMs": 34577.828
+          },
+          {
+            "Worker": 3,
+            "Stage": "prepare",
+            "Phase": "prepare",
+            "StartMs": 29.205,
+            "DurationMs": 34577.875
+          },
+          {
+            "Worker": 2,
+            "Stage": "search",
+            "Phase": "session",
+            "StartMs": 34761.868,
+            "DurationMs": 51768.842
+          },
+          {
+            "Worker": 3,
+            "Stage": "search",
+            "Phase": "session",
+            "StartMs": 34769.219,
+            "DurationMs": 51940.782
+          },
+          {
+            "Worker": 1,
+            "Stage": "search",
+            "Phase": "session",
+            "StartMs": 34993.34,
+            "DurationMs": 51832.033
+          },
+          {
+            "Worker": 0,
+            "Stage": "search",
+            "Phase": "session",
+            "StartMs": 35013.519,
+            "DurationMs": 51941.446
+          },
+          {
+            "Worker": 0,
+            "Stage": "prepare",
+            "Phase": "reuse",
+            "StartMs": 87229.75,
+            "DurationMs": 0.001
+          },
+          {
+            "Worker": 0,
+            "Stage": "verify",
+            "Phase": "verify",
+            "StartMs": 87306.128,
+            "DurationMs": 4818.782
+          }
+        ],
+        "phase_accumulated_ms": {
+          "prepare/files": 1633.74,
+          "prepare/launch": 5392.984,
+          "prepare/engine": 131784.926,
+          "search/ipc": 27.979,
+          "search/dispatch": 578.996,
+          "search/publish": 2700.419,
+          "search/restore": 43794.803,
+          "search/decision": 6600.567,
+          "search/schedule": 1595.295,
+          "search/refine": 813.737,
+          "search/observe": 170.726,
+          "search/card": 66462.064,
+          "search/end_turn": 82144.254,
+          "search/potion": 1204.884,
+          "search/cleanup": 321.091,
+          "search/result_transfer": 433.402,
+          "search/receive": 516.004,
+          "verify/ipc": 52.487,
+          "verify/dispatch": 23.889,
+          "verify/publish": 66.127,
+          "verify/restore": 637.669,
+          "verify/observe": 6.048,
+          "verify/card": 1959.145,
+          "verify/end_turn": 2025.136,
+          "verify/cleanup": 57.111,
+          "verify/result_transfer": 202.734,
+          "verify/receive": 128.311
+        },
+        "note": "Concurrent and nested durations must not be added to derive total waiting time."
+      }
+    },
+    {
+      "name": "final-independent-4",
+      "summary": {
+        "Status": "done",
+        "Evaluated": 30,
+        "Rejected": 0,
+        "Victories": 16,
+        "ElapsedMs": 84941,
+        "Timing": {
+          "RestoreMs": 37964,
+          "ActionMs": 152238,
+          "DecisionMs": 5814,
+          "VerificationMs": 3734,
+          "StartupMs": 115883,
+          "Actions": 999,
+          "Restores": 30,
+          "Verifications": 1
+        },
+        "Workers": 4,
+        "MaxRounds": 64,
+        "BudgetSeconds": 45,
+        "MaxNodes": 32,
+        "IncludePotions": true,
+        "FastCardPresentation": true,
+        "FastNativeWaits": true,
+        "ShareSearchWork": false,
+        "Work": null,
+        "Won": true,
+        "StartingHp": 87,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "HpLost": 14,
+        "Rounds": 9,
+        "EnemyHp": 0,
+        "StopReason": "胜利结算完成",
+        "used_potion": false,
+        "choices": 0,
+        "verified_steps": 33
+      },
+      "timeline": {
+        "spans": 7282,
+        "dropped": 0,
+        "top_intervals": [
+          {
+            "Worker": -1,
+            "Stage": "main",
+            "Phase": "queue",
+            "StartMs": 0.825,
+            "DurationMs": 0.348
+          },
+          {
+            "Worker": 1,
+            "Stage": "prepare",
+            "Phase": "prepare",
+            "StartMs": 23.358,
+            "DurationMs": 28462.225
+          },
+          {
+            "Worker": 0,
+            "Stage": "prepare",
+            "Phase": "prepare",
+            "StartMs": 23.358,
+            "DurationMs": 29714.22
+          },
+          {
+            "Worker": 2,
+            "Stage": "prepare",
+            "Phase": "prepare",
+            "StartMs": 23.364,
+            "DurationMs": 28211.599
+          },
+          {
+            "Worker": 3,
+            "Stage": "prepare",
+            "Phase": "prepare",
+            "StartMs": 23.367,
+            "DurationMs": 29463.668
+          },
+          {
+            "Worker": 2,
+            "Stage": "search",
+            "Phase": "session",
+            "StartMs": 28378.35,
+            "DurationMs": 50577.649
+          },
+          {
+            "Worker": 1,
+            "Stage": "search",
+            "Phase": "session",
+            "StartMs": 28611.152,
+            "DurationMs": 50774.95
+          },
+          {
+            "Worker": 3,
+            "Stage": "search",
+            "Phase": "session",
+            "StartMs": 29577.206,
+            "DurationMs": 50846.008
+          },
+          {
+            "Worker": 0,
+            "Stage": "search",
+            "Phase": "session",
+            "StartMs": 29918.708,
+            "DurationMs": 50684.101
+          },
+          {
+            "Worker": 3,
+            "Stage": "prepare",
+            "Phase": "reuse",
+            "StartMs": 80779.775,
+            "DurationMs": 0.002
+          },
+          {
+            "Worker": 3,
+            "Stage": "verify",
+            "Phase": "verify",
+            "StartMs": 80890.709,
+            "DurationMs": 3785.066
+          }
+        ],
+        "phase_accumulated_ms": {
+          "prepare/files": 1167.965,
+          "prepare/launch": 4517.454,
+          "prepare/engine": 110166.282,
+          "search/ipc": 19.787,
+          "search/dispatch": 519.583,
+          "search/publish": 2703.731,
+          "search/restore": 37918.667,
+          "search/decision": 6307.96,
+          "search/refine": 348.636,
+          "search/observe": 171.362,
+          "search/card": 67791.314,
+          "search/end_turn": 84029.071,
+          "search/potion": 916.471,
+          "search/cleanup": 265.178,
+          "search/result_transfer": 597.592,
+          "search/receive": 505.995,
+          "verify/ipc": 45.005,
+          "verify/dispatch": 65.927,
+          "verify/publish": 46.804,
+          "verify/restore": 585.797,
+          "verify/observe": 3.857,
+          "verify/card": 1466.579,
+          "verify/end_turn": 1576.924,
+          "verify/cleanup": 44.51,
+          "verify/result_transfer": 178.777,
+          "verify/receive": 86.32
+        },
+        "note": "Concurrent and nested durations must not be added to derive total waiting time."
+      }
+    }
+  ],
+  "final_seeded_regression": {
+    "name": "final-seeded-4",
+    "summary": {
+      "Status": "done",
+      "Evaluated": 31,
+      "Rejected": 0,
+      "Victories": 16,
+      "ElapsedMs": 93470,
+      "Timing": {
+        "RestoreMs": 45466,
+        "ActionMs": 146816,
+        "DecisionMs": 5999,
+        "VerificationMs": 3967,
+        "StartupMs": 139502,
+        "Actions": 937,
+        "Restores": 31,
+        "Verifications": 1
+      },
+      "Workers": 4,
+      "MaxRounds": 64,
+      "BudgetSeconds": 45,
+      "MaxNodes": 32,
+      "IncludePotions": true,
+      "FastCardPresentation": true,
+      "FastNativeWaits": true,
+      "ShareSearchWork": true,
+      "Work": {
+        "Submitted": 763,
+        "Claimed": 31,
+        "Completed": 27,
+        "DuplicateOffers": 673
+      },
+      "Won": true,
+      "StartingHp": 87,
+      "Hp": 87,
+      "NetHpLoss": 0,
+      "HpLost": 14,
+      "Rounds": 9,
+      "EnemyHp": 0,
+      "StopReason": "胜利结算完成",
+      "used_potion": false,
+      "choices": 0,
+      "verified_steps": 31
+    },
+    "timeline": {
+      "spans": 6979,
+      "dropped": 0,
+      "top_intervals": [
+        {
+          "Worker": -1,
+          "Stage": "main",
+          "Phase": "queue",
+          "StartMs": 0.84,
+          "DurationMs": 0.246
+        },
+        {
+          "Worker": 0,
+          "Stage": "prepare",
+          "Phase": "prepare",
+          "StartMs": 26.586,
+          "DurationMs": 36237.474
+        },
+        {
+          "Worker": 1,
+          "Stage": "prepare",
+          "Phase": "prepare",
+          "StartMs": 26.587,
+          "DurationMs": 34242.397
+        },
+        {
+          "Worker": 2,
+          "Stage": "prepare",
+          "Phase": "prepare",
+          "StartMs": 26.606,
+          "DurationMs": 34242.341
+        },
+        {
+          "Worker": 3,
+          "Stage": "prepare",
+          "Phase": "prepare",
+          "StartMs": 26.612,
+          "DurationMs": 34743.456
+        },
+        {
+          "Worker": 1,
+          "Stage": "search",
+          "Phase": "session",
+          "StartMs": 34441.469,
+          "DurationMs": 52593.796
+        },
+        {
+          "Worker": 2,
+          "Stage": "search",
+          "Phase": "session",
+          "StartMs": 34477.433,
+          "DurationMs": 52444.912
+        },
+        {
+          "Worker": 3,
+          "Stage": "search",
+          "Phase": "session",
+          "StartMs": 34952.146,
+          "DurationMs": 52171.856
+        },
+        {
+          "Worker": 0,
+          "Stage": "search",
+          "Phase": "session",
+          "StartMs": 36476.997,
+          "DurationMs": 51891.393
+        },
+        {
+          "Worker": 0,
+          "Stage": "prepare",
+          "Phase": "reuse",
+          "StartMs": 88592.22,
+          "DurationMs": 0.003
+        },
+        {
+          "Worker": 0,
+          "Stage": "verify",
+          "Phase": "verify",
+          "StartMs": 88602.773,
+          "DurationMs": 4038.02
+        }
+      ],
+      "phase_accumulated_ms": {
+        "prepare/files": 1508.577,
+        "prepare/launch": 5083.172,
+        "prepare/engine": 132873.908,
+        "search/ipc": 45.873,
+        "search/dispatch": 727.454,
+        "search/publish": 4850.566,
+        "search/restore": 45414.031,
+        "search/decision": 6468.943,
+        "search/schedule": 1851.045,
+        "search/refine": 1025.103,
+        "search/observe": 164.298,
+        "search/card": 66587.698,
+        "search/end_turn": 79731.598,
+        "search/potion": 955.871,
+        "search/cleanup": 281.448,
+        "search/result_transfer": 378.021,
+        "search/receive": 597.85,
+        "verify/ipc": 5.674,
+        "verify/dispatch": 4.874,
+        "verify/publish": 52.954,
+        "verify/restore": 654.632,
+        "verify/observe": 3.818,
+        "verify/card": 1490.178,
+        "verify/end_turn": 1697.543,
+        "verify/cleanup": 62.641,
+        "verify/result_transfer": 245.662,
+        "verify/receive": 98.289,
+        "main/schedule": 484.52
+      },
+      "note": "Concurrent and nested durations must not be added to derive total waiting time."
+    }
+  },
+  "final_warm_comparison": {
+    "method": "Same final DLL and same prepared worker pool; fixed seeded one-route warmup only; measured dynamic searches use original 45s/32 route limits without adding a seed; on/off/off/on order.",
+    "samples": [
+      {
+        "share_search_work": true,
+        "Workers": 4,
+        "BudgetSeconds": 45,
+        "MaxNodes": 32,
+        "Evaluated": 35,
+        "Victories": 9,
+        "Rejected": 0,
+        "ElapsedMs": 51335,
+        "Timing": {
+          "RestoreMs": 22467,
+          "ActionMs": 147366,
+          "DecisionMs": 6042,
+          "VerificationMs": 4079,
+          "StartupMs": 0,
+          "Actions": 1005,
+          "Restores": 35,
+          "Verifications": 1
+        },
+        "Work": {
+          "Submitted": 576,
+          "Claimed": 35,
+          "Completed": 31,
+          "DuplicateOffers": 490
+        },
+        "WorkerMemoryBytes": 7361150976,
+        "Won": true,
+        "StartingHp": 87,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "HpLost": 14,
+        "Rounds": 9,
+        "used_potion": false,
+        "verified_steps": 35,
+        "timeline": {
+          "spans": 7469,
+          "dropped": 0,
+          "top_intervals": [
+            {
+              "Worker": -1,
+              "Stage": "main",
+              "Phase": "queue",
+              "StartMs": 0.001,
+              "DurationMs": 0.004
+            },
+            {
+              "Worker": 3,
+              "Stage": "prepare",
+              "Phase": "reuse",
+              "StartMs": 0.487,
+              "DurationMs": 0.0
+            },
+            {
+              "Worker": 0,
+              "Stage": "prepare",
+              "Phase": "reuse",
+              "StartMs": 0.489,
+              "DurationMs": 0.0
+            },
+            {
+              "Worker": 1,
+              "Stage": "prepare",
+              "Phase": "reuse",
+              "StartMs": 0.489,
+              "DurationMs": 0.0
+            },
+            {
+              "Worker": 2,
+              "Stage": "prepare",
+              "Phase": "reuse",
+              "StartMs": 0.49,
+              "DurationMs": 0.0
+            },
+            {
+              "Worker": 3,
+              "Stage": "search",
+              "Phase": "session",
+              "StartMs": 47.734,
+              "DurationMs": 45872.188
+            },
+            {
+              "Worker": 2,
+              "Stage": "search",
+              "Phase": "session",
+              "StartMs": 105.376,
+              "DurationMs": 45940.199
+            },
+            {
+              "Worker": 0,
+              "Stage": "search",
+              "Phase": "session",
+              "StartMs": 109.93,
+              "DurationMs": 46283.799
+            },
+            {
+              "Worker": 1,
+              "Stage": "search",
+              "Phase": "session",
+              "StartMs": 110.291,
+              "DurationMs": 46047.528
+            },
+            {
+              "Worker": 3,
+              "Stage": "prepare",
+              "Phase": "reuse",
+              "StartMs": 46616.938,
+              "DurationMs": 0.0
+            },
+            {
+              "Worker": 3,
+              "Stage": "verify",
+              "Phase": "verify",
+              "StartMs": 46658.011,
+              "DurationMs": 4149.204
+            }
+          ],
+          "phase_accumulated_ms": {
+            "search/ipc": 10.687,
+            "search/dispatch": 360.683,
+            "search/publish": 2646.649,
+            "search/restore": 22484.845,
+            "search/decision": 6549.832,
+            "search/schedule": 1554.875,
+            "search/refine": 817.733,
+            "search/observe": 172.722,
+            "search/card": 63796.69,
+            "search/end_turn": 83024.231,
+            "search/potion": 1027.809,
+            "search/cleanup": 297.324,
+            "search/result_transfer": 601.661,
+            "search/receive": 688.211,
+            "verify/ipc": 39.819,
+            "verify/dispatch": 1.252,
+            "verify/publish": 54.304,
+            "verify/restore": 476.461,
+            "verify/observe": 4.259,
+            "verify/card": 1763.797,
+            "verify/end_turn": 1706.92,
+            "verify/cleanup": 60.656,
+            "verify/result_transfer": 132.636,
+            "verify/receive": 114.597,
+            "main/schedule": 279.473
+          },
+          "note": "Concurrent and nested durations must not be added to derive total waiting time."
+        }
+      },
+      {
+        "share_search_work": false,
+        "Workers": 4,
+        "BudgetSeconds": 45,
+        "MaxNodes": 32,
+        "Evaluated": 33,
+        "Victories": 15,
+        "Rejected": 0,
+        "ElapsedMs": 51923,
+        "Timing": {
+          "RestoreMs": 22131,
+          "ActionMs": 149835,
+          "DecisionMs": 6066,
+          "VerificationMs": 4621,
+          "StartupMs": 0,
+          "Actions": 1033,
+          "Restores": 33,
+          "Verifications": 1
+        },
+        "Work": null,
+        "WorkerMemoryBytes": 7878975488,
+        "Won": true,
+        "StartingHp": 87,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "HpLost": 14,
+        "Rounds": 9,
+        "used_potion": false,
+        "verified_steps": 33,
+        "timeline": {
+          "spans": 7538,
+          "dropped": 0,
+          "top_intervals": [
+            {
+              "Worker": -1,
+              "Stage": "main",
+              "Phase": "queue",
+              "StartMs": 0.0,
+              "DurationMs": 0.001
+            },
+            {
+              "Worker": 3,
+              "Stage": "prepare",
+              "Phase": "reuse",
+              "StartMs": 0.151,
+              "DurationMs": 0.0
+            },
+            {
+              "Worker": 0,
+              "Stage": "prepare",
+              "Phase": "reuse",
+              "StartMs": 0.157,
+              "DurationMs": 0.0
+            },
+            {
+              "Worker": 1,
+              "Stage": "prepare",
+              "Phase": "reuse",
+              "StartMs": 0.162,
+              "DurationMs": 0.0
+            },
+            {
+              "Worker": 2,
+              "Stage": "prepare",
+              "Phase": "reuse",
+              "StartMs": 0.177,
+              "DurationMs": 0.0
+            },
+            {
+              "Worker": 2,
+              "Stage": "search",
+              "Phase": "session",
+              "StartMs": 14.715,
+              "DurationMs": 46301.661
+            },
+            {
+              "Worker": 1,
+              "Stage": "search",
+              "Phase": "session",
+              "StartMs": 93.655,
+              "DurationMs": 46182.394
+            },
+            {
+              "Worker": 3,
+              "Stage": "search",
+              "Phase": "session",
+              "StartMs": 110.18,
+              "DurationMs": 46141.479
+            },
+            {
+              "Worker": 0,
+              "Stage": "search",
+              "Phase": "session",
+              "StartMs": 113.172,
+              "DurationMs": 46254.769
+            },
+            {
+              "Worker": 3,
+              "Stage": "prepare",
+              "Phase": "reuse",
+              "StartMs": 46850.192,
+              "DurationMs": 0.0
+            },
+            {
+              "Worker": 3,
+              "Stage": "verify",
+              "Phase": "verify",
+              "StartMs": 46935.637,
+              "DurationMs": 4691.278
+            }
+          ],
+          "phase_accumulated_ms": {
+            "search/ipc": 11.488,
+            "search/dispatch": 319.579,
+            "search/publish": 2761.497,
+            "search/restore": 22147.637,
+            "search/decision": 6573.885,
+            "search/refine": 198.581,
+            "search/observe": 172.783,
+            "search/card": 66709.568,
+            "search/end_turn": 82835.318,
+            "search/potion": 806.799,
+            "search/cleanup": 413.797,
+            "search/result_transfer": 504.63,
+            "search/receive": 1518.839,
+            "verify/ipc": 5.738,
+            "verify/dispatch": 79.706,
+            "verify/publish": 57.428,
+            "verify/restore": 649.306,
+            "verify/observe": 4.859,
+            "verify/card": 1912.603,
+            "verify/end_turn": 1947.619,
+            "verify/cleanup": 61.537,
+            "verify/result_transfer": 30.095,
+            "verify/receive": 266.182
+          },
+          "note": "Concurrent and nested durations must not be added to derive total waiting time."
+        }
+      },
+      {
+        "share_search_work": false,
+        "Workers": 4,
+        "BudgetSeconds": 45,
+        "MaxNodes": 32,
+        "Evaluated": 33,
+        "Victories": 15,
+        "Rejected": 0,
+        "ElapsedMs": 51394,
+        "Timing": {
+          "RestoreMs": 21056,
+          "ActionMs": 150544,
+          "DecisionMs": 6125,
+          "VerificationMs": 3982,
+          "StartupMs": 0,
+          "Actions": 1074,
+          "Restores": 33,
+          "Verifications": 1
+        },
+        "Work": null,
+        "WorkerMemoryBytes": 8005410816,
+        "Won": true,
+        "StartingHp": 87,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "HpLost": 14,
+        "Rounds": 9,
+        "used_potion": false,
+        "verified_steps": 33,
+        "timeline": {
+          "spans": 7785,
+          "dropped": 0,
+          "top_intervals": [
+            {
+              "Worker": -1,
+              "Stage": "main",
+              "Phase": "queue",
+              "StartMs": 0.0,
+              "DurationMs": 0.001
+            },
+            {
+              "Worker": 3,
+              "Stage": "prepare",
+              "Phase": "reuse",
+              "StartMs": 0.151,
+              "DurationMs": 0.0
+            },
+            {
+              "Worker": 1,
+              "Stage": "prepare",
+              "Phase": "reuse",
+              "StartMs": 0.158,
+              "DurationMs": 0.0
+            },
+            {
+              "Worker": 0,
+              "Stage": "prepare",
+              "Phase": "reuse",
+              "StartMs": 0.167,
+              "DurationMs": 0.0
+            },
+            {
+              "Worker": 2,
+              "Stage": "prepare",
+              "Phase": "reuse",
+              "StartMs": 0.204,
+              "DurationMs": 0.0
+            },
+            {
+              "Worker": 0,
+              "Stage": "search",
+              "Phase": "session",
+              "StartMs": 14.899,
+              "DurationMs": 46042.884
+            },
+            {
+              "Worker": 1,
+              "Stage": "search",
+              "Phase": "session",
+              "StartMs": 24.263,
+              "DurationMs": 46186.929
+            },
+            {
+              "Worker": 3,
+              "Stage": "search",
+              "Phase": "session",
+              "StartMs": 25.111,
+              "DurationMs": 46055.828
+            },
+            {
+              "Worker": 2,
+              "Stage": "search",
+              "Phase": "session",
+              "StartMs": 81.731,
+              "DurationMs": 46221.837
+            },
+            {
+              "Worker": 3,
+              "Stage": "prepare",
+              "Phase": "reuse",
+              "StartMs": 46823.902,
+              "DurationMs": 0.0
+            },
+            {
+              "Worker": 3,
+              "Stage": "verify",
+              "Phase": "verify",
+              "StartMs": 46898.292,
+              "DurationMs": 4036.881
+            }
+          ],
+          "phase_accumulated_ms": {
+            "search/ipc": 11.883,
+            "search/dispatch": 133.436,
+            "search/publish": 2690.974,
+            "search/restore": 21068.337,
+            "search/decision": 6666.1,
+            "search/refine": 195.998,
+            "search/observe": 176.967,
+            "search/card": 66580.495,
+            "search/end_turn": 83661.048,
+            "search/potion": 835.187,
+            "search/cleanup": 326.91,
+            "search/result_transfer": 524.885,
+            "search/receive": 1644.726,
+            "verify/ipc": 33.149,
+            "verify/dispatch": 41.239,
+            "verify/publish": 53.663,
+            "verify/restore": 547.249,
+            "verify/observe": 4.177,
+            "verify/card": 1583.533,
+            "verify/end_turn": 1717.823,
+            "verify/cleanup": 47.509,
+            "verify/result_transfer": 204.755,
+            "verify/receive": 253.918
+          },
+          "note": "Concurrent and nested durations must not be added to derive total waiting time."
+        }
+      },
+      {
+        "share_search_work": true,
+        "Workers": 4,
+        "BudgetSeconds": 45,
+        "MaxNodes": 32,
+        "Evaluated": 34,
+        "Victories": 9,
+        "Rejected": 0,
+        "ElapsedMs": 53429,
+        "Timing": {
+          "RestoreMs": 23192,
+          "ActionMs": 147019,
+          "DecisionMs": 6259,
+          "VerificationMs": 5424,
+          "StartupMs": 0,
+          "Actions": 987,
+          "Restores": 34,
+          "Verifications": 1
+        },
+        "Work": {
+          "Submitted": 576,
+          "Claimed": 34,
+          "Completed": 30,
+          "DuplicateOffers": 532
+        },
+        "WorkerMemoryBytes": 8099102720,
+        "Won": true,
+        "StartingHp": 87,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "HpLost": 14,
+        "Rounds": 9,
+        "used_potion": false,
+        "verified_steps": 35,
+        "timeline": {
+          "spans": 7352,
+          "dropped": 0,
+          "top_intervals": [
+            {
+              "Worker": -1,
+              "Stage": "main",
+              "Phase": "queue",
+              "StartMs": 0.0,
+              "DurationMs": 0.001
+            },
+            {
+              "Worker": 0,
+              "Stage": "prepare",
+              "Phase": "reuse",
+              "StartMs": 0.14,
+              "DurationMs": 0.0
+            },
+            {
+              "Worker": 1,
+              "Stage": "prepare",
+              "Phase": "reuse",
+              "StartMs": 0.147,
+              "DurationMs": 0.0
+            },
+            {
+              "Worker": 3,
+              "Stage": "prepare",
+              "Phase": "reuse",
+              "StartMs": 0.149,
+              "DurationMs": 0.0
+            },
+            {
+              "Worker": 2,
+              "Stage": "prepare",
+              "Phase": "reuse",
+              "StartMs": 0.168,
+              "DurationMs": 0.0
+            },
+            {
+              "Worker": 2,
+              "Stage": "search",
+              "Phase": "session",
+              "StartMs": 7.521,
+              "DurationMs": 46220.915
+            },
+            {
+              "Worker": 1,
+              "Stage": "search",
+              "Phase": "session",
+              "StartMs": 14.492,
+              "DurationMs": 46163.473
+            },
+            {
+              "Worker": 3,
+              "Stage": "search",
+              "Phase": "session",
+              "StartMs": 89.06,
+              "DurationMs": 46058.274
+            },
+            {
+              "Worker": 0,
+              "Stage": "search",
+              "Phase": "session",
+              "StartMs": 94.799,
+              "DurationMs": 46112.015
+            },
+            {
+              "Worker": 3,
+              "Stage": "prepare",
+              "Phase": "reuse",
+              "StartMs": 47150.869,
+              "DurationMs": 0.0
+            },
+            {
+              "Worker": 3,
+              "Stage": "verify",
+              "Phase": "verify",
+              "StartMs": 47198.534,
+              "DurationMs": 5496.273
+            }
+          ],
+          "phase_accumulated_ms": {
+            "search/ipc": 11.436,
+            "search/dispatch": 193.826,
+            "search/publish": 2755.386,
+            "search/restore": 23206.323,
+            "search/decision": 6753.971,
+            "search/schedule": 1368.113,
+            "search/refine": 583.37,
+            "search/observe": 182.954,
+            "search/card": 65668.752,
+            "search/end_turn": 81129.773,
+            "search/potion": 713.279,
+            "search/cleanup": 346.562,
+            "search/result_transfer": 409.265,
+            "search/receive": 2880.593,
+            "verify/ipc": 15.135,
+            "verify/dispatch": 32.527,
+            "verify/publish": 78.951,
+            "verify/restore": 711.47,
+            "verify/observe": 6.812,
+            "verify/card": 2313.411,
+            "verify/end_turn": 2254.199,
+            "verify/cleanup": 63.396,
+            "verify/result_transfer": 45.056,
+            "verify/receive": 403.546,
+            "main/schedule": 285.876
+          },
+          "note": "Concurrent and nested durations must not be added to derive total waiting time."
+        }
+      }
+    ],
+    "means": [
+      {
+        "share_search_work": true,
+        "samples": 2,
+        "mean_elapsed_ms": 52382.0,
+        "mean_evaluated": 34.5,
+        "all_zero_net_loss_without_potions": true
+      },
+      {
+        "share_search_work": false,
+        "samples": 2,
+        "mean_elapsed_ms": 51658.5,
+        "mean_evaluated": 33.0,
+        "all_zero_net_loss_without_potions": true
+      }
+    ],
+    "limitation": "Two dynamic samples per mode; routes differ. Not a fixed-route speed or all-Mod guarantee."
+  },
+  "native_checkpoint_probe": {
+    "prefix_steps": 2,
+    "source_energy": 1,
+    "source_block": 10,
+    "native_save_restores_exact_combat_prefix": false,
+    "mismatch_guard_rejected": true,
+    "source_host_unchanged": true,
+    "adopted": false,
+    "reason": "Native SerializableRun is not a complete mid-combat checkpoint. Retain native replay restoration."
+  },
+  "native_mechanics": [
+    {
+      "kind": "exhaust",
+      "Status": "done",
+      "Evaluated": 2,
+      "Rejected": 0,
+      "ElapsedMs": 31532,
+      "Timing": {
+        "RestoreMs": 7830,
+        "ActionMs": 1656,
+        "DecisionMs": 59,
+        "VerificationMs": 557,
+        "StartupMs": 50569,
+        "Actions": 8,
+        "Restores": 2,
+        "Verifications": 1
+      },
+      "Workers": 2,
+      "ShareSearchWork": true,
+      "Work": {
+        "Submitted": 21,
+        "Claimed": 2,
+        "Completed": 2,
+        "DuplicateOffers": 23
+      },
+      "EnemyHp": 174,
+      "StartingHp": 80,
+      "Hp": 80,
+      "NetHpLoss": 0,
+      "HpLost": 0,
+      "Rounds": 1,
+      "Won": false,
+      "baseline": null,
+      "actions": [
+        {
+          "ModelId": "CARD.TRUE_GRIT",
+          "choices": [
+            {
+              "Kind": "hand",
+              "Indices": [
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "",
+          "choices": []
+        }
+      ],
+      "verified": true
+    },
+    {
+      "kind": "upgrade",
+      "Status": "done",
+      "Evaluated": 2,
+      "Rejected": 0,
+      "ElapsedMs": 28812,
+      "Timing": {
+        "RestoreMs": 3746,
+        "ActionMs": 791,
+        "DecisionMs": 25,
+        "VerificationMs": 699,
+        "StartupMs": 23175,
+        "Actions": 7,
+        "Restores": 2,
+        "Verifications": 1
+      },
+      "Workers": 2,
+      "ShareSearchWork": true,
+      "Work": {
+        "Submitted": 55,
+        "Claimed": 2,
+        "Completed": 2,
+        "DuplicateOffers": 18
+      },
+      "EnemyHp": 174,
+      "StartingHp": 80,
+      "Hp": 80,
+      "NetHpLoss": 0,
+      "HpLost": 0,
+      "Rounds": 1,
+      "Won": false,
+      "baseline": null,
+      "actions": [
+        {
+          "ModelId": "CARD.ARMAMENTS",
+          "choices": [
+            {
+              "Kind": "hand",
+              "Indices": [
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "",
+          "choices": []
+        }
+      ],
+      "verified": true
+    },
+    {
+      "kind": "multi",
+      "Status": "done",
+      "Evaluated": 1,
+      "Rejected": 0,
+      "ElapsedMs": 30666,
+      "Timing": {
+        "RestoreMs": 4242,
+        "ActionMs": 775,
+        "DecisionMs": 29,
+        "VerificationMs": 622,
+        "StartupMs": 24016,
+        "Actions": 4,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "Workers": 1,
+      "ShareSearchWork": true,
+      "Work": null,
+      "EnemyHp": 174,
+      "StartingHp": 80,
+      "Hp": 75,
+      "NetHpLoss": 5,
+      "HpLost": 5,
+      "Rounds": 1,
+      "Won": false,
+      "baseline": null,
+      "actions": [
+        {
+          "ModelId": "CARD.PREPARED",
+          "choices": [
+            {
+              "Kind": "hand",
+              "Indices": [
+                0,
+                1
+              ]
+            }
+          ]
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "",
+          "choices": []
+        }
+      ],
+      "verified": true
+    },
+    {
+      "kind": "retrieve",
+      "Status": "done",
+      "Evaluated": 1,
+      "Rejected": 0,
+      "ElapsedMs": 1783,
+      "Timing": {
+        "RestoreMs": 449,
+        "ActionMs": 289,
+        "DecisionMs": 16,
+        "VerificationMs": 617,
+        "StartupMs": 0,
+        "Actions": 4,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "Workers": 1,
+      "ShareSearchWork": true,
+      "Work": null,
+      "EnemyHp": 165,
+      "StartingHp": 80,
+      "Hp": 75,
+      "NetHpLoss": 5,
+      "HpLost": 5,
+      "Rounds": 1,
+      "Won": false,
+      "baseline": null,
+      "actions": [
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.HEADBUTT",
+          "choices": [
+            {
+              "Kind": "pile",
+              "Indices": [
+                0
+              ]
+            }
+          ]
+        },
+        {
+          "ModelId": "",
+          "choices": []
+        }
+      ],
+      "verified": true
+    },
+    {
+      "kind": "carry",
+      "Status": "done",
+      "Evaluated": 8,
+      "Rejected": 0,
+      "ElapsedMs": 36759,
+      "Timing": {
+        "RestoreMs": 4690,
+        "ActionMs": 26134,
+        "DecisionMs": 184,
+        "VerificationMs": 2942,
+        "StartupMs": 0,
+        "Actions": 399,
+        "Restores": 8,
+        "Verifications": 1
+      },
+      "Workers": 1,
+      "ShareSearchWork": true,
+      "Work": null,
+      "EnemyHp": 0,
+      "StartingHp": 65,
+      "Hp": 71,
+      "NetHpLoss": 0,
+      "HpLost": 0,
+      "Rounds": 10,
+      "Won": true,
+      "baseline": {
+        "Hp": 42,
+        "HpLost": 29,
+        "Rounds": 20,
+        "Won": true
+      },
+      "actions": [
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.BODY_SLAM",
+          "choices": []
+        },
+        {
+          "ModelId": "",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.BODY_SLAM",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.BODY_SLAM",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "",
+          "choices": []
+        },
+        {
+          "ModelId": "",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.BODY_SLAM",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.BODY_SLAM",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.BODY_SLAM",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.BODY_SLAM",
+          "choices": []
+        },
+        {
+          "ModelId": "",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.BODY_SLAM",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.BODY_SLAM",
+          "choices": []
+        }
+      ],
+      "verified": true
+    },
+    {
+      "kind": "compact",
+      "Status": "done",
+      "Evaluated": 1,
+      "Rejected": 0,
+      "ElapsedMs": 2541,
+      "Timing": {
+        "RestoreMs": 466,
+        "ActionMs": 251,
+        "DecisionMs": 3,
+        "VerificationMs": 619,
+        "StartupMs": 0,
+        "Actions": 6,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "Workers": 1,
+      "ShareSearchWork": true,
+      "Work": null,
+      "EnemyHp": 168,
+      "StartingHp": 80,
+      "Hp": 71,
+      "NetHpLoss": 9,
+      "HpLost": 9,
+      "Rounds": 1,
+      "Won": false,
+      "baseline": null,
+      "actions": [
+        {
+          "ModelId": "CARD.COMPACT",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.FUEL",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.BODY_SLAM",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.FUEL",
+          "choices": []
+        },
+        {
+          "ModelId": "CARD.FUEL",
+          "choices": []
+        },
+        {
+          "ModelId": "",
+          "choices": []
+        }
+      ],
+      "verified": true
+    },
+    {
+      "kind": "turnend",
+      "Status": "done",
+      "Evaluated": 1,
+      "Rejected": 0,
+      "ElapsedMs": 2033,
+      "Timing": {
+        "RestoreMs": 425,
+        "ActionMs": 144,
+        "DecisionMs": 0,
+        "VerificationMs": 496,
+        "StartupMs": 0,
+        "Actions": 1,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "Workers": 1,
+      "ShareSearchWork": true,
+      "Work": null,
+      "EnemyHp": 174,
+      "StartingHp": 80,
+      "Hp": 58,
+      "NetHpLoss": 22,
+      "HpLost": 22,
+      "Rounds": 1,
+      "Won": false,
+      "baseline": null,
+      "actions": [
+        {
+          "ModelId": "",
+          "choices": []
+        }
+      ],
+      "verified": true
+    }
+  ],
+  "multi_lane_fixture_assertion": {
+    "test_assertion_failed": true,
+    "product_choice_unsupported": false,
+    "reason": "Equal final HP; selected native-verified candidate uses fewer actions, so fixture-specific choice is absent from selected output. Unselected lane recorded a valid two-card native selection. Directed single-lane coverage is tested separately.",
+    "candidates": [
+      {
+        "Status": "searched",
+        "hp": 75,
+        "steps": 4,
+        "choices": [
+          {
+            "kind": "hand",
+            "indices": [
+              0,
+              1
+            ]
+          }
+        ]
+      },
+      {
+        "Status": "done",
+        "hp": 75,
+        "steps": 3,
+        "choices": []
+      }
+    ]
+  },
+  "eight_workers": {
+    "measured": false,
+    "reason": "Insufficient available physical memory margin for eight copies of the measured native heaps plus host; do not force paging."
+  },
+  "shared_queue_boundary": "Deduplicates task submissions. Every proposal still executes native effects; common action prefixes and scenes are still restored for each route.",
+  "limitations": [
+    "No proof of arbitrary Mod private/static state equivalence.",
+    "Net loss zero without potions reaches those cost lower bounds, not all rewards or shortest-route optimality.",
+    "Native save shortcut failed; other full checkpoint designs remain untested."
+  ],
+  "installation": {
+    "version": "0.7.5",
+    "installed_dll_sha256": "619a6524f0153f6dd92e2acf01545372fa44523719335af5e823a3ce94685cce",
+    "zip_sha256": "7b46694f541dfffbb74b4839d374c8ef60f033951c5684560d1657b9eddde645",
+    "matches_tested_and_packaged_dll": true,
+    "old_dll_and_manifest_backup_match": true,
+    "private_repository_verified": true
+  }
+}

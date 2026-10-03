@@ -836,6 +836,7 @@ AsyncTest("frequent local telemetry replacement stays readable during concurrent
 });
 
 SearchAlgorithmTests.Register(Test);
+SearchWorkTests.Register(Test);
 OptimizationTests.Register(Test);
 TimelineTests.Register(Test);
 var filter = args.Length == 2 && args[0] == "--filter" ? args[1] : null;
