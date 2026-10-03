@@ -5,10 +5,16 @@ namespace SpireAiCoach.Core;
 public sealed record LocalTurnHint(int Hp, int StartingHp, int EnemyHp, int InitialEnemyHp,
     int Block = 0, int PotionsUsed = 0);
 public sealed record LocalTurnTask(int Id, LocalAction[] Prefix, int SearchRound,
-    bool FullRollout = false, int Lane = 0, bool Focused = false, LocalTurnHint? Hint = null);
+    bool FullRollout = false, int Lane = 0, bool Focused = false, LocalTurnHint? Hint = null,
+    LocalRolloutStyle Style = LocalRolloutStyle.Balanced);
+public sealed record LocalTurnOutcome(int Worker, int Attempt, double CompletedMs, bool Won,
+    int Hp, int GrossLoss, int Rounds, int Potions, LocalRolloutStyle Style, LocalDamageSources? DamageSources);
 public sealed record LocalTurnSearchStats(int Probes = 0, int BoundPruned = 0, int Offered = 0,
     int DuplicateOffers = 0, int Pending = 0, int UnknownRecoveryChecks = 0, int CoveredPrefixes = 0,
-    int CompletedHistories = 0, int RepeatedHistories = 0);
+    int CompletedHistories = 0, int RepeatedHistories = 0,
+    IReadOnlyDictionary<int, int>? ClaimedByRound = null,
+    IReadOnlyDictionary<string, int>? RolloutStyles = null,
+    LocalTurnOutcome[]? Outcomes = null);
 
 // Exact native histories only. A turn probe executes through enemy settlement,
 // records the resulting next turn, then returns to the scheduler. Scores order
@@ -19,9 +25,11 @@ public interface ILocalTurnFrontier
     int Offered { get; }
     int DuplicateOffers { get; }
     int LastLane { get; }
+    IReadOnlyDictionary<int, int> ClaimedByRound { get; }
     void Offer(LocalAction[] prefix, int searchRound, LocalTurnHint hint);
     bool TryTake(out LocalTurnTask task);
     void FocusNext(LocalTurnTask task, IReadOnlyList<LocalAction> actions, IReadOnlyList<LocalDecision> decisions);
+    void ObserveOutcome(LocalCandidate candidate);
     void ReturnInterrupted(LocalTurnTask task, LocalTurnHint hint);
     int DiscardDescendants(IReadOnlyList<LocalAction> prefix);
     int DiscardProvenExpenses(LocalWinningBound? incumbent);
@@ -41,6 +49,11 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
     private readonly Queue<int> _fair = new();
     private readonly Stack<int[]> _focus = new();
     private readonly Stack<int[]> _descent = new();
+    private readonly Queue<int> _winner = new();
+    private LocalCandidate? _winningOutcome;
+    private readonly SortedDictionary<int, RoundQueue> _rounds = new();
+    private readonly Dictionary<int, int> _roundClaims = new();
+    private int _damageRound, _fairRound;
     private readonly Random _random;
     private readonly string? _root;
     private int _next, _taken, _descentTakes;
@@ -50,7 +63,13 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
     public int FocusedTakes { get; private set; }
     public int LastLane { get; private set; }
     public bool LastFocused { get; private set; }
+    public IReadOnlyDictionary<int, int> ClaimedByRound => new Dictionary<int, int>(_roundClaims);
     private sealed record Entry(LocalTurnTask Task, LocalTurnHint Hint);
+    private sealed class RoundQueue
+    {
+        public readonly PriorityQueue<int, (double, int)> Damage = new();
+        public readonly Queue<int> Fair = new();
+    }
 
     public LocalTurnSearch(int seed, string? root = null) { _random = new(seed); _root = root; }
 
@@ -76,8 +95,13 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         // FIFO work retains long prefixes; this only orders the other lanes.
         double replayCost = Math.Sqrt(1 + entry.Task.Prefix.Length);
         _health.Enqueue(entry.Task.Id, (-(hp * 2 + progress + carry - cost) / replayCost, entry.Task.Id));
-        _damage.Enqueue(entry.Task.Id, (-(progress * 2 + hp + carry - cost) / replayCost, entry.Task.Id));
+        var damageScore = (-(progress * 2 + hp + carry - cost) / replayCost, entry.Task.Id);
+        _damage.Enqueue(entry.Task.Id, damageScore);
         _fair.Enqueue(entry.Task.Id);
+        if (!_rounds.TryGetValue(entry.Task.SearchRound, out var round))
+            _rounds.Add(entry.Task.SearchRound, round = new());
+        round.Damage.Enqueue(entry.Task.Id, damageScore);
+        round.Fair.Enqueue(entry.Task.Id);
     }
 
     public bool TryTake(out LocalTurnTask task)
@@ -93,6 +117,9 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         LastFocused = false;
         int id;
         if (lane == 2 && TryFocus(out id)) { FocusedTakes++; LastFocused = true; }
+        else if (lane == 1 && TryWinner(out id)) { }
+        else if (lane == 1 && TryRound(ref _damageRound, true, out id)) { }
+        else if (lane == 3 && TryRound(ref _fairRound, false, out id)) { }
         else if (lane == 3)
         {
             do { id = _fair.Dequeue(); } while (!_pending.ContainsKey(id));
@@ -104,7 +131,56 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         }
         task = _pending[id].Task;
         _pending.Remove(id);
+        _roundClaims[task.SearchRound] = _roundClaims.GetValueOrDefault(task.SearchRound) + 1;
         return true;
+    }
+
+    private bool TryRound(ref int cursor, bool ranked, out int id)
+    {
+        // A cheap round-one replay must not indefinitely outrank every later
+        // native decision. Rotate observed rounds in two lanes, retaining the
+        // original global health and compound-descent lanes. Scores still
+        // order work inside a round; no state or legal branch is discarded.
+        int previous = cursor;
+        var rounds = _rounds.Keys.Where(r => r > previous).Concat(_rounds.Keys.Where(r => r <= previous)).ToArray();
+        foreach (int number in rounds)
+        {
+            var round = _rounds[number];
+            while (ranked ? round.Damage.TryDequeue(out id, out _) : round.Fair.TryDequeue(out id))
+                if (_pending.ContainsKey(id)) { cursor = number; return true; }
+        }
+        id = -1; return false;
+    }
+
+    private bool TryWinner(out int id)
+    {
+        while (_winner.TryDequeue(out id)) if (_pending.ContainsKey(id)) return true;
+        id = -1; return false;
+    }
+
+    public void ObserveOutcome(LocalCandidate candidate)
+    {
+        if (!candidate.Won || candidate.Dead || !LocalSearchPolicy.Better(candidate, _winningOutcome)) return;
+        _winningOutcome = candidate;
+        _winner.Clear();
+        // Complete native outcomes guide exploration around the actual incumbent.
+        // Its exact alternatives have already been offered; no legal prefix is
+        // invented, reopened, merged, or discarded by this scheduling hint.
+        var alternatives = new List<(int Id, int Round, int Step, int Rank)>();
+        foreach (var decision in candidate.Decisions ?? [])
+        {
+            if (decision.BeforeStep < 0 || decision.BeforeStep >= candidate.Actions.Length) continue;
+            var actual = candidate.Actions[decision.BeforeStep];
+            var hint = new LocalTurnHint(candidate.Hp, candidate.StartingHp ?? candidate.Hp, candidate.EnemyHp, 1);
+            foreach (var offer in Alternatives(candidate.Actions, decision, hint))
+            {
+                var key = offer.SearchRound + ":" + HistoryKey(offer.Prefix);
+                if (_seen.TryGetValue(key, out int id) && _pending.ContainsKey(id))
+                    alternatives.Add((id, actual.Round, decision.BeforeStep, offer.Prefix[^1].Preference));
+            }
+        }
+        foreach (var item in alternatives.OrderBy(x => x.Round).ThenBy(x => x.Step).ThenByDescending(x => x.Rank))
+            _winner.Enqueue(item.Id);
     }
 
     private bool TryFocus(out int id)

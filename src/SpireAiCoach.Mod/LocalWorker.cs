@@ -37,6 +37,7 @@ public static class LocalWorker
     private static bool _fastNativeWaits;
     private static bool _fastStateSettling;
     private static LocalNativeLearning? _nativeLearning;
+    private static LocalRolloutStyle _rolloutStyle;
     private static LocalChoices? _choices;
     private static Func<bool> _nativeModeBeforeRequest = () => false;
     internal static LocalChoices CurrentChoices => _choices ?? throw new LocalChoiceException("未处于原生选牌操作中。");
@@ -129,6 +130,7 @@ public static class LocalWorker
         _includePotions = false;
         bool systematic = request.SearchOrder != LocalSearchOrder.MonteCarlo;
         bool turnMode = request.SearchOrder == LocalSearchOrder.TurnFrontier;
+        _rolloutStyle = LocalRolloutStyle.Balanced;
         _nativeLearning = request.StrategicRollouts ? new(trackCosts: turnMode) : null;
         _excludedModels = new(request.ExcludedModels ?? [], StringComparer.Ordinal);
         var timer = Stopwatch.StartNew();
@@ -154,9 +156,13 @@ public static class LocalWorker
         int coveredTasks = 0;
         var terminalHistories = new HashSet<string>(StringComparer.Ordinal);
         int repeatedHistories = 0;
+        var rolloutStyles = new Dictionary<string, int>();
+        var turnOutcomes = new List<LocalTurnOutcome>();
+        int fullTrials = 0;
         LocalTurnSearchStats? TurnStats() => turns == null ? null :
             new(probes, boundPruned, turns.Offered, turns.DuplicateOffers, turns.Count, unknownRecoveryChecks,
-                coveredTasks + (coverage?.Avoided ?? 0), terminalHistories.Count + repeatedHistories, repeatedHistories);
+                coveredTasks + (coverage?.Avoided ?? 0), terminalHistories.Count + repeatedHistories, repeatedHistories,
+                turns.ClaimedByRound, rolloutStyles, turnOutcomes.ToArray());
         var search = noPotionSearch;
         var refiner = new LocalRouteRefiner();
         LocalCandidate? refinementSeed = null;
@@ -246,12 +252,14 @@ public static class LocalWorker
                 int startHp = 0, lost = 0;
                 var recordedActions = new List<LocalAction>();
                 Player? recordedPlayer = null;
+                LocalDamageAccounting? recordedDamage = null;
                 void HpChanged(int oldHp, int newHp) => lost += Math.Max(0, oldHp - newHp);
                 try
                 {
                     var bound = LocalRecordedProbe.Bind(recorded, request.Replay);
                     await LocalWorkerLogic.Run(() => Restore(request with { Replay = bound.Replay }, true, player =>
-                    { recordedPlayer = player; startHp = player.Creature.CurrentHp; player.Creature.CurrentHpChanged += HpChanged; },
+                    { recordedPlayer = player; startHp = player.Creature.CurrentHp;
+                        recordedDamage = new(player); player.Creature.CurrentHpChanged += HpChanged; },
                     (action, player) =>
                     {
                         if (action is ReadyToBeginEnemyTurnAction) return;
@@ -269,7 +277,8 @@ public static class LocalWorker
                     best = new(recordedActions.ToArray(), player.Creature.CurrentHp, lost,
                         CombatManager.Instance.DebugOnlyGetState()!.Enemies.Sum(e => Math.Max(0, e.CurrentHp)), player.Gold,
                         player.Creature.MaxHp, _combatWon && !player.Creature.IsDead, player.Creature.IsDead, false,
-                        Rounds: recordedActions.Select(a => a.Round).Distinct().Count(), StartingHp: startHp);
+                        Rounds: recordedActions.Select(a => a.Round).Distinct().Count(), StartingHp: startHp,
+                        DamageSources: recordedDamage!.Snapshot(lost));
                     // Experimental terminal status is deliberately excluded from the product pool's
                     // acceptable results; this cannot become a displayed/executable empty plan.
                     await Cleanup();
@@ -277,7 +286,11 @@ public static class LocalWorker
                     Publish("recorded", "已核对原始战斗起点并执行本机已记录的全部操作与选牌。");
                     return true;
                 }
-                finally { if (recordedPlayer != null) recordedPlayer.Creature.CurrentHpChanged -= HpChanged; }
+                finally
+                {
+                    recordedDamage?.Dispose();
+                    if (recordedPlayer != null) recordedPlayer.Creature.CurrentHpChanged -= HpChanged;
+                }
             }
             if (request.VerifyCandidate is { } proposed)
             {
@@ -418,9 +431,17 @@ public static class LocalWorker
                     { planned = proposal; refinements++; }
                 }
                 route = ++attempts;
+                _rolloutStyle = turnMode && fullRollout ? sharedTurns != null ? turnTask!.Style :
+                    (LocalRolloutStyle)(fullTrials % 3) : LocalRolloutStyle.Balanced;
+                if (fullRollout)
+                {
+                    fullTrials++;
+                    string style = _rolloutStyle.ToString();
+                    rolloutStyles[style] = rolloutStyles.GetValueOrDefault(style) + 1;
+                }
                 _traceRoute = route; _traceStep = 0;
                 using var turnTiming = turns == null ? null : Trace(fullRollout ? "rollout" : "turn-probe",
-                    $"round={turnTask!.SearchRound};lane={turns!.LastLane};prefix={planned!.Length}");
+                    $"round={turnTask!.SearchRound};lane={turns!.LastLane};prefix={planned!.Length};style={_rolloutStyle}");
                 refining?.Dispose();
                 events.Clear();
                 Progress("恢复路线起点", force: true);
@@ -456,6 +477,7 @@ public static class LocalWorker
                 int planIndex = 0;
                 int lost = 0;
                 string? terminalDigest = null;
+                using var damageSources = new LocalDamageAccounting(player);
                 void HpChanged(int oldHp, int newHp) => lost += Math.Max(0, oldHp - newHp);
                 player.Creature.CurrentHpChanged += HpChanged;
                 try
@@ -664,13 +686,17 @@ public static class LocalWorker
                         Rounds: actions.Select(a => a.Round).Distinct().Count(),
                         StopReason: won ? "胜利结算完成" : player.Creature.IsDead ? "玩家死亡" :
                             string.IsNullOrEmpty(stop) ? "战斗结束但未确认胜利" : stop, Decisions: decisions.ToArray(), StartingHp: startingHp,
-                        Continuation: continuationPoints?.ToArray(), ContinuationFromSearch: continuationPoints != null);
+                        Continuation: continuationPoints?.ToArray(), ContinuationFromSearch: continuationPoints != null,
+                        DamageSources: damageSources.Snapshot(lost));
                     if (turnTask != null && stop == "达到时间预算")
                         turns!.ReturnInterrupted(turnTask, TurnHint(player, startingHp, actions));
                     if (turnMode && IsTerminal(player) && planIndex < planned!.Length)
                         throw new InvalidOperationException("Exact native search prefix terminated early");
                     bool completeAttempt = !turnProbed && !cut && (fullRollout || IsTerminal(player));
-                    using (Trace("trial-result", $"won={won};hp={candidate.Hp};loss={candidate.NetHpLoss};potions={actions.Count(a => a.PotionSlot.HasValue)};" +
+                    if (turnMode && completeAttempt)
+                        turnOutcomes.Add(new(request.Partition, route, _timeline!.ElapsedMs, won, candidate.Hp, lost,
+                            candidate.Rounds, actions.Count(a => a.PotionSlot.HasValue), _rolloutStyle, candidate.DamageSources));
+                    using (Trace("trial-result", $"won={won};hp={candidate.Hp};loss={candidate.NetHpLoss};gross={candidate.HpLost};potions={actions.Count(a => a.PotionSlot.HasValue)};" +
                         $"rounds={candidate.Rounds};complete={completeAttempt};probe={turnProbed};cut={cut};limited={stop == "达到时间预算"}")) { }
                     if (turnTask != null && stop != "达到时间预算" && !cut)
                         turns!.FocusNext(turnTask, actions, decisions);
@@ -678,7 +704,11 @@ public static class LocalWorker
                     else if (completeAttempt) evaluated++;
                     if (won) victories++;
                     Progress(won ? "路线获胜" : candidate.StopReason, Observe(player), true);
-                    if (completeAttempt && LocalSearchPolicy.Better(candidate, best)) { best = candidate; bestRoute = route; }
+                    if (completeAttempt && LocalSearchPolicy.Better(candidate, best))
+                    {
+                        if (turns != null) turns.ObserveOutcome(candidate);
+                        best = candidate; bestRoute = route;
+                    }
                     if (LocalSearchPolicy.CanStop(best, request.StopOnZeroLoss)) { stoppedEarly = true; break; }
                     if (work != null)
                     {
@@ -847,6 +877,7 @@ public static class LocalWorker
         int lost = 0;
         var points = new List<LocalContinuationPoint>();
         bool canContinue = request.History != null && request.History == LocalCapture.History();
+        using var damageSources = new LocalDamageAccounting(player);
         void HpChanged(int oldHp, int newHp) => lost += Math.Max(0, oldHp - newHp);
         player.Creature.CurrentHpChanged += HpChanged;
         try
@@ -864,7 +895,8 @@ public static class LocalWorker
             var enemyHp = CombatManager.Instance.DebugOnlyGetState()?.Enemies.Sum(e => Math.Max(0, e.CurrentHp)) ?? 0;
             if ((_combatWon && !player.Creature.IsDead) != candidate.Won || player.Creature.IsDead != candidate.Dead ||
                 player.Creature.CurrentHp != candidate.Hp || lost != candidate.HpLost || enemyHp != candidate.EnemyHp ||
-                player.Gold != candidate.Gold || player.Creature.MaxHp != candidate.MaxHp)
+                player.Gold != candidate.Gold || player.Creature.MaxHp != candidate.MaxHp ||
+                candidate.DamageSources != null && damageSources.Snapshot(lost) != candidate.DamageSources)
                 throw new InvalidOperationException("最佳路线重新执行后的结算不一致，未发布该进程的建议。");
             return (Observe(player), points.ToArray());
         }
@@ -1003,18 +1035,23 @@ public static class LocalWorker
         // decision, instead of recomputing the full hand for every card/target preview.
         var playable = hand.Where(c => !_excludedModels.Contains(c.Id.ToString()) && c.CanPlay()).ToArray();
         var tactics = LocalTacticalPreview.Capture(player, playable);
+        int Priority(CardModel card, MegaCrit.Sts2.Core.Entities.Creatures.Creature? target)
+        {
+            var native = tactics.Priority(card, target, _rolloutStyle);
+            return _nativeLearning?.Priority(card, native) ?? native;
+        }
         for (var i = 0; i < hand.Count; i++)
         {
             var card = hand[i];
             if (!playable.Contains(card)) continue;
             // Do not assume that attacks precede setup, or that zero damage means no value.
             if (card.IsValidTarget(null)) result.Add(new(i, card.Id.ToString(), null, card.Title, "", hash, state.RoundNumber,
-                Preference: _nativeLearning?.Priority(card, tactics.Priority(card, null)) ?? tactics.Priority(card, null),
+                Preference: Priority(card, null),
                 CombatCardIndex: NetCombatCard.FromModel(card).CombatCardIndex));
             else foreach (var target in state.Creatures.Where(c => c.IsAlive && card.IsValidTarget(c)))
                 result.Add(new(i, card.Id.ToString(), target.CombatId, card.Title,
                     target.CombatId is { } id && _targetLabels?.TryGetValue(id, out var label) == true ? label : target.Name,
-                    hash, state.RoundNumber, Preference: _nativeLearning?.Priority(card, tactics.Priority(card, target)) ?? tactics.Priority(card, target),
+                    hash, state.RoundNumber, Preference: Priority(card, target),
                     CombatCardIndex: NetCombatCard.FromModel(card).CombatCardIndex));
         }
         if (_includePotions)

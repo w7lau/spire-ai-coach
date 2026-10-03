@@ -1,18 +1,22 @@
 namespace SpireAiCoach.Core;
 
+public enum LocalRolloutStyle { Balanced, Preparation, Attack }
+
 // Preview values are hints for exploration, never a substitute for native execution or a prune.
 public sealed record LocalTacticalFeatures(double Damage = 0, double EnemyHp = 0, double EnemyBlock = 0,
     double TargetThreat = 0, double Incoming = 0, double CurrentBlock = 0, double Block = 0,
     double Hp = 80, double Strength = 0, double Vulnerable = 0, double Weak = 0,
     double EnergyGain = 0, double Draw = 0, double HpCost = 0,
     int FollowupAttacks = 0, double FollowupDamage = 0, int Upgrades = 0,
-    bool EndTurn = false, bool Known = false, bool RetainsBlock = false, double HandEndHpLoss = 0);
+    bool EndTurn = false, bool Known = false, bool RetainsBlock = false, double HandEndHpLoss = 0,
+    bool PersistentSetup = false, int EnergyCost = -1);
 
 public static class LocalTactics
 {
-    public static int Priority(LocalTacticalFeatures f)
+    public static int Priority(LocalTacticalFeatures f, LocalRolloutStyle style = LocalRolloutStyle.Balanced)
     {
-        if (!f.Known) return 0;
+        if (!f.Known) return style == LocalRolloutStyle.Preparation ?
+            f.PersistentSetup ? 100 : f.EnergyCost == 0 ? 3 : 0 : 0;
         var gap = Math.Max(0, f.Incoming - f.CurrentBlock);
         // A native HpLoss turn-end effect is a separate risk from incoming attacks.
         // Block must not make retaining the harmful card look harmless.
@@ -41,6 +45,21 @@ public static class LocalTactics
         // This is an exploration hint for removing an in-hand effect, not damage
         // dealt by playing the card. The native completed fight still scores the line.
         score += Math.Max(0, f.HandEndHpLoss) * 4;
-        return (int)Math.Clamp(score, -40, 100);
+        if (style == LocalRolloutStyle.Preparation)
+        {
+            // A second complete rollout strategy tests persistent setup early.
+            // Native card type and observed resource previews supply hints only;
+            // the actual full combat still decides whether the setup pays off.
+            score += f.PersistentSetup ? 100 : 0;
+            score += Math.Max(0, f.EnergyGain) * 8 + Math.Max(0, f.Draw) * 4 + f.Upgrades * 4;
+            if (f.RetainsBlock) score += Math.Max(0, f.Block - saved) * 2;
+            // Free native plays may trigger draw, cost reductions, exhaust or
+            // other opaque hooks. A separate rollout tests that possibility
+            // before ending; it does not certify their value or prune siblings.
+            if (f.EnergyCost == 0) score = Math.Max(3, score);
+        }
+        else if (style == LocalRolloutStyle.Attack)
+            score += Math.Min(f.EnemyHp, effective) * 2 + Math.Max(0, f.Strength) * f.FollowupAttacks * 2;
+        return (int)Math.Clamp(score, -40, style == LocalRolloutStyle.Balanced ? 100 : 200);
     }
 }

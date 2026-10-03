@@ -48,7 +48,7 @@ internal static class AlgorithmIntegration
             result.Evaluated, result.Victories, result.Rejected, result.ElapsedMs,
             result.Timing, result.TurnSearch, completed_histories = completed, repeated_histories = result.TurnSearch!.RepeatedHistories,
             retained_history_digests = histories.Length, dropped_trace_entries = result.Trace?.Dropped,
-            best.Won, best.StartingHp, best.Hp, best.HpLost, best.NetHpLoss, best.Rounds,
+            best.Won, best.StartingHp, best.Hp, best.HpLost, best.NetHpLoss, best.Rounds, best.DamageSources,
             used_potions = best.Actions.Count(a => a.PotionSlot.HasValue), verified_steps = best.Continuation!.Length
         });
     }

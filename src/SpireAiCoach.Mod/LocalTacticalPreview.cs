@@ -49,7 +49,7 @@ internal sealed class LocalTacticalPreview(Player player)
         CurrentBlock: player.Creature.Block, Hp: player.Creature.CurrentHp, EndTurn: true, Known: true,
         HandEndHpLoss: _handEndHpLoss));
 
-    public int Priority(CardModel card, Creature? target)
+    public int Priority(CardModel card, Creature? target, LocalRolloutStyle style = LocalRolloutStyle.Balanced)
     {
         try
         {
@@ -80,7 +80,8 @@ internal sealed class LocalTacticalPreview(Player player)
                 // "Cards" can mean discard/exhaust/selection count, so it is not a generic draw hint.
                 EnergyGain: Value("Energy"), HpCost: card.HasTurnEndInHandEffect ? 0 : Value("HpLoss"),
                 FollowupAttacks: affordable, FollowupDamage: followup, Known: known, RetainsBlock: _retainsBlock,
-                HandEndHpLoss: handEndHpLoss));
+                HandEndHpLoss: handEndHpLoss, PersistentSetup: card.Type == CardType.Power,
+                EnergyCost: card.EnergyCost.GetAmountToSpend()), style);
         }
         catch { return 0; }
     }

@@ -169,7 +169,12 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     turnWork?.Pending ?? results.Sum(r => r.TurnSearch?.Pending ?? 0), results.Sum(r => r.TurnSearch?.UnknownRecoveryChecks ?? 0),
                     results.Sum(r => r.TurnSearch?.CoveredPrefixes ?? 0),
                     turnWork?.CompletedHistories ?? results.Sum(r => r.TurnSearch?.CompletedHistories ?? 0),
-                    turnWork?.RepeatedHistories ?? results.Sum(r => r.TurnSearch?.RepeatedHistories ?? 0)),
+                    turnWork?.RepeatedHistories ?? results.Sum(r => r.TurnSearch?.RepeatedHistories ?? 0),
+                    turnWork?.ClaimedByRound ?? results.SelectMany(r => r.TurnSearch?.ClaimedByRound ?? new Dictionary<int, int>())
+                        .GroupBy(p => p.Key).ToDictionary(g => g.Key, g => g.Sum(p => p.Value)),
+                    results.SelectMany(r => r.TurnSearch?.RolloutStyles ?? new Dictionary<string, int>())
+                        .GroupBy(p => p.Key).ToDictionary(g => g.Key, g => g.Sum(p => p.Value)),
+                    results.SelectMany(r => r.TurnSearch?.Outcomes ?? []).OrderBy(o => o.CompletedMs).ToArray()),
                 Timing = new(allRuns.Sum(r => r.Timing?.RestoreMs ?? 0), allRuns.Sum(r => r.Timing?.ActionMs ?? 0),
                     allRuns.Sum(r => r.Timing?.DecisionMs ?? 0), allRuns.Sum(r => r.Timing?.VerificationMs ?? 0),
                     allRuns.Sum(r => r.Timing?.StartupMs ?? 0), allRuns.Sum(r => r.Timing?.Actions ?? 0), allRuns.Sum(r => r.Timing?.Restores ?? 0),

@@ -33,6 +33,7 @@ static class TurnWorkTests
             var captured = Request(); using var broker = new LocalTurnWork(captured, 8);
             var command = captured with { TurnWorkPipe = broker.PipeName };
             var keys = new System.Collections.Concurrent.ConcurrentBag<string>();
+            var styles = new System.Collections.Concurrent.ConcurrentBag<LocalRolloutStyle>();
             using (var producer = new LocalTurnWorkClient(command))
             {
                 for (int i = 0; i < 96; i++) producer.Offer([Move(0), Move(i + 1, "later")], 2, Hint());
@@ -42,10 +43,16 @@ static class TurnWorkTests
             {
                 using var client = new LocalTurnWorkClient(command with { Partition = i });
                 while (client.TryTake(out var task))
-                { keys.Add(LocalTurnSearch.HistoryKey(task.Prefix)); client.Finish(task); }
+                {
+                    keys.Add(LocalTurnSearch.HistoryKey(task.Prefix));
+                    if (task.FullRollout) styles.Add(task.Style);
+                    client.Finish(task);
+                }
             })));
             Check(keys.Count == 96 && keys.Distinct().Count() == 96 && broker.Pending == 0,
                 "Later branches were lost or claimed by two workers");
+            Check(styles.Count == 48 && Enum.GetValues<LocalRolloutStyle>().All(s => styles.Count(x => x == s) == 16),
+                "Concurrent owners must share an even portfolio of complete native rollouts");
         });
 
         test("shared turn work retains its listener with all sixteen owners connected", () =>

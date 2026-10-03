@@ -10,6 +10,37 @@ static class TurnSearchTests
 
     public static void Register(Action<string, Action> test)
     {
+        test("turn optimization native winning feedback promotes observed alternatives without deleting other work", () =>
+        {
+            var search = new LocalTurnSearch(1);
+            var hint = new LocalTurnHint(50, 50, 100, 100);
+            for (int i = 10; i < 5010; i++) search.Offer([Move(i)], 1, hint);
+            var root = Move(0);
+            var attack = Move(1, "after native setup", preference: 80);
+            var setup = Move(2, "after native setup", preference: 0);
+            var decision = new LocalDecision(1, [attack, setup]);
+            search.OfferAlternatives([root, attack], decision, hint);
+            search.ObserveOutcome(Win(actions: [root, attack]) with { Decisions = [decision] });
+            Check(search.TryTake(out _) && search.TryTake(out var task) && task.Prefix.Length == 2 &&
+                task.Prefix[1].CombatCardIndex == 2, "Completed native feedback was buried behind shallow proposals");
+            Check(search.Count == 4999, "Winning feedback must only reorder the retained exact frontier");
+        });
+
+        test("turn optimization shares exploration across later rounds despite a large shallow frontier", () =>
+        {
+            var search = new LocalTurnSearch(1);
+            for (int i = 0; i < 5000; i++) search.Offer([Move(i)], 1, new(50, 50, 100, 100));
+            foreach (int round in new[] { 2, 3, 10 })
+                search.Offer(Enumerable.Range(0, round * 3).Select(i => Move(i, "later", round)).ToArray(),
+                    round, new(30, 50, 20, 100));
+            var visited = new HashSet<int>();
+            for (int i = 0; i < 16; i++)
+            { Check(search.TryTake(out var task), "Missing observed native task"); visited.Add(task.SearchRound); }
+            Check(new[] { 1, 2, 3, 10 }.All(visited.Contains), "Replay cost starved a later native round");
+            Check(search.Count == 5003 - 16 && search.ClaimedByRound.Values.Sum() == 16,
+                "Round fairness must order retained tasks and count every actual claim");
+        });
+
         test("turn optimization complete feedback rotates across all scheduling lanes", () =>
         {
             var counts = new int[4];
