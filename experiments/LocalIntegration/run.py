@@ -46,7 +46,10 @@ parser.add_argument('--recorded-replay', type=Path)
 parser.add_argument('--numerical-benchmark', action='store_true')
 parser.add_argument('--early-stop-test', action='store_true')
 parser.add_argument('--results-dir', type=Path)
+parser.add_argument('--overhead-benchmark', action='store_true')
 args = parser.parse_args()
+if args.overhead_benchmark and (not args.replay or not args.seed_result):
+    parser.error('--overhead-benchmark requires --replay and --seed-result')
 if args.numerical_benchmark and (not args.replay or not args.recorded_replay):
     parser.error('--numerical-benchmark requires --replay and --recorded-replay')
 if args.early_stop_test and (not args.replay or not args.seed_result):
@@ -130,6 +133,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_RECORDED_REPLAY'] = str(args.recorded_replay.resolve()) if args.recorded_replay else ''
     env['SPIRE_LOCAL_NUMERICAL_BENCHMARK'] = '1' if args.numerical_benchmark else '0'
     env['SPIRE_LOCAL_EARLY_STOP_TEST'] = '1' if args.early_stop_test else '0'
+    env['SPIRE_LOCAL_OVERHEAD_BENCHMARK'] = '1' if args.overhead_benchmark else '0'
     settings = root / 'Roaming/SlayTheSpire2/default/1/settings.save'
     settings_data = json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}
     settings_data.update(volume_master=0, volume_bgm=0, volume_sfx=0, volume_ambience=0)

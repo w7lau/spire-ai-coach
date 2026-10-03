@@ -1,10 +1,10 @@
 # 验证记录
 
-## 0.7.10 回合末手牌扣血排序（2026-10-03）
+## 0.7.11 回合末手牌扣血排序（2026-10-04）
 
 最新真实 0.7.9 请求已冻结在私有 work，含同版本游戏和八项加载模块；原计算 8 路共评估 256 条、12 次获胜，推荐路线 6 回合、40→16、净失血 24。完整时间轴含 186 次原生打出「呼唤」、分布在 109 条试走，合法候选也多次包含该牌，因此不是未支持或未纳入。对照本机实际游戏代码，HpLoss=6 属于 OnTurnEndInHand，打出本身没有该扣血；旧预览却作为 HpCost 扣除排序分 18，且结束回合忽略这部分手牌风险。
 
-修正采用原生触发标志和数值，不使用卡名名单。额外发现补打状态牌后，弃牌列表及原生选牌次数改变会让旧选择完全失配，已添加仅用于搜索的唯一合法模型提议与意图续接，最终执行校验没有放宽。针对性 search 检查 19/19，通过当前游戏程序集的 Mod 和集成宿主构建，均为 0 警告 / 0 错误。
+修正采用原生触发标志和数值，不使用卡名名单。额外发现补打状态牌后，弃牌列表及原生选牌次数改变会让旧选择完全失配，已添加仅用于搜索的唯一合法模型提议与意图续接，最终执行校验没有放宽。针对性 search 检查 19/19、optimization 11/11，通过当前游戏程序集的 Mod 和集成宿主构建，均为 0 警告 / 0 错误。
 
 固定路线对照保留原组合，在第 3、5 回合各补打一张呼唤，并按实际合法选牌保留取回出击的组合意图。隔离原生执行及独立复核均通过：仍为 6 回合胜利、不喝药，40→28、净失血 12，26/26 续用点，故这次战斗至少存在少掉 12 血的可执行路线。该对照提供了修改后的计划，只用于证明路线可行与收益，不能说搜索器自己找到了它。此前未给定计划的单路 32 条试走没有取得胜利，随后沿旧候选的单路补充搜索仍为净失血 24；搜索质量问题没有因静态检查或这条固定成功路线而被视为解决。产品的 60 秒、32 条/路和 64 回合预算保持原值；固定对照的单路线限制仅用于隔离验证。
 
@@ -345,3 +345,12 @@ Mod 与集成项目构建零警告零错误。合成选择链路在同一功能�
 The default-off `NumericalExecution` experiment passed same-worker old/new/new/old comparisons of the recorded 6-round/49-action route and a fixed 10-round/60-action search route. Every native action/state fingerprint and final settlement matched; the search route's full card choices also matched and its final candidate passed 60/60 ordinary-scene continuation checks. Warm full-route times were 2.023 → 0.845 seconds and 2.212 → 1.202 seconds. The 60-action execution portion was 1.536 → 0.654 seconds. New samples retained only 3 root-restoration frame waits and none in cards/enemy turns. Startup and independent verification are outside these figures. Details and limitations are in [numerical-execution-experiment.md](numerical-execution-experiment.md).
 
 The first reuse prototype failed; late continuations and cross-action turn-loop dispatch were corrected before the final repeated comparisons. Installed-game build: zero warnings/errors. Targeted core checks: search 14/14, timeline 5/5. No unseeded quality search or full suite was run. This experimental branch has not replaced the installed Mod and does not establish arbitrary-Mod compatibility or optimality.
+# 0.7.10 展示/输出开销与方法计时（2026-10-03）
+
+核心检查 111/111，通过；本机 v0.111.0 游戏适配层及隔离宿主编译零警告、零错误。固定同一根状态与相同 Mod 副本，在单个已准备的实例内先预热两种路径，再按关/开/开/关执行 10 回合 60 步路线。动作、卡牌实例、原生选牌、每步指纹、起点/最终生命、累计扣血、金币、最大生命、敌人剩余生命和回合数全部一致；每条均最终生命 87、净损失 0。常规场景最终复核 60/60，通过，新增展示快捷入口不在复核中生效。20 组原生边界全部安装成功，无安装失败。
+
+记录用时为关闭 1423/1036ms、开启 1353/1314ms；常规复核 7985ms。同机游戏和多个计算实例仍在运行，样本不足且总用时有波动；这些结果没有证明稳定的总体提速，不以最佳单次或缩短预算宣称收益。新路径确实跳过重放文件输出、音效入口、特效叶入口及普通日志。关闭路径中的重放输出约 9ms、音频底层调用约 13–19ms；完整状态复制 224 次、累计约 520–726ms，是目前可观察的主要成本。方法累计包含嵌套调用，同名重载也合并累计，不能与指纹或原生校验再次相加。
+
+开始对照时两次输入准备被真实 Mod/模型清单校验拒绝；改用同一历史战斗对应的已保存 Mod 副本。随后发现最初配对的请求属于另一场战斗，改用与固定路线首步指纹完全相同的冻结请求，并加入测试入口的根一致性检查。没有修改模型哈希、忽略 Mod 身份、取消原生状态校验或冒充获胜。
+
+上述验证是固定路线的执行兼容与方法观察，不是无提示最优解搜索、任意 Mod 兼容证明或并发吞吐测试。当前完整状态复制仍调用原生卡牌费用和遗物序列化等逻辑，不共享未证明完整的中途状态。源码/包已准备，安装仍需游戏退出；用户实际重启加载和后续战斗进度显示尚未验证。

@@ -1,12 +1,24 @@
 # 设计与合同
 
-## 0.7.10 回合末手牌风险与搜索选牌续接
+## 0.7.11 回合末手牌风险与搜索选牌续接
 
 战术预览通过原生 HasTurnEndInHandEffect 区分 HpLoss 数值的上下文：带手牌回合末触发的卡不再把该值直接当成出牌付款。手牌风险单独参与结束回合的排序提示，不因攻击格挡而消失；原生执行中实际观察到的额外出牌扣血仍修正探索提示。这些只影响优先试走顺序，没有删除合法分支，也没有实现卡牌效果副本。条件触发和未知 Mod 机制的最终影响仍由完整原生战斗结算决定。
 
 修改前缀可能改变选牌列表、顺序或次数。仅在搜索计划提议阶段，ProposeChoice 优先采用完全相同的选择；旧列表变化时，只对 hand/pile 单选中的相同精确模型且当前唯一合法的选项提议新选择。重复实例、多选、不同选择类型及未知模型不猜身份。ProposeNextChoice 可跳过无法重新提议的旧意图，尝试后续唯一合法意图，以免次数变化截断组合。真实 Play 保存新的 offer 和坐标，最终复核及前台执行仍使用原有完整选择、原生指纹和历史核对，不采用这套提议规则。
 
 LocalRouteRefiner 交错提供一组有限的组合候选：在多个回合结束前提议各自最高正向提示的合法卡，并尝试原重复选牌意图的不同起始顺序。它不认为两个操作独立或自动有收益，而是让原生试走检验一起调整后的路线；原单点补牌、删牌、换牌、重排和选牌分支继续保留。单点插入按当前原生提示优先排队，组合候选仍占原 64 个待试提议及原搜索预算。
+
+## 0.7.10 展示和输出开销、方法计时
+
+LocalWorkerOverhead 仅在已核对所有权标记与可执行路径的独立实例安装。TrimWorkerOverhead 默认 true；实际跳过还要求 NumericalExecution、DataOnlyCombat、DataOnlyRun，且不是 VerifyCandidate 请求。VerifyBest 关闭数据场景模式时，跳过入口自动失效。每组原生方法用独立 Harmony owner 安装，签名不支持时撤回该组并在私有 runtime.json 留下失败原因。
+
+SfxCmd 的播放入口、NAudioManager 的单次播放/循环/参数入口、VfxCmd 的返回 void 的展示入口在此范围内直接返回；声音停止与清理方法保留。特效的集合包装仍枚举调用方传入的序列，只跳过叶调用。ConsoleLogPrinter.Print 仅跳过普通输出，Warn/Error 和 Logger.LogCallback 保留。CombatReplayWriter.WriteReplay 跳过匿名化、序列化和写盘，仍执行要求的 StopRecording；没有开始录制或已禁用的原生行为继续执行，不隐藏错误。内存重放事件、历史选择、所有规则效果和原生校验继续保留。
+
+快速搜索中 force 标志不再绕开每 100ms 的运行中进度节流；结束/失败状态仍立即写入。运行中候选统一最多每 250ms 发布，最终候选立即写入。父进程仍按原生状态和历史检查方案，搜索分支、预算、评分和无伤提前停止条件没有变化。
+
+LocalTrace.Methods 用 Source/Worker/Stage/Method 区分一次后台请求的同步方法累计，包含 Calls、Skipped、TotalMs、MaxMs。Native checksum、NetFullCombatState.FromRun/Serialize、PlayerCombatState.RecalculateCardValues 用原入口的 prefix/finalizer 计时；finalizer 不替换或吞掉原异常。LocalCapture.Fingerprint 和进度/候选发布在所属流程计时。结构体计时范围与原地计数器避免逐调用分配记录、生成时间线项或写盘，完成快照时才物化记录；每类累计有容量上限。Source 保留跨进程导入身份，更新的累计快照替换旧值，独立请求相加。旧诊断缺少 Methods 时仍可读取。方法累计包含内部调用，不能与父操作或其他嵌套方法相加；最终结果文件自身正在进行的最后一次写入不在它自己的快照中。
+
+Mod/模型清单不一致时保存私有 model-mismatch.json，含预期/实际模型哈希及程序集身份，不放宽校验。速度验证必须使用同一根状态、同一动作/选牌路线和实际相同的 Mod 副本，测试入口先检查固定路线首步指纹与冻结请求相同。
 
 ## 0.7.9 无伤获胜后停止全部搜索
 
