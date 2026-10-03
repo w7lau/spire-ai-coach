@@ -1,0 +1,66 @@
+{
+  "human_plan_seeded": false,
+  "numerical_execution": true,
+  "workers": 4,
+  "budget_seconds_per_worker": 60,
+  "max_full_attempts_per_worker": 32,
+  "product_default_changed": false,
+  "summary": {
+    "status": "done",
+    "rejected": 0,
+    "evaluated": 58,
+    "victories": 36,
+    "elapsed_ms": 109362,
+    "turn_stats": {
+      "Probes": 174,
+      "BoundPruned": 6699,
+      "Offered": 23253,
+      "DuplicateOffers": 2530,
+      "Pending": 21479,
+      "UnknownRecoveryChecks": 841
+    },
+    "hp": 87,
+    "max_hp": 87,
+    "gold": 109,
+    "net_loss": 0,
+    "gross_hp_loss": 13,
+    "rounds": 8,
+    "steps": 58,
+    "potions": 0,
+    "verified_steps": 58,
+    "dropped": 0,
+    "trials": {
+      "rollout": {
+        "count": 58,
+        "median_ms": 2466.82,
+        "median_prefix": 3.0,
+        "lanes": {
+          "0": 16,
+          "1": 16,
+          "2": 14,
+          "3": 12
+        }
+      },
+      "turn-probe": {
+        "count": 176,
+        "median_ms": 495.17,
+        "median_prefix": 3.0,
+        "lanes": {
+          "1": 44,
+          "2": 44,
+          "3": 44,
+          "0": 44
+        }
+      }
+    },
+    "outcomes": 234,
+    "winning_rounds": {
+      "8": 6,
+      "10": 4,
+      "11": 3,
+      "12": 1,
+      "13": 2
+    },
+    "longest_display_prefix": 3
+  }
+}
