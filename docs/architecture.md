@@ -1,5 +1,13 @@
 # 设计与合同
 
+## 0.7.9 无伤获胜后停止全部搜索
+
+CoachSettings.LocalStopOnZeroLoss 和 LocalSearchRequest.StopOnZeroLoss 默认 true；旧配置/旧请求省略时继承默认值，显式 false 保留。面板勾选后自动保存，不要求 AI 配置；计算入口冻结该值。停止标准仅为 Won、未死亡、已知 StartingHp 且 NetHpLoss=0，包含原生战中及战后回血。不再依赖 RewardCoverageKnown、ContinueOptimization 或未喝药条件；使用药水的合法性仍由请求 IncludePotions 控制。当前不搜索额外奖励收益，关闭开关才继续优化无伤路线。
+
+本路胜利完整结算后立即退出探索，不再提交后续分支。父进程收到首个符合条件的完整候选后，用一次原子操作通知其他路；各路 stop-search.json 绑定请求 ID、快照和原生根指纹，旧战斗、关闭开关及 VerifyCandidate 命令均不接受该信号。其他路在当前原生动作完成后停止，丢弃未完成试走，保留此前完整候选，完成清理并返回 searched/StoppedEarly。还在启动的实例取消准备；超过两秒仍未响应的所属进程退役，避免异常回调拖到原搜索预算结束。
+
+父进程收齐停止确认后仅复核最终完整候选；停止不替代原生指纹、操作历史、选择或结算校验。已达标候选的其他失败搜索不会强制重跑整场，最终无伤候选若复核失败则不按提前成功返回，沿用原常规执行回退。旧的成功终局不能用于下一场停止。关闭开关时没有全局停止信号，仍执行原有预算。结果显式带 StoppedEarly，时间轴记录 stop_search，玩家提示为已停止后续搜索并通过复核。
+
 ## 0.7.8 连续原生数值结算
 
 LocalSearchRequest.NumericalExecution 默认开启，旧请求省略该字段也使用新默认值；内部对照仍可显式关闭。LocalWorkerLogic 只在已检查所有权及可执行路径的后台实例安装，且要求 DataOnlyRun 和当前操作的数值执行上下文。真实玩家操作与最终常规场景复核不进入该上下文。

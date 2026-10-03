@@ -81,10 +81,12 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             ulong reusable = (ulong)_workers.Where(w => w.Process?.HasExited == false).Sum(w => w.Process!.PrivateMemorySize64);
             int count = LocalSearchPolicy.WorkerCount(Environment.ProcessorCount, memory.AvailablePhysical + reusable, request.Workers);
             foreach (var idle in _workers.Skip(count)) idle.Stop();
+            using var goalReached = new CancellationTokenSource();
+            int goalWorker = -1;
             progress("准备计算…");
             var results = (await Task.WhenAll(_workers.Take(count).Select((worker, index) => Task.Run(() => Run(worker, index), cancellation)))).ToList();
             cancellation.ThrowIfCancellationRequested();
-            if (request.DataOnlyCombat && results.Any(r => r.Status is "failed" or "unsupported" or "partial"))
+            if (request.DataOnlyCombat && !goalReached.IsCancellationRequested && results.Any(r => r.Status is "failed" or "unsupported" or "partial"))
                 throw new CoachException("local_data_unavailable", string.Join("\n", results.Select(r => r.Message).Distinct()));
             // Pending native selectors own callbacks. Retire their processes; never reset underneath them.
             // If every lane failed before producing a route, spend only the remaining search budget on
@@ -102,7 +104,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             var valid = results.Where(r => r.Status is "searched" or "done" or "partial" && r.Best != null).ToArray();
             if (valid.Length == 0)
                 throw new CoachException("local_failed", string.Join("\n", results.Select(r => r.Message).Distinct()));
-            // Search all lanes first. Only a globally selected candidate is independently replayed.
+            // Every lane has now completed or acknowledged the goal stop. Only the
+            // selected complete candidate is independently replayed.
             // Failed verification discards that candidate; it never bypasses checks to publish it.
             var verificationResults = new List<LocalSearchResult>();
             LocalSearchResult? verifiedBest = null;
@@ -121,13 +124,15 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             }
             if (verifiedBest == null) throw new CoachException("local_verify_failed",
                 string.Join("\n", verificationResults.Select(r => r.Message).Distinct()));
+            if (goalReached.IsCancellationRequested && !LocalSearchPolicy.CanStop(verifiedBest.Best, request.StopOnZeroLoss))
+                throw new CoachException("local_verify_failed", "无伤候选未通过复核，不能按提前停止的结果返回。");
             var best = verifiedBest;
             var allRuns = results.Concat(verificationResults).ToArray();
             LocalWorkStats? workStats = null;
             if (request.ShareSearchWork && count > 1)
             {
                 using var scheduling = timeline.Measure(-1, "main", "schedule", "释放已结束的分支提案", depth: 1);
-                var work = new LocalSearchWork(Path.GetDirectoryName(_workers[0].Root)!, request);
+                var work = new LocalSearchWork(Path.GetDirectoryName(_workers[goalWorker >= 0 ? goalWorker : 0].Root)!, request);
                 workStats = work.Stats();
                 try { work.ReleasePlans(); }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -140,14 +145,16 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     (results.Count > count ? results[^1].ElapsedMs : 0),
                 WorkerMemoryBytes = (results.Count > count ? results.Skip(1) : results).Sum(r => r.WorkerMemoryBytes),
                 IncludePotions = request.IncludePotions,
+                StoppedEarly = goalReached.IsCancellationRequested,
                 Id = request.Id,
                 Work = workStats,
                 Timing = new(allRuns.Sum(r => r.Timing?.RestoreMs ?? 0), allRuns.Sum(r => r.Timing?.ActionMs ?? 0),
                     allRuns.Sum(r => r.Timing?.DecisionMs ?? 0), allRuns.Sum(r => r.Timing?.VerificationMs ?? 0),
                     allRuns.Sum(r => r.Timing?.StartupMs ?? 0), allRuns.Sum(r => r.Timing?.Actions ?? 0), allRuns.Sum(r => r.Timing?.Restores ?? 0),
                     allRuns.Sum(r => r.Timing?.Verifications ?? 0)),
-                Status = results.All(r => r.Status is "searched" or "done") && verificationResults.All(r => r.Status == "done") ? "done" : "partial",
-                Message = "本地整场计算完成。" + (results.Any(r => r.Status is not ("searched" or "done")) || verificationResults.Any(r => r.Status != "done") ? "部分搜索未完成，显示已复核的可用路线。" : "") +
+                Status = goalReached.IsCancellationRequested || results.All(r => r.Status is "searched" or "done") && verificationResults.All(r => r.Status == "done") ? "done" : "partial",
+                Message = goalReached.IsCancellationRequested ? "已找到战后无伤获胜路线，已停止全部后续搜索并通过路线复核。" :
+                    "本地整场计算完成。" + (results.Any(r => r.Status is not ("searched" or "done")) || verificationResults.Any(r => r.Status != "done") ? "部分搜索未完成，显示已复核的可用路线。" : "") +
                     (results.Count > count ? "本次补充搜索未纳入：" + string.Join("、", blocked.Select(a => a.CardName)) + "。" : "") +
                     "按战后净生命损失选路，同等净损失优先保留药水；预算内候选，未证明全局最优。" };
 
@@ -155,22 +162,39 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             {
                 var command = fallback ?? request with { Partition = index, Partitions = count, DeferVerification = true };
                 bool verifying = command.VerifyCandidate != null;
+                LocalSearchResult? lastResult = null;
+                LocalSearchResult Stopped() => (lastResult ?? new(command.Id, request.SnapshotId, "searched", "", 0, 0, 0, null)) with
+                    { Status = "searched", Best = null, StoppedEarly = true, Message = "已停止其余搜索。" };
                 try
                 {
+                    if (!verifying && goalReached.IsCancellationRequested) return Stopped();
                     simulationProgress?.Invoke(new(request.Id, request.SnapshotId, index, count, 0, 0, 0, request.MaxNodes, 0,
                         0, request.BudgetSeconds, "准备计算", null, []));
                     var preparation = Stopwatch.StartNew();
-                    await worker.Ensure(directory, index, installation, cancellation, timeline);
+                    // Stop any still-starting lane too, without cancelling final verification.
+                    using var preparing = CancellationTokenSource.CreateLinkedTokenSource(cancellation,
+                        verifying ? CancellationToken.None : goalReached.Token);
+                    await worker.Ensure(directory, index, installation, preparing.Token, timeline);
                     preparation.Stop();
+                    if (!verifying && goalReached.IsCancellationRequested) return Stopped();
                     progress("正在计算…");
+                    File.Delete(Path.Combine(worker.Root, "stop-search.json"));
                     using (timeline.Measure(index, verifying ? "verify" : "search", "ipc", depth: 1))
                         LocalWire.Write(Path.Combine(worker.Root, "request.json"), command);
                     double dispatched = timeline.ElapsedMs;
                     var timer = Stopwatch.StartNew();
                     long seenSequence = 0;
+                    Stopwatch? stopping = null;
                     while (timer.Elapsed.TotalSeconds < 180)
                     {
                         cancellation.ThrowIfCancellationRequested();
+                        if (!verifying && goalReached.IsCancellationRequested && stopping == null)
+                        {
+                            using var stopScope = timeline.Measure(index, "search", "stop_search", "停止其余搜索", depth: 1);
+                            LocalWire.Write(Path.Combine(worker.Root, "stop-search.json"),
+                                new LocalSearchStop(command.Id, command.SnapshotId, command.NativeHash));
+                            stopping = Stopwatch.StartNew();
+                        }
                         var previewPath = Path.Combine(worker.Root, "progress.json");
                         if (simulationProgress != null && File.Exists(previewPath))
                         {
@@ -186,6 +210,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                             var result = LocalWire.Read<LocalSearchResult>(file);
                             if (result.Id == command.Id && result.SnapshotId == request.SnapshotId)
                             {
+                                lastResult = result;
                                 if (result.Status != "running")
                                 {
                                     if (result.Trace?.Spans is { Length: > 0 } spans)
@@ -217,17 +242,30 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                                         if (command.DataOnlyCombat) LocalWire.Write(Path.Combine(worker.Root, "last-data-failure.json"), result);
                                         worker.Stop();
                                     }
+                                    if (!verifying && result.Status is "searched" or "done" &&
+                                        LocalSearchPolicy.CanStop(result.Best, request.StopOnZeroLoss) &&
+                                        Interlocked.CompareExchange(ref goalWorker, index, -1) == -1)
+                                    {
+                                        goalReached.Cancel();
+                                        progress("已找到无伤获胜路线，正在停止其余搜索并复核…");
+                                    }
                                     return result;
                                 }
-                                progress($"正在计算 · 已评估 {result.Evaluated} 条路线");
+                                if (!goalReached.IsCancellationRequested) progress($"正在计算 · 已评估 {result.Evaluated} 条路线");
                             }
                         }
+                        // Normally the native action settles and acknowledges within one poll.
+                        // A stuck callback must not hold the goal route until the search budget.
+                        if (stopping?.Elapsed.TotalSeconds >= 2)
+                        { worker.Stop(); return Stopped(); }
                         if (worker.Process?.HasExited != false)
                             throw new CoachException("local_exit", "本次计算意外中断，请重试。");
                         await Task.Delay(250, cancellation);
                     }
                     throw new CoachException("local_timeout", "计算超时，已停止；可以重试或使用 AI 分析。");
                 }
+                catch (OperationCanceledException) when (!verifying && goalReached.IsCancellationRequested && !cancellation.IsCancellationRequested)
+                { worker.Stop(); return Stopped(); }
                 catch (OperationCanceledException) { worker.Stop(); throw; }
                 catch (Exception ex)
                 {

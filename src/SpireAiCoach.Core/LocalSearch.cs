@@ -14,7 +14,14 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     bool FastCardPresentation = true, bool FastNativeWaits = true, bool ShareSearchWork = true,
     bool FastStateSettling = true, bool FastAssetCollection = false, bool StrategicRollouts = true,
     bool ExperimentalNativeData = false, byte[]? RecordedReplayProbe = null, bool DataOnlyCombat = true,
-    bool DataOnlyRun = true, bool NumericalExecution = true);
+    bool DataOnlyRun = true, bool NumericalExecution = true, bool StopOnZeroLoss = true);
+
+// A stop belongs to one frozen request, never to another battle or final verification.
+public sealed record LocalSearchStop(string Id, string SnapshotId, string NativeHash)
+{
+    public bool Matches(LocalSearchRequest request) => request.StopOnZeroLoss && request.VerifyCandidate == null &&
+        Id == request.Id && SnapshotId == request.SnapshotId && NativeHash == request.NativeHash;
+}
 
 public sealed record LocalAction(int HandIndex, string ModelId, uint? TargetId,
     string CardName, string TargetName, string BeforeHash, int Round = 0,
@@ -42,14 +49,13 @@ public sealed record LocalSearchResult(string Id, string SnapshotId, string Stat
     string Message, int Evaluated, int Rejected, long ElapsedMs, LocalCandidate? Best,
     int Duplicates = 0, int BudgetPruned = 0, int Victories = 0, int Workers = 1,
     long WorkerMemoryBytes = 0, long SearchElapsedMs = 0, bool IncludePotions = false, LocalSearchTiming? Timing = null,
-    LocalAction? BlockedAction = null, int MaxRounds = 64, LocalTrace? Trace = null, LocalWorkStats? Work = null);
+    LocalAction? BlockedAction = null, int MaxRounds = 64, LocalTrace? Trace = null, LocalWorkStats? Work = null,
+    bool StoppedEarly = false);
 
 public static class LocalSearchPolicy
 {
-    public static bool CanStop(LocalCandidate candidate, bool continueOptimization) =>
-        !continueOptimization && candidate.Won && !candidate.Dead &&
-        (candidate.NetHpLoss == 0 || candidate.StartingHp == null && candidate.HpLost == 0) &&
-        !candidate.Actions.Any(a => a.PotionSlot.HasValue) && candidate.RewardCoverageKnown;
+    public static bool CanStop(LocalCandidate? candidate, bool stopOnZeroLoss) =>
+        stopOnZeroLoss && candidate is { Won: true, Dead: false, NetHpLoss: 0 };
 
     // Same root, completed native victory: net HP loss first, potions are a reserve resource.
     public static bool Better(LocalCandidate candidate, LocalCandidate? prior)

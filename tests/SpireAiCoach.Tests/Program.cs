@@ -634,17 +634,29 @@ AsyncTest("HTTP content has one JSON object encoding and readable diagnostics pr
     Check(DiagnosticDisplay.Format(new CallDiagnostics().RedactedJson("")).Contains("尚未生成请求"));
 });
 
-Test("local no-damage stopping requires known rewards and opt-in continuation wins", () =>
+Test("local zero-loss switch stops complete wins without reward or potion gates", () =>
 {
-    var safe = new LocalCandidate([], 50, 0, 0, 100, 80, true, false, true, StartingHp: 50);
-    Check(LocalSearchPolicy.CanStop(safe, false));
-    Check(!LocalSearchPolicy.CanStop(safe, true));
-    Check(!LocalSearchPolicy.CanStop(safe with { RewardCoverageKnown = false }, false));
-    Check(LocalSearchPolicy.CanStop(safe with { HpLost = 3 }, false), "Recovered damage still meets the net no-loss objective");
-    Check(!LocalSearchPolicy.CanStop(safe with { Hp = 49 }, false));
-    Check(!LocalSearchPolicy.CanStop(safe with { Actions = [new(-1, "potion", null, "", "", "", PotionSlot: 0)] }, false));
-    Check(!LocalSearchPolicy.CanStop(safe with { Dead = true }, false));
-    Check(!LocalSearchPolicy.CanStop(safe with { Won = false }, false));
+    var safe = new LocalCandidate([], 50, 0, 0, 100, 80, true, false, false, StartingHp: 50);
+    Check(LocalSearchPolicy.CanStop(safe, true));
+    Check(!LocalSearchPolicy.CanStop(safe, false));
+    Check(LocalSearchPolicy.CanStop(safe with { HpLost = 3 }, true), "Native healing counts toward the final objective");
+    Check(LocalSearchPolicy.CanStop(safe with { Actions = [new(-1, "potion", null, "", "", "", PotionSlot: 0)] }, true));
+    Check(!LocalSearchPolicy.CanStop(safe with { Hp = 49 }, true));
+    Check(!LocalSearchPolicy.CanStop(safe with { Dead = true }, true));
+    Check(!LocalSearchPolicy.CanStop(safe with { Won = false }, true));
+    Check(!LocalSearchPolicy.CanStop(safe with { StartingHp = null }, true));
+    Check(!LocalSearchPolicy.CanStop(null, true));
+});
+Test("local goal stop is scoped to its frozen search and cannot interrupt verification", () =>
+{
+    var request = new LocalSearchRequest("job", "snapshot", [], "root", 42, ["mod"], true);
+    var stop = new LocalSearchStop(request.Id, request.SnapshotId, request.NativeHash);
+    Check(stop.Matches(request), "Explicit continue button does not override the visible stop switch");
+    Check(!stop.Matches(request with { Id = "next-job" }));
+    Check(!stop.Matches(request with { SnapshotId = "changed" }));
+    Check(!stop.Matches(request with { NativeHash = "changed" }));
+    Check(!stop.Matches(request with { StopOnZeroLoss = false }));
+    Check(!stop.Matches(request with { VerifyCandidate = new([], 50, 0, 0, 0, 80, true, false, false) }));
 });
 Test("local ranking prioritizes combat victory over healthy unfinished horizons", () =>
 {
@@ -659,14 +671,16 @@ Test("local ranking prioritizes combat victory over healthy unfinished horizons"
 Test("local requests default to numerical execution while preserving explicit legacy override", () =>
 {
     var request = new LocalSearchRequest("job", "snapshot", [], "root", 42, ["mod"], false);
-    Check(request.NumericalExecution && request.DataOnlyRun && request.DataOnlyCombat);
+    Check(request.NumericalExecution && request.DataOnlyRun && request.DataOnlyCombat && request.StopOnZeroLoss);
     var oldJson = JsonSerializer.SerializeToNode(request)!.AsObject();
     oldJson.Remove(nameof(LocalSearchRequest.NumericalExecution));
+    oldJson.Remove(nameof(LocalSearchRequest.StopOnZeroLoss));
     var old = oldJson.Deserialize<LocalSearchRequest>()!;
-    Check(old.NumericalExecution && old.BudgetSeconds == 60 && old.MaxNodes == 32 && old.MaxRounds == 64);
+    Check(old.NumericalExecution && old.StopOnZeroLoss && old.BudgetSeconds == 60 && old.MaxNodes == 32 && old.MaxRounds == 64);
     oldJson[nameof(LocalSearchRequest.NumericalExecution)] = false;
+    oldJson[nameof(LocalSearchRequest.StopOnZeroLoss)] = false;
     var legacy = oldJson.Deserialize<LocalSearchRequest>()!;
-    Check(!legacy.NumericalExecution && legacy.NativeHash == request.NativeHash && legacy.Replay.Length == 0);
+    Check(!legacy.NumericalExecution && !legacy.StopOnZeroLoss && legacy.NativeHash == request.NativeHash && legacy.Replay.Length == 0);
 });
 Test("local protocol preserves instance position and pre-state identity", () =>
 {
@@ -871,6 +885,7 @@ Test("local telemetry atomically replaces a snapshot held by an external shared 
 });
 
 SearchAlgorithmTests.Register(Test);
+EarlyStopSettingsTests.Register(Test);
 SearchWorkTests.Register(Test);
 OptimizationTests.Register(Test);
 TimelineTests.Register(Test);

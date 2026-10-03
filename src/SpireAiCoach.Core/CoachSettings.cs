@@ -10,6 +10,7 @@ public sealed record CoachSettings
     public int TimeoutSeconds { get; init; } = 120;
     public int LocalWorkers { get; init; } = 0;
     public bool LocalIncludePotions { get; init; }
+    public bool LocalStopOnZeroLoss { get; init; } = true;
 
     public Uri Endpoint()
     {
