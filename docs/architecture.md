@@ -1,5 +1,13 @@
 # 设计与合同
 
+## 0.7.14 可选最终复核与收尾计时
+
+本地面板新增默认关闭、不持久保存的「跳过最终复核」切换按钮。两个算法共用的 LocalCalculation 将其冻结为 SkipFinalVerification；旧请求省略该字段仍复核。它不同于各搜索 worker 的 DeferVerification：后者只把复核推迟到父池选路，并不跳过最终复核。所有原生游戏规则、Mod 钩子、状态/模型核对、完整胜利结算、搜索停止与清理仍执行，64 次/60 秒/64 回合预算不变。
+
+父池收到全部搜索结果或停止确认后，显式开启时直接按相同 Better 规则选择已模拟候选，不发送 VerifyCandidate 请求；结果置 VerificationSkipped，清除 Continuation，提示未复核。默认路径仍逐个复核最终候选，失败候选不发布为已复核。前台显示仍检查当前快照和原生根指纹；未复核结果不能建立续用路线，LocalContinuation 即使收到遗留续用点也会拒绝该标志，自动执行仍只接受复核路线。开关改变时取消进行中的计算，下一次计算使用新值。
+
+时间轴总条目容量不变，大容量记录单独保留128个概要/收尾条目；详细动作记录最多占其余空间。概要含各路完整 session、最终 verify、准备、主线程显示，以及结果传递、接收和停止通知。概要区满时保留最新概要并累计 Dropped，细节满时继续保留之后的概要；导入跨进程记录沿用同一规则。方法累计仍独立且有界。诊断保存 SkipFinalVerification、VerificationSkipped 和 Timing，以便条目被省略后仍能读取复核次数/用时。
+
 ## 0.7.13 最终复核的展示与资源开销
 
 FastVerification 是本地 IPC 的内部对照开关，默认 true，旧请求省略时继承默认值；显式 false 保留原有复核。LocalWorkerVerification 只在已验证所有权的后台进程安装，每个边界用独立 Harmony owner；四个边界均可安装且 SimulationSpeed>1 时才生效。VerifyBestCore 仍关闭 DataOnlyCombat/DataOnlyRun 并恢复普通 NonInteractiveMode：完整 NRun/NCombatRoom、原生执行器调度、状态通知、选择页面、所有模型效果、Mod 钩子、校验与逐步历史都保留，不使用搜索中的连续数值队列替代复核。

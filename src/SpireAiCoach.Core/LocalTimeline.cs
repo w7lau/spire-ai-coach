@@ -17,8 +17,10 @@ public sealed class LocalTimeline
 {
     private readonly object _gate = new();
     private readonly List<LocalTraceSpan> _spans = [];
+    private readonly Queue<LocalTraceSpan> _overview = new();
     private readonly Func<long> _clock;
     private readonly int _capacity;
+    private readonly int _overviewCapacity;
     private readonly string _methodSource = Guid.NewGuid().ToString("N");
     private readonly Dictionary<(int Worker, string Stage, string Method), MethodCounter> _methodCounters = [];
     private readonly Dictionary<(string Source, int Worker, string Stage, string Method), LocalMethodTiming> _methods = [];
@@ -33,6 +35,8 @@ public sealed class LocalTimeline
         Frequency = frequency > 0 ? frequency : Stopwatch.Frequency;
         Origin = origin > 0 ? origin : _clock();
         _capacity = Math.Max(1, capacity);
+        // Reserve bounded room for late stages even when per-action details fill up.
+        _overviewCapacity = _capacity >= 512 ? 128 : 0;
     }
 
     public double ElapsedMs => (_clock() - Origin) * 1000d / Frequency;
@@ -91,7 +95,13 @@ public sealed class LocalTimeline
             throw new ArgumentException("Invalid timeline span");
         lock (_gate)
         {
-            if (_spans.Count < _capacity) _spans.Add(span with { Detail = span.Detail.Length <= 160 ? span.Detail : span.Detail[..160] });
+            span = span with { Detail = span.Detail.Length <= 160 ? span.Detail : span.Detail[..160] };
+            if (_overviewCapacity > 0 && (span.Depth == 0 || span.Phase is "result_transfer" or "receive" or "stop_search"))
+            {
+                if (_overview.Count == _overviewCapacity) { _overview.Dequeue(); _dropped++; }
+                _overview.Enqueue(span);
+            }
+            else if (_spans.Count < _capacity - _overviewCapacity) _spans.Add(span);
             else _dropped++;
         }
     }
@@ -125,7 +135,7 @@ public sealed class LocalTimeline
 
     public LocalTrace Snapshot()
     {
-        lock (_gate) return new(Origin, Frequency, _spans.OrderBy(s => s.StartMs).ThenBy(s => s.Depth).ToArray(), _dropped,
+        lock (_gate) return new(Origin, Frequency, _spans.Concat(_overview).OrderBy(s => s.StartMs).ThenBy(s => s.Depth).ToArray(), _dropped,
             _methods.Values.Concat(_methodCounters.Select(p => new LocalMethodTiming(_methodSource, p.Key.Worker, p.Key.Stage,
                 p.Key.Method, p.Value.Calls, p.Value.Skipped, p.Value.TotalMs, p.Value.MaxMs)))
                 .OrderBy(m => m.Worker).ThenBy(m => m.Stage).ThenBy(m => m.Method).ToArray());

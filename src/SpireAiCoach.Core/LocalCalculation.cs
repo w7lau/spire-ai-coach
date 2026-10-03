@@ -15,7 +15,7 @@ public static class LocalCalculation
     };
 
     public static LocalSearchRequest Configure(LocalSearchRequest captured, LocalSearchOrder order,
-        int workers, bool includePotions, bool stopOnZeroLoss)
+        int workers, bool includePotions, bool stopOnZeroLoss, bool skipFinalVerification = false)
     {
         _ = Name(order);
         return captured with
@@ -23,6 +23,7 @@ public static class LocalCalculation
             SearchOrder = order, Workers = Math.Clamp(workers, 0, 16), IncludePotions = includePotions,
             MaxNodes = AttemptsPerWorker, BudgetSeconds = SearchSeconds, MaxRounds = Rounds,
             StopOnZeroLoss = stopOnZeroLoss,
+            SkipFinalVerification = skipFinalVerification,
             ShareSearchWork = order == LocalSearchOrder.MonteCarlo && captured.ShareSearchWork,
             // Turn-frontier continuations are generated from the current native state.
             InitialPlan = order == LocalSearchOrder.TurnFrontier ? null : captured.InitialPlan

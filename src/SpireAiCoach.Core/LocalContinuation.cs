@@ -13,7 +13,7 @@ public sealed class LocalContinuation(string combatId, string[] mods, LocalSearc
     {
         if (Invalid) return null;
         var best = original.Best;
-        if (currentCombat != combatId || !mods.SequenceEqual(currentMods) || best?.Continuation == null)
+        if (original.VerificationSkipped || currentCombat != combatId || !mods.SequenceEqual(currentMods) || best?.Continuation == null)
             return Reject();
         var matches = best.Continuation.Where(p => p.ActionIndex >= CompletedActions &&
             p.ActionIndex < best.Actions.Length && p.NativeHash == nativeHash && p.History == history).ToArray();

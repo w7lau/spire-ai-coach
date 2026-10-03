@@ -41,6 +41,7 @@ public sealed class CoachOverlay
     private LocalWorkerPool _localPool = null!;
     private bool _localAnalyzing;
     private CheckBox _localStopOnZeroLoss = null!;
+    private Button _localSkipVerification = null!;
     private bool _executing;
     private CancellationTokenSource? _execution;
     private readonly CancellationTokenSource _lifetime = new();
@@ -139,7 +140,7 @@ public sealed class CoachOverlay
         };
         body.AddChild(_localPotions);
         _localStopOnZeroLoss = new CheckBox { Text = "无伤通关后立即返回（含回血）", ButtonPressed = _settings.LocalStopOnZeroLoss,
-            TooltipText = "默认开启。找到获胜且战后生命不低于计算起点的路线，就停止全部搜索，完成路线复核后返回；暂不追求额外奖励。关闭后可继续搜索更佳路线。" };
+            TooltipText = "默认开启。找到获胜且战后生命不低于计算起点的路线，就停止全部搜索；默认复核后返回，开启跳过复核则直接显示结果。关闭后可继续搜索更佳路线。" };
         _localStopOnZeroLoss.Toggled += enabled =>
         {
             _settings = _settings with { LocalStopOnZeroLoss = enabled };
@@ -148,6 +149,15 @@ public sealed class CoachOverlay
             catch (Exception ex) { _status.Text = "选项本次已生效，保存失败：" + ex.GetType().Name; }
         };
         body.AddChild(_localStopOnZeroLoss);
+        _localSkipVerification = new Button { Name = "LocalSkipVerification", Text = "跳过最终复核：关闭", ToggleMode = true,
+            TooltipText = "本次游戏默认关闭。开启后省去最终路线的独立重放，直接显示模拟结果供手动对照；未复核路线不能自动执行或续用。" };
+        _localSkipVerification.Toggled += enabled =>
+        {
+            _localSkipVerification.Text = enabled ? "跳过最终复核：开启" : "跳过最终复核：关闭";
+            if (_localAnalyzing) Cancel("复核选项已改变，请重新计算。");
+            _status.Text = enabled ? "下次本地计算跳过最终复核，结果供手动对照。" : "下次本地计算会复核最终路线。";
+        };
+        body.AddChild(_localSkipVerification);
         _localProgress = new LocalProgressPanel(); body.AddChild(_localProgress.View);
         var timing = new Button { Text = "展开 / 收起耗时分析" }; body.AddChild(timing);
         _localTiming = new TextEdit { Editable = false, Visible = false, Text = "计算完成后显示耗时分析。",
@@ -458,7 +468,8 @@ public sealed class CoachOverlay
         try
         {
             request = LocalCalculation.Configure(LocalCapture.Capture(_snapshotHash!, continueOptimization), order,
-                (int)_localWorkers.Value, _localPotions.ButtonPressed, _localStopOnZeroLoss.ButtonPressed);
+                (int)_localWorkers.Value, _localPotions.ButtonPressed, _localStopOnZeroLoss.ButtonPressed,
+                _localSkipVerification.ButtonPressed);
             // Reuse only the suffix matching this combat, mods, native state and complete history.
             // It is an exploration seed; the worker re-executes and verifies it, never copies its score.
             if (order == LocalSearchOrder.MonteCarlo && _continuation != null && request.History != null)
@@ -514,15 +525,17 @@ public sealed class CoachOverlay
                         try
                         {
                             Directory.CreateDirectory(Path.GetDirectoryName(timingPath)!);
-                            LocalWire.Write(timingPath, new { version = "0.7.12", request.SearchOrder, request.MaxNodes, request.BudgetSeconds, result.ElapsedMs, result.Workers,
-                                result.Evaluated, result.Victories, result.Trace });
+                            LocalWire.Write(timingPath, new { version = "0.7.14", request.SearchOrder, request.MaxNodes, request.BudgetSeconds,
+                                request.SkipFinalVerification, result.VerificationSkipped, result.ElapsedMs, result.Workers,
+                                result.Evaluated, result.Victories, result.Timing, result.Trace });
                         }
                         catch (Exception ex) { GD.Print("[SpireAiCoach] Timing save failed: " + ex.GetType().Name); }
                     });
                     _adviceHash = request.SnapshotId;
-                    _freshness.Text = "路线已复核；按建议操作可续用。当前为预算内最佳候选，尚未证明全局最优。";
+                    _freshness.Text = result.VerificationSkipped ? "路线未复核，供手动对照；当前为预算内候选，尚未证明全局最优。" :
+                        "路线已复核；按建议操作可续用。当前为预算内最佳候选，尚未证明全局最优。";
                     _status.Text = LocalCalculation.Name(order) + "完成 · 不消耗 API";
-                    if (result.Best?.Continuation is { Length: > 0 })
+                    if (!result.VerificationSkipped && result.Best?.Continuation is { Length: > 0 })
                     {
                         _continuation = new(_snapshot!.CombatId, request.LoadedMods, result);
                         _continuationPending = false;
