@@ -293,7 +293,7 @@ public static class LocalWorker
                     Progress("复核最终候选", after);
                 });
                 verifyMs += (long)Stopwatch.GetElapsedTime(verifyStarted).TotalMilliseconds;
-                best = best with { Continuation = verified.Points };
+                best = best with { Continuation = verified.Points, ContinuationFromSearch = false };
                 Progress("计算完成 · 最终候选复核通过", verified.State, true, "done");
                 await Cleanup();
                 session?.Dispose();
@@ -441,6 +441,7 @@ public static class LocalWorker
                     search = _includePotions ? potionSearch : noPotionSearch;
                 }
                 var actions = new List<LocalAction>();
+                var continuationPoints = request.SkipFinalVerification && request.History != null ? new List<LocalContinuationPoint>() : null;
                 var decisions = new List<LocalDecision>();
                 var partition = systematic && sharedTurns == null ? new LocalBranchPartition(request.Partition, partitions) : null;
                 var trial = search.Begin();
@@ -557,6 +558,18 @@ public static class LocalWorker
                         var actionStarted = Stopwatch.GetTimestamp();
                         pendingAction = next;
                         _traceStep = actions.Count + 1;
+                        if (continuationPoints != null)
+                        {
+                            try
+                            {
+                                // Reuse the fingerprint from native legal-action enumeration;
+                                // recording adds no frame wait or independent state replay.
+                                var history = LocalCapture.History();
+                                if (actions.Count == 0 && history != request.History) continuationPoints = null;
+                                else continuationPoints.Add(new(actions.Count, next.BeforeHash, history, lost, player.Creature.CurrentHp));
+                            }
+                            catch (InvalidOperationException) { continuationPoints = null; }
+                        }
                         try
                         {
                             int choiceIndex = 0;
@@ -650,7 +663,8 @@ public static class LocalWorker
                         RewardCoverageKnown: false,
                         Rounds: actions.Select(a => a.Round).Distinct().Count(),
                         StopReason: won ? "胜利结算完成" : player.Creature.IsDead ? "玩家死亡" :
-                            string.IsNullOrEmpty(stop) ? "战斗结束但未确认胜利" : stop, Decisions: decisions.ToArray(), StartingHp: startingHp);
+                            string.IsNullOrEmpty(stop) ? "战斗结束但未确认胜利" : stop, Decisions: decisions.ToArray(), StartingHp: startingHp,
+                        Continuation: continuationPoints?.ToArray(), ContinuationFromSearch: continuationPoints != null);
                     if (turnTask != null && stop == "达到时间预算")
                         turns!.ReturnInterrupted(turnTask, TurnHint(player, startingHp, actions));
                     if (turnMode && IsTerminal(player) && planIndex < planned!.Length)
@@ -713,7 +727,7 @@ public static class LocalWorker
                     Progress("复核最佳路线", after);
                 });
                 verifyMs += (long)Stopwatch.GetElapsedTime(verifyStarted).TotalMilliseconds;
-                best = best with { Continuation = verified.Points };
+                best = best with { Continuation = verified.Points, ContinuationFromSearch = false };
                 Progress("计算完成 · 最佳路线复核通过", verified.State, true, "done");
             }
             else if (stoppedEarly) Progress("已停止搜索，等待返回路线", force: true, status: "searched");

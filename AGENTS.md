@@ -1,6 +1,6 @@
 # Spire AI Coach
 
-- Capture and AI advice remain read-only. The user explicitly authorized a button to execute a verified local plan (2026-10-02): only on click, singleplayer, matching combat/mods/native state/action history before every step, with cancellation and stop-on-divergence. Never auto-execute AI text, edit saves or mutate RNG directly.
+- Capture and AI advice remain read-only. The user explicitly authorized a button to execute local plans (2026-10-02), including plans that skip independent final replay (2026-10-04). Execution still requires complete native checkpoints from the search or verification: only on click, singleplayer, matching combat/mods/native state/action history before every step, with cancellation and stop-on-divergence. Never auto-execute AI text, edit saves or mutate RNG directly.
 - Simulation/replay stays in owned isolated workers. Live execution uses a separate guarded executor; never invoke LocalWorker simulation/reset actions in the live game. Preserve replay mismatch, stale-result, cancellation and OS-handle isolation checks.
 - Read `docs/architecture.md` before changing snapshots, prompts or parsers. Keep the prompt, projection, validation and display contract synchronized.
 - Game assemblies are local references only. Never commit DLLs, PCKs, decompiled game source, saves, credentials or real API configurations.

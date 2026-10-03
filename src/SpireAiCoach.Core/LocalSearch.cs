@@ -37,7 +37,7 @@ public sealed record LocalCardChoice(string OfferHash, int Index, string ModelId
 public sealed record LocalCandidate(LocalAction[] Actions, int Hp, int HpLost, int EnemyHp,
     int Gold, int MaxHp, bool Won, bool Dead, bool RewardCoverageKnown,
     int Rounds = 0, string StopReason = "", LocalContinuationPoint[]? Continuation = null,
-    LocalDecision[]? Decisions = null, int? StartingHp = null)
+    LocalDecision[]? Decisions = null, int? StartingHp = null, bool ContinuationFromSearch = false)
 {
     // Gross HP costs remain useful diagnostics, but healing and victory hooks are part of the goal.
     public int? NetHpLoss => StartingHp.HasValue ? Math.Max(0, StartingHp.Value - Hp) : null;
@@ -57,6 +57,20 @@ public sealed record LocalSearchResult(string Id, string SnapshotId, string Stat
 
 public static class LocalSearchPolicy
 {
+    // Opt-out still needs complete first-pass native checkpoints. Legacy skipped
+    // results cannot become executable merely by copying another plan's points.
+    public static bool HasExecutionPoints(LocalSearchResult result)
+    {
+        if (result.Best is not { Dead: false, Actions.Length: > 0, Continuation: { } points } best ||
+            points.Length != best.Actions.Length || result.VerificationSkipped && !best.ContinuationFromSearch) return false;
+        for (int i = 0; i < points.Length; i++)
+            if (points[i].ActionIndex != i || points[i].NativeHash != best.Actions[i].BeforeHash ||
+                string.IsNullOrEmpty(points[i].NativeHash) || points[i].History == null ||
+                string.IsNullOrEmpty(points[i].History.Hash) || points[i].History.Count < 0 ||
+                i > 0 && points[i].History.Count <= points[i - 1].History.Count) return false;
+        return true;
+    }
+
     public static bool CanStop(LocalCandidate? candidate, bool stopOnZeroLoss) =>
         stopOnZeroLoss && candidate is { Won: true, Dead: false, NetHpLoss: 0 };
 
@@ -93,7 +107,9 @@ public static class LocalSearchPolicy
             $"过程累计扣血 {best.HpLost}" + (best.StartingHp is { } start ? $"，已恢复或增加生命 {Math.Max(0, best.Hp - start + best.HpLost)}" : "") +
                 $"；敌人剩余生命合计 {best.EnemyHp}。" };
         if (result.VerificationSkipped)
-            lines.Insert(1, "未复核：直接显示后台模拟结果，供手动对照；自动执行与路线续用不可用。");
+            lines.Insert(1, HasExecutionPoints(result) ?
+                "已跳过最终复核：可点击执行方案，执行时逐步核对首次模拟记录，偏离即停止。" :
+                "已跳过最终复核，但未取得完整逐步记录；目前仅供手动查看，暂不能自动执行。");
         if (best.Won && best.NetHpLoss == 0 && !best.Actions.Any(a => a.PotionSlot.HasValue))
             lines.Add("已达到战后净损失 0 且不消耗药水的目标；其他收益和最短路线未证明最优。");
         if (!best.Won) lines.Add("以下仅为已模拟的部分路线，不代表能打赢本次战斗。停止原因：" + best.StopReason);

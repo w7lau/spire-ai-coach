@@ -3,6 +3,7 @@ using Godot;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Context;
+using MegaCrit.Sts2.Core.Entities.Multiplayer;
 using MegaCrit.Sts2.Core.Entities.Potions;
 using MegaCrit.Sts2.Core.GameActions;
 using MegaCrit.Sts2.Core.Multiplayer.Game;
@@ -54,7 +55,9 @@ public sealed class LocalPlanExecutor(SceneTree tree)
                 var hand = player.PlayerCombatState!.Hand.Cards;
                 if (action.HandIndex < 0 || action.HandIndex >= hand.Count) throw new InvalidOperationException("手牌已变化，已停止执行。");
                 var card = hand[action.HandIndex];
-                if (card.Id.ToString() != action.ModelId || !card.CanPlay() || !card.IsValidTarget(target))
+                if (card.Id.ToString() != action.ModelId ||
+                    action.CombatCardIndex is { } instance && NetCombatCard.FromModel(card).CombatCardIndex != instance ||
+                    !card.CanPlay() || !card.IsValidTarget(target))
                     throw new InvalidOperationException("这张牌或目标已不可用，已停止执行。");
                 RunManager.Instance.ActionQueueSet.EnqueueWithoutSynchronizing(new PlayCardAction(card, target));
             }
@@ -75,7 +78,7 @@ public sealed class LocalPlanExecutor(SceneTree tree)
             }
             choices.Finish();
             expected++;
-            if (best.Actions.Length == 1) return "已执行完已验证的路线；战斗未结束时请重新计算。";
+            if (best.Actions.Length == 1) return "已执行完方案；战斗未结束时请重新计算。";
         }
     }
 
