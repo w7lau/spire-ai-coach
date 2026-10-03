@@ -82,7 +82,10 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             int goalWorker = -1;
             var rootBranches = new int[count];
             var starting = new int[count];
-            bool shared = request.ShareSearchWork && request.SearchOrder == LocalSearchOrder.MonteCarlo && count > 1;
+            bool shared = request.ShareSearchWork && count > 1 &&
+                request.SearchOrder is LocalSearchOrder.MonteCarlo or LocalSearchOrder.TurnFrontier;
+            using var turnWork = shared && request.SearchOrder == LocalSearchOrder.TurnFrontier ? new LocalTurnWork(request, count) : null;
+            request = request with { TurnWorkPipe = turnWork?.PipeName };
             LocalSearchWork? schedulingWork = null;
             int launched = 0;
             progress("准备计算…");
@@ -102,6 +105,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             {
                 progress("部分动作无法完成，正在计算其他路线…");
                 var fallback = request with { Partition = 0, Partitions = 1, BudgetSeconds = remainingSeconds, DeferVerification = true,
+                    TurnWorkPipe = null,
                     ExcludedModels = (request.ExcludedModels ?? []).Concat(blocked.Select(a => a.ModelId)).Distinct().ToArray() };
                 results.Add(await Task.Run(() => Run(_workers[0], 0, fallback), cancellation));
             }
@@ -123,7 +127,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 var proposed = valid.Aggregate((a, b) => LocalSearchPolicy.Better(b.Best!, a.Best) ? b : a);
                 int index = Math.Clamp(results.IndexOf(proposed), 0, used - 1);
                 var verify = request with { Id = request.Id + "-verify-" + verificationResults.Count,
-                    Partition = index, Partitions = count, DeferVerification = false, VerifyCandidate = proposed.Best };
+                    Partition = index, Partitions = count, DeferVerification = false, VerifyCandidate = proposed.Best, TurnWorkPipe = null };
                 progress("正在复核最终路线…");
                 var check = await Task.Run(() => Run(_workers[index], index, verify), cancellation);
                 verificationResults.Add(check);
@@ -160,9 +164,12 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 Work = workStats,
                 TurnSearch = request.SearchOrder != LocalSearchOrder.TurnFrontier ? null : new(
                     results.Sum(r => r.TurnSearch?.Probes ?? 0), results.Sum(r => r.TurnSearch?.BoundPruned ?? 0),
-                    results.Sum(r => r.TurnSearch?.Offered ?? 0), results.Sum(r => r.TurnSearch?.DuplicateOffers ?? 0),
-                    results.Sum(r => r.TurnSearch?.Pending ?? 0), results.Sum(r => r.TurnSearch?.UnknownRecoveryChecks ?? 0),
-                    results.Sum(r => r.TurnSearch?.CoveredPrefixes ?? 0)),
+                    turnWork?.Offered ?? results.Sum(r => r.TurnSearch?.Offered ?? 0),
+                    turnWork?.DuplicateOffers ?? results.Sum(r => r.TurnSearch?.DuplicateOffers ?? 0),
+                    turnWork?.Pending ?? results.Sum(r => r.TurnSearch?.Pending ?? 0), results.Sum(r => r.TurnSearch?.UnknownRecoveryChecks ?? 0),
+                    results.Sum(r => r.TurnSearch?.CoveredPrefixes ?? 0),
+                    turnWork?.CompletedHistories ?? results.Sum(r => r.TurnSearch?.CompletedHistories ?? 0),
+                    turnWork?.RepeatedHistories ?? results.Sum(r => r.TurnSearch?.RepeatedHistories ?? 0)),
                 Timing = new(allRuns.Sum(r => r.Timing?.RestoreMs ?? 0), allRuns.Sum(r => r.Timing?.ActionMs ?? 0),
                     allRuns.Sum(r => r.Timing?.DecisionMs ?? 0), allRuns.Sum(r => r.Timing?.VerificationMs ?? 0),
                     allRuns.Sum(r => r.Timing?.StartupMs ?? 0), allRuns.Sum(r => r.Timing?.Actions ?? 0), allRuns.Sum(r => r.Timing?.Restores ?? 0),
@@ -192,7 +199,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             {
                 int roots = Volatile.Read(ref rootBranches[0]);
                 int pending = 0;
-                if (shared && roots > 0 && _workers[0].Root.Length > 0)
+                if (turnWork != null) pending = turnWork.Pending;
+                else if (shared && roots > 0 && _workers[0].Root.Length > 0)
                 {
                     schedulingWork ??= new LocalSearchWork(Path.GetDirectoryName(_workers[0].Root)!, request);
                     pending = schedulingWork.Stats().Pending;
