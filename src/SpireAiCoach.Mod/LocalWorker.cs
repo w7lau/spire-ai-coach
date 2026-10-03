@@ -127,6 +127,14 @@ public static class LocalWorker
         var budget = new Stopwatch();
         LocalCandidate? best = null;
         int evaluated = 0, rejected = 0, victories = 0;
+        bool stoppedEarly = false;
+        bool StopRequested()
+        {
+            if (!request.StopOnZeroLoss || request.VerifyCandidate != null) return false;
+            var path = Path.Combine(_root, "stop-search.json");
+            if (!File.Exists(path)) return false;
+            return LocalWire.Read<LocalSearchStop>(path).Matches(request);
+        }
         var noPotionSearch = new LocalSearchTree(1729 + request.Partition);
         var potionSearch = new LocalSearchTree(2718 + request.Partition);
         var search = noPotionSearch;
@@ -178,7 +186,7 @@ public static class LocalWorker
                 Victories: victories, IncludePotions: request.IncludePotions,
                 Timing: new(restoreMs, actionMs, decisionMs, verifyMs, Actions: executed, Restores: restores, Verifications: verifyMs > 0 ? 1 : 0),
                 BlockedAction: blockedAction, MaxRounds: request.MaxRounds,
-                Trace: status == "running" ? null : _timeline!.Snapshot()));
+                Trace: status == "running" ? null : _timeline!.Snapshot(), StoppedEarly: stoppedEarly));
         }
         try
         {
@@ -281,6 +289,7 @@ public static class LocalWorker
             while (evaluated < request.MaxNodes && budget.Elapsed.TotalSeconds < request.BudgetSeconds &&
                 (work != null || !noPotionSearch.Exhausted || request.IncludePotions && !potionSearch.Exhausted || refiner.Count > 0))
             {
+                if (StopRequested()) { stoppedEarly = true; break; }
                 using var refining = Trace("refine");
                 // Other workers' candidates seed exploration only. Their results are never adopted without
                 // executing the proposed line in this worker, including all native effects and choices.
@@ -325,6 +334,7 @@ public static class LocalWorker
                 events.Clear();
                 Progress("恢复路线起点", force: true);
                 if (evaluated > 0) await RestoreMeasured();
+                if (StopRequested()) { stoppedEarly = true; break; }
                 var player = LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!;
                 var startRound = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
                 var startingHp = player.Creature.CurrentHp;
@@ -353,6 +363,7 @@ public static class LocalWorker
                     string stop = "";
                     while (!IsTerminal(player))
                     {
+                        if (StopRequested()) { stoppedEarly = true; break; }
                         var round = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
                         if (round - startRound >= request.MaxRounds) { stop = "达到轮数上限"; break; }
                         if (budget.Elapsed.TotalSeconds >= request.BudgetSeconds) { stop = "达到时间预算"; break; }
@@ -428,13 +439,16 @@ public static class LocalWorker
                         Progress("试走路线", after);
                         plays = next.EndTurn ? 0 : plays + 1;
                     }
+                    // A peer reached the goal. Discard this unfinished trial; only a
+                    // previously completed candidate may survive to final verification.
+                    if (stoppedEarly) break;
                     await StableOrTerminal(player);
                     var state = CombatManager.Instance.DebugOnlyGetState();
                     var won = _combatWon && !player.Creature.IsDead;
                     var candidate = new LocalCandidate(actions.ToArray(), player.Creature.CurrentHp, lost,
                         state?.Enemies.Sum(e => Math.Max(0, e.CurrentHp)) ?? 0,
                         player.Gold, player.Creature.MaxHp, won, player.Creature.IsDead,
-                        // A general Mod reward classifier does not exist yet. Unknown must not enable early exit.
+                        // Extra rewards remain unknown; the explicit zero-loss switch does not depend on them.
                         RewardCoverageKnown: false,
                         Rounds: actions.Select(a => a.Round).Distinct().Count(),
                         StopReason: won ? "胜利结算完成" : player.Creature.IsDead ? "玩家死亡" :
@@ -443,6 +457,7 @@ public static class LocalWorker
                     if (won) victories++;
                     Progress(won ? "路线获胜" : candidate.StopReason, Observe(player), true);
                     if (LocalSearchPolicy.Better(candidate, best)) { best = candidate; bestRoute = route; }
+                    if (LocalSearchPolicy.CanStop(best, request.StopOnZeroLoss)) { stoppedEarly = true; break; }
                     if (work != null)
                     {
                         using var scheduling = Trace("schedule");
@@ -452,7 +467,6 @@ public static class LocalWorker
                     // A wall-clock interruption says nothing about the strength of this continuation.
                     if (stop != "达到时间预算") search.Complete(trial, candidate, initialEnemyHp, closeExactPrefix: true);
                     Publish("running", $"已找到 {victories} 条整场获胜路线；已记录 {noPotionSearch.Nodes + (request.IncludePotions ? potionSearch.Nodes : 0)} 个操作树节点，按实际结算反馈选路。");
-                    if (LocalSearchPolicy.CanStop(candidate, request.ContinueOptimization)) break;
                 }
                 catch (LocalChoiceException ex)
                 {
@@ -484,11 +498,13 @@ public static class LocalWorker
                 best = best with { Continuation = verified.Points };
                 Progress("计算完成 · 最佳路线复核通过", verified.State, true, "done");
             }
+            else if (stoppedEarly) Progress("已停止搜索，等待返回路线", force: true, status: "searched");
             else if (best == null) Progress("未取得可用路线", force: true, status: "unsupported");
             else Progress("搜索完成 · 等待最终候选复核", force: true, status: "searched");
             await Cleanup();
             session?.Dispose();
-            Publish(best == null ? "unsupported" : request.DeferVerification ? "searched" : "done", best == null ? "没有找到可完整结算的路线。" :
+            Publish(best == null ? stoppedEarly ? "searched" : "unsupported" : request.DeferVerification ? "searched" : "done",
+                stoppedEarly ? "已达到无伤通关停止条件，停止后续搜索。" : best == null ? "没有找到可完整结算的路线。" :
                 $"已完成当前预算，操作树 {noPotionSearch.Nodes + (request.IncludePotions ? potionSearch.Nodes : 0)} 个节点，比较了 {refinements} 条补牌、删牌、换牌和选牌路线。");
             return true;
         }

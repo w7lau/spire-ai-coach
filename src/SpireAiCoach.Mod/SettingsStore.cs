@@ -37,12 +37,13 @@ public sealed class SettingsStore
 
     public void SaveLocalWorkers(int workers) => SaveLocalOptions(workers, null);
 
-    public void SaveLocalOptions(int workers, bool? includePotions)
+    public void SaveLocalOptions(int workers, bool? includePotions, bool? stopOnZeroLoss = null)
     {
         if (workers is < 0 or > 16) throw new ArgumentOutOfRangeException(nameof(workers));
         var settings = File.Exists(ConfigPath) ? JsonNode.Parse(File.ReadAllText(ConfigPath))!.AsObject() : new JsonObject();
         settings["local_workers"] = workers;
         if (includePotions.HasValue) settings["local_include_potions"] = includePotions.Value;
+        if (stopOnZeroLoss.HasValue) settings["local_stop_on_zero_loss"] = stopOnZeroLoss.Value;
         Directory.CreateDirectory(_directory);
         AtomicWrite(ConfigPath, Encoding.UTF8.GetBytes(settings.ToJsonString()));
         // Local-only preferences must not require AI credentials or rewrite the encrypted key.

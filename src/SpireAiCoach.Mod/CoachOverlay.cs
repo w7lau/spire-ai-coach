@@ -38,6 +38,7 @@ public sealed class CoachOverlay
     private Button _continueOptimize = null!;
     private LocalWorkerPool _localPool = null!;
     private bool _localAnalyzing;
+    private CheckBox _localStopOnZeroLoss = null!;
     private bool _executing;
     private CancellationTokenSource? _execution;
     private readonly CancellationTokenSource _lifetime = new();
@@ -112,7 +113,7 @@ public sealed class CoachOverlay
         config.Pressed += () => _settingsPanel.Visible = !_settingsPanel.Visible;
         var hide = new Button { Text = "收起" }; row.AddChild(hide);
         hide.Pressed += () => _panel.Hide();
-        body.AddChild(Wrapped("规划整场战斗，最多 64 轮，优先减少战后净生命损失、保留药水。可沿已找到的路线继续优化。"));
+        body.AddChild(Wrapped("规划整场战斗，最多 64 轮，优先减少战后净生命损失、保留药水。关闭“无伤通关后立即返回”可继续优化无伤路线。"));
         var localOptions = new HBoxContainer(); body.AddChild(localOptions);
         localOptions.AddChild(new Label { Text = "本地并发（0 自动，1–16 手动）" });
         _localWorkers = new SpinBox { MinValue = 0, MaxValue = 16, Step = 1, Value = Math.Clamp(_settings.LocalWorkers, 0, 16) };
@@ -120,7 +121,7 @@ public sealed class CoachOverlay
         var saveLocal = new Button { Text = "保存本地设置" }; localOptions.AddChild(saveLocal);
         saveLocal.Pressed += () =>
         {
-            try { _store.SaveLocalOptions((int)_localWorkers.Value, _localPotions.ButtonPressed); _settings = _settings with { LocalWorkers = (int)_localWorkers.Value, LocalIncludePotions = _localPotions.ButtonPressed }; _status.Text = "本地设置已保存，下次计算生效。"; }
+            try { _store.SaveLocalOptions((int)_localWorkers.Value, _localPotions.ButtonPressed, _localStopOnZeroLoss.ButtonPressed); _settings = _settings with { LocalWorkers = (int)_localWorkers.Value, LocalIncludePotions = _localPotions.ButtonPressed, LocalStopOnZeroLoss = _localStopOnZeroLoss.ButtonPressed }; _status.Text = "本地设置已保存，下次计算生效。"; }
             catch (Exception ex) { _status.Text = "本地并发保存失败：" + ex.GetType().Name; }
         };
         _localPotions = new CheckBox { Text = "必要时考虑药水（优先保留）", ButtonPressed = _settings.LocalIncludePotions };
@@ -131,6 +132,16 @@ public sealed class CoachOverlay
             _adviceHash = null; _advice.Text = "药水策略已改变，原本地路线已清除。";
         };
         body.AddChild(_localPotions);
+        _localStopOnZeroLoss = new CheckBox { Text = "无伤通关后立即返回（含回血）", ButtonPressed = _settings.LocalStopOnZeroLoss,
+            TooltipText = "默认开启。找到获胜且战后生命不低于计算起点的路线，就停止全部搜索，完成路线复核后返回；暂不追求额外奖励。关闭后可继续搜索更佳路线。" };
+        _localStopOnZeroLoss.Toggled += enabled =>
+        {
+            _settings = _settings with { LocalStopOnZeroLoss = enabled };
+            if (_localAnalyzing) Cancel("停止条件已改变，请重新计算。");
+            try { _store.SaveLocalOptions((int)_localWorkers.Value, _localPotions.ButtonPressed, enabled); }
+            catch (Exception ex) { _status.Text = "选项本次已生效，保存失败：" + ex.GetType().Name; }
+        };
+        body.AddChild(_localStopOnZeroLoss);
         _localProgress = new LocalProgressPanel(); body.AddChild(_localProgress.View);
         var timing = new Button { Text = "展开 / 收起耗时分析" }; body.AddChild(timing);
         _localTiming = new TextEdit { Editable = false, Visible = false, Text = "计算完成后显示耗时分析。",
@@ -334,7 +345,7 @@ public sealed class CoachOverlay
             var next = _settings with { BaseUrl = _url.Text.Trim(), Model = _model.Text.Trim(),
                 RememberKey = _remember.ButtonPressed, RevealDrawOrder = _reveal.ButtonPressed,
                 IncludeStreamUsage = _usage.ButtonPressed, LocalWorkers = (int)_localWorkers.Value,
-                LocalIncludePotions = _localPotions.ButtonPressed };
+                LocalIncludePotions = _localPotions.ButtonPressed, LocalStopOnZeroLoss = _localStopOnZeroLoss.ButtonPressed };
             _store.Save(next, _apiKey.Text.Trim());
             Cancel("设置已保存，可以开始分析。");
             _settings = next; _key = _apiKey.Text.Trim();
@@ -444,7 +455,7 @@ public sealed class CoachOverlay
         {
             request = LocalCapture.Capture(_snapshotHash!, continueOptimization) with
                 { Workers = (int)_localWorkers.Value, IncludePotions = _localPotions.ButtonPressed,
-                    BudgetSeconds = 60 };
+                    BudgetSeconds = 60, StopOnZeroLoss = _localStopOnZeroLoss.ButtonPressed };
             // Reuse only the suffix matching this combat, mods, native state and complete history.
             // It is an exploration seed; the worker re-executes and verifies it, never copies its score.
             if (_continuation != null && request.History != null)

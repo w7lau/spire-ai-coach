@@ -87,6 +87,7 @@ public sealed class LocalTimeline
         "action_queue" => "等待原生动作结算", "settle" => "等待状态与胜利结算",
         "executor" => "等待原生执行完成", "asset_gc" => "资源准备后的内存回收",
         "logic_frame" => "等待事件",
+        "stop_search" => "停止其余搜索",
         "observe" => "读取过程预览", "publish" => "写入进度与候选", "ipc" => "传递计算请求",
         "receive" => "接收候选与检查运行日志", "dispatch" => "等待计算进程接收请求",
         "result_transfer" => "结果传递与轮询等待", "display_wait" => "等待界面显示",
