@@ -6,6 +6,52 @@ static class SearchAlgorithmTests
 
     public static void Register(Action<string, Action> test)
     {
+        test("search correlated policies discover repeated delayed setup without an answer seed", () =>
+        {
+            int found = 0;
+            for (int seed = 0; seed < 30; seed++)
+            {
+                var policy = new LocalRolloutPolicy(seed);
+                bool success = false;
+                for (int attempt = 0; attempt < 64 && !success; attempt++)
+                {
+                    policy.Begin();
+                    var actions = new List<LocalAction>();
+                    for (int step = 0; step < 12; step++)
+                    {
+                        var legal = new[] { Move("immediate") with { Preference = 20, BeforeHash = "state-" + step },
+                            Move("delayed") with { BeforeHash = "state-" + step } };
+                        actions.Add(legal.OrderByDescending(policy.Priority).First());
+                    }
+                    // All twelve preparations are needed. There is no intermediate
+                    // reward or improvement for a one-step alteration of the baseline.
+                    success = actions.All(a => a.ModelId == "delayed");
+                    policy.Complete(new(actions.ToArray(), success ? 80 : 40, success ? 0 : 40,
+                        success ? 0 : 20, 0, 80, success, false, false, StartingHp: 80));
+                }
+                if (success) found++;
+            }
+            Check(found == 30, "Independent decision noise must not be required at every step of a long combination");
+        });
+        test("search policy changes never collapse native instances or close untried histories", () =>
+        {
+            var policy = new LocalRolloutPolicy(91);
+            var tree = new LocalSearchTree(22);
+            var a = Move("duplicate") with { CombatCardIndex = 1 };
+            var legal = new[] { a, a with { CombatCardIndex = 2, HandIndex = 1 }, a with { TargetId = 2 } };
+            var seen = new HashSet<string>();
+            for (int i = 0; !tree.Exhausted && i < 20; i++)
+            {
+                policy.Begin();
+                var trial = tree.Begin();
+                var first = tree.Select(trial, legal, greedy: true, priority: policy.Priority);
+                var tail = tree.Select(trial, [Move("tail-a"), Move("tail-b")], greedy: true, priority: policy.Priority);
+                Check(seen.Add(first.CombatCardIndex + ":" + first.TargetId + ":" + tail.ModelId), "An exact terminal history repeated");
+                var result = new LocalCandidate([first, tail], 80, 0, 0, 0, 80, true, false, false, StartingHp: 80);
+                tree.Complete(trial, result, 20, closeExactPrefix: true); policy.Complete(result);
+            }
+            Check(tree.Exhausted && seen.Count == 6, "Perturbations may change ordering, never the legal leaf set");
+        });
         test("search tactics distinguish in-hand turn-end loss from a play payment", () =>
         {
             var payment = LocalTactics.Priority(new(Known: true, HpCost: 6));

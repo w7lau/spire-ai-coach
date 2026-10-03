@@ -17,6 +17,44 @@ public static class SearchWorkTests
             finally { Directory.Delete(directory, recursive: true); }
         }
         void Check(bool condition) { if (!condition) throw new Exception("Shared work assertion failed"); }
+        test("search work executed prefix audit preserves native choices and instances", () =>
+        {
+            var choice = new LocalCardChoice("offer", 0, "chosen", "display", [0], "pile");
+            var observed = action with { Choices = [choice, choice with { OfferHash = "later" }] };
+            Check(LocalSearchWork.MatchesPrefix([observed], [action]));
+            Check(LocalSearchWork.MatchesPrefix([observed], [action with { Choices = [choice] }]));
+            Check(!LocalSearchWork.MatchesPrefix([observed], [action with { CombatCardIndex = 7 }]));
+            Check(!LocalSearchWork.MatchesPrefix([observed], [action with { BeforeHash = "different" }]));
+            Check(!LocalSearchWork.MatchesPrefix([observed], [action with { Choices = [choice with { Index = 1 }] }]));
+            Check(!LocalSearchWork.MatchesPrefix([observed], [observed, action]));
+        });
+        test("search work early consumers wait for atomic root publication", () => WithQueue(dir =>
+        {
+            var work = new LocalSearchWork(dir, request);
+            Parallel.For(1, 4, i =>
+            {
+                var early = new LocalSearchWork(dir, request);
+                Check(early.Take("expand", i) == null);
+                Check(!early.Stats().RootReady);
+            });
+            work.Offer("expand", Enumerable.Range(0, 4).Select(i => new[] { action with { TargetId = (uint)i } }), initializeRoot: true);
+            var keys = new System.Collections.Concurrent.ConcurrentBag<string>();
+            Parallel.For(0, 4, i =>
+            {
+                var consumer = new LocalSearchWork(dir, request);
+                Check(consumer.Stats().RootReady);
+                while (consumer.Take("expand", i) is { } task) { keys.Add(task.Key); consumer.Complete(task); }
+            });
+            Check(keys.Count == 4 && keys.Distinct().Count() == 4);
+            Check(work.Stats() is { RootReady: true, Pending: 0, Active: 0, Completed: 4 });
+        }));
+        test("search work a failed root producer releases startup waiters", () => WithQueue(dir =>
+        {
+            var work = new LocalSearchWork(dir, request);
+            Check(!work.Stats().RootReady);
+            work.Retire(0);
+            Check(work.Stats() is { RootReady: true, Active: 0, Pending: 0 });
+        }));
         test("search work concurrent producers deduplicate exact jobs", () => WithQueue(dir =>
         {
             Parallel.For(0, 8, _ => new LocalSearchWork(dir, request).Offer("expand", [new[] { action }]));

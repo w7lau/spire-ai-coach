@@ -33,6 +33,9 @@ parser.add_argument('--checkpoint', action='store_true')
 parser.add_argument('--workers', type=int)
 parser.add_argument('--shared-work', choices=['on', 'off'])
 parser.add_argument('--search-order', choices=['monte-carlo', 'limited', 'depth', 'portfolio', 'turn-frontier'])
+parser.add_argument('--correlated-rollouts', action='store_true')
+parser.add_argument('--search-cases', help='One to four comma-separated baseline/correlated comparisons in one owned pool')
+parser.add_argument('--lean-checksum-test', action='store_true')
 parser.add_argument('--work-benchmark', action='store_true')
 parser.add_argument('--settle-benchmark', action='store_true')
 parser.add_argument('--quality-benchmark', action='store_true')
@@ -74,6 +77,12 @@ if args.workers is not None and not 1 <= args.workers <= 16:
     parser.error('--workers must be between 1 and 16')
 if args.search_order and not args.replay:
     parser.error('--search-order requires --replay')
+if args.correlated_rollouts and (not args.replay or args.seed_result or args.recorded_replay):
+    parser.error('--correlated-rollouts requires an unseeded --replay')
+if args.search_cases and (not args.replay or args.seed_result or args.recorded_replay):
+    parser.error('--search-cases requires an unseeded --replay')
+if args.lean_checksum_test and (not args.replay or not args.seed_result or args.search_cases):
+    parser.error('--lean-checksum-test requires --replay and a fixed --seed-result')
 if args.work_benchmark and (not args.replay or not args.seed_result):
     parser.error('--work-benchmark requires --replay and --seed-result')
 if args.settle_benchmark and (not args.replay or not args.seed_result):
@@ -119,6 +128,12 @@ with worker_lock(root):
         for name in ['integration-incident-summary.json', 'integration-incident-private.json',
                      'integration-incident-rejection-private.json']:
             (root / name).unlink(missing_ok=True)
+    if args.search_cases:
+        for name in ['integration-self-search-summary.json', *[f'integration-self-search-private-{i}.json' for i in range(4)]]:
+            (root / name).unlink(missing_ok=True)
+    if args.lean_checksum_test:
+        for name in ['integration-lean-checksum-summary.json', 'integration-lean-checksum-private-0.json', 'integration-lean-checksum-private-1.json']:
+            (root / name).unlink(missing_ok=True)
     env = dict(os.environ, APPDATA=str(root / 'Roaming'), LOCALAPPDATA=str(root / 'Local'),
                SPIRE_LOCAL_INTEGRATION=str(root))
     env.pop('SPIRE_NATIVE_PROBE_ROOT', None)
@@ -148,6 +163,9 @@ with worker_lock(root):
         'depth': 'DepthDiscrepancy', 'portfolio': 'DiscrepancyPortfolio',
         'turn-frontier': 'TurnFrontier',
     }.get(args.search_order, '')
+    env['SPIRE_LOCAL_CORRELATED_ROLLOUTS'] = '1' if args.correlated_rollouts else '0'
+    env['SPIRE_LOCAL_SEARCH_CASES'] = args.search_cases or ''
+    env['SPIRE_LOCAL_LEAN_CHECKSUM_TEST'] = '1' if args.lean_checksum_test else '0'
     env['SPIRE_LOCAL_WORK_BENCHMARK'] = '1' if args.work_benchmark else '0'
     env['SPIRE_LOCAL_SETTLE_BENCHMARK'] = '1' if args.settle_benchmark else '0'
     env['SPIRE_LOCAL_QUALITY_BENCHMARK'] = '1' if args.quality_benchmark else '0'
@@ -198,6 +216,12 @@ with worker_lock(root):
             names = ['integration-incident-summary.json', 'integration-incident-private.json',
                      'integration-incident-rejection-private.json', 'integration-success',
                      'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.search_cases:
+            names = ['integration-self-search-summary.json', *[f'integration-self-search-private-{i}.json' for i in range(4)],
+                     'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.lean_checksum_test:
+            names = ['integration-lean-checksum-summary.json', 'integration-lean-checksum-private-0.json', 'integration-lean-checksum-private-1.json',
+                     'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
         for name in names:
             if (root / name).is_file():
                 shutil.copy2(root / name, args.results_dir / name)

@@ -161,6 +161,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 VerificationSkipped = request.SkipFinalVerification,
                 StoppedEarly = goalReached.IsCancellationRequested,
                 Id = request.Id,
+                Trials = results.SelectMany(r => r.Trials ?? []).OrderBy(t => t.FinishedMs).ToArray(),
                 Work = workStats,
                 TurnSearch = request.SearchOrder != LocalSearchOrder.TurnFrontier ? null : new(
                     results.Sum(r => r.TurnSearch?.Probes ?? 0), results.Sum(r => r.TurnSearch?.BoundPruned ?? 0),

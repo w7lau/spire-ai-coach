@@ -23,6 +23,7 @@ internal static class LocalWorkerOverhead
     private static readonly List<string> Boundaries = [];
     private static readonly List<string> Failures = [];
     public static bool Enabled { get; set; }
+    public static bool LeanSearchChecksums { get; set; }
     public static bool Active => Enabled && (LocalWorkerDataMode.Active && LocalWorkerDataMode.MinimalRun || LocalWorkerVerification.Active);
     public static object Status() => new { enabled = Enabled, active = Active, boundaries = Boundaries.ToArray(), failures = Failures.ToArray() };
 
@@ -36,11 +37,56 @@ internal static class LocalWorkerOverhead
         PatchVoid(typeof(ConsoleLogPrinter), ["Print"], nameof(LogOutput));
         PatchVoid(typeof(CombatReplayWriter), ["WriteReplay"], nameof(ReplayOutput));
         Profile(typeof(ChecksumTracker), "GenerateChecksum");
+        InstallLeanChecksum();
         Profile(typeof(NetFullCombatState), "FromRun");
         Profile(typeof(NetFullCombatState), "Serialize");
         Profile(typeof(PlayerCombatState), "RecalculateCardValues");
         Profile(typeof(AssetCache), "GetAsset");
         Profile(typeof(NCard), "UpdateVisuals");
+    }
+
+    private static readonly FieldInfo? ChecksumListeners = AccessTools.Field(typeof(ChecksumTracker), "ChecksumGenerated");
+    private static void InstallLeanChecksum()
+    {
+        var harmony = new Harmony("SpireAiCoach.owned-worker.overhead.lean-checksum");
+        var method = AccessTools.Method(typeof(ChecksumTracker), "GenerateChecksum", [typeof(string), typeof(MegaCrit.Sts2.Core.GameActions.GameAction)]);
+        if (method == null || ChecksumListeners == null) { Failures.Add("LeanChecksum: native boundary unavailable"); return; }
+        try
+        {
+            // Harmony state belongs to the declaring patch class. Keep the bool
+            // scope separate from this file's MethodScope profiling patches.
+            harmony.Patch(method, prefix: new(AccessTools.Method(typeof(ChecksumBoundary), nameof(ChecksumBoundary.Pause))),
+                finalizer: new(AccessTools.Method(typeof(ChecksumBoundary), nameof(ChecksumBoundary.Restore))));
+            Boundaries.Add("ChecksumTracker.LeanSearch");
+        }
+        catch (Exception ex)
+        {
+            harmony.UnpatchAll(harmony.Id);
+            Failures.Add("LeanChecksum: " + ex.GetType().Name + ": " + ex.Message);
+        }
+    }
+
+    private static class ChecksumBoundary
+    {
+    public static void Pause(ChecksumTracker __instance, MethodBase __originalMethod, ref bool __state)
+    {
+        if (!LeanSearchChecksums || !Active || LocalWorkerVerification.Active || !__instance.IsEnabled ||
+            MegaCrit.Sts2.Core.Runs.RunManager.Instance.NetService.Type != NetGameType.Singleplayer) return;
+        // Recheck diagnostic subscribers on every call: a Mod can attach one
+        // during a play. External callbacks and patches keep normal execution.
+        if (ChecksumListeners!.GetValue(__instance) is Delegate listeners && listeners.GetInvocationList()
+            .Any(d => d.Method.DeclaringType != typeof(CombatReplayWriter))) return;
+        var patches = Harmony.GetPatchInfo(__originalMethod);
+        if (patches != null && patches.Owners.Any(owner => !owner.StartsWith("SpireAiCoach.owned-worker.overhead.", StringComparison.Ordinal))) return;
+        __state = true;
+        __instance.IsEnabled = false;
+        LocalWorker.SkipMethod("ChecksumTracker.SearchSnapshotSuppressed");
+    }
+
+    public static void Restore(ChecksumTracker __instance, bool __state)
+    {
+        if (__state) __instance.IsEnabled = true;
+    }
     }
 
     private static void PatchVoid(Type type, string[] names, string prefix)

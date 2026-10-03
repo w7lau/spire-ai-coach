@@ -16,7 +16,8 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     bool ExperimentalNativeData = false, byte[]? RecordedReplayProbe = null, bool DataOnlyCombat = true,
     bool DataOnlyRun = true, bool NumericalExecution = true, bool StopOnZeroLoss = true, bool TrimWorkerOverhead = true,
     LocalSearchOrder SearchOrder = LocalSearchOrder.MonteCarlo, bool FastVerification = true,
-    bool SkipFinalVerification = false, bool AdaptiveWorkers = true, string? TurnWorkPipe = null);
+    bool SkipFinalVerification = false, bool AdaptiveWorkers = true, bool CorrelatedRollouts = false,
+    bool LeanSearchChecksums = false, string? TurnWorkPipe = null);
 
 // A stop belongs to one frozen request, never to another battle or final verification.
 public sealed record LocalSearchStop(string Id, string SnapshotId, string NativeHash)
@@ -53,6 +54,9 @@ public sealed record LocalCandidate(LocalAction[] Actions, int Hp, int HpLost, i
 // Legal alternatives observed before a real native action. Search hints only, never instructions.
 public sealed record LocalDecision(int BeforeStep, LocalAction[] Legal, LocalChoiceDecision[]? Choices = null);
 public sealed record LocalChoiceDecision(int AtChoice, LocalCardChoice[] Legal);
+// Bounded per-trial metrics survive truncation of detailed native event traces.
+public sealed record LocalSearchTrial(int Worker, int Attempt, double FinishedMs, bool Won,
+    int Hp, int? NetHpLoss, int Rounds, int PotionsUsed, bool Complete, bool? ClaimedPrefixMatched = null);
 
 public sealed record LocalSearchResult(string Id, string SnapshotId, string Status,
     string Message, int Evaluated, int Rejected, long ElapsedMs, LocalCandidate? Best,
@@ -60,7 +64,7 @@ public sealed record LocalSearchResult(string Id, string SnapshotId, string Stat
     long WorkerMemoryBytes = 0, long SearchElapsedMs = 0, bool IncludePotions = false, LocalSearchTiming? Timing = null,
     LocalAction? BlockedAction = null, int MaxRounds = 64, LocalTrace? Trace = null, LocalWorkStats? Work = null,
     bool StoppedEarly = false, LocalTurnSearchStats? TurnSearch = null, bool VerificationSkipped = false,
-    int RootBranches = 0, int WorkerLimit = 0);
+    int RootBranches = 0, int WorkerLimit = 0, LocalSearchTrial[]? Trials = null);
 
 public static class LocalSearchPolicy
 {

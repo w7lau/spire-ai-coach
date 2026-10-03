@@ -13,9 +13,11 @@ namespace SpireAiCoach.Mod;
 internal sealed class LocalNativeLearning(bool trackCosts = false)
 {
     internal sealed record Observation(string Card, int Round, decimal Energy, int PaidEnergy, int Hand,
-        int Upgrades, int Statuses, int Buffs, int Hp, uint Played,
-        IReadOnlyDictionary<uint, int>? HandCosts, bool HasHandEndEffect);
+        int Upgrades, int Statuses, int Buffs, int BuffAmount, int Hp, uint Played,
+        IReadOnlyDictionary<uint, int>? HandCosts, bool HasHandEndEffect, IReadOnlyDictionary<uint, int> Hints);
     private readonly Dictionary<string, (double Total, int Samples)> _bonuses = new(StringComparer.Ordinal);
+    private Dictionary<uint, int> _hints = [];
+    private Observation? _pending;
     private static string Key(CardModel card) => $"{card.Id}:{card.CurrentUpgradeLevel}";
 
     private static Dictionary<uint, int> Costs(Player player) => player.PlayerCombatState!.Hand.Cards
@@ -33,8 +35,10 @@ internal sealed class LocalNativeLearning(bool trackCosts = false)
                 pcs.Hand.Cards.Count, pcs.AllPiles.SelectMany(p => p.Cards).Sum(c => c.CurrentUpgradeLevel),
                 pcs.AllPiles.Where(p => p.Type != PileType.Exhaust).SelectMany(p => p.Cards)
                     .Count(c => c.Type is CardType.Status or CardType.Curse),
-                player.Creature.Powers.Count(p => p.TypeForCurrentAmount == PowerType.Buff), player.Creature.CurrentHp,
-                NetCombatCard.FromModel(card).CombatCardIndex, trackCosts ? Costs(player) : null, card.HasTurnEndInHandEffect);
+                player.Creature.Powers.Count(p => p.TypeForCurrentAmount == PowerType.Buff),
+                player.Creature.Powers.Where(p => p.TypeForCurrentAmount == PowerType.Buff).Sum(p => Math.Max(0, p.Amount)),
+                player.Creature.CurrentHp, NetCombatCard.FromModel(card).CombatCardIndex, trackCosts ? Costs(player) : null,
+                card.HasTurnEndInHandEffect, new Dictionary<uint, int>(_hints));
         }
         catch { return null; }
     }
@@ -53,6 +57,8 @@ internal sealed class LocalNativeLearning(bool trackCosts = false)
             var removed = Math.Max(0, before.Statuses - pcs.AllPiles.Where(p => p.Type != PileType.Exhaust)
                 .SelectMany(p => p.Cards).Count(c => c.Type is CardType.Status or CardType.Curse));
             var buffs = Math.Max(0, player.Creature.Powers.Count(p => p.TypeForCurrentAmount == PowerType.Buff) - before.Buffs);
+            var buffAmount = Math.Max(0, player.Creature.Powers.Where(p => p.TypeForCurrentAmount == PowerType.Buff)
+                .Sum(p => Math.Max(0, p.Amount)) - before.BuffAmount);
             var healed = Math.Max(0, player.Creature.CurrentHp - before.Hp);
             // An end-in-hand flag does not forbid an additional OnPlay cost in a Mod.
             // Correct that uncertain preview with the HP change actually observed on play.
@@ -60,12 +66,29 @@ internal sealed class LocalNativeLearning(bool trackCosts = false)
             double bonus = Math.Min(36, drawn * 6) + Math.Min(40, (double)energy * 12) +
                 Math.Min(40, upgrades * 6) + Math.Min(24, removed * 6) + Math.Min(40, buffs * 20) + Math.Min(24, healed * 3) -
                 Math.Min(40, handEffectPlayCost * 3);
+            bonus += Math.Min(40, Math.Sqrt(buffAmount) * 8);
             if (before.HandCosts != null)
                 bonus += Math.Min(80d, (double)LocalResourceEffects.HandCostSavings(before.HandCosts, Costs(player), before.Played) * 12);
             var old = _bonuses.GetValueOrDefault(before.Card);
             _bonuses[before.Card] = (old.Total + bonus, old.Samples + 1);
+            _pending = before;
         }
         catch { /* Unknown Mod observations do not alter legal branches or final scoring. */ }
+    }
+
+    public void ResetDecision() { _pending = null; _hints.Clear(); }
+    public void ObserveHints(Player player, Dictionary<uint, int> current)
+    {
+        // Reuse previews already computed by native enumeration. No extra card
+        // execution or hypothetical mechanics: compare the same remaining
+        // instances after the preceding real play (upgrades, strength, costs,
+        // and block-driven damage can all improve a following card).
+        var pending = _pending; _pending = null; _hints = current;
+        if (pending == null || player.Creature.CombatState?.RoundNumber != pending.Round) return;
+        int gains = current.Where(p => p.Key != pending.Played && pending.Hints.ContainsKey(p.Key))
+            .Sum(p => Math.Max(0, p.Value - pending.Hints[p.Key]));
+        var old = _bonuses.GetValueOrDefault(pending.Card);
+        if (old.Samples > 0) _bonuses[pending.Card] = (old.Total + Math.Min(80, gains * .75), old.Samples);
     }
 
     public int Priority(CardModel card, int nativePreview) => _bonuses.TryGetValue(Key(card), out var learned)
