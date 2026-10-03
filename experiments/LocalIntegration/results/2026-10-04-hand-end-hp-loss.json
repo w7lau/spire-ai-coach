@@ -1,0 +1,53 @@
+{
+  "source": "frozen latest 0.7.9 player request",
+  "mod_release": "0.7.10",
+  "root_original_evaluated": 256,
+  "root_original_victories": 12,
+  "root_original_hp": 16,
+  "root_starting_hp": 40,
+  "root_original_net_loss": 24,
+  "native_beckon_plays_in_original_search": 186,
+  "native_routes_playing_beckon_in_original_search": 109,
+  "improvement_mode": "continue from original published candidate only; improved fixed route not supplied",
+  "Status": "done",
+  "Evaluated": 27,
+  "Rejected": 0,
+  "Victories": 11,
+  "Hp": 28,
+  "NetHpLoss": 12,
+  "Rounds": 6,
+  "Won": true,
+  "used_potion": false,
+  "beckon_plays": [
+    [
+      14,
+      3
+    ],
+    [
+      22,
+      5
+    ]
+  ],
+  "verified_steps": 25,
+  "verification_count": 1,
+  "ElapsedMs": 105618,
+  "Timing": {
+    "RestoreMs": 4890,
+    "ActionMs": 31666,
+    "DecisionMs": 10154,
+    "VerificationMs": 10161,
+    "StartupMs": 31339,
+    "Actions": 1324,
+    "Restores": 27,
+    "Verifications": 1
+  },
+  "Budgets": {
+    "Workers": 1,
+    "MaxNodes": 32,
+    "BudgetSeconds": 60,
+    "MaxRounds": 64
+  },
+  "fresh_unseeded_success_not_proven": true,
+  "globally_optimal_not_proven": true,
+  "installed": false
+}

@@ -6,7 +6,7 @@ public sealed record LocalTacticalFeatures(double Damage = 0, double EnemyHp = 0
     double Hp = 80, double Strength = 0, double Vulnerable = 0, double Weak = 0,
     double EnergyGain = 0, double Draw = 0, double HpCost = 0,
     int FollowupAttacks = 0, double FollowupDamage = 0, int Upgrades = 0,
-    bool EndTurn = false, bool Known = false, bool RetainsBlock = false);
+    bool EndTurn = false, bool Known = false, bool RetainsBlock = false, double HandEndHpLoss = 0);
 
 public static class LocalTactics
 {
@@ -14,7 +14,10 @@ public static class LocalTactics
     {
         if (!f.Known) return 0;
         var gap = Math.Max(0, f.Incoming - f.CurrentBlock);
-        if (f.EndTurn) return gap >= f.Hp ? -40 : gap > 0 ? -15 : 0;
+        // A native HpLoss turn-end effect is a separate risk from incoming attacks.
+        // Block must not make retaining the harmful card look harmless.
+        var endLoss = gap + Math.Max(0, f.HandEndHpLoss);
+        if (f.EndTurn) return endLoss >= f.Hp ? -40 : endLoss > 0 ? -15 : 0;
         var effective = Math.Max(0, f.Damage - f.EnemyBlock);
         double score = Math.Min(f.EnemyHp, effective) * 2;
         // A shield hit may enable another hit; never label it impossible or remove the branch.
@@ -35,6 +38,9 @@ public static class LocalTactics
         score += Math.Min(40, Math.Max(0, f.EnergyGain) * 12) + Math.Min(24, Math.Max(0, f.Draw) * 6);
         if (f.Upgrades > 0) score += 15 + Math.Min(30, f.Upgrades * 6);
         score -= Math.Max(0, f.HpCost) * 3;
+        // This is an exploration hint for removing an in-hand effect, not damage
+        // dealt by playing the card. The native completed fight still scores the line.
+        score += Math.Max(0, f.HandEndHpLoss) * 4;
         return (int)Math.Clamp(score, -40, 100);
     }
 }

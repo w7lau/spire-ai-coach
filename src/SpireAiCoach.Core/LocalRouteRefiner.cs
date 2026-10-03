@@ -35,12 +35,39 @@ public sealed class LocalRouteRefiner
         }
         }
         var decisions = (candidate.Decisions ?? []).Where(d => d.BeforeStep >= 0 && d.BeforeStep < actions.Length).ToArray();
+        IEnumerable<LocalAction[]> EndSetups()
+        {
+            // A single insertion can change later copy/selection triggers and look
+            // worse until another turn's unused energy and retrieval are changed too.
+            // Propose this small combined neighborhood; never assert independence.
+            var plan = actions.ToList(); int inserted = 0;
+            foreach (var point in decisions.Where(d => actions[d.BeforeStep].EndTurn).OrderByDescending(d => d.BeforeStep))
+            {
+                var alternate = point.Legal.Where(a => !a.EndTurn && a.PotionSlot == null && a.Preference > 0)
+                    .OrderByDescending(a => a.Preference).FirstOrDefault();
+                if (alternate == null) continue;
+                plan.Insert(point.BeforeStep, alternate); inserted++;
+            }
+            if (inserted < 2) yield break;
+            var combined = plan.ToArray(); yield return combined;
+            // Changed play counts can collapse repeated offers. Try each previously
+            // intended choice first, rather than assuming all old offers will recur.
+            for (int i = 0; i < combined.Length; i++)
+                if (combined[i].Choices is { Length: > 1 } choices)
+                    for (int first = 1; first < choices.Length; first++)
+                    {
+                        var rotated = combined.ToArray();
+                        rotated[i] = rotated[i] with { Choices = choices.Skip(first).Concat(choices.Take(first)).ToArray() };
+                        yield return rotated;
+                    }
+        }
         IEnumerable<LocalAction[]> Insertions()
         {
             // Spending otherwise unused resources is worth testing even when the preview sees no
             // immediate benefit. The native continuation decides whether block/setup carries forward.
             foreach (var point in decisions.OrderByDescending(d => actions[d.BeforeStep].EndTurn).ThenBy(d => d.BeforeStep))
-                foreach (var alternate in point.Legal.Where(a => !a.EndTurn && !Same(a, actions[point.BeforeStep])))
+                foreach (var alternate in point.Legal.Where(a => !a.EndTurn && !Same(a, actions[point.BeforeStep]))
+                    .OrderByDescending(a => a.Preference))
                 {
                     var plan = actions.ToList(); plan.Insert(point.BeforeStep, alternate); yield return plan.ToArray();
                 }
@@ -73,7 +100,7 @@ public sealed class LocalRouteRefiner
                     }
         }
         // Interleave neighborhoods; a long battle's reorder list must not hide unused-card tests.
-        var streams = new[] { Reorders(), Insertions(), ChoiceChanges(), Replacements(), Removals() }.Select(s => s.GetEnumerator()).ToList();
+        var streams = new[] { EndSetups(), Reorders(), Insertions(), ChoiceChanges(), Replacements(), Removals() }.Select(s => s.GetEnumerator()).ToList();
         var queued = new HashSet<string>(StringComparer.Ordinal);
         int proposal = 0;
         try
@@ -108,6 +135,33 @@ public sealed class LocalRouteRefiner
         a.Round == planned.Round && a.EndTurn == planned.EndTurn && a.PotionSlot == planned.PotionSlot &&
         a.TargetId == planned.TargetId && a.ModelId == planned.ModelId &&
         (a.EndTurn || a.PotionSlot != null || planned.CombatCardIndex != null && a.CombatCardIndex == planned.CombatCardIndex));
+
+    // A changed prefix changes the offer hash. During search only, propose the
+    // unique currently legal card of the same exact model to preserve a combo.
+    // This is a new proposal, not proof of instance identity or a replay match;
+    // Play records the actual offer, and execution/verification remain exact.
+    public static LocalCardChoice? ProposeChoice(LocalCardChoice expected, IReadOnlyList<LocalCardChoice> legal)
+    {
+        var exact = legal.FirstOrDefault(c => c.OfferHash == expected.OfferHash && c.Kind == expected.Kind &&
+            c.Index == expected.Index && c.ModelId == expected.ModelId &&
+            (c.Indices ?? []).SequenceEqual(expected.Indices ?? []));
+        if (exact != null) return exact;
+        if (expected.Kind is not ("hand" or "pile") || expected.Indices is not { Length: 1 } ||
+            string.IsNullOrEmpty(expected.ModelId)) return null;
+        var matching = legal.Where(c => c.Kind == expected.Kind && c.ModelId == expected.ModelId &&
+            c.Indices is { Length: 1 }).Take(2).ToArray();
+        return matching.Length == 1 ? matching[0] : null;
+    }
+
+    public static LocalCardChoice? ProposeNextChoice(IReadOnlyList<LocalCardChoice> intended,
+        IReadOnlyList<LocalCardChoice> legal, ref int next)
+    {
+        // Changed prefixes can also change the number of offers. As with skipped
+        // unavailable planned cards, retain a later legal intent as a fresh proposal.
+        while (next < intended.Count)
+            if (ProposeChoice(intended[next++], legal) is { } proposal) return proposal;
+        return null;
+    }
 }
 
 public static class LocalSelectionBranches
