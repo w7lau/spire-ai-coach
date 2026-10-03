@@ -1,5 +1,6 @@
 using System.Reflection;
 using HarmonyLib;
+using MegaCrit.Sts2.Core.Assets;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Entities.Multiplayer;
@@ -8,6 +9,7 @@ using MegaCrit.Sts2.Core.Multiplayer.Game;
 using MegaCrit.Sts2.Core.Multiplayer.Replay;
 using MegaCrit.Sts2.Core.Multiplayer.Serialization;
 using MegaCrit.Sts2.Core.Nodes.Audio;
+using MegaCrit.Sts2.Core.Nodes.Cards;
 using SpireAiCoach.Core;
 
 namespace SpireAiCoach.Mod;
@@ -21,7 +23,7 @@ internal static class LocalWorkerOverhead
     private static readonly List<string> Boundaries = [];
     private static readonly List<string> Failures = [];
     public static bool Enabled { get; set; }
-    public static bool Active => Enabled && LocalWorkerDataMode.Active && LocalWorkerDataMode.MinimalRun;
+    public static bool Active => Enabled && (LocalWorkerDataMode.Active && LocalWorkerDataMode.MinimalRun || LocalWorkerVerification.Active);
     public static object Status() => new { enabled = Enabled, active = Active, boundaries = Boundaries.ToArray(), failures = Failures.ToArray() };
 
     public static void Install()
@@ -37,6 +39,8 @@ internal static class LocalWorkerOverhead
         Profile(typeof(NetFullCombatState), "FromRun");
         Profile(typeof(NetFullCombatState), "Serialize");
         Profile(typeof(PlayerCombatState), "RecalculateCardValues");
+        Profile(typeof(AssetCache), "GetAsset");
+        Profile(typeof(NCard), "UpdateVisuals");
     }
 
     private static void PatchVoid(Type type, string[] names, string prefix)
