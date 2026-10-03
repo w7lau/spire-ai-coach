@@ -43,7 +43,10 @@ parser.add_argument('--execution-search-benchmark', action='store_true')
 parser.add_argument('--bootstrap-benchmark', action='store_true')
 parser.add_argument('--bootstrap-reverse', action='store_true')
 parser.add_argument('--recorded-replay', type=Path)
+parser.add_argument('--numerical-benchmark', action='store_true')
 args = parser.parse_args()
+if args.numerical_benchmark and (not args.replay or not args.recorded_replay):
+    parser.error('--numerical-benchmark requires --replay and --recorded-replay')
 if args.workers is not None and not 1 <= args.workers <= 16:
     parser.error('--workers must be between 1 and 16')
 if args.work_benchmark and (not args.replay or not args.seed_result):
@@ -121,6 +124,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_BOOTSTRAP_BENCHMARK'] = '1' if args.bootstrap_benchmark else '0'
     env['SPIRE_LOCAL_BOOTSTRAP_REVERSE'] = '1' if args.bootstrap_reverse else '0'
     env['SPIRE_LOCAL_RECORDED_REPLAY'] = str(args.recorded_replay.resolve()) if args.recorded_replay else ''
+    env['SPIRE_LOCAL_NUMERICAL_BENCHMARK'] = '1' if args.numerical_benchmark else '0'
     settings = root / 'Roaming/SlayTheSpire2/default/1/settings.save'
     settings_data = json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}
     settings_data.update(volume_master=0, volume_bgm=0, volume_sfx=0, volume_ambience=0)

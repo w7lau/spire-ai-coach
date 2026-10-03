@@ -41,6 +41,13 @@ public static class ReplayIntegration
         // Frozen execution controls retain the same startup; bootstrap has its own paired
         // cold measurements. Ordinary integration fixtures use the product's default.
         var installation = new LocalInstallation(game, directories, MinimalWorkerBootstrap: false);
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_NUMERICAL_BENCHMARK") == "1")
+        {
+            await NumericalIntegration.Run(root, pool, request, installation,
+                System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_RECORDED_REPLAY")
+                    ?? throw new InvalidOperationException("A recorded native route is required"));
+            return;
+        }
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_RECORDED_REPLAY") is { Length: > 0 } recordedPath)
         {
             await Task.Run(() => pool.Prepare(installation, 1, CancellationToken.None));

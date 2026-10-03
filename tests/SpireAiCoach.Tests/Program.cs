@@ -656,6 +656,18 @@ Test("local ranking prioritizes combat victory over healthy unfinished horizons"
     Check(LocalSearchPolicy.Better(prior with { Hp = 5 }, prior with { Won = false, Hp = 80 }));
     Check(!LocalSearchPolicy.Better(prior with { Won = false, Hp = 80 }, prior));
 });
+Test("local requests default to numerical execution while preserving explicit legacy override", () =>
+{
+    var request = new LocalSearchRequest("job", "snapshot", [], "root", 42, ["mod"], false);
+    Check(request.NumericalExecution && request.DataOnlyRun && request.DataOnlyCombat);
+    var oldJson = JsonSerializer.SerializeToNode(request)!.AsObject();
+    oldJson.Remove(nameof(LocalSearchRequest.NumericalExecution));
+    var old = oldJson.Deserialize<LocalSearchRequest>()!;
+    Check(old.NumericalExecution && old.BudgetSeconds == 60 && old.MaxNodes == 32 && old.MaxRounds == 64);
+    oldJson[nameof(LocalSearchRequest.NumericalExecution)] = false;
+    var legacy = oldJson.Deserialize<LocalSearchRequest>()!;
+    Check(!legacy.NumericalExecution && legacy.NativeHash == request.NativeHash && legacy.Replay.Length == 0);
+});
 Test("local protocol preserves instance position and pre-state identity", () =>
 {
     var action = new LocalAction(3, "CARD.STRIKE", 42, "Strike", "Slime", "native-before");
@@ -745,7 +757,10 @@ Test("local concurrency persists without AI configuration and preserves existing
         var store = new SpireAiCoach.Mod.SettingsStore(directory);
         store.SaveLocalWorkers(6);
         Check(store.Load().Settings.LocalWorkers == 6 && store.Load().Settings.Model == "");
-        store.Save(Settings() with { RememberKey = true }, "synthetic-test-secret");
+        store.Save(Settings() with { RememberKey = OperatingSystem.IsWindows() }, "synthetic-test-secret");
+        // DPAPI is Windows-only. Other hosts still verify that local preferences
+        // preserve an opaque existing key file without reading or rewriting it.
+        if (!OperatingSystem.IsWindows()) File.WriteAllBytes(Path.Combine(directory, "api-key.dpapi"), [1, 2, 3, 4]);
         var key = File.ReadAllBytes(Path.Combine(directory, "api-key.dpapi"));
         var before = JsonNode.Parse(File.ReadAllText(Path.Combine(directory, "config.json")))!;
         store.SaveLocalWorkers(8);
@@ -753,7 +768,7 @@ Test("local concurrency persists without AI configuration and preserves existing
         before["local_workers"] = 8;
         Check(JsonNode.DeepEquals(before, after));
         Check(key.SequenceEqual(File.ReadAllBytes(Path.Combine(directory, "api-key.dpapi"))));
-        Check(store.Load().Key == "synthetic-test-secret" && store.Load().Settings.LocalWorkers == 8);
+        Check(store.Load().Key == (OperatingSystem.IsWindows() ? "synthetic-test-secret" : "") && store.Load().Settings.LocalWorkers == 8);
     }
     finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
 });
@@ -782,7 +797,8 @@ Test("local potion preference persists independently of AI connection and encryp
         store.SaveLocalOptions(4, true);
         Check(store.Load().Settings.LocalIncludePotions);
         store.SaveLocalWorkers(2); Check(store.Load().Settings.LocalIncludePotions);
-        store.Save(Settings() with { RememberKey = true, LocalIncludePotions = true }, "synthetic-secret");
+        store.Save(Settings() with { RememberKey = OperatingSystem.IsWindows(), LocalIncludePotions = true }, "synthetic-secret");
+        if (!OperatingSystem.IsWindows()) File.WriteAllBytes(Path.Combine(directory, "api-key.dpapi"), [1, 2, 3, 4]);
         var key = File.ReadAllBytes(Path.Combine(directory, "api-key.dpapi"));
         store.SaveLocalOptions(4, false);
         Check(!store.Load().Settings.LocalIncludePotions && store.Load().Settings.Model == Settings().Model);
