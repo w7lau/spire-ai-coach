@@ -137,7 +137,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             }
             if (selectedBest == null) throw new CoachException("local_verify_failed",
                 string.Join("\n", verificationResults.Select(r => r.Message).Distinct()));
-            if (goalReached.IsCancellationRequested && !LocalSearchPolicy.CanStop(selectedBest.Best, request.StopOnZeroLoss))
+            if (goalReached.IsCancellationRequested && !LocalSearchPolicy.CanStop(selectedBest.Best, request.StopOnZeroLoss,
+                request.TargetVictoryRounds, request.TargetPotionUses))
                 throw new CoachException("local_verify_failed", "无伤候选未通过复核，不能按提前停止的结果返回。");
             var best = selectedBest;
             var allRuns = results.Concat(verificationResults).ToArray();
@@ -302,7 +303,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                                         worker.Stop();
                                     }
                                     if (!verifying && result.Status is "searched" or "done" &&
-                                        LocalSearchPolicy.CanStop(result.Best, request.StopOnZeroLoss) &&
+                                        LocalSearchPolicy.CanStop(result.Best, request.StopOnZeroLoss,
+                                            request.TargetVictoryRounds, request.TargetPotionUses) &&
                                         Interlocked.CompareExchange(ref goalWorker, index, -1) == -1)
                                     {
                                         goalReached.Cancel();

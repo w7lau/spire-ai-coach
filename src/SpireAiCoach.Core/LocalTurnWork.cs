@@ -15,7 +15,7 @@ public sealed class LocalTurnWork : IDisposable
         LocalAction[]? Actions = null, LocalDecision[]? Decisions = null,
         LocalTurnHint? Hint = null, LocalWinningBound? Bound = null, string? TerminalDigest = null);
     internal sealed record Reply(LocalTurnTask? Task, int Pending, int Active,
-        int Offered, int Duplicates, int Affected = 0, string? Error = null);
+        int Offered, int Duplicates, int Affected = 0, string? Error = null, bool RootReady = false);
 
     private readonly object _gate = new();
     private readonly LocalTurnSearch _frontier;
@@ -29,6 +29,7 @@ public sealed class LocalTurnWork : IDisposable
     private readonly string _scope;
     private readonly int _maximum;
     private int _taken;
+    private bool _rootReady;
     public string PipeName { get; } = "SpireAiCoach-turn-" + Guid.NewGuid().ToString("N");
     public int Pending { get { lock (_gate) return _frontier.Count; } }
     public int Offered { get { lock (_gate) return _frontier.Offered; } }
@@ -100,11 +101,12 @@ public sealed class LocalTurnWork : IDisposable
     }
 
     private Reply Snapshot(LocalTurnTask? task = null, int affected = 0, string? error = null) =>
-        new(task, _frontier.Count, _active.Count, _frontier.Offered, _frontier.DuplicateOffers, affected, error);
+        new(task, _frontier.Count, _active.Count, _frontier.Offered, _frontier.DuplicateOffers, affected, error, _rootReady);
 
     private Reply Apply(Command command)
     {
         foreach (var offer in command.Offers ?? []) _frontier.Offer(offer.Prefix, offer.SearchRound, offer.Hint);
+        if (command.Offers is { Length: > 0 }) _rootReady = true;
         switch (command.Operation)
         {
             case "offer": return Snapshot();
@@ -142,6 +144,9 @@ public sealed class LocalTurnWork : IDisposable
 
     private void Retire(int owner)
     {
+        // A failed root producer cannot leave the remaining clients waiting
+        // forever for a task that will never be published.
+        if (owner == 0) _rootReady = true;
         if (!_active.Remove(owner, out var task)) return;
         // A disconnected/interrupted process does not close a native subtree.
         _frontier.ReturnInterrupted(task, task.Hint ?? throw new InvalidDataException("Turn task lost its observed hint"));
@@ -173,6 +178,7 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
     private long _lastFlush = Environment.TickCount64;
     public int Count => _last.Pending + _offers.Count;
     public int Active => _last.Active;
+    public bool RootReady => _last.RootReady;
     public int Offered => _last.Offered;
     public int DuplicateOffers => _last.Duplicates;
     public int LastLane { get; private set; }

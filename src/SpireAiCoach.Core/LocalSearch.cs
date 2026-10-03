@@ -17,7 +17,9 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     bool DataOnlyRun = true, bool NumericalExecution = true, bool StopOnZeroLoss = true, bool TrimWorkerOverhead = true,
     LocalSearchOrder SearchOrder = LocalSearchOrder.MonteCarlo, bool FastVerification = true,
     bool SkipFinalVerification = false, bool AdaptiveWorkers = true, bool CorrelatedRollouts = false,
-    bool LeanSearchChecksums = false, string? TurnWorkPipe = null);
+    bool LeanSearchChecksums = true, string? TurnWorkPipe = null, bool ProbeChecksumListener = false,
+    int? TargetVictoryRounds = null, int? TargetPotionUses = null,
+    bool EfficientTactics = true, bool LearnBuffDuration = true);
 
 // A stop belongs to one frozen request, never to another battle or final verification.
 public sealed record LocalSearchStop(string Id, string SnapshotId, string NativeHash)
@@ -51,6 +53,10 @@ public sealed record LocalChoiceDecision(int AtChoice, LocalCardChoice[] Legal);
 public sealed record LocalSearchTrial(int Worker, int Attempt, double FinishedMs, bool Won,
     int Hp, int? NetHpLoss, int Rounds, int PotionsUsed, bool Complete, bool? ClaimedPrefixMatched = null);
 
+// A peer's measured route is an exploration proposal. Keep diagnostic traces
+// out of the scheduling protocol; it does not certify a result or an HP bound.
+public sealed record LocalSearchSeed(string Id, string SnapshotId, string NativeHash, LocalCandidate Candidate);
+
 public sealed record LocalSearchResult(string Id, string SnapshotId, string Status,
     string Message, int Evaluated, int Rejected, long ElapsedMs, LocalCandidate? Best,
     int Duplicates = 0, int BudgetPruned = 0, int Victories = 0, int Workers = 1,
@@ -75,8 +81,11 @@ public static class LocalSearchPolicy
         return true;
     }
 
-    public static bool CanStop(LocalCandidate? candidate, bool stopOnZeroLoss) =>
-        stopOnZeroLoss && candidate is { Won: true, Dead: false, NetHpLoss: 0 };
+    public static bool CanStop(LocalCandidate? candidate, bool stopOnZeroLoss,
+        int? targetRounds = null, int? targetPotions = null) =>
+        stopOnZeroLoss && candidate is { Won: true, Dead: false, NetHpLoss: 0 } &&
+        (!targetRounds.HasValue || candidate.Rounds <= targetRounds.Value) &&
+        (!targetPotions.HasValue || candidate.Actions.Count(a => a.PotionSlot.HasValue) <= targetPotions.Value);
 
     // Same root, completed native victory: net HP loss first, potions are a reserve resource.
     public static bool Better(LocalCandidate candidate, LocalCandidate? prior)

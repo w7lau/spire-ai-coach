@@ -6,7 +6,8 @@ public sealed record LocalTacticalFeatures(double Damage = 0, double EnemyHp = 0
     double Hp = 80, double Strength = 0, double Vulnerable = 0, double Weak = 0,
     double EnergyGain = 0, double Draw = 0, double HpCost = 0,
     int FollowupAttacks = 0, double FollowupDamage = 0, int Upgrades = 0,
-    bool EndTurn = false, bool Known = false, bool RetainsBlock = false, double HandEndHpLoss = 0);
+    bool EndTurn = false, bool Known = false, bool RetainsBlock = false, double HandEndHpLoss = 0,
+    double? ResourceCost = null);
 
 public static class LocalTactics
 {
@@ -41,6 +42,17 @@ public static class LocalTactics
         // This is an exploration hint for removing an in-hand effect, not damage
         // dealt by playing the card. The native completed fight still scores the line.
         score += Math.Max(0, f.HandEndHpLoss) * 4;
+        if (f.ResourceCost.HasValue)
+        {
+            // Benefit per actual currently spendable resource orders proposals.
+            // A present lethal remains urgent; unknown branches stay available.
+            bool lethal = f.EnemyHp > 0 && effective >= f.EnemyHp;
+            if (!lethal && score > 0) score /= 1 + Math.Max(0, f.ResourceCost.Value);
+            // Free block with no known payment is not an energy sacrifice. It
+            // may trigger a native relic/Mod effect even when direct block is
+            // currently unnecessary. The complete native outcome judges it.
+            if (f.ResourceCost == 0 && f.Block > 0 && f.HpCost == 0 && score < 0) score = 0;
+        }
         return (int)Math.Clamp(score, -40, 100);
     }
 }

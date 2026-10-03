@@ -15,8 +15,8 @@ using SpireAiCoach.Core;
 namespace SpireAiCoach.Mod;
 
 // Installed only after LocalWorker verifies its own isolated executable/marker.
-// Skip native presentation/file output only. Keep model effects, native checksums,
-// replay events, RNG, logger callbacks and ordinary-scene final verification.
+// Skip presentation/file output and unused diagnostic snapshots during search.
+// Keep model effects, replay events, RNG, external callbacks and native final verification.
 internal static class LocalWorkerOverhead
 {
     private static readonly Dictionary<MethodBase, string> Names = [];
@@ -26,6 +26,17 @@ internal static class LocalWorkerOverhead
     public static bool LeanSearchChecksums { get; set; }
     public static bool Active => Enabled && (LocalWorkerDataMode.Active && LocalWorkerDataMode.MinimalRun || LocalWorkerVerification.Active);
     public static object Status() => new { enabled = Enabled, active = Active, boundaries = Boundaries.ToArray(), failures = Failures.ToArray() };
+
+    // Owned integration probes attach the same native event API available to Mods.
+    // The normal search must retain that callback even when lean snapshots are on.
+    public static IDisposable ObserveChecksums(ChecksumTracker tracker)
+    {
+        void Observe(NetChecksumData _, string context, NetFullCombatState state)
+        { using var timing = LocalWorker.MeasureMethod("ChecksumTracker.ExternalListenerProbe"); }
+        tracker.ChecksumGenerated += Observe;
+        return new Subscription(() => tracker.ChecksumGenerated -= Observe);
+    }
+    private sealed class Subscription(Action remove) : IDisposable { public void Dispose() => remove(); }
 
     public static void Install()
     {
@@ -68,25 +79,25 @@ internal static class LocalWorkerOverhead
 
     private static class ChecksumBoundary
     {
-    public static void Pause(ChecksumTracker __instance, MethodBase __originalMethod, ref bool __state)
-    {
-        if (!LeanSearchChecksums || !Active || LocalWorkerVerification.Active || !__instance.IsEnabled ||
-            MegaCrit.Sts2.Core.Runs.RunManager.Instance.NetService.Type != NetGameType.Singleplayer) return;
-        // Recheck diagnostic subscribers on every call: a Mod can attach one
-        // during a play. External callbacks and patches keep normal execution.
-        if (ChecksumListeners!.GetValue(__instance) is Delegate listeners && listeners.GetInvocationList()
-            .Any(d => d.Method.DeclaringType != typeof(CombatReplayWriter))) return;
-        var patches = Harmony.GetPatchInfo(__originalMethod);
-        if (patches != null && patches.Owners.Any(owner => !owner.StartsWith("SpireAiCoach.owned-worker.overhead.", StringComparison.Ordinal))) return;
-        __state = true;
-        __instance.IsEnabled = false;
-        LocalWorker.SkipMethod("ChecksumTracker.SearchSnapshotSuppressed");
-    }
+        public static void Pause(ChecksumTracker __instance, MethodBase __originalMethod, ref bool __state)
+        {
+            if (!LeanSearchChecksums || !Active || LocalWorkerVerification.Active || !__instance.IsEnabled ||
+                MegaCrit.Sts2.Core.Runs.RunManager.Instance.NetService.Type != NetGameType.Singleplayer) return;
+            // Recheck diagnostic subscribers on every call: a Mod can attach one
+            // during a play. External callbacks and patches keep normal execution.
+            if (ChecksumListeners!.GetValue(__instance) is Delegate listeners && listeners.GetInvocationList()
+                .Any(d => d.Method.DeclaringType != typeof(CombatReplayWriter))) return;
+            var patches = Harmony.GetPatchInfo(__originalMethod);
+            if (patches != null && patches.Owners.Any(owner => !owner.StartsWith("SpireAiCoach.owned-worker.overhead.", StringComparison.Ordinal))) return;
+            __state = true;
+            __instance.IsEnabled = false;
+            LocalWorker.SkipMethod("ChecksumTracker.SearchSnapshotSuppressed");
+        }
 
-    public static void Restore(ChecksumTracker __instance, bool __state)
-    {
-        if (__state) __instance.IsEnabled = true;
-    }
+        public static void Restore(ChecksumTracker __instance, bool __state)
+        {
+            if (__state) __instance.IsEnabled = true;
+        }
     }
 
     private static void PatchVoid(Type type, string[] names, string prefix)

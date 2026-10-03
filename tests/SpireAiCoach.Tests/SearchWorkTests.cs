@@ -98,6 +98,60 @@ public static class SearchWorkTests
             Check(work.Take("expand", 0, true)!.Plan.Length == 2);
             Check(work.Take("expand", 1)!.Plan.Length == 1);
         }));
+        test("search work completed tasks release capacity without reopening identities", () => WithQueue(dir =>
+        {
+            var work = new LocalSearchWork(dir, request, 1);
+            work.Offer("expand", [[action]]);
+            var first = work.Take("expand", 0)!; work.Complete(first);
+            var later = action with { BeforeHash = "later", CombatCardIndex = 7 };
+            work.Offer("expand", [[action], [later]]);
+            var next = work.Take("expand", 1)!;
+            Check(next.Key != first.Key && next.Plan.Single() == later);
+            Check(work.Take("expand", 2) == null);
+            Check(work.Stats() is { Submitted: 2, Claimed: 2, Completed: 1, DuplicateOffers: 1 });
+        }));
+        test("search work promoting a pending job preserves focused and broad capacity", () => WithQueue(dir =>
+        {
+            var work = new LocalSearchWork(dir, request, 1);
+            var later = action with { BeforeHash = "after", CombatCardIndex = 7 };
+            var extra = action with { BeforeHash = "beyond", CombatCardIndex = 8 };
+            work.Offer("expand", [[action]]);
+            work.Offer("expand", [[action], [later]], parent: "measured-parent");
+            Check(work.Stats().Submitted == 1);
+            work.Offer("expand", [[later]]);
+            work.Offer("expand", [[later], [extra]], parent: "measured-parent");
+            Check(work.Stats().Submitted == 2);
+            Check(work.Take("expand", 0, focused: true)!.Plan.Single() == action);
+            Check(work.Take("expand", 1)!.Plan.Single() == later);
+        }));
+        test("search work focused descent survives interposed broad jobs and preserves siblings", () => WithQueue(dir =>
+        {
+            var work = new LocalSearchWork(dir, request, 2);
+            work.Offer("expand", [[action], [action with { TargetId = 2 }]]);
+            var root = work.Take("expand", 0, focused: true)!;
+            var fork = action with { BeforeHash = "after-root", ModelId = "second", CombatCardIndex = 7 };
+            work.Offer("expand", [[action, fork], [action, fork with { TargetId = 2 }]], parent: root.Key);
+            work.Complete(root);
+            var child = work.Take("expand", 0, focused: true)!;
+            Check(child.Plan.Length == 2 && child.Plan.Last() == fork);
+            var broad = work.Take("expand", 0)!;
+            Check(broad.Plan.Length == 1 && broad.Plan[0].TargetId == 2);
+            var deeper = fork with { BeforeHash = "after-second", ModelId = "third", CombatCardIndex = 9 };
+            work.Offer("expand", [[..child.Plan, deeper]], parent: child.Key);
+            work.Complete(child); work.Complete(broad);
+            var grandchild = work.Take("expand", 0, focused: true)!;
+            Check(grandchild.Plan.Length == 3 && grandchild.Plan.Last() == deeper);
+            Check(work.Take("expand", 1)!.Plan.Last().TargetId == 2);
+        }));
+        test("search work new improvement generation gets attention while older plans remain reachable", () => WithQueue(dir =>
+        {
+            var work = new LocalSearchWork(dir, request);
+            var shortOld = action with { ModelId = "old" };
+            work.Offer("improve", [[shortOld]]);
+            work.Offer("improve", [[action, action with { ModelId = "new" }]]);
+            Check(work.Take("improve", 0)!.Plan.Last().ModelId == "new");
+            Check(work.Take("improve", 1, deeper: true)!.Plan.Single() == shortOld);
+        }));
         test("search work expansion cannot starve later route improvements", () => WithQueue(dir =>
         {
             var work = new LocalSearchWork(dir, request, 2);
