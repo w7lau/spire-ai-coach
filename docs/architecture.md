@@ -1,5 +1,11 @@
 # 设计与合同
 
+## 0.7.14 按任务增加并发
+
+`LocalConcurrency` 负责实例准入，配置值是上限。只预热实例 0；原算法按共享队列待办数量扣除准备中实例的预留任务逐路增加，新算法按所有实例共同观察到的根动作数确定固定分片再分批启动。CPU/内存参与上限估算，无伤目标或取消后不再增加，已经启动的请求全部收尾才复核和返回。当前数量与上限分别记录，`admit_worker` 时间轴说明每一路何时启动。
+
+`LocalSearchWork` 提供 Pending/Active 统计、任务所有者退出标志和完整终局历史索引。退出不等于路线完成；只完成胜利/死亡历史可以跳过完全相同的未领取任务。空队列不再触发各实例自主重搜，同一个候选的改进由获得该候选的实例提交；不同实例自己的候选仍可提交。每路预算保持原值。公共前缀仍重放，完整原生状态及 Mod 私有状态没有跨实例复用。详见 [动态并发边界](adaptive-concurrency.md)。
+
 ## 0.7.13 最终复核的展示与资源开销
 
 FastVerification 是本地 IPC 的内部对照开关，默认 true，旧请求省略时继承默认值；显式 false 保留原有复核。LocalWorkerVerification 只在已验证所有权的后台进程安装，每个边界用独立 Harmony owner；四个边界均可安装且 SimulationSpeed>1 时才生效。VerifyBestCore 仍关闭 DataOnlyCombat/DataOnlyRun 并恢复普通 NonInteractiveMode：完整 NRun/NCombatRoom、原生执行器调度、状态通知、选择页面、所有模型效果、Mod 钩子、校验与逐步历史都保留，不使用搜索中的连续数值队列替代复核。

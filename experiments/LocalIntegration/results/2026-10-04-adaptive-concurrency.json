@@ -1,0 +1,109 @@
+{
+  "version": "0.7.14",
+  "coreChecks": {
+    "passed": 161,
+    "total": 161
+  },
+  "nativeSyntheticAcceptance": [
+    {
+      "stage": "prewarm",
+      "configured": 8,
+      "alive": 1,
+      "elapsedMs": 21443
+    },
+    {
+      "stage": "MonteCarlo",
+      "Status": "done",
+      "Workers": 2,
+      "WorkerLimit": 2,
+      "RootBranches": 6,
+      "Evaluated": 4,
+      "Rejected": 0,
+      "ElapsedMs": 27483,
+      "Timing": {
+        "RestoreMs": 2491,
+        "ActionMs": 991,
+        "DecisionMs": 136,
+        "VerificationMs": 5145,
+        "StartupMs": 17004,
+        "Actions": 38,
+        "Restores": 4,
+        "Verifications": 1
+      },
+      "Work": {
+        "Submitted": 218,
+        "Claimed": 4,
+        "Completed": 4,
+        "DuplicateOffers": 28,
+        "Pending": 214,
+        "Active": 0,
+        "CoveredJobs": 0
+      },
+      "Won": false,
+      "Hp": 77,
+      "NetHpLoss": 3,
+      "verifiedSteps": 9,
+      "admissions": [
+        {
+          "Worker": 0,
+          "StartMs": 39.2554
+        },
+        {
+          "Worker": 1,
+          "StartMs": 1806.0068
+        }
+      ],
+      "sourceUnchanged": true
+    },
+    {
+      "stage": "TurnFrontier",
+      "Status": "done",
+      "Workers": 2,
+      "WorkerLimit": 2,
+      "RootBranches": 6,
+      "Evaluated": 4,
+      "Rejected": 0,
+      "ElapsedMs": 6080,
+      "Timing": {
+        "RestoreMs": 248,
+        "ActionMs": 46,
+        "DecisionMs": 24,
+        "VerificationMs": 4669,
+        "StartupMs": 0,
+        "Actions": 74,
+        "Restores": 12,
+        "Verifications": 1
+      },
+      "Work": null,
+      "Won": false,
+      "Hp": 74,
+      "NetHpLoss": 6,
+      "verifiedSteps": 10,
+      "admissions": [
+        {
+          "Worker": 0,
+          "StartMs": 0.0661
+        },
+        {
+          "Worker": 1,
+          "StartMs": 499.1325
+        }
+      ],
+      "sourceUnchanged": true
+    }
+  ],
+  "installation": {
+    "installed": true,
+    "dllMatchesAccepted": true,
+    "dllSha256": "5605d2f131573d003714cd8df855b334ad4e055ac9ffbf8bc4046d5ea1b918de",
+    "packageSha256": "20068092acb414a721a64c9f58078bdd711b71e9bd613db9ab13e0e0e867160b",
+    "configurationFilesChecked": 72,
+    "configurationFilesChanged": 0,
+    "liveRestartValidated": false
+  },
+  "limitations": [
+    "Synthetic acceptance is not a speed comparison or optimality proof",
+    "Common prefixes still replay; complete native state is not shared",
+    "Turn-frontier workers keep one fixed root-derived partition count"
+  ]
+}
