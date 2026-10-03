@@ -31,6 +31,7 @@ parser.add_argument('--visual-benchmark', action='store_true')
 parser.add_argument('--checkpoint', action='store_true')
 parser.add_argument('--workers', type=int)
 parser.add_argument('--shared-work', choices=['on', 'off'])
+parser.add_argument('--search-order', choices=['monte-carlo', 'limited', 'depth', 'portfolio', 'turn-frontier'])
 parser.add_argument('--work-benchmark', action='store_true')
 parser.add_argument('--settle-benchmark', action='store_true')
 parser.add_argument('--quality-benchmark', action='store_true')
@@ -45,11 +46,15 @@ parser.add_argument('--bootstrap-reverse', action='store_true')
 parser.add_argument('--recorded-replay', type=Path)
 parser.add_argument('--numerical-benchmark', action='store_true')
 parser.add_argument('--early-stop-test', action='store_true')
+parser.add_argument('--results-dir', type=Path)
 parser.add_argument('--overhead-benchmark', action='store_true')
 parser.add_argument('--verification-benchmark', action='store_true')
+parser.add_argument('--algorithm-test', action='store_true')
 args = parser.parse_args()
 if args.verification_benchmark and (not args.replay or not args.seed_result):
     parser.error('--verification-benchmark requires --replay and --seed-result')
+if args.algorithm_test and (not args.replay or args.seed_result or args.recorded_replay):
+    parser.error('--algorithm-test requires an unseeded --replay')
 if args.overhead_benchmark and (not args.replay or not args.seed_result):
     parser.error('--overhead-benchmark requires --replay and --seed-result')
 if args.numerical_benchmark and (not args.replay or not args.recorded_replay):
@@ -58,6 +63,8 @@ if args.early_stop_test and (not args.replay or not args.seed_result):
     parser.error('--early-stop-test requires --replay and --seed-result')
 if args.workers is not None and not 1 <= args.workers <= 16:
     parser.error('--workers must be between 1 and 16')
+if args.search_order and not args.replay:
+    parser.error('--search-order requires --replay')
 if args.work_benchmark and (not args.replay or not args.seed_result):
     parser.error('--work-benchmark requires --replay and --seed-result')
 if args.settle_benchmark and (not args.replay or not args.seed_result):
@@ -121,6 +128,11 @@ with worker_lock(root):
     env['SPIRE_LOCAL_CHECKPOINT'] = '1' if args.checkpoint else '0'
     env['SPIRE_LOCAL_WORKERS'] = str(args.workers) if args.workers is not None else ''
     env['SPIRE_LOCAL_SHARED_WORK'] = args.shared_work or ''
+    env['SPIRE_LOCAL_SEARCH_ORDER'] = {
+        'monte-carlo': 'MonteCarlo', 'limited': 'LimitedDiscrepancy',
+        'depth': 'DepthDiscrepancy', 'portfolio': 'DiscrepancyPortfolio',
+        'turn-frontier': 'TurnFrontier',
+    }.get(args.search_order, '')
     env['SPIRE_LOCAL_WORK_BENCHMARK'] = '1' if args.work_benchmark else '0'
     env['SPIRE_LOCAL_SETTLE_BENCHMARK'] = '1' if args.settle_benchmark else '0'
     env['SPIRE_LOCAL_QUALITY_BENCHMARK'] = '1' if args.quality_benchmark else '0'
@@ -137,6 +149,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_EARLY_STOP_TEST'] = '1' if args.early_stop_test else '0'
     env['SPIRE_LOCAL_OVERHEAD_BENCHMARK'] = '1' if args.overhead_benchmark else '0'
     env['SPIRE_LOCAL_VERIFICATION_BENCHMARK'] = '1' if args.verification_benchmark else '0'
+    env['SPIRE_LOCAL_ALGORITHM_TEST'] = '1' if args.algorithm_test else '0'
     settings = root / 'Roaming/SlayTheSpire2/default/1/settings.save'
     settings_data = json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}
     settings_data.update(volume_master=0, volume_bgm=0, volume_sfx=0, volume_ambience=0)
@@ -154,5 +167,13 @@ with worker_lock(root):
     if (root / 'integration-error.txt').exists():
         print((root / 'integration-error.txt').read_text(encoding='utf-8'))
     passed = (root / 'integration-success').is_file()
+    if args.results_dir:
+        # Preserve this run while the workspace lock is still held. Other local
+        # experiments may reuse the host immediately after it exits.
+        args.results_dir.mkdir(parents=True, exist_ok=True)
+        for name in ['integration-replay-private.json', 'integration-replay-summary.json',
+                     'integration-error.txt', 'integration-stdout.log', 'integration-game.log']:
+            if (root / name).is_file():
+                shutil.copy2(root / name, args.results_dir / name)
     print(json.dumps(dict(exit_code=process.returncode, passed=passed)))
     raise SystemExit(0 if passed and process.returncode == 0 else 1)

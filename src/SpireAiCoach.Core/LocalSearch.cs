@@ -5,7 +5,7 @@ namespace SpireAiCoach.Core;
 // Local IPC only: no provider calls or credentials are part of this protocol.
 public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Replay,
     string NativeHash, uint ModelHash, string[] LoadedMods, bool ContinueOptimization,
-    int Partition = 0, int Partitions = 2, int MaxNodes = 32, int MaxDepth = 24,
+    int Partition = 0, int Partitions = 2, int MaxNodes = LocalCalculation.AttemptsPerWorker, int MaxDepth = 24,
     int BudgetSeconds = 60, string? DebugEncounter = null,
     IReadOnlyDictionary<uint, string>? TargetLabels = null, int MaxRounds = 64,
     int Workers = 0, bool IncludePotions = false, LocalHistoryStamp? History = null, string[]? ExcludedModels = null,
@@ -15,7 +15,7 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     bool FastStateSettling = true, bool FastAssetCollection = false, bool StrategicRollouts = true,
     bool ExperimentalNativeData = false, byte[]? RecordedReplayProbe = null, bool DataOnlyCombat = true,
     bool DataOnlyRun = true, bool NumericalExecution = true, bool StopOnZeroLoss = true, bool TrimWorkerOverhead = true,
-    bool FastVerification = true);
+    LocalSearchOrder SearchOrder = LocalSearchOrder.MonteCarlo, bool FastVerification = true);
 
 // A stop belongs to one frozen request, never to another battle or final verification.
 public sealed record LocalSearchStop(string Id, string SnapshotId, string NativeHash)
@@ -51,7 +51,7 @@ public sealed record LocalSearchResult(string Id, string SnapshotId, string Stat
     int Duplicates = 0, int BudgetPruned = 0, int Victories = 0, int Workers = 1,
     long WorkerMemoryBytes = 0, long SearchElapsedMs = 0, bool IncludePotions = false, LocalSearchTiming? Timing = null,
     LocalAction? BlockedAction = null, int MaxRounds = 64, LocalTrace? Trace = null, LocalWorkStats? Work = null,
-    bool StoppedEarly = false);
+    bool StoppedEarly = false, LocalTurnSearchStats? TurnSearch = null);
 
 public static class LocalSearchPolicy
 {
@@ -95,6 +95,7 @@ public static class LocalSearchPolicy
         if (!best.Won) lines.Add("以下仅为已模拟的部分路线，不代表能打赢本次战斗。停止原因：" + best.StopReason);
         if (best.Dead) lines.Add("注意：目前找到的路线仍会死亡，不能保证存活。");
         if (result.Work is { } work) lines.Add($"分支分工：领取 {work.Claimed} 项任务，合并 {work.DuplicateOffers} 次重复提交。");
+        if (result.TurnSearch is { } turns) lines.Add($"另探查 {turns.Probes} 个回合组合，按可证明的界限剪枝 {turns.BoundPruned} 次，跳过 {turns.CoveredPrefixes} 个已评估前缀，仍待搜索 {turns.Pending} 个操作前缀。");
         lines.Add($"计算用时 {result.ElapsedMs / 1000d:F1} 秒。");
         int round = -1;
         for (var i = 0; i < best.Actions.Length; i++)

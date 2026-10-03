@@ -676,7 +676,7 @@ Test("local requests default to numerical execution while preserving explicit le
     oldJson.Remove(nameof(LocalSearchRequest.NumericalExecution));
     oldJson.Remove(nameof(LocalSearchRequest.StopOnZeroLoss));
     var old = oldJson.Deserialize<LocalSearchRequest>()!;
-    Check(old.NumericalExecution && old.StopOnZeroLoss && old.BudgetSeconds == 60 && old.MaxNodes == 32 && old.MaxRounds == 64);
+    Check(old.NumericalExecution && old.StopOnZeroLoss && old.BudgetSeconds == 60 && old.MaxNodes == 64 && old.MaxRounds == 64);
     oldJson[nameof(LocalSearchRequest.NumericalExecution)] = false;
     oldJson[nameof(LocalSearchRequest.StopOnZeroLoss)] = false;
     var legacy = oldJson.Deserialize<LocalSearchRequest>()!;
@@ -888,6 +888,9 @@ SearchAlgorithmTests.Register(Test);
 EarlyStopSettingsTests.Register(Test);
 SearchWorkTests.Register(Test);
 OptimizationTests.Register(Test);
+DiscrepancyTests.Register(Test);
+TurnSearchTests.Register(Test);
+RouteCoverageTests.Register(Test);
 TimelineTests.Register(Test);
 var filter = args.Length == 2 && args[0] == "--filter" ? args[1] : null;
 if (args.Length != 0 && filter == null) { Console.Error.WriteLine("Usage: [--filter substring]"); return 2; }

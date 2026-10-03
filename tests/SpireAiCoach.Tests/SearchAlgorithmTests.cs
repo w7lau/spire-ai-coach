@@ -6,6 +6,74 @@ static class SearchAlgorithmTests
 
     public static void Register(Action<string, Action> test)
     {
+        test("search tactics distinguish in-hand turn-end loss from a play payment", () =>
+        {
+            var payment = LocalTactics.Priority(new(Known: true, HpCost: 6));
+            var removeHeldLoss = LocalTactics.Priority(new(Known: true, HandEndHpLoss: 6));
+            var emptyDefense = LocalTactics.Priority(new(Known: true, Block: 5));
+            var protectedEnd = LocalTactics.Priority(new(Known: true, EndTurn: true,
+                Incoming: 10, CurrentBlock: 20, Hp: 40, HandEndHpLoss: 6));
+            Check(payment < 0, "An actual play payment must remain a cost");
+            Check(removeHeldLoss > emptyDefense && removeHeldLoss > protectedEnd,
+                "Explore removing the harmful hand effect before wasting defense or ending");
+            Check(protectedEnd < 0, "Attack block must not erase a separate turn-end HP loss");
+            Check(LocalTactics.Priority(new(Known: true, EndTurn: true, Hp: 6, HandEndHpLoss: 6)) <= -40,
+                "Do not treat a potentially fatal in-hand effect as a safe end turn");
+        });
+        test("search choice proposals preserve unique model intent after a changed prefix", () =>
+        {
+            var old = new LocalCardChoice("old", 1, "CARD.SETUP", "old display", [1], "pile");
+            var current = old with { OfferHash = "new", Index = 3, Indices = [3], Name = "new display" };
+            Check(LocalRouteRefiner.ProposeChoice(old, [current]) == current,
+                "Propose the unique native legal model, recording its new offer and coordinates");
+            Check(LocalRouteRefiner.ProposeChoice(old, [old, current]) == old, "Exact offers take precedence");
+            Check(LocalRouteRefiner.ProposeChoice(old, [current, current with { Index = 4, Indices = [4] }]) == null,
+                "Duplicate instances need fresh exploration, not a guessed identity");
+            Check(LocalRouteRefiner.ProposeChoice(old, [current with { ModelId = "CARD.OTHER" }]) == null,
+                "Display names cannot substitute a different model");
+            Check(LocalRouteRefiner.ProposeChoice(old with { Indices = [1, 2] }, [current]) == null,
+                "A changed multi-select offer is a new decision");
+            Check(LocalRouteRefiner.ProposeChoice(old, [current with { Kind = "hand" }]) == null,
+                "Do not carry pile choice intent to a different selection context");
+        });
+        test("search choice proposals continue a combo when a changed offer removes an earlier intent", () =>
+        {
+            var earlier = new LocalCardChoice("old", 0, "CARD.DEFENSE", "defense", [0], "pile");
+            var later = earlier with { Index = 3, Indices = [3], ModelId = "CARD.FINISHER" };
+            var available = later with { OfferHash = "new", Index = 1, Indices = [1] };
+            LocalCardChoice[] legal = [earlier with { OfferHash = "new" },
+                earlier with { OfferHash = "new", Index = 2, Indices = [2] }, available];
+            int next = 0;
+            Check(LocalRouteRefiner.ProposeNextChoice([earlier, later], legal, ref next) == available && next == 2,
+                "Ambiguous old instances must not hide a later unique legal combination proposal");
+            Check(LocalRouteRefiner.ProposeNextChoice([earlier, later], legal, ref next) == null,
+                "Do not reuse the same planned choice for extra offers");
+            next = 0;
+            Check(LocalRouteRefiner.ProposeNextChoice([earlier, later], [earlier, later], ref next) == earlier && next == 1,
+                "An unchanged native offer keeps its exact first choice");
+        });
+        test("search refinement proposes coupled end-turn plays and changed repeated choice order", () =>
+        {
+            var end1 = Move("end") with { EndTurn = true, ModelId = "", CombatCardIndex = null };
+            var end2 = end1 with { Round = 2 };
+            var costlessDefense = Move("empty-defense") with { CombatCardIndex = 1, Preference = -12 };
+            var held1 = Move("held-risk") with { CombatCardIndex = 2, Preference = 24 };
+            var held2 = held1 with { Round = 2, CombatCardIndex = 3 };
+            var early = new LocalCardChoice("one", 0, "CARD.DEFENSE", "", [0], "pile");
+            var late = new LocalCardChoice("two", 1, "CARD.FINISHER", "", [1], "pile");
+            var pull = Move("retrieve") with { Round = 3, CombatCardIndex = 4, Choices = [early, late] };
+            var refiner = new LocalRouteRefiner();
+            refiner.Offer(new([end1, end2, pull], 16, 24, 0, 0, 40, true, false, false,
+                Decisions: [new(0, [costlessDefense, held1, end1]), new(1, [held2, end2])], StartingHp: 40));
+            var proposals = new List<LocalAction[]>();
+            while (refiner.TryTake(out var plan)) proposals.Add(plan);
+            Check(proposals.Any(p => p.Count(a => a.ModelId == "held-risk") == 2),
+                "Two turn-end improvements must not require either alone to improve the incumbent");
+            Check(proposals.Any(p => p.Count(a => a.ModelId == "held-risk") == 2 &&
+                p.Single(a => a.ModelId == "retrieve").Choices![0] == late),
+                "A changed repeated offer needs a candidate retaining the finisher intent");
+            Check(proposals.All(p => p.Count(a => a.EndTurn) == 2), "Do not move or remove native turn boundaries");
+        });
         test("search feedback finds strength vulnerability upgrades and energy before attacks", () =>
         {
             foreach (var setup in new[] { "strength", "vulnerable", "upgrade", "energy" })

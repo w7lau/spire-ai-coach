@@ -7,7 +7,7 @@ public sealed record LocalSimState(int Round, int Hp, int MaxHp, int Block, deci
 public sealed record LocalSimEvent(int Step, int Round, string Action, string Changes);
 public sealed record LocalProgress(string Id, string SnapshotId, int Worker, int Workers, long Sequence,
     int Route, int Evaluated, int MaxNodes, int Victories, long ElapsedMs, int BudgetSeconds,
-    string Phase, LocalSimState? State, LocalSimEvent[] Events, string Status = "running");
+    string Phase, LocalSimState? State, LocalSimEvent[] Events, string Status = "running", int TurnProbes = 0, int BoundPruned = 0);
 
 public sealed class LocalProgressBook(string id, string snapshotId)
 {
@@ -22,7 +22,8 @@ public sealed class LocalProgressBook(string id, string snapshotId)
     }
     public static double BudgetUsed(LocalProgress progress) => Math.Clamp(100d * progress.ElapsedMs / Math.Max(1000, progress.BudgetSeconds * 1000), 0, 100);
     public static string Overview(LocalProgress progress) => $"搜索分组 {progress.Worker + 1} · {progress.Phase} · 路线 {progress.Route} · " +
-        $"评估 {progress.Evaluated}/{progress.MaxNodes} · 获胜 {progress.Victories}";
+        $"评估 {progress.Evaluated}/{progress.MaxNodes} · 获胜 {progress.Victories}" +
+        (progress.TurnProbes > 0 || progress.BoundPruned > 0 ? $" · 回合探查 {progress.TurnProbes} · 剪枝 {progress.BoundPruned}" : "");
     public static string StateText(LocalSimState state) =>
         $"第 {state.Round} 回合 | 生命 {state.Hp}/{state.MaxHp} | 格挡 {state.Block} | 能量 {state.Energy} | 药水 {state.Potions}\n" +
         $"自身状态：{state.Powers}\n手牌：{string.Join("、", state.Hand)}\n" +
