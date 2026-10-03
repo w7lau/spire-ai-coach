@@ -1,5 +1,15 @@
 # 设计与合同
 
+## 0.7.11 最终复核的展示与资源开销
+
+FastVerification 是本地 IPC 的内部对照开关，默认 true，旧请求省略时继承默认值；显式 false 保留原有复核。LocalWorkerVerification 只在已验证所有权的后台进程安装，每个边界用独立 Harmony owner；四个边界均可安装且 SimulationSpeed>1 时才生效。VerifyBestCore 仍关闭 DataOnlyCombat/DataOnlyRun 并恢复普通 NonInteractiveMode：完整 NRun/NCombatRoom、原生执行器调度、状态通知、选择页面、所有模型效果、Mod 钩子、校验与逐步历史都保留，不使用搜索中的连续数值队列替代复核。
+
+Scope 保存并恢复 PreloadManager.Enabled，采用原生关闭预加载的受支持路径：LoadRunAssets/LoadActAssets/LoadRoomAssets 仍执行资源集合维护，AssetCache.GetAsset 在实际使用时同步加载所需资源；不以角色或卡名缓存规则状态。MegaLabel/MegaRichTextLabel 的 AdjustFontSize 只跳过字体二分适配；SetTextAutoSize、文本赋值、NCard.UpdateVisuals 和模型动态预览继续执行。RunManager.FadeIn/FadeOut 只跳过原生房间过渡；TestMode 的自定义过渡回调沿用原路径。
+
+LocalWorkerOverhead 的音效/特效叶入口、普通日志和重放文件输出也在这个 Scope 生效。Warn/Error、日志订阅、停止录制收尾、内存操作/选择记录和原生 checksum 不省略。Scope 在成功及异常退出时恢复资源开关，清理和普通玩家进程不继承它；runtime.json 记录实际采用的方式、可用边界、失败原因和原生资源开关状态。AssetCache.GetAsset、NCard.UpdateVisuals 及字体适配增加同步方法计时；资源等待/角色资源/章节资源分段记录，不能把这些嵌套时间相加为总等待。
+
+快速复核失败只对同一选中候选重新执行一次常规复核，保留 verification-fallback.txt 和 verify_fallback 时间段，不重跑整场搜索。最终状态/结算仍不一致时沿用失败出口，Best=null，不生成续用点或可执行方案。普通请求、其他战斗、每次请求的 Scope 与回退原因独立；药水、搜索预算、候选排名和无伤停止标准均不变。
+
 ## 0.7.10 展示和输出开销、方法计时
 
 LocalWorkerOverhead 仅在已核对所有权标记与可执行路径的独立实例安装。TrimWorkerOverhead 默认 true；实际跳过还要求 NumericalExecution、DataOnlyCombat、DataOnlyRun，且不是 VerifyCandidate 请求。VerifyBest 关闭数据场景模式时，跳过入口自动失效。每组原生方法用独立 Harmony owner 安装，签名不支持时撤回该组并在私有 runtime.json 留下失败原因。
