@@ -230,11 +230,12 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
         public Process? Process { get; private set; }
         private FileStream? _lock;
         private string? _configuration;
+        private long _logPosition;
 
         public async Task Ensure(string directory, int index, LocalInstallation installation, CancellationToken token, LocalTimeline? timeline = null)
         {
             var signature = typeof(LocalWorker).Assembly.ManifestModule.ModuleVersionId + "|" +
-                installation.GameDirectory + "|" + Path.GetFullPath(directory) + "|" + string.Join("|", installation.ModDirectories);
+                installation.GameDirectory + "|" + Path.GetFullPath(directory) + "|" + string.Join("|", installation.ModDirectories) + "|" + installation.MinimalWorkerBootstrap;
             var configuration = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(signature)))[..16];
             if (Process?.HasExited == false && _configuration == configuration)
             {
@@ -244,6 +245,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             using var preparation = timeline?.Measure(index, "prepare", "prepare");
             using var files = timeline?.Measure(index, "prepare", "files", depth: 1);
             Stop();
+            _logPosition = 0;
             _configuration = configuration;
             // NTFS hardlinks require one volume. Keep tiny launch trees beside the installation, never in it.
             var sharedRoot = Path.Combine(Directory.GetParent(installation.GameDirectory)!.FullName, ".spire-ai-coach-workers");
@@ -277,6 +279,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             foreach (var arg in new[] { "--headless", "--audio-driver", "Dummy", "--disable-vsync", "--max-fps", "120", "--force-steam=off", "--log-file", Path.Combine(Root, "game.log") }) start.ArgumentList.Add(arg);
             start.Environment["APPDATA"] = roaming; start.Environment["LOCALAPPDATA"] = local;
             start.Environment["SPIRE_COACH_WORKER"] = Root;
+            LocalWorkerOwner.Attach(start);
+            start.Environment["SPIRE_COACH_MINIMAL_BOOTSTRAP"] = installation.MinimalWorkerBootstrap ? "1" : "0";
             start.Environment.Remove("SPIRE_NATIVE_PROBE_ROOT");
             token.ThrowIfCancellationRequested();
             files?.Dispose();
@@ -295,8 +299,17 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
         {
             var path = Path.Combine(Root, "game.log");
             using var stream = new FileStream(path, FileMode.Open, System.IO.FileAccess.Read, FileShare.ReadWrite);
+            if (_logPosition > stream.Length) _logPosition = 0;
+            stream.Position = _logPosition;
             using var reader = new StreamReader(stream);
-            return reader.ReadToEnd().Contains("[ERROR]", StringComparison.Ordinal);
+            string? line;
+            bool failed = false;
+            while ((line = reader.ReadLine()) != null)
+                failed |= line.Contains("[ERROR]", StringComparison.Ordinal) ||
+                    line.StartsWith("System.", StringComparison.Ordinal) && line.Contains("Exception:", StringComparison.Ordinal) ||
+                    line.Contains("ERROR: FATAL:", StringComparison.Ordinal);
+            _logPosition = stream.Position;
+            return failed;
         }
 
         private static void CopyFile(string source, string target, CancellationToken token)

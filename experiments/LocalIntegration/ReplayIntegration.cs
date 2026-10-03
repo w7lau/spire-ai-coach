@@ -30,12 +30,121 @@ public static class ReplayIntegration
                 catch (Exception ex) when (ex is JsonException or KeyNotFoundException or InvalidOperationException) { return false; }
             })).Append(coach).ToArray();
         // Preserve the frozen user's search/potion settings; only raise the old turn horizon.
-        var request = original with { Id = Guid.NewGuid().ToString("N"), LoadedMods = loaded, MaxRounds = 64 };
+        var request = original with { Id = Guid.NewGuid().ToString("N"), LoadedMods = loaded, MaxRounds = 64,
+            TimelineOrigin = 0, InitialTrace = null };
         if (int.TryParse(System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_WORKERS"), out var workers))
             request = request with { Workers = workers };
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SHARED_WORK") is { Length: > 0 } sharing)
             request = request with { ShareSearchWork = sharing == "on" };
         var installation = new LocalInstallation(game, directories);
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_RECORDED_REPLAY") is { Length: > 0 } recordedPath)
+        {
+            await Task.Run(() => pool.Prepare(installation, 1, CancellationToken.None));
+            // Standalone probe of an owned worker. Its status is not accepted by Analyze and
+            // cannot publish an executable recommendation in the real game.
+            var worker = ((Array)typeof(LocalWorkerPool).GetField("_workers", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!
+                .GetValue(pool)!).GetValue(0)!;
+            var workerRoot = (string)worker.GetType().GetProperty("Root")!.GetValue(worker)!;
+            if (!File.Exists(Path.Combine(workerRoot, ".coach-worker"))) throw new InvalidOperationException("Not an owned calculation instance");
+            request = request with { Id = Guid.NewGuid().ToString("N"), Partition = 0, Partitions = 1,
+                RecordedReplayProbe = File.ReadAllBytes(recordedPath) };
+            LocalWire.Write(Path.Combine(workerRoot, "request.json"), request);
+            var timer = System.Diagnostics.Stopwatch.StartNew();
+            while (timer.Elapsed.TotalSeconds < 120)
+            {
+                await Task.Delay(100);
+                var file = Path.Combine(workerRoot, "result.json");
+                if (!File.Exists(file)) continue;
+                var recordedResult = LocalWire.Read<LocalSearchResult>(file);
+                if (recordedResult.Id != request.Id || recordedResult.Status == "running") continue;
+                LocalWire.Write(Path.Combine(root, "integration-recorded-private.json"), recordedResult);
+                LocalWire.Write(Path.Combine(root, "integration-recorded-summary.json"), new
+                    { recordedResult.Status, recordedResult.Message, recordedResult.ElapsedMs, recordedResult.Best?.Won, recordedResult.Best?.StartingHp,
+                        recordedResult.Best?.Hp, recordedResult.Best?.HpLost, recordedResult.Best?.NetHpLoss, enabled_in_product = false });
+                return;
+            }
+            throw new TimeoutException("Recorded replay probe did not finish");
+        }
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_BOOTSTRAP_BENCHMARK") == "1")
+        {
+            request = request with { Workers = 1, MaxNodes = 1, BudgetSeconds = 60,
+                InitialPlan = LocalWire.Read<LocalSearchResult>(System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT")!).Best!.Actions };
+            LocalCandidate? baseline = null;
+            var records = new List<object>();
+            foreach (var minimal in new[] { false, true })
+            {
+                // A separate owned pool/configuration per mode includes cold startup and the
+                // first native restoration; moving resource loading later does not count as a win.
+                using var cold = new LocalWorkerPool(Path.Combine(root, "bootstrap-" + minimal));
+                var sample = await Task.Run(() => cold.Analyze(request with { Id = Guid.NewGuid().ToString("N") },
+                    installation with { MinimalWorkerBootstrap = minimal }, _ => { }, CancellationToken.None));
+                var best = sample.Best ?? throw new InvalidOperationException("Bootstrap returned no route");
+                if (sample.Status != "done" || sample.Rejected != 0 || !best.Won || best.Continuation?.Length != best.Actions.Length)
+                    throw new InvalidOperationException("Bootstrap did not restore and independently verify a complete line");
+                if (baseline != null && (JsonSerializer.Serialize(best.Actions) != JsonSerializer.Serialize(baseline.Actions) ||
+                    !best.Continuation!.SequenceEqual(baseline.Continuation!) || best.Hp != baseline.Hp || best.HpLost != baseline.HpLost ||
+                    best.Gold != baseline.Gold || best.MaxHp != baseline.MaxHp))
+                    throw new InvalidOperationException("Bootstrap changed native states/history or final settlement");
+                baseline ??= best;
+                LocalWire.Write(Path.Combine(root, $"integration-bootstrap-private-{records.Count}.json"), sample);
+                var firstDecision = sample.Trace!.Spans.First(s => s.Stage == "search" && s.Phase == "decision").StartMs;
+                records.Add(new { minimal_bootstrap = minimal, sample.ElapsedMs, sample.Timing,
+                    first_decision_ms = firstDecision, sample.WorkerMemoryBytes, best.Hp, best.HpLost,
+                    native_states_and_history_match = true });
+            }
+            LocalWire.Write(Path.Combine(root, "integration-bootstrap-summary.json"), records);
+            return;
+        }
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_QUALITY_BENCHMARK") == "1")
+        {
+            var warmupSeedPath = System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT")
+                ?? throw new InvalidOperationException("A warmup line is required");
+            await Task.Run(() => pool.Analyze(request with { Id = Guid.NewGuid().ToString("N"), MaxNodes = 1,
+                InitialPlan = LocalWire.Read<LocalSearchResult>(warmupSeedPath).Best!.Actions }, installation, _ => { }, CancellationToken.None));
+            var records = new List<object>();
+            // Both searches keep the frozen full budgets, no added line, same fast execution.
+            foreach (var strategic in new[] { false, true })
+            {
+                var sample = await Task.Run(() => pool.Analyze(request with { Id = Guid.NewGuid().ToString("N"),
+                    StrategicRollouts = strategic }, installation, _ => { }, CancellationToken.None));
+                var best = sample.Best ?? throw new InvalidOperationException("Quality search returned no route");
+                LocalWire.Write(Path.Combine(root, $"integration-quality-private-{records.Count}.json"), sample);
+                if (sample.Status != "done" || sample.Rejected != 0 || !best.Won ||
+                    best.Continuation?.Length != best.Actions.Length || sample.Timing?.Verifications != 1)
+                    throw new InvalidOperationException("Quality search did not complete every lane and verify its victory");
+                records.Add(new { strategic_rollouts = strategic, sample.Workers, request.BudgetSeconds, request.MaxNodes,
+                    sample.Status, sample.Evaluated, sample.Victories, sample.Rejected, sample.ElapsedMs, sample.Timing,
+                    sample.WorkerMemoryBytes, best.Won, best.StartingHp, best.Hp, best.NetHpLoss, best.HpLost, best.Rounds,
+                    used_potion = best.Actions.Any(a => a.PotionSlot.HasValue), verified_steps = best.Continuation.Length });
+            }
+            LocalWire.Write(Path.Combine(root, "integration-quality-summary.json"), records);
+            return;
+        }
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_NATIVE_DATA_PROBE") == "1")
+        {
+            request = request with { Workers = 1, MaxNodes = 1, BudgetSeconds = 60,
+                InitialPlan = LocalWire.Read<LocalSearchResult>(System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT")!).Best!.Actions };
+            var baseline = await Task.Run(() => pool.Analyze(request, installation, _ => { }, CancellationToken.None));
+            await Task.Run(() => pool.Analyze(request with { Id = Guid.NewGuid().ToString("N"), ExperimentalNativeData = true },
+                installation, _ => { }, CancellationToken.None));
+            var records = new List<object>();
+            foreach (var native in new[] { false, true, true, false })
+            {
+                var probe = await Task.Run(() => pool.Analyze(request with { Id = Guid.NewGuid().ToString("N"),
+                    ExperimentalNativeData = native }, installation, _ => { }, CancellationToken.None));
+                LocalWire.Write(Path.Combine(root, $"integration-native-data-private-{records.Count}.json"), probe);
+                bool matches = probe.Status == "done" && probe.Rejected == 0 && baseline.Best is { } before && probe.Best is { } after &&
+                    before.Won == after.Won && before.Hp == after.Hp && before.HpLost == after.HpLost && before.Gold == after.Gold &&
+                    before.MaxHp == after.MaxHp && before.Rounds == after.Rounds &&
+                    JsonSerializer.Serialize(before.Actions) == JsonSerializer.Serialize(after.Actions) &&
+                    before.Continuation!.SequenceEqual(after.Continuation!);
+                records.Add(new { native_noninteractive = native, probe.Status, probe.Message, probe.ElapsedMs, probe.Timing,
+                    matches, enabled_in_product = false });
+            }
+            LocalWire.Write(Path.Combine(root, "integration-native-data-summary.json"), records);
+            // A rejected native-mode experiment is an observed result, never an instruction to relax checks.
+            return;
+        }
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_WORK_BENCHMARK") == "1")
         {
             var warmupSeedPath = System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT")
@@ -65,6 +174,44 @@ public static class ReplayIntegration
         }
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT") is { Length: > 0 } seedPath)
             request = request with { InitialPlan = LocalWire.Read<LocalSearchResult>(seedPath).Best!.Actions };
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SETTLE_BENCHMARK") == "1")
+        {
+            if (request.InitialPlan is not { Length: > 0 }) throw new InvalidOperationException("A fixed complete line is required");
+            // One fixed route isolates execution cost. The product's full search budget is unchanged.
+            request = request with { Workers = 1, MaxNodes = 1, BudgetSeconds = 60, SimulationSpeed = 8 };
+            await Task.Run(() => pool.Prepare(installation, 1, CancellationToken.None));
+            LocalCandidate? baseline = null;
+            async Task<LocalSearchResult> Sample(bool events, bool collection)
+            {
+                var sample = await Task.Run(() => pool.Analyze(request with { Id = Guid.NewGuid().ToString("N"),
+                    FastStateSettling = events, FastAssetCollection = collection }, installation, _ => { }, CancellationToken.None));
+                var best = sample.Best ?? throw new InvalidOperationException("Settlement sample returned no route");
+                if (sample.Status != "done" || !best.Won || sample.Rejected != 0 || best.Continuation?.Length != best.Actions.Length || sample.Timing?.Verifications != 1)
+                    throw new InvalidOperationException("Settlement sample did not produce independently verified victory");
+                if (baseline != null && (best.Hp != baseline.Hp || best.HpLost != baseline.HpLost || best.Gold != baseline.Gold ||
+                    best.MaxHp != baseline.MaxHp || best.Rounds != baseline.Rounds || best.StartingHp != baseline.StartingHp ||
+                    JsonSerializer.Serialize(best.Actions) != JsonSerializer.Serialize(baseline.Actions) ||
+                    !best.Continuation!.SequenceEqual(baseline.Continuation!)))
+                    throw new InvalidOperationException("Settlement optimization changed actions, native states, history or final settlement");
+                baseline ??= best;
+                return sample;
+            }
+            await Sample(false, false); await Sample(true, false); await Sample(false, true); await Sample(true, true);
+            var records = new List<object>();
+            foreach (var (events, collection) in new[] { (false, false), (true, false), (false, true), (true, true),
+                (true, true), (false, true), (true, false), (false, false) })
+            {
+                var sample = await Sample(events, collection);
+                var best = sample.Best!;
+                LocalWire.Write(Path.Combine(root, $"integration-settle-private-{records.Count}.json"), sample);
+                records.Add(new { event_driven_settling = events, avoid_forced_asset_gc = collection,
+                    request.SimulationSpeed, sample.ElapsedMs, sample.Timing, sample.WorkerMemoryBytes,
+                    best.HpLost, best.Hp, best.NetHpLoss, best.Rounds, steps = best.Actions.Length,
+                    native_states_and_history_match = true });
+            }
+            LocalWire.Write(Path.Combine(root, "integration-settle-summary.json"), records);
+            return;
+        }
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_VISUAL_BENCHMARK") == "1")
         {
             if (request.InitialPlan is not { Length: > 0 }) throw new InvalidOperationException("A fixed complete line is required");
@@ -137,6 +284,7 @@ public static class ReplayIntegration
             result.Status, result.Evaluated, result.Rejected, result.Victories, result.ElapsedMs, result.Timing,
             result.Workers, result.MaxRounds, request.BudgetSeconds, request.MaxNodes, request.IncludePotions,
             request.FastCardPresentation, request.FastNativeWaits,
+            request.FastStateSettling, request.FastAssetCollection,
             request.ShareSearchWork, result.Work,
             result.Best.Won, result.Best.StartingHp, result.Best.Hp, result.Best.NetHpLoss, result.Best.HpLost, result.Best.Rounds,
             result.Best.EnemyHp, result.Best.StopReason,

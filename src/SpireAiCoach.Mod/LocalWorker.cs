@@ -11,6 +11,7 @@ using MegaCrit.Sts2.Core.Entities.Multiplayer;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Entities.Potions;
 using MegaCrit.Sts2.Core.GameActions;
+using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Map;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Multiplayer.Replay;
@@ -34,6 +35,8 @@ public static class LocalWorker
     private static IReadOnlyDictionary<uint, string>? _targetLabels;
     private static bool _includePotions;
     private static bool _fastNativeWaits;
+    private static bool _fastStateSettling;
+    private static LocalNativeLearning? _nativeLearning;
     private static LocalChoices? _choices;
     private static HashSet<string> _excludedModels = [];
     private static string? _assetsRequest;
@@ -42,6 +45,7 @@ public static class LocalWorker
     private static string _traceStage = "search";
     private static IDisposable? Trace(string phase, string detail = "", int depth = 1) =>
         _timeline?.Measure(_traceWorker, _traceStage, phase, detail, _traceRoute, _traceStep, depth);
+    internal static IDisposable? TracePreloadCollection() => Trace("asset_gc", depth: 3);
     private static Task Frame() => _tree.ToSignal(_tree, SceneTree.SignalName.ProcessFrame).AsTask();
 
     public static bool TryStart()
@@ -56,6 +60,7 @@ public static class LocalWorker
         LocalReplayChoices.Install(harmony);
         LocalWorkerResources.Install(harmony);
         LocalWorkerVisuals.Install(harmony);
+        LocalWorkerBootstrap.Install(harmony);
         Callable.From(Run).CallDeferred();
         return true;
     }
@@ -79,7 +84,10 @@ public static class LocalWorker
             File.WriteAllText(Path.Combine(_root, "ready"), "ready");
             string? previous = null;
             var idle = Stopwatch.StartNew();
-            while (idle.Elapsed.TotalMinutes < 10)
+            // Keep the owner's warm instances available during long battles. Previously a
+            // ten-minute idle exit silently turned a later calculation into a cold start.
+            using var owner = LocalWorkerOwner.Open();
+            while (owner != null ? owner.IsAlive : idle.Elapsed.TotalMinutes < 10)
             {
                 var path = Path.Combine(_root, "request.json");
                 if (File.Exists(path))
@@ -101,6 +109,7 @@ public static class LocalWorker
 
     private static async Task<bool> Search(LocalSearchRequest request)
     {
+        _nativeLearning = request.StrategicRollouts ? new() : null;
         _timeline = new(request.TimelineOrigin);
         _traceWorker = request.Partition; _traceRoute = _traceStep = _restoreDepth = 0;
         _traceStage = request.VerifyCandidate == null ? "search" : "verify";
@@ -123,6 +132,7 @@ public static class LocalWorker
         LocalWorkerResources.Retain = true;
         var originalScale = Engine.TimeScale;
         var originalFps = Engine.MaxFps;
+        var originalNativeMode = NonInteractiveMode.AutoSlayerCheck;
         long restoreMs = 0, actionMs = 0, decisionMs = 0, verifyMs = 0;
         int executed = 0, restores = 0;
         async Task RestoreMeasured()
@@ -166,8 +176,48 @@ public static class LocalWorker
             LocalWorkerVisuals.Active = request.SimulationSpeed > 1;
             LocalWorkerVisuals.FastCardPresentation = request.SimulationSpeed > 1 && request.FastCardPresentation;
             _fastNativeWaits = request.SimulationSpeed > 1 && request.FastNativeWaits;
+            _fastStateSettling = request.SimulationSpeed > 1 && request.FastStateSettling;
+            LocalWorkerResources.FastCollection = request.SimulationSpeed > 1 && request.FastAssetCollection;
+            if (request.ExperimentalNativeData) NonInteractiveMode.AutoSlayerCheck = () => true;
             if (request.ModelHash != ModelIdSerializationCache.Hash || !request.LoadedMods.SequenceEqual(LocalCapture.LoadedMods()))
                 throw new InvalidOperationException("后台的游戏模型或 Mod 清单与当前游戏不一致，请重启游戏后重试。");
+            if (request.RecordedReplayProbe is { } recorded)
+            {
+                int startHp = 0, lost = 0;
+                var recordedActions = new List<LocalAction>();
+                Player? recordedPlayer = null;
+                void HpChanged(int oldHp, int newHp) => lost += Math.Max(0, oldHp - newHp);
+                try
+                {
+                    var bound = LocalRecordedProbe.Bind(recorded, request.Replay);
+                    await Restore(request with { Replay = bound.Replay }, true, player =>
+                    { recordedPlayer = player; startHp = player.Creature.CurrentHp; player.Creature.CurrentHpChanged += HpChanged; },
+                    (action, player) =>
+                    {
+                        if (action is ReadyToBeginEnemyTurnAction) return;
+                        var next = EnumerateActions().Single(a => action switch
+                        {
+                            PlayCardAction card => a.CombatCardIndex == card.NetCombatCard.CombatCardIndex && a.TargetId == card.TargetId,
+                            UsePotionAction potion => a.PotionSlot == potion.PotionIndex,
+                            EndPlayerTurnAction => a.EndTurn,
+                            _ => false
+                        });
+                        recordedActions.Add(next);
+                    }, bound.PrefixEvents);
+                    var player = recordedPlayer ?? throw new InvalidOperationException("Recorded root was not validated");
+                    best = new(recordedActions.ToArray(), player.Creature.CurrentHp, lost,
+                        CombatManager.Instance.DebugOnlyGetState()!.Enemies.Sum(e => Math.Max(0, e.CurrentHp)), player.Gold,
+                        player.Creature.MaxHp, _combatWon && !player.Creature.IsDead, player.Creature.IsDead, false,
+                        Rounds: recordedActions.Select(a => a.Round).Distinct().Count(), StartingHp: startHp);
+                    // Experimental terminal status is deliberately excluded from the product pool's
+                    // acceptable results; this cannot become a displayed/executable empty plan.
+                    await Cleanup();
+                    session?.Dispose();
+                    Publish("recorded", "已核对原始战斗起点并执行本机已记录的全部操作与选牌。");
+                    return true;
+                }
+                finally { if (recordedPlayer != null) recordedPlayer.Creature.CurrentHpChanged -= HpChanged; }
+            }
             if (request.VerifyCandidate is { } proposed)
             {
                 best = proposed;
@@ -301,18 +351,28 @@ public static class LocalWorker
                         {
                             while (planIndex < planned.Length && preferred == null)
                             {
-                                plannedAction = planned[planIndex++];
+                                    plannedAction = planned[planIndex];
+                                    // A changed action can leave the current round with more plays.
+                                    // Do not consume the seed's later rounds before they are reached.
+                                    if (plannedAction.Round > round) { plannedAction = null; break; }
+                                    planIndex++;
                                 preferred = LocalRouteRefiner.Resolve(plannedAction, legal);
                             }
                         }
                         else if (evaluated == 0 && actions.Count == 0)
                             preferred = roots.OrderByDescending(a => a.Preference).First();
-                        var next = search.Select(trial, legal, preferred);
+                        // Explore explicit branch proposals, then continue most trials coherently.
+                        // Randomizing every card in a long rollout almost never preserves a combo.
+                        // One quarter of complete trials retain broad stochastic exploration.
+                        bool coherent = request.StrategicRollouts && evaluated % 4 != 3;
+                        var next = search.Select(trial, legal, preferred, greedy: coherent);
                         var choiceDecisions = new List<LocalChoiceDecision>();
                         decisions.Add(new(actions.Count, legal));
                         decisionMs += (long)Stopwatch.GetElapsedTime(decisionStarted).TotalMilliseconds;
                         deciding?.Dispose();
                         var before = Observe(player);
+                        var learned = !next.EndTurn && next.PotionSlot == null
+                            ? _nativeLearning?.Before(player.PlayerCombatState!.Hand.Cards[next.HandIndex], player) : null;
                         Progress("执行：" + LocalSearchPolicy.Describe(next), before);
                         var priorLost = lost;
                         var actionStarted = Stopwatch.GetTimestamp();
@@ -330,13 +390,15 @@ public static class LocalWorker
                                     c.Kind == expected.Kind && c.Index == expected.Index && c.ModelId == expected.ModelId &&
                                     (c.Indices ?? []).SequenceEqual(expected.Indices ?? []));
                                 var choices = options.Select(c => new LocalAction(c.Index, "choice:" + c.ModelId,
-                                    null, c.Name, "", c.OfferHash, round)).ToArray();
-                                var selected = search.Select(trial, choices, match == null ? null : choices.Single(c => c.HandIndex == match.Index));
+                                    null, c.Name, "", c.OfferHash, round, Preference: c.Preference)).ToArray();
+                                var selected = search.Select(trial, choices, match == null ? null : choices.Single(c => c.HandIndex == match.Index),
+                                    greedy: coherent);
                                 return options.Single(c => c.Index == selected.HandIndex);
                             });
                         }
                         finally { actionMs += (long)Stopwatch.GetElapsedTime(actionStarted).TotalMilliseconds; executed++; }
                         actions.Add(next);
+                        _nativeLearning?.After(learned, player);
                         decisions[^1] = decisions[^1] with { Choices = choiceDecisions.ToArray() };
                         pendingAction = null;
                         var after = Observe(player);
@@ -420,7 +482,7 @@ public static class LocalWorker
             Publish("failed", ex.Message);
             return false;
         }
-        finally { LocalWorkerVisuals.Reset(); _fastNativeWaits = false; LocalWorkerResources.Retain = false; Engine.TimeScale = originalScale; Engine.MaxFps = originalFps; _timeline = null; }
+        finally { NonInteractiveMode.AutoSlayerCheck = originalNativeMode; LocalWorkerVisuals.Reset(); _fastNativeWaits = _fastStateSettling = false; LocalWorkerResources.Retain = LocalWorkerResources.FastCollection = false; Engine.TimeScale = originalScale; Engine.MaxFps = originalFps; _timeline = null; }
     }
 
     private static IEnumerable<LocalAction[]> ExpansionPrefixes(LocalCandidate candidate)
@@ -534,7 +596,8 @@ public static class LocalWorker
         }
     }
 
-    private static async Task Restore(LocalSearchRequest request)
+    private static async Task Restore(LocalSearchRequest request, bool completedReplayProbe = false, Action<Player>? atRoot = null,
+        Action<GameAction, Player>? atAction = null, int rootAfterEvents = 0)
     {
         using var restoring = Trace("restore", "战斗起点");
         _restoreDepth = 1;
@@ -578,13 +641,27 @@ public static class LocalWorker
             await StableOrTerminal(player);
             scene?.Dispose();
             using var history = Trace("history", depth: 2);
-            foreach (var item in replay.events)
+            void CheckRecordedRoot()
             {
+                // The full recorded route must begin at the exact frozen source, before any
+                // historical action. A different/anonymized root is rejected, never guessed.
+                if (IsTerminal(player) || LocalCapture.Fingerprint() != request.NativeHash)
+                    throw new InvalidOperationException("已记录路线的起点与冻结战斗不一致。");
+                atRoot!(player);
+            }
+            if (completedReplayProbe && rootAfterEvents == 0) CheckRecordedRoot();
+            for (int eventIndex = 0; eventIndex < replay.events.Count; eventIndex++)
+            {
+                var item = replay.events[eventIndex];
                 if (item.eventType is CombatReplayEventType.HookAction or CombatReplayEventType.PlayerChoice or CombatReplayEventType.ResumeAction)
+                {
+                    if (completedReplayProbe && eventIndex + 1 == rootAfterEvents) CheckRecordedRoot();
                     continue; // The native synchronization path restores completed choices without a UI.
+                }
                 if (item.eventType != CombatReplayEventType.GameAction || item.action == null)
                     throw new InvalidOperationException("本地重放暂不支持这场战斗中的额外选择。");
                 var action = item.action.ToGameAction(player);
+                if (eventIndex >= rootAfterEvents) atAction?.Invoke(action, player);
                 if (action is UsePotionAction use)
                 {
                     var potion = player.GetPotionAtSlotIndex((int)use.PotionIndex) ?? throw new InvalidOperationException("历史药水槽不一致。");
@@ -602,11 +679,12 @@ public static class LocalWorker
                 else if (action is EndPlayerTurnAction) await EndTurn(player);
                 else if (action is not ReadyToBeginEnemyTurnAction)
                     throw new InvalidOperationException("本地重放暂不支持历史操作：" + action.GetType().Name);
+                if (completedReplayProbe && eventIndex + 1 == rootAfterEvents) CheckRecordedRoot();
             }
             historical.Finish();
             history?.Dispose();
             using var fingerprint = Trace("fingerprint", depth: 2);
-            if (IsTerminal(player) || LocalCapture.Fingerprint() != request.NativeHash)
+            if (!completedReplayProbe && (IsTerminal(player) || LocalCapture.Fingerprint() != request.NativeHash))
                 throw new InvalidOperationException("后台重放与当前战斗状态不一致，未发布本地建议。可切换 AI 模式。");
         }
         finally { _restoreDepth = 0; }
@@ -619,18 +697,23 @@ public static class LocalWorker
         var hash = LocalCapture.Fingerprint();
         var result = new List<LocalAction>();
         var hand = player.PlayerCombatState!.Hand.Cards;
-        var tactics = LocalTacticalPreview.Capture(player);
+        // CanPlay walks the hook chain. Query once per card and reuse within this settled
+        // decision, instead of recomputing the full hand for every card/target preview.
+        var playable = hand.Where(c => !_excludedModels.Contains(c.Id.ToString()) && c.CanPlay()).ToArray();
+        var tactics = LocalTacticalPreview.Capture(player, playable);
         for (var i = 0; i < hand.Count; i++)
         {
             var card = hand[i];
-            if (!card.CanPlay() || _excludedModels.Contains(card.Id.ToString())) continue;
+            if (!playable.Contains(card)) continue;
             // Do not assume that attacks precede setup, or that zero damage means no value.
             if (card.IsValidTarget(null)) result.Add(new(i, card.Id.ToString(), null, card.Title, "", hash, state.RoundNumber,
-                Preference: tactics.Priority(card, null), CombatCardIndex: NetCombatCard.FromModel(card).CombatCardIndex));
+                Preference: _nativeLearning?.Priority(card, tactics.Priority(card, null)) ?? tactics.Priority(card, null),
+                CombatCardIndex: NetCombatCard.FromModel(card).CombatCardIndex));
             else foreach (var target in state.Creatures.Where(c => c.IsAlive && card.IsValidTarget(c)))
                 result.Add(new(i, card.Id.ToString(), target.CombatId, card.Title,
                     target.CombatId is { } id && _targetLabels?.TryGetValue(id, out var label) == true ? label : target.Name,
-                    hash, state.RoundNumber, Preference: tactics.Priority(card, target), CombatCardIndex: NetCombatCard.FromModel(card).CombatCardIndex));
+                    hash, state.RoundNumber, Preference: _nativeLearning?.Priority(card, tactics.Priority(card, target)) ?? tactics.Priority(card, target),
+                    CombatCardIndex: NetCombatCard.FromModel(card).CombatCardIndex));
         }
         if (_includePotions)
         {
@@ -712,6 +795,22 @@ public static class LocalWorker
         await pending;
     }
 
+    private static async Task WaitExecutor()
+    {
+        using var waiting = Trace("executor", depth: _restoreDepth > 0 ? 3 : 2);
+        // An empty queue can be reported before CheckWinCondition and executor cleanup.
+        // Await the real completion instead of using a whole frame as a proxy for it.
+        var pending = RunManager.Instance.ActionExecutor.FinishedExecutingActions();
+        var timer = Stopwatch.StartNew();
+        while (!pending.IsCompleted)
+        {
+            _choices?.Tick();
+            if (timer.Elapsed.TotalSeconds > 8) throw new LocalChoiceException("等待动作执行完成超时（" + LocalChoices.PendingDescription() + "）。");
+            await Task.WhenAny(pending, Frame());
+        }
+        await pending;
+    }
+
     private static bool IsTerminal(Player player) => !CombatManager.Instance.IsStarting &&
         (player.Creature.IsDead || CombatManager.Instance.IsOverOrEnding);
 
@@ -735,19 +834,20 @@ public static class LocalWorker
         var timer = Stopwatch.StartNew();
         while (true)
         {
+            if (_fastStateSettling) await WaitExecutor();
             if (IsTerminal(player))
             {
                 // CombatEnded fires after native victory/death hooks, not when the final enemy merely reaches 0 HP.
                 if (_combatSettled)
                 {
                     await WaitActionQueue();
-                    await Frame();
+                    if (!_fastStateSettling) await Frame();
                     return;
                 }
             }
             else if (player.PlayerCombatState?.Phase == PlayerTurnPhase.Play && !CombatManager.Instance.PlayerActionsDisabled &&
                 player.PlayerCombatState.PlayPile.IsEmpty && RunManager.Instance.ActionQueueSet.BecameEmpty().IsCompletedSuccessfully)
-            { await Frame(); return; }
+            { if (!_fastStateSettling) await Frame(); return; }
             _choices?.Tick();
             if (timer.Elapsed.TotalSeconds > 8) throw new LocalChoiceException("等待战斗稳定超时（" + LocalChoices.PendingDescription() + "）。");
             await Frame();

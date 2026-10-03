@@ -3,6 +3,7 @@ using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.MonsterMoves.Intents;
 using SpireAiCoach.Core;
 
@@ -12,10 +13,15 @@ internal sealed class LocalTacticalPreview(Player player)
 {
     private readonly Dictionary<Creature, double> _threats = new();
     private double _incoming;
+    private bool _retainsBlock;
+    private CardModel[] _playable = [];
 
-    public static LocalTacticalPreview Capture(Player player)
+    public static LocalTacticalPreview Capture(Player player, CardModel[] playable)
     {
         var result = new LocalTacticalPreview(player);
+        result._playable = playable;
+        try { result._retainsBlock = !Hook.ShouldClearBlock(player.Creature.CombatState!, player.Creature, out _); }
+        catch { /* Unknown retention keeps the neutral prior; native execution remains authoritative. */ }
         foreach (var enemy in CombatManager.Instance.DebugOnlyGetState()!.Enemies)
         {
             try
@@ -40,11 +46,10 @@ internal sealed class LocalTacticalPreview(Player player)
             card.UpdateDynamicVarPreview(CardPreviewMode.Normal, target, vars);
             double Value(string key) => vars.TryGetValue(key, out var v) ? Math.Max(0, (double)v.PreviewValue) : 0;
             bool enemy = target != null && _threats.ContainsKey(target);
-            var hand = player.PlayerCombatState!.Hand.Cards;
-            var others = hand.Where(c => c != card && c.CanPlay()).ToArray();
+            var others = _playable.Where(c => c != card).ToArray();
             double baseDamage(CardModel c) => c.DynamicVars.TryGetValue("Damage", out var d) ? Math.Max(0, (double)d.BaseValue) : 0;
             int attacks = others.Count(c => baseDamage(c) > 0);
-            var energyAfter = Math.Max(0, player.PlayerCombatState.Energy - card.EnergyCost.GetAmountToSpend());
+            var energyAfter = Math.Max(0, player.PlayerCombatState!.Energy - card.EnergyCost.GetAmountToSpend());
             int affordable = Math.Min(attacks, energyAfter + others.Count(c => baseDamage(c) > 0 && c.EnergyCost.GetAmountToSpend() == 0));
             var followup = others.Select(baseDamage).OrderDescending().Take(affordable).Sum();
             var repeat = Math.Max(1, Value("Repeat"));
@@ -59,7 +64,7 @@ internal sealed class LocalTacticalPreview(Player player)
                 Vulnerable: enemy ? Value("VulnerablePower") : 0, Weak: enemy ? Value("WeakPower") : 0,
                 // "Cards" can mean discard/exhaust/selection count, so it is not a generic draw hint.
                 EnergyGain: Value("Energy"), HpCost: Value("HpLoss"),
-                FollowupAttacks: affordable, FollowupDamage: followup, Known: known));
+                FollowupAttacks: affordable, FollowupDamage: followup, Known: known, RetainsBlock: _retainsBlock));
         }
         catch { return 0; }
     }

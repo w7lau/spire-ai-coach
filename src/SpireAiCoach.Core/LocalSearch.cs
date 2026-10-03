@@ -11,7 +11,9 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     int Workers = 0, bool IncludePotions = false, LocalHistoryStamp? History = null, string[]? ExcludedModels = null,
     LocalAction[]? InitialPlan = null, int SimulationSpeed = 8, bool DeferVerification = false,
     LocalCandidate? VerifyCandidate = null, long TimelineOrigin = 0, LocalTrace? InitialTrace = null,
-    bool FastCardPresentation = true, bool FastNativeWaits = true, bool ShareSearchWork = true);
+    bool FastCardPresentation = true, bool FastNativeWaits = true, bool ShareSearchWork = true,
+    bool FastStateSettling = true, bool FastAssetCollection = false, bool StrategicRollouts = true,
+    bool ExperimentalNativeData = false, byte[]? RecordedReplayProbe = null);
 
 public sealed record LocalAction(int HandIndex, string ModelId, uint? TargetId,
     string CardName, string TargetName, string BeforeHash, int Round = 0,
@@ -20,7 +22,7 @@ public sealed record LocalAction(int HandIndex, string ModelId, uint? TargetId,
 
 // Index is relative to this exact ordered native offer, never to a display-name lookup.
 public sealed record LocalCardChoice(string OfferHash, int Index, string ModelId, string Name,
-    int[]? Indices = null, string Kind = "offer");
+    int[]? Indices = null, string Kind = "offer", int Preference = 0);
 
 public sealed record LocalCandidate(LocalAction[] Actions, int Hp, int HpLost, int EnemyHp,
     int Gold, int MaxHp, bool Won, bool Dead, bool RewardCoverageKnown,
@@ -153,9 +155,17 @@ public static class LocalWire
     public static void Write<T>(string path, T value)
     {
         using var lease = new FileLease(path);
-        var temporary = path + ".tmp";
-        File.WriteAllText(temporary, JsonSerializer.Serialize(value));
-        File.Move(temporary, path, true);
+        // Never reuse a just-retired staging path. On Windows it can still be held by
+        // an external reader/scanner after replacement. ReplaceFile preserves an
+        // already-published document atomically instead of deleting its directory entry.
+        var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        try
+        {
+            File.WriteAllText(temporary, JsonSerializer.Serialize(value));
+            if (File.Exists(path)) File.Replace(temporary, path, null);
+            else File.Move(temporary, path);
+        }
+        finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }
 
     // Windows replacement can race with an open reader even with FileShare.Delete.

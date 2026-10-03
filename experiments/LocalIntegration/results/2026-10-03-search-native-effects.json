@@ -1,0 +1,654 @@
+{
+  "version": "0.7.6",
+  "dll_sha256": "b945d5b1af6398cbd7d16a5e03bf3f34746b7d838afac26b4090015e725bab27",
+  "product_budget_unchanged": {
+    "seconds_per_worker": 60,
+    "max_routes_per_worker": 32,
+    "max_player_rounds": 64
+  },
+  "focused_core": {
+    "optimization": [
+      11,
+      11
+    ],
+    "search": [
+      14,
+      14
+    ],
+    "timeline": [
+      5,
+      5
+    ],
+    "local": [
+      10,
+      10
+    ],
+    "ipc_concurrent_and_external_reader": [
+      2,
+      2
+    ],
+    "full_suite_rerun": false
+  },
+  "manual_reference": {
+    "Status": "recorded",
+    "ElapsedMs": 8189,
+    "Won": true,
+    "StartingHp": 87,
+    "Hp": 87,
+    "HpLost": 11,
+    "NetHpLoss": 0,
+    "rounds": 6,
+    "steps": 49,
+    "native_root_and_prefix_matched": true,
+    "used_as_search_seed": false,
+    "diagnostic_only": true
+  },
+  "before_atomic_ipc_fix_quality": [
+    {
+      "strategic_rollouts": false,
+      "Workers": 4,
+      "BudgetSeconds": 60,
+      "MaxNodes": 32,
+      "Status": "done",
+      "Evaluated": 38,
+      "Victories": 14,
+      "Rejected": 0,
+      "ElapsedMs": 66897,
+      "Timing": {
+        "RestoreMs": 22180,
+        "ActionMs": 199326,
+        "DecisionMs": 13138,
+        "VerificationMs": 4958,
+        "StartupMs": 0,
+        "Actions": 2575,
+        "Restores": 38,
+        "Verifications": 1
+      },
+      "WorkerMemoryBytes": 7552086016,
+      "Won": true,
+      "StartingHp": 87,
+      "Hp": 52,
+      "NetHpLoss": 35,
+      "HpLost": 71,
+      "Rounds": 25,
+      "used_potion": false,
+      "verified_steps": 70
+    },
+    {
+      "strategic_rollouts": true,
+      "Workers": 4,
+      "BudgetSeconds": 60,
+      "MaxNodes": 32,
+      "Status": "done",
+      "Evaluated": 40,
+      "Victories": 16,
+      "Rejected": 0,
+      "ElapsedMs": 65613,
+      "Timing": {
+        "RestoreMs": 23970,
+        "ActionMs": 197080,
+        "DecisionMs": 13385,
+        "VerificationMs": 3652,
+        "StartupMs": 0,
+        "Actions": 2574,
+        "Restores": 40,
+        "Verifications": 1
+      },
+      "WorkerMemoryBytes": 7839076352,
+      "Won": true,
+      "StartingHp": 87,
+      "Hp": 87,
+      "NetHpLoss": 0,
+      "HpLost": 17,
+      "Rounds": 12,
+      "used_potion": false,
+      "verified_steps": 66
+    }
+  ],
+  "release_quality": [
+    {
+      "strategic_rollouts": false,
+      "Workers": 4,
+      "BudgetSeconds": 60,
+      "MaxNodes": 32,
+      "Status": "done",
+      "Evaluated": 38,
+      "Victories": 15,
+      "Rejected": 0,
+      "ElapsedMs": 65906,
+      "Timing": {
+        "RestoreMs": 23053,
+        "ActionMs": 191750,
+        "DecisionMs": 11724,
+        "VerificationMs": 3402,
+        "StartupMs": 0,
+        "Actions": 2493,
+        "Restores": 38,
+        "Verifications": 1
+      },
+      "WorkerMemoryBytes": 7432515584,
+      "Won": true,
+      "StartingHp": 87,
+      "Hp": 87,
+      "NetHpLoss": 0,
+      "HpLost": 22,
+      "Rounds": 11,
+      "used_potion": false,
+      "verified_steps": 58
+    },
+    {
+      "strategic_rollouts": true,
+      "Workers": 4,
+      "BudgetSeconds": 60,
+      "MaxNodes": 32,
+      "Status": "done",
+      "Evaluated": 38,
+      "Victories": 15,
+      "Rejected": 0,
+      "ElapsedMs": 64267,
+      "Timing": {
+        "RestoreMs": 22575,
+        "ActionMs": 192719,
+        "DecisionMs": 12738,
+        "VerificationMs": 2672,
+        "StartupMs": 0,
+        "Actions": 2645,
+        "Restores": 38,
+        "Verifications": 1
+      },
+      "WorkerMemoryBytes": 7901200384,
+      "Won": true,
+      "StartingHp": 87,
+      "Hp": 87,
+      "NetHpLoss": 0,
+      "HpLost": 14,
+      "Rounds": 9,
+      "used_potion": false,
+      "verified_steps": 60
+    }
+  ],
+  "release_native_mechanics": [
+    {
+      "kind": "exhaust",
+      "Status": "done",
+      "Evaluated": 1,
+      "Rejected": 0,
+      "ElapsedMs": 26421,
+      "Timing": {
+        "RestoreMs": 3544,
+        "ActionMs": 609,
+        "DecisionMs": 24,
+        "VerificationMs": 508,
+        "StartupMs": 21064,
+        "Actions": 4,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "Workers": 1,
+      "EnemyHp": 174,
+      "StartingHp": 80,
+      "Hp": 80,
+      "NetHpLoss": 0,
+      "HpLost": 0,
+      "Rounds": 1,
+      "Won": false,
+      "verified": true
+    },
+    {
+      "kind": "upgrade",
+      "Status": "done",
+      "Evaluated": 1,
+      "Rejected": 0,
+      "ElapsedMs": 1532,
+      "Timing": {
+        "RestoreMs": 339,
+        "ActionMs": 129,
+        "DecisionMs": 0,
+        "VerificationMs": 474,
+        "StartupMs": 0,
+        "Actions": 4,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "Workers": 1,
+      "EnemyHp": 174,
+      "StartingHp": 80,
+      "Hp": 80,
+      "NetHpLoss": 0,
+      "HpLost": 0,
+      "Rounds": 1,
+      "Won": false,
+      "verified": true
+    },
+    {
+      "kind": "multi",
+      "Status": "done",
+      "Evaluated": 1,
+      "Rejected": 0,
+      "ElapsedMs": 1532,
+      "Timing": {
+        "RestoreMs": 367,
+        "ActionMs": 139,
+        "DecisionMs": 0,
+        "VerificationMs": 422,
+        "StartupMs": 0,
+        "Actions": 4,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "Workers": 1,
+      "EnemyHp": 174,
+      "StartingHp": 80,
+      "Hp": 75,
+      "NetHpLoss": 5,
+      "HpLost": 5,
+      "Rounds": 1,
+      "Won": false,
+      "verified": true
+    },
+    {
+      "kind": "retrieve",
+      "Status": "done",
+      "Evaluated": 1,
+      "Rejected": 0,
+      "ElapsedMs": 1534,
+      "Timing": {
+        "RestoreMs": 336,
+        "ActionMs": 207,
+        "DecisionMs": 8,
+        "VerificationMs": 427,
+        "StartupMs": 0,
+        "Actions": 4,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "Workers": 1,
+      "EnemyHp": 165,
+      "StartingHp": 80,
+      "Hp": 75,
+      "NetHpLoss": 5,
+      "HpLost": 5,
+      "Rounds": 1,
+      "Won": false,
+      "verified": true
+    },
+    {
+      "kind": "carry",
+      "Status": "done",
+      "Evaluated": 8,
+      "Rejected": 0,
+      "ElapsedMs": 10099,
+      "Timing": {
+        "RestoreMs": 3512,
+        "ActionMs": 4398,
+        "DecisionMs": 1,
+        "VerificationMs": 824,
+        "StartupMs": 0,
+        "Actions": 297,
+        "Restores": 8,
+        "Verifications": 1
+      },
+      "Workers": 1,
+      "EnemyHp": 0,
+      "StartingHp": 65,
+      "Hp": 71,
+      "NetHpLoss": 0,
+      "HpLost": 0,
+      "Rounds": 6,
+      "Won": true,
+      "verified": true
+    },
+    {
+      "kind": "compact",
+      "Status": "done",
+      "Evaluated": 1,
+      "Rejected": 0,
+      "ElapsedMs": 1537,
+      "Timing": {
+        "RestoreMs": 422,
+        "ActionMs": 149,
+        "DecisionMs": 0,
+        "VerificationMs": 449,
+        "StartupMs": 0,
+        "Actions": 6,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "Workers": 1,
+      "EnemyHp": 168,
+      "StartingHp": 80,
+      "Hp": 71,
+      "NetHpLoss": 9,
+      "HpLost": 9,
+      "Rounds": 1,
+      "Won": false,
+      "verified": true
+    },
+    {
+      "kind": "turnend",
+      "Status": "done",
+      "Evaluated": 1,
+      "Rejected": 0,
+      "ElapsedMs": 1531,
+      "Timing": {
+        "RestoreMs": 321,
+        "ActionMs": 92,
+        "DecisionMs": 0,
+        "VerificationMs": 399,
+        "StartupMs": 0,
+        "Actions": 1,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "Workers": 1,
+      "EnemyHp": 174,
+      "StartingHp": 80,
+      "Hp": 58,
+      "NetHpLoss": 22,
+      "HpLost": 22,
+      "Rounds": 1,
+      "Won": false,
+      "verified": true
+    }
+  ],
+  "fixed_native_line": {
+    "warmups": 4,
+    "measured_samples": [
+      {
+        "event_driven_settling": false,
+        "avoid_forced_asset_gc": false,
+        "SimulationSpeed": 8,
+        "ElapsedMs": 6055,
+        "Timing": {
+          "RestoreMs": 456,
+          "ActionMs": 1990,
+          "DecisionMs": 76,
+          "VerificationMs": 2624,
+          "StartupMs": 0,
+          "Actions": 33,
+          "Restores": 1,
+          "Verifications": 1
+        },
+        "WorkerMemoryBytes": 1792188416,
+        "HpLost": 14,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "Rounds": 9,
+        "steps": 33,
+        "native_states_and_history_match": true
+      },
+      {
+        "event_driven_settling": true,
+        "avoid_forced_asset_gc": false,
+        "SimulationSpeed": 8,
+        "ElapsedMs": 4800,
+        "Timing": {
+          "RestoreMs": 399,
+          "ActionMs": 1556,
+          "DecisionMs": 68,
+          "VerificationMs": 2097,
+          "StartupMs": 0,
+          "Actions": 33,
+          "Restores": 1,
+          "Verifications": 1
+        },
+        "WorkerMemoryBytes": 1770442752,
+        "HpLost": 14,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "Rounds": 9,
+        "steps": 33,
+        "native_states_and_history_match": true
+      },
+      {
+        "event_driven_settling": false,
+        "avoid_forced_asset_gc": true,
+        "SimulationSpeed": 8,
+        "ElapsedMs": 5551,
+        "Timing": {
+          "RestoreMs": 377,
+          "ActionMs": 1997,
+          "DecisionMs": 104,
+          "VerificationMs": 2440,
+          "StartupMs": 0,
+          "Actions": 33,
+          "Restores": 1,
+          "Verifications": 1
+        },
+        "WorkerMemoryBytes": 1844445184,
+        "HpLost": 14,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "Rounds": 9,
+        "steps": 33,
+        "native_states_and_history_match": true
+      },
+      {
+        "event_driven_settling": true,
+        "avoid_forced_asset_gc": true,
+        "SimulationSpeed": 8,
+        "ElapsedMs": 4801,
+        "Timing": {
+          "RestoreMs": 356,
+          "ActionMs": 1607,
+          "DecisionMs": 70,
+          "VerificationMs": 2016,
+          "StartupMs": 0,
+          "Actions": 33,
+          "Restores": 1,
+          "Verifications": 1
+        },
+        "WorkerMemoryBytes": 1857810432,
+        "HpLost": 14,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "Rounds": 9,
+        "steps": 33,
+        "native_states_and_history_match": true
+      },
+      {
+        "event_driven_settling": true,
+        "avoid_forced_asset_gc": true,
+        "SimulationSpeed": 8,
+        "ElapsedMs": 5048,
+        "Timing": {
+          "RestoreMs": 375,
+          "ActionMs": 1578,
+          "DecisionMs": 62,
+          "VerificationMs": 2146,
+          "StartupMs": 0,
+          "Actions": 33,
+          "Restores": 1,
+          "Verifications": 1
+        },
+        "WorkerMemoryBytes": 1915056128,
+        "HpLost": 14,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "Rounds": 9,
+        "steps": 33,
+        "native_states_and_history_match": true
+      },
+      {
+        "event_driven_settling": false,
+        "avoid_forced_asset_gc": true,
+        "SimulationSpeed": 8,
+        "ElapsedMs": 5556,
+        "Timing": {
+          "RestoreMs": 345,
+          "ActionMs": 2065,
+          "DecisionMs": 71,
+          "VerificationMs": 2549,
+          "StartupMs": 0,
+          "Actions": 33,
+          "Restores": 1,
+          "Verifications": 1
+        },
+        "WorkerMemoryBytes": 1898086400,
+        "HpLost": 14,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "Rounds": 9,
+        "steps": 33,
+        "native_states_and_history_match": true
+      },
+      {
+        "event_driven_settling": true,
+        "avoid_forced_asset_gc": false,
+        "SimulationSpeed": 8,
+        "ElapsedMs": 5046,
+        "Timing": {
+          "RestoreMs": 426,
+          "ActionMs": 1554,
+          "DecisionMs": 68,
+          "VerificationMs": 2231,
+          "StartupMs": 0,
+          "Actions": 33,
+          "Restores": 1,
+          "Verifications": 1
+        },
+        "WorkerMemoryBytes": 1886605312,
+        "HpLost": 14,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "Rounds": 9,
+        "steps": 33,
+        "native_states_and_history_match": true
+      },
+      {
+        "event_driven_settling": false,
+        "avoid_forced_asset_gc": false,
+        "SimulationSpeed": 8,
+        "ElapsedMs": 5800,
+        "Timing": {
+          "RestoreMs": 476,
+          "ActionMs": 2075,
+          "DecisionMs": 79,
+          "VerificationMs": 2567,
+          "StartupMs": 0,
+          "Actions": 33,
+          "Restores": 1,
+          "Verifications": 1
+        },
+        "WorkerMemoryBytes": 1934712832,
+        "HpLost": 14,
+        "Hp": 87,
+        "NetHpLoss": 0,
+        "Rounds": 9,
+        "steps": 33,
+        "native_states_and_history_match": true
+      }
+    ],
+    "steps": 33,
+    "rounds": 9,
+    "all_native_states_and_history_and_settlement_match": true,
+    "all_independently_verified": true,
+    "normal_gc_baseline_mean_ms": 5927.5,
+    "event_settling_mean_ms": 4923.0,
+    "event_settling_reduction_percent": 16.95,
+    "single_route_limit_is_benchmark_only": true
+  },
+  "noninteractive_probe_before_atomic_ipc_fix": [
+    {
+      "native_noninteractive": false,
+      "Status": "done",
+      "Message": "本地整场计算完成。按战后净生命损失选路，同等净损失优先保留药水；预算内候选，未证明全局最优。",
+      "ElapsedMs": 4532,
+      "Timing": {
+        "RestoreMs": 398,
+        "ActionMs": 1373,
+        "DecisionMs": 56,
+        "VerificationMs": 1847,
+        "StartupMs": 0,
+        "Actions": 33,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "matches": true,
+      "enabled_in_product": false
+    },
+    {
+      "native_noninteractive": true,
+      "Status": "done",
+      "Message": "本地整场计算完成。按战后净生命损失选路，同等净损失优先保留药水；预算内候选，未证明全局最优。",
+      "ElapsedMs": 4285,
+      "Timing": {
+        "RestoreMs": 354,
+        "ActionMs": 1537,
+        "DecisionMs": 71,
+        "VerificationMs": 1906,
+        "StartupMs": 0,
+        "Actions": 33,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "matches": true,
+      "enabled_in_product": false
+    },
+    {
+      "native_noninteractive": true,
+      "Status": "done",
+      "Message": "本地整场计算完成。按战后净生命损失选路，同等净损失优先保留药水；预算内候选，未证明全局最优。",
+      "ElapsedMs": 4034,
+      "Timing": {
+        "RestoreMs": 348,
+        "ActionMs": 1318,
+        "DecisionMs": 60,
+        "VerificationMs": 1750,
+        "StartupMs": 0,
+        "Actions": 33,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "matches": true,
+      "enabled_in_product": false
+    },
+    {
+      "native_noninteractive": false,
+      "Status": "done",
+      "Message": "本地整场计算完成。按战后净生命损失选路，同等净损失优先保留药水；预算内候选，未证明全局最优。",
+      "ElapsedMs": 4282,
+      "Timing": {
+        "RestoreMs": 397,
+        "ActionMs": 1390,
+        "DecisionMs": 55,
+        "VerificationMs": 1866,
+        "StartupMs": 0,
+        "Actions": 33,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "matches": true,
+      "enabled_in_product": false
+    }
+  ],
+  "not_adopted": [
+    "disabling_explicit_full_asset_gc",
+    "minimal_main_menu_bootstrap",
+    "native_noninteractive_default"
+  ],
+  "pre_release_failures_retained_privately": [
+    "disposed_shuffle_source_retained_by_sibling_trail",
+    "stale_reward_screen_deferred_refresh_after_cleanup",
+    "power_fly_curve_overshoot_stopped_one_lane",
+    "atomic_request_file_publication_access_denied"
+  ],
+  "limits": [
+    "not_full_pure_data_simulation",
+    "not_all_mod_private_fields_restored",
+    "net_hp_loss_zero_is_not_proof_of_no_incoming_damage",
+    "not_globally_optimal_or_as_fast_as_the_manual_reference",
+    "dynamic_parallel_search_and_single_pair_are_not_a_general_performance_ratio",
+    "no_real_game_actions_or_save_recovery_performed",
+    "real_window_interaction_not_manually_verified"
+  ],
+  "installation": {
+    "version": "0.7.6",
+    "installed_dll_sha256": "b945d5b1af6398cbd7d16a5e03bf3f34746b7d838afac26b4090015e725bab27",
+    "package_sha256": "327f087cc742abaf4464277d53593548853047ebdd33ae97efabbf0d12c4d944",
+    "tested_packaged_and_installed_dll_match": true,
+    "previous_dll_and_manifest_backups_match": true,
+    "config_unchanged": true,
+    "real_game_was_exited": true
+  }
+}

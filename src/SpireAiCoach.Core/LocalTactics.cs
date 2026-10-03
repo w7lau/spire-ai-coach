@@ -6,7 +6,7 @@ public sealed record LocalTacticalFeatures(double Damage = 0, double EnemyHp = 0
     double Hp = 80, double Strength = 0, double Vulnerable = 0, double Weak = 0,
     double EnergyGain = 0, double Draw = 0, double HpCost = 0,
     int FollowupAttacks = 0, double FollowupDamage = 0, int Upgrades = 0,
-    bool EndTurn = false, bool Known = false);
+    bool EndTurn = false, bool Known = false, bool RetainsBlock = false);
 
 public static class LocalTactics
 {
@@ -25,7 +25,8 @@ public static class LocalTactics
         var saved = Math.Min(gap, f.Block);
         score += saved * 4;
         if (saved > 0 && gap >= f.Hp && gap - saved < f.Hp) score += 60;
-        if (f.Block > 0 && gap == 0) score -= 12;
+        if (f.RetainsBlock) score += Math.Max(0, f.Block - saved) * 2;
+        else if (f.Block > 0 && gap == 0) score -= 12;
         if (f.Strength > 0 && f.FollowupAttacks > 0)
             score += 15 + Math.Min(40, f.Strength * f.FollowupAttacks * 4);
         if (f.Vulnerable > 0 && f.FollowupDamage > 0)

@@ -32,11 +32,24 @@ parser.add_argument('--checkpoint', action='store_true')
 parser.add_argument('--workers', type=int)
 parser.add_argument('--shared-work', choices=['on', 'off'])
 parser.add_argument('--work-benchmark', action='store_true')
+parser.add_argument('--settle-benchmark', action='store_true')
+parser.add_argument('--quality-benchmark', action='store_true')
+parser.add_argument('--native-data-probe', action='store_true')
+parser.add_argument('--bootstrap-benchmark', action='store_true')
+parser.add_argument('--recorded-replay', type=Path)
 args = parser.parse_args()
 if args.workers is not None and not 1 <= args.workers <= 16:
     parser.error('--workers must be between 1 and 16')
 if args.work_benchmark and (not args.replay or not args.seed_result):
     parser.error('--work-benchmark requires --replay and --seed-result')
+if args.settle_benchmark and (not args.replay or not args.seed_result):
+    parser.error('--settle-benchmark requires --replay and --seed-result')
+if args.quality_benchmark and (not args.replay or not args.seed_result):
+    parser.error('--quality-benchmark requires --replay and --seed-result')
+if args.native_data_probe and (not args.replay or not args.seed_result):
+    parser.error('--native-data-probe requires --replay and --seed-result')
+if args.bootstrap_benchmark and (not args.replay or not args.seed_result):
+    parser.error('--bootstrap-benchmark requires --replay and --seed-result')
 if args.visual_benchmark and (not args.replay or not args.seed_result or args.speed_benchmark):
     parser.error('--visual-benchmark requires --replay and --seed-result, without --speed-benchmark')
 root = args.workspace.resolve()
@@ -83,6 +96,11 @@ with worker_lock(root):
     env['SPIRE_LOCAL_WORKERS'] = str(args.workers) if args.workers is not None else ''
     env['SPIRE_LOCAL_SHARED_WORK'] = args.shared_work or ''
     env['SPIRE_LOCAL_WORK_BENCHMARK'] = '1' if args.work_benchmark else '0'
+    env['SPIRE_LOCAL_SETTLE_BENCHMARK'] = '1' if args.settle_benchmark else '0'
+    env['SPIRE_LOCAL_QUALITY_BENCHMARK'] = '1' if args.quality_benchmark else '0'
+    env['SPIRE_LOCAL_NATIVE_DATA_PROBE'] = '1' if args.native_data_probe else '0'
+    env['SPIRE_LOCAL_BOOTSTRAP_BENCHMARK'] = '1' if args.bootstrap_benchmark else '0'
+    env['SPIRE_LOCAL_RECORDED_REPLAY'] = str(args.recorded_replay.resolve()) if args.recorded_replay else ''
     settings = root / 'Roaming/SlayTheSpire2/default/1/settings.save'
     settings_data = json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}
     settings_data.update(volume_master=0, volume_bgm=0, volume_sfx=0, volume_ambience=0)

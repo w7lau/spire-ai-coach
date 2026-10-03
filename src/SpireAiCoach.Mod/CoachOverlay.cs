@@ -261,11 +261,13 @@ public sealed class CoachOverlay
             _execute.Disabled = _analyze.Disabled || _continuation == null || _continuation.Invalid || !LocalCapture.Stable();
             _continueOptimize.Disabled = _execute.Disabled;
             _stopExecution.Disabled = !_executing;
-            if (snapshot?.CanAdvise == true && _preparedCombat != snapshot.CombatId && _request == null && !_executing &&
+            var preparationScope = snapshot?.CombatId ??
+                (MegaCrit.Sts2.Core.Runs.RunManager.Instance.IsInProgress ? "active-run" : null);
+            if (preparationScope != null && _preparedCombat != preparationScope && _request == null && !_executing &&
                 MegaCrit.Sts2.Core.Runs.RunManager.Instance.NetService.Type == MegaCrit.Sts2.Core.Multiplayer.Game.NetGameType.Singleplayer &&
                 System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_INTEGRATION") == null)
             {
-                _preparedCombat = snapshot.CombatId;
+                _preparedCombat = preparationScope;
                 var installation = LocalCapture.Installation();
                 var workers = (int)_localWorkers.Value;
                 _ = Task.Run(async () =>
@@ -497,7 +499,7 @@ public sealed class CoachOverlay
                         try
                         {
                             Directory.CreateDirectory(Path.GetDirectoryName(timingPath)!);
-                            LocalWire.Write(timingPath, new { version = "0.7.5", result.ElapsedMs, result.Workers,
+                            LocalWire.Write(timingPath, new { version = "0.7.6", result.ElapsedMs, result.Workers,
                                 result.Evaluated, result.Victories, result.Trace });
                         }
                         catch (Exception ex) { GD.Print("[SpireAiCoach] Timing save failed: " + ex.GetType().Name); }

@@ -18,7 +18,7 @@ using SpireAiCoach.Core;
 
 namespace SpireAiCoach.Mod;
 
-public sealed record LocalInstallation(string GameDirectory, string[] ModDirectories);
+public sealed record LocalInstallation(string GameDirectory, string[] ModDirectories, bool MinimalWorkerBootstrap = false);
 
 public static class LocalCapture
 {

@@ -30,7 +30,7 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192)
 
     public Trial Begin() => new(_root);
 
-    public LocalAction Select(Trial trial, IReadOnlyList<LocalAction> legal, LocalAction? preferred = null)
+    public LocalAction Select(Trial trial, IReadOnlyList<LocalAction> legal, LocalAction? preferred = null, bool greedy = false)
     {
         if (trial.Finished) throw new InvalidOperationException("Trial has already finished");
         if (legal.Count == 0) throw new InvalidOperationException("No legal action");
@@ -46,7 +46,7 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192)
             if (remaining.Length == 0 && preferred == null) throw new InvalidOperationException("This exact subtree has already been exhausted");
             var unseen = remaining.Where(a => !parent.Children.TryGetValue(Key(a), out var n) || n.Visits == 0).ToArray();
             if (preferred != null) action = preferred;
-            else if (unseen.Length > 0) action = Explore(unseen);
+            else if (unseen.Length > 0) action = greedy ? unseen.OrderByDescending(a => a.Preference).ThenBy(a => a.EndTurn).First() : Explore(unseen);
             else
             {
                 // A good continuation must not be hidden by its earlier unsuccessful samples.

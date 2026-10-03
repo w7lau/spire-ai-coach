@@ -66,9 +66,28 @@ public sealed class LocalChoices
         var minimum = clampCount ? Math.Min(cards.Length, prefs.MinSelect) : prefs.MinSelect;
         var maximum = clampCount ? Math.Min(cards.Length, prefs.MaxSelect) : prefs.MaxSelect;
         var hash = OfferHash(kind, cards, minimum, maximum);
+        // The native selector explicitly describes discard/exhaust, independent of the
+        // source card's name or Mod. These are exploration hints, never eliminated choices.
+        var prompt = prefs.Prompt;
+        bool discards = prompt.LocTable == CardSelectorPrefs.DiscardSelectionPrompt.LocTable &&
+            prompt.LocEntryKey == CardSelectorPrefs.DiscardSelectionPrompt.LocEntryKey;
+        bool exhausts = prompt.LocTable == CardSelectorPrefs.ExhaustSelectionPrompt.LocTable &&
+            prompt.LocEntryKey == CardSelectorPrefs.ExhaustSelectionPrompt.LocEntryKey;
+        int Priority(CardModel card)
+        {
+            int score = 0;
+            if ((discards || exhausts) && card.Type is CardType.Status or CardType.Curse) score += 40;
+            try
+            {
+                if (prefs.ShouldGlowGold?.Invoke(card) == true) score += 20;
+            }
+            catch { /* Unknown native preview retains all alternatives. */ }
+            return score;
+        }
         var options = LocalSelectionBranches.Generate(cards.Length, minimum, maximum).Select((indexes, i) =>
             new LocalCardChoice(hash, i, string.Join(";", indexes.Select(n => cards[n].Id)),
-                string.Join("、", indexes.Select(n => $"{n + 1}. {cards[n].Title}")), indexes, kind)).ToArray();
+                string.Join("、", indexes.Select(n => $"{n + 1}. {cards[n].Title}")), indexes, kind,
+                Preference: indexes.Sum(n => Priority(cards[n])))).ToArray();
         return Select(options, identity);
     }
 

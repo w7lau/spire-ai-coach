@@ -85,6 +85,7 @@ public sealed class LocalTimeline
         "schedule" => "分配搜索分支",
         "card" => "出牌并结算", "potion" => "药水并结算", "end_turn" => "敌方行动与下回合",
         "action_queue" => "等待原生动作结算", "settle" => "等待状态与胜利结算",
+        "executor" => "等待原生执行完成", "asset_gc" => "资源准备后的内存回收",
         "observe" => "读取过程预览", "publish" => "写入进度与候选", "ipc" => "传递计算请求",
         "receive" => "接收候选与检查运行日志", "dispatch" => "等待计算进程接收请求",
         "result_transfer" => "结果传递与轮询等待", "display_wait" => "等待界面显示",

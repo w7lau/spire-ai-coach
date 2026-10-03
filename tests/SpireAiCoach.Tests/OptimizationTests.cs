@@ -101,6 +101,21 @@ static class OptimizationTests
             }
             Check(seen.Count == 2, "Prior accidentally pruned a legal action");
         });
+        test("optimization tactical rollout keeps carried block valuable and still explores unknown branches", () =>
+        {
+            var block = new LocalTacticalFeatures(Block: 16, Incoming: 0, Known: true);
+            Check(LocalTactics.Priority(block with { RetainsBlock = true }) > LocalTactics.Priority(new(EndTurn: true, Known: true)),
+                "Carried block must remain useful when this turn has no incoming attack");
+            Check(LocalTactics.Priority(block) < 0, "Ordinary excess block is not assumed to carry");
+            var a = new LocalAction(0, "native-defense", null, "", "", "root", Preference: 32);
+            var b = a with { HandIndex = 1, ModelId = "unknown-mod-mechanism", Preference = 0 };
+            var tree = new LocalSearchTree(2);
+            var first = tree.Begin();
+            Check(tree.Select(first, [a,b], greedy: true) == a, "First coherent rollout must use the current tactical prior");
+            tree.Complete(first, new([a], 80, 0, 0, 0, 80, true, false, false), 10, true);
+            var second = tree.Begin();
+            Check(tree.Select(second, [a,b], greedy: true) == b, "Coherent rollouts must not delete unknown mechanics");
+        });
         LocalSearchResult Result()
         {
             var actions = Enumerable.Range(0, 3).Select(i => new LocalAction(i, "card", 1, "card", "", "state" + i, 1)).ToArray();

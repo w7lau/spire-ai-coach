@@ -7,7 +7,9 @@ using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Nodes.GodotExtensions;
 using MegaCrit.Sts2.Core.Nodes.Cards;
+using MegaCrit.Sts2.Core.Nodes.Screens;
 using MegaCrit.Sts2.Core.Nodes.Vfx;
+using MegaCrit.Sts2.Core.Runs;
 
 namespace SpireAiCoach.Mod;
 
@@ -36,7 +38,13 @@ internal static class LocalWorkerVisuals
             prefix: Patch(nameof(FinishCardFly)));
         harmony.Patch(typeof(NCardFlyShuffleVfx).GetMethod("PlayAnim", BindingFlags.NonPublic | BindingFlags.Instance)!,
             prefix: Patch(nameof(FinishShuffleFly)));
+        harmony.Patch(typeof(NCardFlyPowerVfx).GetMethod(nameof(NCardFlyPowerVfx.PlayAnim))!,
+            prefix: Patch(nameof(FinishPowerFly)));
+        harmony.Patch(typeof(NCardFlyPowerVfx).GetMethod(nameof(NCardFlyPowerVfx.GetDuration))!,
+            prefix: Patch(nameof(PowerFlyDuration)));
         harmony.Patch(typeof(NCardTrail).GetMethod(nameof(NCardTrail._Process))!, prefix: Patch(nameof(Trail)));
+        harmony.Patch(typeof(NRewardsScreen).GetMethod("UpdateScreenState", BindingFlags.NonPublic | BindingFlags.Instance)!,
+            prefix: Patch(nameof(UpdateCurrentRewardsScreen)));
     }
 
     public static void Reset()
@@ -92,7 +100,7 @@ internal static class LocalWorkerVisuals
 
     // Native fly animations own completion/cleanup as well as visuals. Preserve those
     // responsibilities when omitting their frame-by-frame curve and trail sampling.
-    private static bool FinishCardFly(NCardFlyVfx __instance, NCard ____card, bool ____isAddingToPile, ref Task __result)
+    private static bool FinishCardFly(NCardFlyVfx __instance, NCard ____card, bool ____isAddingToPile, NCardTrailVfx? ____vfx, ref Task __result)
     {
         if (!FastCardPresentation) return true;
         var model = ____card.Model ?? throw new InvalidOperationException("Missing card model in native fly animation");
@@ -101,18 +109,60 @@ internal static class LocalWorkerVisuals
         _swooshCompletionSetter.Invoke(__instance, [completion]);
         if (____isAddingToPile) model.Pile?.InvokeCardAddFinished();
         completion.TrySetResult();
+        RetireTrail(____vfx);
         ____card.QueueFreeSafely(); // Native TreeExited handler retires the fly/trail nodes.
         __result = Task.CompletedTask;
         return false;
     }
 
-    private static bool FinishShuffleFly(NCardFlyShuffleVfx __instance, CardPile ____targetPile, ref Task __result)
+    private static bool FinishShuffleFly(NCardFlyShuffleVfx __instance, CardPile ____targetPile, NCardTrailVfx? ____vfx, ref Task __result)
     {
         if (!FastCardPresentation) return true;
         ____targetPile.InvokeCardAddFinished();
+        // Native PlayAnim fades this separate sibling out before freeing its source.
+        // Omitting the animation must also retire it; otherwise _Process dereferences
+        // the disposed source forever, including while the worker is idle.
+        RetireTrail(____vfx);
         __instance.QueueFreeSafely();
         __result = Task.CompletedTask;
         return false;
+    }
+
+    private static void RetireTrail(NCardTrailVfx? trail)
+    {
+        if (trail == null || !GodotObject.IsInstanceValid(trail)) return;
+        trail.SetProcess(false);
+        trail.QueueFreeSafely(); // Native _ExitTree kills its own Tween.
+    }
+
+    // Native power fly animation is presentation and node ownership only. Its curve
+    // sampling can overshoot the baked path at accelerated frame deltas. Keep the
+    // same card/trail/fly cleanup without starting that detached animation task.
+    private static bool FinishPowerFly(NCardFlyPowerVfx __instance, NCardTrailVfx? ____vfx, ref Task __result)
+    {
+        if (!FastCardPresentation) return true;
+        SfxCmd.Play("event:/sfx/ui/cards/card_movement_B_power");
+        RetireTrail(____vfx);
+        __instance.CardNode.QueueFreeSafely();
+        __instance.QueueFreeSafely();
+        __result = Task.CompletedTask;
+        return false;
+    }
+    private static bool PowerFlyDuration(ref float __result)
+    {
+        if (!FastCardPresentation) return true;
+        __result = 0;
+        return false;
+    }
+
+    // A deferred UI refresh can outlive the restored run that created it. Retire only
+    // that stale callback; reward generation, synchronization, completion and healing
+    // still execute for the current run. This patch exists only in owned workers.
+    private static bool UpdateCurrentRewardsScreen(NRewardsScreen __instance, IRunState ____runState)
+    {
+        var manager = RunManager.Instance;
+        return GodotObject.IsInstanceValid(__instance) && !__instance.IsQueuedForDeletion() && __instance.IsInsideTree() &&
+            !manager.IsCleaningUp && ReferenceEquals(____runState, manager.DebugOnlyGetState()) && manager.RewardsSetSynchronizer != null;
     }
 
     // Pure Line2D geometry; no model, history, RNG or completion side effects.

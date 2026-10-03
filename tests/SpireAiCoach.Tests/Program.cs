@@ -834,6 +834,24 @@ AsyncTest("frequent local telemetry replacement stays readable during concurrent
     }
     finally { Directory.Delete(directory, true); }
 });
+Test("local telemetry atomically replaces a snapshot held by an external shared reader", () =>
+{
+    var directory = Path.Combine(Path.GetTempPath(), "spire-wire-held-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(directory);
+    var path = Path.Combine(directory, "request.json");
+    try
+    {
+        LocalWire.Write(path, new[] { 1, 1 });
+        using (var held = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete))
+        {
+            LocalWire.Write(path, new[] { 2, 2 });
+            Check(JsonSerializer.Deserialize<int[]>(held)!.SequenceEqual(new[] { 1, 1 }));
+            Check(LocalWire.Read<int[]>(path).SequenceEqual(new[] { 2, 2 }));
+        }
+        Check(!Directory.EnumerateFiles(directory, "*.tmp").Any());
+    }
+    finally { Directory.Delete(directory, true); }
+});
 
 SearchAlgorithmTests.Register(Test);
 SearchWorkTests.Register(Test);
