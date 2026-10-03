@@ -147,19 +147,22 @@ public static class LocalWorker
         var noPotionSearch = new LocalSearchTree(1729 + request.Partition, order: treeOrder);
         var potionSearch = new LocalSearchTree(2718 + request.Partition, order: treeOrder);
         string healthRoot = request.SnapshotId + ":" + request.NativeHash;
-        var turns = turnMode ? new LocalTurnSearch(1729 + request.Partition, healthRoot) : null;
+        ILocalTurnFrontier? turns = turnMode ? new LocalTurnSearch(1729 + request.Partition, healthRoot) : null;
+        LocalTurnWorkClient? sharedTurns = null;
+        bool sharedExhausted = false;
         var coverage = turnMode ? new LocalRouteCoverage() : null;
         int coveredTasks = 0;
+        var terminalHistories = new HashSet<string>(StringComparer.Ordinal);
+        int repeatedHistories = 0;
         LocalTurnSearchStats? TurnStats() => turns == null ? null :
             new(probes, boundPruned, turns.Offered, turns.DuplicateOffers, turns.Count, unknownRecoveryChecks,
-                coveredTasks + (coverage?.Avoided ?? 0));
+                coveredTasks + (coverage?.Avoided ?? 0), terminalHistories.Count + repeatedHistories, repeatedHistories);
         var search = noPotionSearch;
         var refiner = new LocalRouteRefiner();
         var policy = request.CorrelatedRollouts && !systematic ? new LocalRolloutPolicy(314159 + request.Partition) : null;
         LocalCandidate? refinementSeed = null;
-        // The experimental tree owns a complete observed-prefix frontier. Do not overwrite
-        // its order with the old bounded expansion/refinement proposal queue. Workers still
-        // partition first actions; every continuation remains in its owning native process.
+        // Turn work uses an exact shared frontier, separate from the old soft
+        // improvement proposals. Every claimed history is replayed in its owner.
         LocalSearchWork? work = !systematic && request.ShareSearchWork && request.Partitions > 1 && request.VerifyCandidate == null
             ? new(Path.GetDirectoryName(_root)!, request) : null;
         int refinements = 0;
@@ -295,7 +298,7 @@ public static class LocalWorker
                     Progress("复核最终候选", after);
                 });
                 verifyMs += (long)Stopwatch.GetElapsedTime(verifyStarted).TotalMilliseconds;
-                best = best with { Continuation = verified.Points };
+                best = best with { Continuation = verified.Points, ContinuationFromSearch = false };
                 Progress("计算完成 · 最终候选复核通过", verified.State, true, "done");
                 await Cleanup();
                 session?.Dispose();
@@ -303,6 +306,8 @@ public static class LocalWorker
                 return true;
             }
             Publish("running", "正在恢复并核对当前战斗…");
+            if (turnMode && request.TurnWorkPipe != null)
+                turns = sharedTurns = new LocalTurnWorkClient(request);
             // Keep the legal set stable for exact-history worker ownership. A
             // baseline continuation still chooses no potion; reserve moves are
             // offered as alternatives, never forced at the beginning of a trial.
@@ -317,8 +322,8 @@ public static class LocalWorker
             using (Trace("decision")) first = EnumerateActions();
             decisionMs += (long)Stopwatch.GetElapsedTime(decisionStarted).TotalMilliseconds;
             rootBranches = first.Length;
-            int partitions = systematic ? LocalConcurrency.Partitions(request.Partitions, rootBranches, request.AdaptiveWorkers) : request.Partitions;
-            if (request.Partition >= partitions) throw new InvalidDataException("Worker is outside the admitted native root partition");
+            int partitions = systematic && sharedTurns == null ? LocalConcurrency.Partitions(request.Partitions, rootBranches, request.AdaptiveWorkers) : request.Partitions;
+            if (sharedTurns == null && request.Partition >= partitions) throw new InvalidDataException("Worker is outside the admitted native root partition");
             var roots = first.Where((_, i) => i % partitions == request.Partition).ToArray();
             // More workers than first moves explore different continuations of the same first move.
             if (roots.Length == 0) roots = [first[request.Partition % first.Length]];
@@ -337,10 +342,11 @@ public static class LocalWorker
             {
                 if (request.InitialPlan is { Length: > 0 }) throw new InvalidDataException("Turn frontier requires an unseeded frozen root");
                 var rootPlayer = LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!;
-                turns.Offer([], CombatManager.Instance.DebugOnlyGetState()!.RoundNumber, TurnHint(rootPlayer, rootPlayer.Creature.CurrentHp, []));
+                if (sharedTurns == null || request.Partition == 0)
+                    turns.Offer([], CombatManager.Instance.DebugOnlyGetState()!.RoundNumber, TurnHint(rootPlayer, rootPlayer.Creature.CurrentHp, []));
             }
             while (evaluated < request.MaxNodes && budget.Elapsed.TotalSeconds < request.BudgetSeconds &&
-                (turns != null ? turns.Count > 0 && !coverage!.Exhausted : work != null || !noPotionSearch.Exhausted || request.IncludePotions && !potionSearch.Exhausted || refiner.Count > 0))
+                (turns != null ? sharedTurns != null || turns.Count > 0 && !coverage!.Exhausted : work != null || !noPotionSearch.Exhausted || request.IncludePotions && !potionSearch.Exhausted || refiner.Count > 0))
             {
                 if (StopRequested()) { stoppedEarly = true; break; }
                 using var refining = Trace("refine");
@@ -371,13 +377,22 @@ public static class LocalWorker
                 LocalWorkTask? sharedTask = null;
                 if (turns != null)
                 {
+                    using var turnScheduling = MeasureMethod("LocalTurnFrontier.Take");
                     // Only this worker's completed native victory supplies a bound.
                     // Peer results may suggest a continuation, never certify a cut.
                     boundPruned += turns.DiscardProvenExpenses(LocalWinningBound.From(healthRoot, best));
-                    if (!turns.TryTake(out turnTask)) break;
+                    if (!turns.TryTake(out turnTask))
+                    {
+                        if (sharedTurns?.Active > 0)
+                        {
+                            refining?.Dispose(); Progress("等待可探索分支"); await Task.Delay(50); continue;
+                        }
+                        sharedExhausted = sharedTurns != null; break;
+                    }
+                    if (sharedTurns != null) fullRollout = turnTask.FullRollout;
                     planned = turnTask.Prefix;
                     // Skip already completed subtrees before restoring their prefix.
-                    if (coverage!.IsClosedPrefix(planned)) { coveredTasks++; continue; }
+                    if (coverage!.IsClosedPrefix(planned)) { coveredTasks++; sharedTurns?.Finish(turnTask); continue; }
                 }
                 else if (work != null)
                 {
@@ -433,8 +448,9 @@ public static class LocalWorker
                     search = _includePotions ? potionSearch : noPotionSearch;
                 }
                 var actions = new List<LocalAction>();
+                var continuationPoints = request.SkipFinalVerification && request.History != null ? new List<LocalContinuationPoint>() : null;
                 var decisions = new List<LocalDecision>();
-                var partition = systematic ? new LocalBranchPartition(request.Partition, partitions) : null;
+                var partition = systematic && sharedTurns == null ? new LocalBranchPartition(request.Partition, partitions) : null;
                 var trial = search.Begin();
                 policy?.Begin();
                 var coveredTrial = coverage?.Begin();
@@ -447,6 +463,7 @@ public static class LocalWorker
                 int continuationIndex = 0;
                 int planIndex = 0;
                 int lost = 0;
+                string? terminalDigest = null;
                 void HpChanged(int oldHp, int newHp) => lost += Math.Max(0, oldHp - newHp);
                 player.Creature.CurrentHpChanged += HpChanged;
                 try
@@ -549,6 +566,18 @@ public static class LocalWorker
                         var actionStarted = Stopwatch.GetTimestamp();
                         pendingAction = next;
                         _traceStep = actions.Count + 1;
+                        if (continuationPoints != null)
+                        {
+                            try
+                            {
+                                // Reuse the fingerprint from native legal-action enumeration;
+                                // recording adds no frame wait or independent state replay.
+                                var history = LocalCapture.History();
+                                if (actions.Count == 0 && history != request.History) continuationPoints = null;
+                                else continuationPoints.Add(new(actions.Count, next.BeforeHash, history, lost, player.Creature.CurrentHp));
+                            }
+                            catch (InvalidOperationException) { continuationPoints = null; }
+                        }
                         try
                         {
                             int choiceIndex = 0;
@@ -588,7 +617,10 @@ public static class LocalWorker
                         _nativeLearning?.After(learned, player);
                         decisions[^1] = decisions[^1] with { Choices = choiceDecisions.ToArray() };
                         if (turns != null && actions.Count >= planned!.Length)
-                            turns.OfferAlternatives(actions, decisions[^1], beforeHint!);
+                        {
+                            using var offering = MeasureMethod("LocalTurnFrontier.OfferAlternatives");
+                            turns.OfferAlternatives(actions, decisions[^1], beforeHint!, turnTask);
+                        }
                         pendingAction = null;
                         var after = Observe(player);
                         var changes = before != null && after != null ? LocalProgressBook.Changes(before, after) : "动作已结算；状态预览暂不可用。";
@@ -611,7 +643,9 @@ public static class LocalWorker
                                 stop = "分支已无法优于现有获胜路线"; break;
                             }
                             int nextRound = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
-                            if (nextRound > round && actions.Count >= planned!.Length)
+                            // A full trial already continues this exact turn boundary.
+                            // Only a short probe needs to publish that open continuation.
+                            if (!fullRollout && nextRound > round && actions.Count >= planned!.Length)
                                 turns.Offer(actions.ToArray(), nextRound, TurnHint(player, startingHp, actions));
                         }
                     }
@@ -623,9 +657,10 @@ public static class LocalWorker
                     coverage?.Complete(coveredTrial!, IsTerminal(player));
                     if (coverage != null && IsTerminal(player))
                     {
-                        var digest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                        terminalDigest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
                             System.Text.Encoding.UTF8.GetBytes(LocalTurnSearch.HistoryKey(actions))));
-                        using (Trace("completed-route", digest)) { }
+                        if (!terminalHistories.Add(terminalDigest)) repeatedHistories++;
+                        using (Trace("completed-route", terminalDigest)) { }
                     }
                     var state = CombatManager.Instance.DebugOnlyGetState();
                     var won = _combatWon && !player.Creature.IsDead;
@@ -636,7 +671,8 @@ public static class LocalWorker
                         RewardCoverageKnown: false,
                         Rounds: actions.Select(a => a.Round).Distinct().Count(),
                         StopReason: won ? "胜利结算完成" : player.Creature.IsDead ? "玩家死亡" :
-                            string.IsNullOrEmpty(stop) ? "战斗结束但未确认胜利" : stop, Decisions: decisions.ToArray(), StartingHp: startingHp);
+                            string.IsNullOrEmpty(stop) ? "战斗结束但未确认胜利" : stop, Decisions: decisions.ToArray(), StartingHp: startingHp,
+                        Continuation: continuationPoints?.ToArray(), ContinuationFromSearch: continuationPoints != null);
                     if (turnTask != null && stop == "达到时间预算")
                         turns!.ReturnInterrupted(turnTask, TurnHint(player, startingHp, actions));
                     if (turnMode && IsTerminal(player) && planIndex < planned!.Length)
@@ -679,7 +715,15 @@ public static class LocalWorker
                     Progress("遇到额外选择，停止搜索", force: true, status: "unsupported");
                     return false;
                 }
-                finally { player.Creature.CurrentHpChanged -= HpChanged; }
+                finally
+                {
+                    player.Creature.CurrentHpChanged -= HpChanged;
+                    if (turnTask != null)
+                    {
+                        using var finishing = MeasureMethod("LocalTurnFrontier.Finish");
+                        sharedTurns?.Finish(turnTask, terminalDigest);
+                    }
+                }
             }
             LocalWorkerOverhead.LeanSearchChecksums = false;
             if (best != null && !request.DeferVerification)
@@ -697,15 +741,16 @@ public static class LocalWorker
                     Progress("复核最佳路线", after);
                 });
                 verifyMs += (long)Stopwatch.GetElapsedTime(verifyStarted).TotalMilliseconds;
-                best = best with { Continuation = verified.Points };
+                best = best with { Continuation = verified.Points, ContinuationFromSearch = false };
                 Progress("计算完成 · 最佳路线复核通过", verified.State, true, "done");
             }
             else if (stoppedEarly) Progress("已停止搜索，等待返回路线", force: true, status: "searched");
-            else if (best == null) Progress("未取得可用路线", force: true, status: "unsupported");
+            else if (best == null) Progress(sharedExhausted ? "已完成分工" : "未取得可用路线", force: true,
+                status: sharedExhausted ? "searched" : "unsupported");
             else Progress("搜索完成 · 等待最终候选复核", force: true, status: "searched");
             await Cleanup();
             session?.Dispose();
-            Publish(best == null ? stoppedEarly ? "searched" : "unsupported" : request.DeferVerification ? "searched" : "done",
+            Publish(best == null ? stoppedEarly || sharedExhausted ? "searched" : "unsupported" : request.DeferVerification ? "searched" : "done",
                 stoppedEarly ? "已达到无伤通关停止条件，停止后续搜索。" : best == null ? "没有找到可完整结算的路线。" :
                 turns != null ? $"已完成当前预算；评估 {evaluated} 条整场路线，另探查 {probes} 个回合组合，剪枝 {boundPruned} 次；尚未证明全局最优。" :
                 $"已完成当前预算，操作树 {noPotionSearch.Nodes + (request.IncludePotions ? potionSearch.Nodes : 0)} 个节点，比较了 {refinements} 条补牌、删牌、换牌和选牌路线。");
@@ -722,7 +767,7 @@ public static class LocalWorker
         }
         finally
         {
-            try { work?.Retire(request.Partition); }
+            try { sharedTurns?.Dispose(); work?.Retire(request.Partition); }
             finally { NonInteractiveMode.AutoSlayerCheck = originalNativeMode; LocalWorkerOverhead.Enabled = false; LocalWorkerOverhead.LeanSearchChecksums = false; LocalWorkerLogic.Enabled = false; LocalWorkerDataMode.Reset(); LocalWorkerVisuals.Reset(); _fastNativeWaits = _fastStateSettling = false; LocalWorkerResources.Retain = LocalWorkerResources.FastCollection = false; Engine.TimeScale = originalScale; Engine.MaxFps = originalFps; _timeline = null; }
         }
     }

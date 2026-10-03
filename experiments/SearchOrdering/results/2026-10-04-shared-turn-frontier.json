@@ -1,0 +1,311 @@
+{
+  "release_version": "0.7.18",
+  "native_test": {
+    "version": "0.7.17.0",
+    "ui_controls_mounted": true,
+    "outside_combat_guard_passed": true,
+    "SearchOrder": 4,
+    "requested_workers": 4,
+    "MaxNodes": 64,
+    "BudgetSeconds": 60,
+    "MaxRounds": 64,
+    "IncludePotions": true,
+    "StopOnZeroLoss": false,
+    "NumericalExecution": true,
+    "TrimWorkerOverhead": true,
+    "manual_seed": false,
+    "ShareSearchWork": true,
+    "Status": "done",
+    "Workers": 4,
+    "WorkerLimit": 4,
+    "Evaluated": 141,
+    "Victories": 91,
+    "Rejected": 0,
+    "ElapsedMs": 116811,
+    "Timing": {
+      "RestoreMs": 18585,
+      "ActionMs": 117393,
+      "DecisionMs": 47800,
+      "VerificationMs": 4055,
+      "StartupMs": 94965,
+      "Actions": 12317,
+      "Restores": 281,
+      "Verifications": 1
+    },
+    "TurnSearch": {
+      "Probes": 139,
+      "BoundPruned": 12604,
+      "Offered": 37201,
+      "DuplicateOffers": 144,
+      "Pending": 35063,
+      "UnknownRecoveryChecks": 1818,
+      "CoveredPrefixes": 0,
+      "CompletedHistories": 138,
+      "RepeatedHistories": 0
+    },
+    "completed_histories": 138,
+    "repeated_histories": 0,
+    "retained_history_digests": 95,
+    "dropped_trace_entries": 27458,
+    "Won": true,
+    "StartingHp": 87,
+    "Hp": 87,
+    "HpLost": 14,
+    "NetHpLoss": 0,
+    "Rounds": 9,
+    "used_potions": 0,
+    "verified_steps": 48
+  },
+  "historical_baseline_not_rerun": {
+    "version": "0.7.12",
+    "ui_controls_mounted": true,
+    "outside_combat_guard_passed": true,
+    "SearchOrder": 4,
+    "Workers": 4,
+    "MaxNodes": 64,
+    "BudgetSeconds": 60,
+    "MaxRounds": 64,
+    "IncludePotions": true,
+    "StopOnZeroLoss": false,
+    "NumericalExecution": true,
+    "TrimWorkerOverhead": true,
+    "manual_seed": false,
+    "Status": "done",
+    "Evaluated": 67,
+    "Victories": 40,
+    "Rejected": 0,
+    "ElapsedMs": 108720,
+    "Timing": {
+      "RestoreMs": 24361,
+      "ActionMs": 121435,
+      "DecisionMs": 56053,
+      "VerificationMs": 7410,
+      "StartupMs": 151695,
+      "Actions": 7548,
+      "Restores": 264,
+      "Verifications": 1
+    },
+    "TurnSearch": {
+      "Probes": 196,
+      "BoundPruned": 7708,
+      "Offered": 25950,
+      "DuplicateOffers": 3326,
+      "Pending": 24146,
+      "UnknownRecoveryChecks": 978,
+      "CoveredPrefixes": 2
+    },
+    "completed_histories": 63,
+    "repeated_histories": 0,
+    "Won": true,
+    "StartingHp": 87,
+    "Hp": 87,
+    "HpLost": 13,
+    "NetHpLoss": 0,
+    "Rounds": 8,
+    "used_potions": 0,
+    "verified_steps": 58
+  },
+  "completed_history_coverage_ratio": 2.1904761904761907,
+  "first_retained_zero_net_loss_no_potion_ms": 43892.046200000004,
+  "cold_prepare_timeline": [
+    {
+      "worker": 0,
+      "phase": "prepare",
+      "start_ms": 47.6964,
+      "duration_ms": 23501.1844
+    },
+    {
+      "worker": 0,
+      "phase": "files",
+      "start_ms": 47.6964,
+      "duration_ms": 267.1416
+    },
+    {
+      "worker": 0,
+      "phase": "engine",
+      "start_ms": 2003.1619,
+      "duration_ms": 21545.7179
+    },
+    {
+      "worker": 1,
+      "phase": "prepare",
+      "start_ms": 25347.0979,
+      "duration_ms": 23361.1809
+    },
+    {
+      "worker": 1,
+      "phase": "files",
+      "start_ms": 25347.098,
+      "duration_ms": 270.4899
+    },
+    {
+      "worker": 2,
+      "phase": "prepare",
+      "start_ms": 25602.4876,
+      "duration_ms": 23478.3345
+    },
+    {
+      "worker": 2,
+      "phase": "files",
+      "start_ms": 25602.4877,
+      "duration_ms": 286.3295
+    },
+    {
+      "worker": 3,
+      "phase": "prepare",
+      "start_ms": 25859.7947,
+      "duration_ms": 24617.4482
+    },
+    {
+      "worker": 3,
+      "phase": "files",
+      "start_ms": 25859.7948,
+      "duration_ms": 294.1994
+    },
+    {
+      "worker": 1,
+      "phase": "engine",
+      "start_ms": 26893.2654,
+      "duration_ms": 21815.0126
+    },
+    {
+      "worker": 2,
+      "phase": "engine",
+      "start_ms": 27279.4335,
+      "duration_ms": 21801.3876
+    },
+    {
+      "worker": 3,
+      "phase": "engine",
+      "start_ms": 27660.8555,
+      "duration_ms": 22816.3862
+    }
+  ],
+  "search_sessions": [
+    {
+      "worker": 0,
+      "start_ms": 23689.6895,
+      "duration_ms": 61369.19699999999
+    },
+    {
+      "worker": 1,
+      "start_ms": 48917.5902,
+      "duration_ms": 61469.766299999996
+    },
+    {
+      "worker": 2,
+      "start_ms": 49243.9826,
+      "duration_ms": 61596.79150000001
+    },
+    {
+      "worker": 3,
+      "start_ms": 50706.1041,
+      "duration_ms": 61679.346300000005
+    }
+  ],
+  "queue_method_cumulative": [
+    {
+      "Worker": 0,
+      "Method": "LocalTurnFrontier.Finish",
+      "Calls": 64,
+      "TotalMs": 13.1247
+    },
+    {
+      "Worker": 0,
+      "Method": "LocalTurnFrontier.OfferAlternatives",
+      "Calls": 2919,
+      "TotalMs": 3551.102500000008
+    },
+    {
+      "Worker": 0,
+      "Method": "LocalTurnFrontier.Take",
+      "Calls": 64,
+      "TotalMs": 451.17999999999995
+    },
+    {
+      "Worker": 1,
+      "Method": "LocalTurnFrontier.Finish",
+      "Calls": 73,
+      "TotalMs": 37.47760000000002
+    },
+    {
+      "Worker": 1,
+      "Method": "LocalTurnFrontier.OfferAlternatives",
+      "Calls": 2779,
+      "TotalMs": 2823.3332000000064
+    },
+    {
+      "Worker": 1,
+      "Method": "LocalTurnFrontier.Take",
+      "Calls": 73,
+      "TotalMs": 1181.0104
+    },
+    {
+      "Worker": 2,
+      "Method": "LocalTurnFrontier.Finish",
+      "Calls": 74,
+      "TotalMs": 32.0595
+    },
+    {
+      "Worker": 2,
+      "Method": "LocalTurnFrontier.OfferAlternatives",
+      "Calls": 2789,
+      "TotalMs": 2931.7064000000128
+    },
+    {
+      "Worker": 2,
+      "Method": "LocalTurnFrontier.Take",
+      "Calls": 74,
+      "TotalMs": 1278.2462
+    },
+    {
+      "Worker": 3,
+      "Method": "LocalTurnFrontier.Finish",
+      "Calls": 70,
+      "TotalMs": 22.836800000000007
+    },
+    {
+      "Worker": 3,
+      "Method": "LocalTurnFrontier.OfferAlternatives",
+      "Calls": 2816,
+      "TotalMs": 2951.2893000000245
+    },
+    {
+      "Worker": 3,
+      "Method": "LocalTurnFrontier.Take",
+      "Calls": 70,
+      "TotalMs": 1180.2195000000002
+    }
+  ],
+  "limits": [
+    "Only one new full native search; the historical baseline was not rerun.",
+    "The native test build was 0.7.17.0 before merging the other 0.7.17 release and pipe lifecycle repairs.",
+    "No player plan was seeded; the human six-round no-gross-damage route was not discovered.",
+    "The final nine-round route is slower than the historical eight-round route at equal net loss.",
+    "Cold wall time did not improve; startup and nested method totals are not additive wall time.",
+    "Early stop was disabled for this benchmark; product budgets and default early stop were retained.",
+    "Detailed timeline entries were dropped; completed terminal histories have a separate ledger.",
+    "Only completed exact histories were counted; native states and shared prefixes were not cloned or merged.",
+    "This is not exhaustive search, arbitrary-Mod compatibility, or global optimality evidence."
+  ],
+  "final_release_checks": {
+    "core_passed": 173,
+    "core_total": 173,
+    "mod_build_warnings": 0,
+    "mod_build_errors": 0,
+    "integration_build_warnings": 0,
+    "integration_build_errors": 0
+  },
+  "installation": {
+    "utc": "2026-10-03T19:48:57.3617962Z",
+    "version": "0.7.18",
+    "previous_version": "0.7.17",
+    "dll_sha256": "E9F1FB9E269A2BE18D1030D40570B70256393DF6BF5F71444C73FF47C6AD7051",
+    "zip_sha256": "E63A87F52CEEE8F7643D2D600C7D793C97C20BB420BDA8EF8D59AB8173D16702",
+    "protected_files": 489,
+    "protected_files_unchanged": true,
+    "backups_verified": true,
+    "game_started": false,
+    "native_search_build_matches_final_release": false
+  }
+}

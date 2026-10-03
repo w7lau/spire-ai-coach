@@ -51,7 +51,7 @@ public static class ReplayIntegration
             if (!Enum.TryParse<LocalSearchOrder>(ordering, out var searchOrder) || !Enum.IsDefined(searchOrder))
                 throw new InvalidOperationException("Unknown experimental search order");
             request = request with { SearchOrder = searchOrder,
-                ShareSearchWork = searchOrder == LocalSearchOrder.MonteCarlo && request.ShareSearchWork };
+                ShareSearchWork = searchOrder is LocalSearchOrder.MonteCarlo or LocalSearchOrder.TurnFrontier && request.ShareSearchWork };
         }
         // Frozen execution controls retain the same startup; bootstrap has its own paired
         // cold measurements. Ordinary integration fixtures use the product's default.

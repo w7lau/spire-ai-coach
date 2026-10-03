@@ -34,17 +34,20 @@ internal static class AlgorithmIntegration
         var best = result.Best ?? throw new InvalidOperationException("New algorithm returned no route");
         var histories = result.Trace?.Spans.Where(s => s.Stage == "search" && s.Phase == "completed-route").ToArray() ?? [];
         int duplicates = histories.Length - histories.Select(s => s.Detail).Distinct(StringComparer.Ordinal).Count();
+        int completed = result.TurnSearch?.CompletedHistories ?? 0;
         if (result.Status != "done" || result.Rejected != 0 || !best.Won || result.Timing?.Verifications != 1 ||
-            best.Continuation?.Length != best.Actions.Length || duplicates != 0 || histories.Length == 0 ||
-            result.Trace?.Dropped != 0 || result.Message.StartsWith("常规执行", StringComparison.Ordinal))
+            best.Continuation?.Length != best.Actions.Length || duplicates != 0 || completed == 0 ||
+            result.TurnSearch?.RepeatedHistories != 0 || result.Message.StartsWith("常规执行", StringComparison.Ordinal))
             throw new InvalidOperationException("New-mode native search/coverage/final verification failed: " + result.Message);
         LocalWire.Write(Path.Combine(root, "integration-algorithm-summary.json"), new
         {
-            version = "0.7.12", ui_controls_mounted = true, outside_combat_guard_passed = true,
-            request.SearchOrder, request.Workers, request.MaxNodes, request.BudgetSeconds, request.MaxRounds,
+            version = typeof(ModEntry).Assembly.GetName().Version!.ToString(), ui_controls_mounted = true, outside_combat_guard_passed = true,
+            request.SearchOrder, requested_workers = request.Workers, request.MaxNodes, request.BudgetSeconds, request.MaxRounds,
             request.IncludePotions, request.StopOnZeroLoss, request.NumericalExecution, request.TrimWorkerOverhead,
-            manual_seed = false, result.Status, result.Evaluated, result.Victories, result.Rejected, result.ElapsedMs,
-            result.Timing, result.TurnSearch, completed_histories = histories.Length, repeated_histories = duplicates,
+            manual_seed = false, request.ShareSearchWork, result.Status, result.Workers, result.WorkerLimit,
+            result.Evaluated, result.Victories, result.Rejected, result.ElapsedMs,
+            result.Timing, result.TurnSearch, completed_histories = completed, repeated_histories = result.TurnSearch!.RepeatedHistories,
+            retained_history_digests = histories.Length, dropped_trace_entries = result.Trace?.Dropped,
             best.Won, best.StartingHp, best.Hp, best.HpLost, best.NetHpLoss, best.Rounds,
             used_potions = best.Actions.Count(a => a.PotionSlot.HasValue), verified_steps = best.Continuation!.Length
         });

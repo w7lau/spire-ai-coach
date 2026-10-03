@@ -13,7 +13,8 @@ public sealed class LocalContinuation(string combatId, string[] mods, LocalSearc
     {
         if (Invalid) return null;
         var best = original.Best;
-        if (original.VerificationSkipped || currentCombat != combatId || !mods.SequenceEqual(currentMods) || best?.Continuation == null)
+        if (original.VerificationSkipped && !LocalSearchPolicy.HasExecutionPoints(original) ||
+            currentCombat != combatId || !mods.SequenceEqual(currentMods) || best?.Continuation == null)
             return Reject();
         var matches = best.Continuation.Where(p => p.ActionIndex >= CompletedActions &&
             p.ActionIndex < best.Actions.Length && p.NativeHash == nativeHash && p.History == history).ToArray();
@@ -22,6 +23,8 @@ public sealed class LocalContinuation(string combatId, string[] mods, LocalSearc
         var point = matches[0]; CompletedActions = point.ActionIndex;
         var remaining = best.Actions.Skip(CompletedActions).ToArray();
         return original with { Best = best with { Actions = remaining,
+            Continuation = best.Continuation.Skip(CompletedActions).Select(p => p with
+                { ActionIndex = p.ActionIndex - CompletedActions, HpLost = Math.Max(0, p.HpLost - point.HpLost) }).ToArray(),
             StartingHp = point.Hp ?? best.StartingHp, HpLost = Math.Max(0, best.HpLost - point.HpLost),
             Rounds = remaining.Select(a => a.Round).Distinct().Count() },
             Message = CompletedActions == 0 ? original.Message : $"已核对并完成前 {CompletedActions} 步，继续使用原路线；未重新搜索。" };

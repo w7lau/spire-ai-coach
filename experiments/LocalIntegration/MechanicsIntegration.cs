@@ -110,6 +110,8 @@ public static class MechanicsIntegration
                 { Workers = 1, MaxNodes = kind == "ordering" || kind == "carry" ? 8 : 1, MaxRounds = kind == "longfight" || kind == "carry" ? 64 : 1,
                     BudgetSeconds = kind == "longfight" || kind == "carry" ? 40 : 25, InitialPlan = initial,
                     DebugEncounter = "SLUMBERING_BEETLE_NORMAL" };
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SKIP_FINAL_VERIFICATION") == "1")
+                request = request with { SkipFinalVerification = true };
             if (int.TryParse(System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_WORKERS"), out var workers))
                 request = request with { Workers = workers };
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_DATA_COMBAT") == "1") request = request with { DataOnlyCombat = true };
@@ -120,7 +122,8 @@ public static class MechanicsIntegration
             if (kind == "carry") baseline = await Task.Run(() => pool.Analyze(request with { Id = Guid.NewGuid().ToString("N"), MaxNodes = 1 }, LocalCapture.Installation(), _ => { }, CancellationToken.None));
             var result = await Task.Run(() => pool.Analyze(request, LocalCapture.Installation(), _ => { }, CancellationToken.None));
             LocalWire.Write(Path.Combine(root, "integration-mechanics-" + kind + "-private.json"), result);
-            if (LocalCapture.Fingerprint() != request.NativeHash || result.Rejected != 0 || result.Best?.Continuation?.Length != result.Best?.Actions.Length)
+            if (LocalCapture.Fingerprint() != request.NativeHash || result.Rejected != 0 || !LocalSearchPolicy.HasExecutionPoints(result) ||
+                request.SkipFinalVerification && (!result.VerificationSkipped || result.Timing?.Verifications != 0 || result.Timing?.VerificationMs != 0))
                 throw new InvalidOperationException(kind + ": native search/verification failed: " + result.Message +
                     "; unchanged=" + (LocalCapture.Fingerprint() == request.NativeHash));
             var best = result.Best!;
@@ -167,10 +170,13 @@ public static class MechanicsIntegration
                 var messages = new List<string>();
                 await new LocalPlanExecutor(tree).Execute(new(snapshot.CombatId, request.LoadedMods, result),
                     () => capture.Capture(false)?.CombatId, true, messages.Add, CancellationToken.None);
+                if (messages.Count != best.Actions.Length || player.Creature.CurrentHp != best.Hp)
+                    throw new InvalidOperationException(kind + ": first-pass choice execution diverged");
                 var after = LocalCapture.Capture(capture.Capture(true)!.Fingerprint(), true) with
-                    { Workers = 1, MaxNodes = 1, MaxRounds = 1, BudgetSeconds = 20, DebugEncounter = "SLUMBERING_BEETLE_NORMAL", DataOnlyCombat = request.DataOnlyCombat, DataOnlyRun = request.DataOnlyRun };
+                    { Workers = 1, MaxNodes = 1, MaxRounds = 1, BudgetSeconds = 20, DebugEncounter = "SLUMBERING_BEETLE_NORMAL",
+                        DataOnlyCombat = request.DataOnlyCombat, DataOnlyRun = request.DataOnlyRun, SkipFinalVerification = request.SkipFinalVerification };
                 var replay = await Task.Run(() => pool.Analyze(after, LocalCapture.Installation(), _ => { }, CancellationToken.None));
-                if (replay.Best == null || replay.Rejected != 0 || replay.Best.Continuation?.Length != replay.Best.Actions.Length ||
+                if (replay.Best == null || replay.Rejected != 0 || !LocalSearchPolicy.HasExecutionPoints(replay) ||
                     after.NativeHash != LocalCapture.Fingerprint()) throw new InvalidOperationException(kind + ": completed choice continuation failed");
             }
             records.Add(new { kind, result.Status, result.Evaluated, result.Rejected, result.ElapsedMs, result.Timing,
@@ -178,7 +184,8 @@ public static class MechanicsIntegration
                 best.EnemyHp, best.StartingHp, best.Hp, best.NetHpLoss, best.HpLost, best.Rounds, best.Won,
                 baseline = baseline?.Best is { } previous ? new { previous.Hp, previous.HpLost, previous.Rounds, previous.Won } : null,
                 actions = best.Actions.Select(a => new { a.ModelId, a.CombatCardIndex,
-                    choices = (a.Choices ?? []).Select(c => new { c.Kind, c.Indices }) }), verified = true });
+                    choices = (a.Choices ?? []).Select(c => new { c.Kind, c.Indices }) }), verified = !result.VerificationSkipped,
+                result.VerificationSkipped, best.ContinuationFromSearch, checkpoint_steps = best.Continuation?.Length ?? 0 });
             LocalWire.Write(Path.Combine(root, "integration-mechanics.json"), records);
         }
     }
