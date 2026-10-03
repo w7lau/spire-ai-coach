@@ -53,7 +53,8 @@ public sealed class LocalTurnWork : IDisposable
         {
             while (!_stop.IsCancellationRequested)
             {
-                var pipe = new NamedPipeServerStream(PipeName, PipeDirection.InOut, 16,
+                // Keep room for the next listener while all sixteen owners are connected.
+                var pipe = new NamedPipeServerStream(PipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
                     PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
                 _pipes.TryAdd(pipe, 0);
                 await pipe.WaitForConnectionAsync(_stop.Token);
@@ -151,6 +152,8 @@ public sealed class LocalTurnWork : IDisposable
         _stop.Cancel();
         foreach (var pipe in _pipes.Keys) pipe.Dispose();
         _listener.GetAwaiter().GetResult();
+        // Cancellation can race with adding the listener's final waiting pipe.
+        foreach (var pipe in _pipes.Keys) pipe.Dispose();
         Task.WhenAll(_sessions).GetAwaiter().GetResult();
         _stop.Dispose();
     }

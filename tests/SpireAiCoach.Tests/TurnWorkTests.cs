@@ -48,6 +48,27 @@ static class TurnWorkTests
                 "Later branches were lost or claimed by two workers");
         });
 
+        test("shared turn work retains its listener with all sixteen owners connected", () =>
+        {
+            var captured = Request(); using var broker = new LocalTurnWork(captured, 16);
+            var command = captured with { TurnWorkPipe = broker.PipeName };
+            var clients = new List<LocalTurnWorkClient>();
+            try
+            {
+                for (int owner = 0; owner < 16; owner++)
+                {
+                    var client = new LocalTurnWorkClient(command with { Partition = owner });
+                    clients.Add(client);
+                    client.Offer([Move(owner)], 1, Hint());
+                    Check(client.TryTake(out _), "Missing work at maximum owner count");
+                }
+            }
+            finally { foreach (var client in clients) client.Dispose(); }
+            using var resumed = new LocalTurnWorkClient(command);
+            Check(resumed.TryTake(out var task), "Listener stopped at the configured maximum");
+            resumed.Finish(task);
+        });
+
         asyncTest("shared turn work rejects other frozen roots and returns interrupted owned histories", async () =>
         {
             var captured = Request(); using var broker = new LocalTurnWork(captured, 2);

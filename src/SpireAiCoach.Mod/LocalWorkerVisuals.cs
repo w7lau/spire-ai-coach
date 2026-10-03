@@ -43,6 +43,10 @@ internal static class LocalWorkerVisuals
         harmony.Patch(typeof(NCardFlyPowerVfx).GetMethod(nameof(NCardFlyPowerVfx.GetDuration))!,
             prefix: Patch(nameof(PowerFlyDuration)));
         harmony.Patch(typeof(NCardTrail).GetMethod(nameof(NCardTrail._Process))!, prefix: Patch(nameof(Trail)));
+        harmony.Patch(AccessTools.Method(typeof(NDecimillipedeRocksVfx), "Play"),
+            prefix: Patch(nameof(FinishAmbientRocks)));
+        harmony.Patch(AccessTools.Method(typeof(NCard), "UpdateTypePlaqueSizeAndPosition"),
+            prefix: Patch(nameof(TypePlaque)));
         harmony.Patch(typeof(NRewardsScreen).GetMethod("UpdateScreenState", BindingFlags.NonPublic | BindingFlags.Instance)!,
             prefix: Patch(nameof(UpdateCurrentRewardsScreen)));
     }
@@ -59,6 +63,21 @@ internal static class LocalWorkerVisuals
         __result = Task.CompletedTask;
         return false;
     }
+
+    // This detached rock animation uses wall-clock delays and presentation RNG.
+    // It can wake after the combat scene was replaced and dereference disposed
+    // children. Do not start it in an owned worker; retain its node cleanup.
+    private static bool FinishAmbientRocks(NDecimillipedeRocksVfx __instance, ref Task __result)
+    {
+        if (!Active) return true;
+        __instance.QueueFreeSafely();
+        __result = Task.CompletedTask;
+        return false;
+    }
+
+    // Only sizes/positions the card type banner. Hidden accelerated scenes do
+    // not need its deferred geometry, which can divide by a zero scale.
+    private static bool TypePlaque() => !FastCardPresentation;
 
     // Keep the native pile command, its events, node cleanup and return value unchanged.
     // Only tweens returned by this exact presentation boundary can be completed early.

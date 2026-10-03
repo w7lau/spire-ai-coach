@@ -38,6 +38,7 @@ public static class LocalConcurrency
         if (maximum is < 1 or > 16 || pollMs < 1) throw new ArgumentOutOfRangeException(nameof(maximum));
         if (!adaptive) return await Task.WhenAll(Enumerable.Range(0, maximum).Select(launch));
         var runs = new List<Task<T>> { launch(0) };
+        bool admissionClosed = false;
         try
         {
             while (true)
@@ -46,7 +47,12 @@ public static class LocalConcurrency
                 // Observe failures before admitting any more work. The finally
                 // block joins all admitted workers, including cancellation cleanup.
                 if (runs.Any(r => r.IsFaulted || r.IsCanceled)) break;
-                bool added = !stopped() && Desired(maximum, runs.Count, demand(runs.Count), shared) > runs.Count;
+                // A shared search ending releases memory. That must not reopen
+                // admission and start a fresh full-budget worker after its peers
+                // have finished. Fixed partitions still require every root owner.
+                if (shared && runs.Any(r => r.IsCompleted)) admissionClosed = true;
+                bool added = !admissionClosed && !stopped() &&
+                    Desired(maximum, runs.Count, demand(runs.Count), shared) > runs.Count;
                 if (added) runs.Add(launch(runs.Count));
                 if (!added && runs.All(r => r.IsCompleted)) break;
                 await Task.WhenAny(Task.WhenAll(runs), Task.Delay(pollMs, cancellation));

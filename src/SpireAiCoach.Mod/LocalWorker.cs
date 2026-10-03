@@ -360,7 +360,11 @@ public static class LocalWorker
                     catch (IOException) { /* Peer can be replacing its private IPC file. */ }
                 }
                 if (best != null && LocalSearchPolicy.Better(best, refinementSeed)) refinementSeed = best;
-                if (!systematic && refinementSeed != null && (work == null || ReferenceEquals(best, refinementSeed))) refiner.Offer(refinementSeed, work == null ? request.Partition : 0,
+                // Each producer submits improvements of its own measured best.
+                // Retain distinct local seeds, rather than regenerating one peer's
+                // plan on every worker or deleting all weaker-looking seeds.
+                var proposalSeed = work == null ? refinementSeed : best;
+                if (!systematic && proposalSeed != null) refiner.Offer(proposalSeed, work == null ? request.Partition : 0,
                     work == null ? request.Partitions : 1);
                 LocalAction[]? planned = null;
                 LocalTurnTask? turnTask = null;
@@ -368,6 +372,7 @@ public static class LocalWorker
                 LocalWorkTask? sharedTask = null;
                 if (turns != null)
                 {
+                    using var turnScheduling = MeasureMethod("LocalTurnFrontier.Take");
                     // Only this worker's completed native victory supplies a bound.
                     // Peer results may suggest a continuation, never certify a cut.
                     boundPruned += turns.DiscardProvenExpenses(LocalWinningBound.From(healthRoot, best));
@@ -591,7 +596,10 @@ public static class LocalWorker
                         _nativeLearning?.After(learned, player);
                         decisions[^1] = decisions[^1] with { Choices = choiceDecisions.ToArray() };
                         if (turns != null && actions.Count >= planned!.Length)
+                        {
+                            using var offering = MeasureMethod("LocalTurnFrontier.OfferAlternatives");
                             turns.OfferAlternatives(actions, decisions[^1], beforeHint!, turnTask);
+                        }
                         pendingAction = null;
                         var after = Observe(player);
                         var changes = before != null && after != null ? LocalProgressBook.Changes(before, after) : "动作已结算；状态预览暂不可用。";
@@ -683,7 +691,11 @@ public static class LocalWorker
                 finally
                 {
                     player.Creature.CurrentHpChanged -= HpChanged;
-                    if (turnTask != null) sharedTurns?.Finish(turnTask, terminalDigest);
+                    if (turnTask != null)
+                    {
+                        using var finishing = MeasureMethod("LocalTurnFrontier.Finish");
+                        sharedTurns?.Finish(turnTask, terminalDigest);
+                    }
                 }
             }
             if (best != null && !request.DeferVerification)
