@@ -39,7 +39,8 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOr
 
     public Trial Begin() => new(_root) { Discrepancy = _discrepancy?.Begin() };
 
-    public LocalAction Select(Trial trial, IReadOnlyList<LocalAction> legal, LocalAction? preferred = null, bool greedy = false)
+    public LocalAction Select(Trial trial, IReadOnlyList<LocalAction> legal, LocalAction? preferred = null, bool greedy = false,
+        Func<LocalAction, int>? priority = null)
     {
         if (_discrepancy != null) return _discrepancy.Select(trial.Discrepancy ??
             throw new InvalidOperationException("Trial belongs to a different search"), legal, preferred);
@@ -48,7 +49,7 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOr
         var parent = trial.Current;
         LocalAction action;
         Node? child = null;
-        if (parent == null) action = preferred ?? Explore(legal);
+        if (parent == null) action = preferred ?? Explore(legal, priority);
         else
         {
             parent.LegalKeys = legal.Select(Key).Distinct(StringComparer.Ordinal).ToArray();
@@ -57,7 +58,7 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOr
             if (remaining.Length == 0 && preferred == null) throw new InvalidOperationException("This exact subtree has already been exhausted");
             var unseen = remaining.Where(a => !parent.Children.TryGetValue(Key(a), out var n) || n.Visits == 0).ToArray();
             if (preferred != null) action = preferred;
-            else if (unseen.Length > 0) action = greedy ? unseen.OrderByDescending(a => a.Preference).ThenBy(a => a.EndTurn).First() : Explore(unseen);
+            else if (unseen.Length > 0) action = greedy ? unseen.OrderByDescending(a => priority?.Invoke(a) ?? a.Preference).ThenBy(a => a.EndTurn).First() : Explore(unseen, priority);
             else
             {
                 // A good continuation must not be hidden by its earlier unsuccessful samples.
@@ -104,14 +105,14 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOr
         }
     }
 
-    private LocalAction Explore(IReadOnlyList<LocalAction> actions)
+    private LocalAction Explore(IReadOnlyList<LocalAction> actions, Func<LocalAction, int>? priority = null)
     {
         // State-dependent tactical priors seed exploration; they never suppress unknown mechanics.
         // One quarter of choices ignore the prior so an incorrect preview cannot freeze ordering.
         if (_random.Next(4) != 0)
         {
-            var best = actions.Max(a => a.Preference);
-            var leaders = actions.Where(a => a.Preference == best).ToArray();
+            var best = actions.Max(a => priority?.Invoke(a) ?? a.Preference);
+            var leaders = actions.Where(a => (priority?.Invoke(a) ?? a.Preference) == best).ToArray();
             if (leaders.Length < actions.Count) return leaders[_random.Next(leaders.Length)];
         }
         // No Attack/Skill/Power preference. End turn is a real choice even with playable cards.

@@ -16,7 +16,11 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     bool ExperimentalNativeData = false, byte[]? RecordedReplayProbe = null, bool DataOnlyCombat = true,
     bool DataOnlyRun = true, bool NumericalExecution = true, bool StopOnZeroLoss = true, bool TrimWorkerOverhead = true,
     LocalSearchOrder SearchOrder = LocalSearchOrder.MonteCarlo, bool FastVerification = true,
-    bool SkipFinalVerification = false, bool AdaptiveWorkers = true, string? TurnWorkPipe = null);
+    bool SkipFinalVerification = false, bool AdaptiveWorkers = true, bool CorrelatedRollouts = false,
+    bool LeanSearchChecksums = true, string? TurnWorkPipe = null, bool ProbeChecksumListener = false,
+    int? TargetVictoryRounds = null, int? TargetPotionUses = null,
+    bool EfficientTactics = true, bool LearnBuffDuration = true, bool GuideWinningRoutes = true,
+    bool OwnedWinningFocus = true);
 
 // A stop belongs to one frozen request, never to another battle or final verification.
 public sealed record LocalSearchStop(string Id, string SnapshotId, string NativeHash)
@@ -46,6 +50,13 @@ public sealed record LocalCandidate(LocalAction[] Actions, int Hp, int HpLost, i
 // Legal alternatives observed before a real native action. Search hints only, never instructions.
 public sealed record LocalDecision(int BeforeStep, LocalAction[] Legal, LocalChoiceDecision[]? Choices = null);
 public sealed record LocalChoiceDecision(int AtChoice, LocalCardChoice[] Legal);
+// Bounded per-trial metrics survive truncation of detailed native event traces.
+public sealed record LocalSearchTrial(int Worker, int Attempt, double FinishedMs, bool Won,
+    int Hp, int? NetHpLoss, int Rounds, int PotionsUsed, bool Complete, bool? ClaimedPrefixMatched = null);
+
+// A peer's measured route is an exploration proposal. Keep diagnostic traces
+// out of the scheduling protocol; it does not certify a result or an HP bound.
+public sealed record LocalSearchSeed(string Id, string SnapshotId, string NativeHash, LocalCandidate Candidate);
 
 public sealed record LocalSearchResult(string Id, string SnapshotId, string Status,
     string Message, int Evaluated, int Rejected, long ElapsedMs, LocalCandidate? Best,
@@ -53,7 +64,7 @@ public sealed record LocalSearchResult(string Id, string SnapshotId, string Stat
     long WorkerMemoryBytes = 0, long SearchElapsedMs = 0, bool IncludePotions = false, LocalSearchTiming? Timing = null,
     LocalAction? BlockedAction = null, int MaxRounds = 64, LocalTrace? Trace = null, LocalWorkStats? Work = null,
     bool StoppedEarly = false, LocalTurnSearchStats? TurnSearch = null, bool VerificationSkipped = false,
-    int RootBranches = 0, int WorkerLimit = 0);
+    int RootBranches = 0, int WorkerLimit = 0, LocalSearchTrial[]? Trials = null);
 
 public static class LocalSearchPolicy
 {
@@ -71,8 +82,11 @@ public static class LocalSearchPolicy
         return true;
     }
 
-    public static bool CanStop(LocalCandidate? candidate, bool stopOnZeroLoss) =>
-        stopOnZeroLoss && candidate is { Won: true, Dead: false, NetHpLoss: 0 };
+    public static bool CanStop(LocalCandidate? candidate, bool stopOnZeroLoss,
+        int? targetRounds = null, int? targetPotions = null) =>
+        stopOnZeroLoss && candidate is { Won: true, Dead: false, NetHpLoss: 0 } &&
+        (!targetRounds.HasValue || candidate.Rounds <= targetRounds.Value) &&
+        (!targetPotions.HasValue || candidate.Actions.Count(a => a.PotionSlot.HasValue) <= targetPotions.Value);
 
     // Same root, completed native victory: net HP loss first, potions are a reserve resource.
     public static bool Better(LocalCandidate candidate, LocalCandidate? prior)
@@ -100,7 +114,7 @@ public static class LocalSearchPolicy
     {
         if (result.Best is not { } best) return result.Message;
         var lines = new List<string> { best.Won ? "本地整场战斗 · 已找到获胜路线" : "本地整场战斗 · 尚未找到获胜路线", result.Message,
-            $"{result.Workers} 路并发，评估 {result.Evaluated} 条路线，其中 {result.Victories} 条获胜，不支持 {result.Rejected}。",
+            $"启用 {result.Workers} 路，评估 {result.Evaluated} 条路线，其中 {result.Victories} 条获胜，不支持 {result.Rejected}。",
             best.StartingHp is { } initial ?
                 $"{(best.Won ? "预测战后生命" : "已模拟到的生命")} {initial} → {best.Hp}/{best.MaxHp}；净生命损失 {best.NetHpLoss}{(best.Won ? "（包含战中、战后回血）" : "（战斗尚未完成）")}。" :
                 $"{(best.Won ? "预测战后生命" : "已模拟到的生命")} {best.Hp}/{best.MaxHp}。",

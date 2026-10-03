@@ -736,7 +736,7 @@ Test("combat plans preserve end turn boundaries and never invent a final end tur
     Check(copy.Best!.Actions.SequenceEqual(best.Actions));
     var text = LocalSearchPolicy.Format(copy);
     Check(text.Contains("第 3 回合") && text.Contains("第 4 回合") && text.Contains("已找到获胜路线"));
-    Check(!text.Contains("3. 结束回合") && text.Contains("4 路并发"));
+    Check(!text.Contains("3. 结束回合") && text.Contains("启用 4 路"));
 });
 Test("frontier deduplicates exact prefixes without merging distinct card instances or rounds", () =>
 {

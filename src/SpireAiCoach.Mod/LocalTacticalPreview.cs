@@ -9,7 +9,7 @@ using SpireAiCoach.Core;
 
 namespace SpireAiCoach.Mod;
 
-internal sealed class LocalTacticalPreview(Player player)
+internal sealed class LocalTacticalPreview(Player player, bool efficient = false)
 {
     private readonly Dictionary<Creature, double> _threats = new();
     private double _incoming;
@@ -17,9 +17,9 @@ internal sealed class LocalTacticalPreview(Player player)
     private bool _retainsBlock;
     private CardModel[] _playable = [];
 
-    public static LocalTacticalPreview Capture(Player player, CardModel[] playable)
+    public static LocalTacticalPreview Capture(Player player, CardModel[] playable, bool efficient = false)
     {
-        var result = new LocalTacticalPreview(player);
+        var result = new LocalTacticalPreview(player, efficient);
         result._playable = playable;
         foreach (var card in player.PlayerCombatState!.Hand.Cards)
         {
@@ -74,13 +74,17 @@ internal sealed class LocalTacticalPreview(Player player)
                 Damage: enemy ? Math.Max(Value("Damage"), Value("CalculatedDamage")) * repeat : 0,
                 EnemyHp: enemy ? target!.CurrentHp : 0, EnemyBlock: enemy ? target!.Block : 0,
                 TargetThreat: enemy ? _threats[target!] : 0, Incoming: _incoming,
-                CurrentBlock: player.Creature.Block, Block: Math.Max(Value("Block"), Value("CalculatedBlock")),
+                // Modal cards can carry variables for several inactive effects.
+                // Use the native capability, not the existence of a Block variable.
+                CurrentBlock: player.Creature.Block, Block: card.GainsBlock ? Math.Max(Value("Block"), Value("CalculatedBlock")) : 0,
                 Hp: player.Creature.CurrentHp, Strength: Value("StrengthPower"),
                 Vulnerable: enemy ? Value("VulnerablePower") : 0, Weak: enemy ? Value("WeakPower") : 0,
                 // "Cards" can mean discard/exhaust/selection count, so it is not a generic draw hint.
                 EnergyGain: Value("Energy"), HpCost: card.HasTurnEndInHandEffect ? 0 : Value("HpLoss"),
                 FollowupAttacks: affordable, FollowupDamage: followup, Known: known, RetainsBlock: _retainsBlock,
-                HandEndHpLoss: handEndHpLoss));
+                HandEndHpLoss: handEndHpLoss,
+                ResourceCost: efficient ? Math.Max(0, card.EnergyCost.GetAmountToSpend()) +
+                    Math.Max(0, card.HasStarCostX ? player.PlayerCombatState!.Stars : card.GetStarCostWithModifiers()) : null));
         }
         catch { return 0; }
     }

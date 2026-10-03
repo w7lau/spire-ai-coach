@@ -10,6 +10,53 @@ static class TurnSearchTests
 
     public static void Register(Action<string, Action> test)
     {
+        test("turn optimization winning focus returns to its native learning owner without reserving unrelated work", () =>
+        {
+            var search = new LocalTurnSearch(1);
+            var start = Move(0); var hint = new LocalTurnHint(50, 50, 100, 100);
+            search.Offer([start], 1, hint); search.TryTake(out _, 0);
+            for (int i = 10; i < 1010; i++) search.Offer([Move(i)], 1, hint);
+            var actual = Move(1, "after", preference: 80);
+            var alternate = Move(2, "after", preference: 30);
+            var point = new LocalDecision(1, [actual, alternate]);
+            search.OfferAlternatives([start, actual], point, hint);
+            search.PromoteWinning(Win(actions: [start, actual]) with { Decisions = [point] }, 0);
+            Check(search.TryTake(out var broad, 1) && !broad.FullRollout,
+                "Other owners must retain independent work instead of taking the winning guide");
+            Check(search.TryTake(out var guided, 0) && guided.FullRollout && guided.Prefix.Length == 2,
+                "The winning owner's next decision must not depend on the global lane counter");
+            search.ReleaseWinningOwner(0);
+            int count = 0;
+            while (search.TryTake(out _, 1)) count++;
+            Check(count == 999, "Owner retirement must not strand or remove legal work");
+        });
+
+        test("turn optimization winning feedback promotes pending native siblings without merging or closing others", () =>
+        {
+            var search = new LocalTurnSearch(1);
+            var start = Move(0);
+            var choice = new LocalCardChoice("offer", 0, "opaque", "same");
+            start = start with { Choices = [choice] };
+            var hint = new LocalTurnHint(50, 50, 100, 100);
+            search.Offer([start], 1, hint); search.TryTake(out _);
+            for (int i = 10; i < 1010; i++) search.Offer([Move(i)], 1, hint);
+            var actual = Move(1, "after root", preference: 60);
+            var setup = Move(2, "after root", preference: 20) with { TargetId = 3 };
+            var decision = new LocalDecision(1, [actual, setup]);
+            search.OfferAlternatives([start, actual], decision, hint);
+            var candidate = Win(actions: [start, actual]) with { Decisions = [decision] };
+            search.PromoteWinning(candidate with { Won = false });
+            search.PromoteWinning(candidate);
+            search.PromoteWinning(candidate with { Hp = 1, Actions = [Move(10)],
+                Decisions = [new(0, [Move(10), Move(11)])] });
+            Check(search.TryTake(out _), "Missing fair broad task");
+            Check(search.TryTake(out var improved) && improved.FullRollout && improved.Prefix.Length == 2 &&
+                improved.Prefix[1].TargetId == 3 && improved.Prefix[1].CombatCardIndex == 2 &&
+                LocalTurnSearch.SameChoice(improved.Prefix[0].Choices![0], choice),
+                "Winning feedback lost the exact earlier choices or its pending target/instance");
+            Check(search.Count == 999, "Promotion must not create, merge or delete unrelated native branches");
+        });
+
         test("turn optimization complete feedback rotates across all scheduling lanes", () =>
         {
             var counts = new int[4];

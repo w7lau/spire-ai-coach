@@ -11,6 +11,41 @@ static class TurnWorkTests
 
     public static void Register(Action<string, Action> test, Action<string, Func<Task>> asyncTest)
     {
+        test("shared turn work winning improvement requires its exact owned native history", () =>
+        {
+            var captured = Request(); using var broker = new LocalTurnWork(captured, 2);
+            using var owner = new LocalTurnWorkClient(captured with { TurnWorkPipe = broker.PipeName });
+            var start = Move(0); owner.Offer([start], 1, Hint());
+            Check(owner.TryTake(out var task), "Missing owned task");
+            var actual = Move(1, "after"); var other = Move(2, "after");
+            var decision = new LocalDecision(1, [actual, other]);
+            owner.OfferAlternatives([start, actual], decision, Hint(), task);
+            var win = new LocalCandidate([start, actual], 50, 0, 0, 0, 100, true, false, false,
+                Decisions: [decision], StartingHp: 50);
+            bool rejected = false;
+            try { owner.PromoteWinning(win with { Actions = [start with { CombatCardIndex = 99 }, actual] }); }
+            catch (InvalidOperationException) { rejected = true; }
+            Check(rejected, "A different native prefix must not steer this owned task's improvements");
+            owner.PromoteWinning(win); owner.Finish(task);
+            Check(broker.Pending == 1, "Owned winning feedback duplicated or deleted pending siblings");
+        });
+
+        asyncTest("shared turn work early consumers distinguish startup from exhausted work", async () =>
+        {
+            var captured = Request(); using var broker = new LocalTurnWork(captured, 4);
+            var command = captured with { TurnWorkPipe = broker.PipeName };
+            await Task.WhenAll(Enumerable.Range(1, 3).Select(owner => Task.Run(() =>
+            {
+                using var early = new LocalTurnWorkClient(command with { Partition = owner });
+                Check(!early.TryTake(out _) && !early.RootReady && early.Active == 0,
+                    "An empty startup queue must not be reported as exhausted");
+            })));
+            using var producer = new LocalTurnWorkClient(command);
+            producer.Offer([], 1, Hint()); Check(producer.TryTake(out var root), "Root was not published atomically");
+            Check(producer.RootReady, "Published root is still reported as preparing"); producer.Finish(root);
+            using var done = new LocalTurnWorkClient(command with { Partition = 1 });
+            Check(!done.TryTake(out _) && done.RootReady && done.Active == 0, "Completed work must release waiters");
+        });
         test("shared turn work publishes only alternatives beyond its owned action and selection prefix", () =>
         {
             var fixedChoice = new LocalCardChoice("native-offer", 0, "opaque", "display");

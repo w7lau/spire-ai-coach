@@ -10,12 +10,24 @@ namespace SpireAiCoach.Mod;
 
 // Learn exploration hints from effects actually executed in this frozen search.
 // This is not an effect mirror: native hooks still execute every proposed line.
-internal sealed class LocalNativeLearning(bool trackCosts = false)
+internal sealed class LocalNativeLearning(bool trackCosts = false, bool trackDurations = false)
 {
     internal sealed record Observation(string Card, int Round, decimal Energy, int PaidEnergy, int Hand,
-        int Upgrades, int Statuses, int Buffs, int Hp, uint Played,
-        IReadOnlyDictionary<uint, int>? HandCosts, bool HasHandEndEffect);
+        int Upgrades, int Statuses, int Buffs, int BuffAmount, int Hp, uint Played,
+        IReadOnlyDictionary<uint, int>? HandCosts, bool HasHandEndEffect, IReadOnlyDictionary<uint, int> Hints,
+        IReadOnlyDictionary<PowerModel, int> BuffPowers);
     private readonly Dictionary<string, (double Total, int Samples)> _bonuses = new(StringComparer.Ordinal);
+    private Dictionary<uint, int> _hints = [];
+    private Observation? _pending;
+    private sealed record BuffCredit(string Card, int Round, IReadOnlyDictionary<PowerModel, int> Before,
+        Dictionary<PowerModel, int> Gained, double Bonus);
+    private readonly List<BuffCredit> _credits = [];
+    private static readonly IEqualityComparer<PowerModel> PowerIdentity = ReferenceEqualityComparer.Instance;
+    private static Dictionary<PowerModel, int> Buffs(Player player) => player.Creature.Powers
+        .Where(p => p.TypeForCurrentAmount == PowerType.Buff).ToDictionary(p => p, p => Math.Max(0, p.Amount),
+            PowerIdentity);
+    private static double BuffBonus(IReadOnlyDictionary<PowerModel, int> before, Dictionary<PowerModel, int> gained) =>
+        Math.Min(40, gained.Count(p => !before.ContainsKey(p.Key)) * 20) + Math.Min(40, Math.Sqrt(gained.Values.Sum()) * 8);
     private static string Key(CardModel card) => $"{card.Id}:{card.CurrentUpgradeLevel}";
 
     private static Dictionary<uint, int> Costs(Player player) => player.PlayerCombatState!.Hand.Cards
@@ -33,8 +45,11 @@ internal sealed class LocalNativeLearning(bool trackCosts = false)
                 pcs.Hand.Cards.Count, pcs.AllPiles.SelectMany(p => p.Cards).Sum(c => c.CurrentUpgradeLevel),
                 pcs.AllPiles.Where(p => p.Type != PileType.Exhaust).SelectMany(p => p.Cards)
                     .Count(c => c.Type is CardType.Status or CardType.Curse),
-                player.Creature.Powers.Count(p => p.TypeForCurrentAmount == PowerType.Buff), player.Creature.CurrentHp,
-                NetCombatCard.FromModel(card).CombatCardIndex, trackCosts ? Costs(player) : null, card.HasTurnEndInHandEffect);
+                player.Creature.Powers.Count(p => p.TypeForCurrentAmount == PowerType.Buff),
+                player.Creature.Powers.Where(p => p.TypeForCurrentAmount == PowerType.Buff).Sum(p => Math.Max(0, p.Amount)),
+                player.Creature.CurrentHp, NetCombatCard.FromModel(card).CombatCardIndex, trackCosts ? Costs(player) : null,
+                card.HasTurnEndInHandEffect, new Dictionary<uint, int>(_hints), trackDurations ? Buffs(player) :
+                    new Dictionary<PowerModel, int>(PowerIdentity));
         }
         catch { return null; }
     }
@@ -53,6 +68,8 @@ internal sealed class LocalNativeLearning(bool trackCosts = false)
             var removed = Math.Max(0, before.Statuses - pcs.AllPiles.Where(p => p.Type != PileType.Exhaust)
                 .SelectMany(p => p.Cards).Count(c => c.Type is CardType.Status or CardType.Curse));
             var buffs = Math.Max(0, player.Creature.Powers.Count(p => p.TypeForCurrentAmount == PowerType.Buff) - before.Buffs);
+            var buffAmount = Math.Max(0, player.Creature.Powers.Where(p => p.TypeForCurrentAmount == PowerType.Buff)
+                .Sum(p => Math.Max(0, p.Amount)) - before.BuffAmount);
             var healed = Math.Max(0, player.Creature.CurrentHp - before.Hp);
             // An end-in-hand flag does not forbid an additional OnPlay cost in a Mod.
             // Correct that uncertain preview with the HP change actually observed on play.
@@ -60,12 +77,57 @@ internal sealed class LocalNativeLearning(bool trackCosts = false)
             double bonus = Math.Min(36, drawn * 6) + Math.Min(40, (double)energy * 12) +
                 Math.Min(40, upgrades * 6) + Math.Min(24, removed * 6) + Math.Min(40, buffs * 20) + Math.Min(24, healed * 3) -
                 Math.Min(40, handEffectPlayCost * 3);
+            double growthBonus = Math.Min(40, buffs * 20) + Math.Min(40, Math.Sqrt(buffAmount) * 8);
+            if (trackDurations)
+            {
+                var gained = Buffs(player).Where(p => p.Value > before.BuffPowers.GetValueOrDefault(p.Key))
+                    .ToDictionary(p => p.Key, p => p.Value - before.BuffPowers.GetValueOrDefault(p.Key), PowerIdentity);
+                double actualBonus = BuffBonus(before.BuffPowers, gained);
+                bonus += actualBonus - Math.Min(40, buffs * 20);
+                _credits.Add(new(before.Card, before.Round, before.BuffPowers, gained, actualBonus));
+            }
+            else bonus += growthBonus - Math.Min(40, buffs * 20);
             if (before.HandCosts != null)
                 bonus += Math.Min(80d, (double)LocalResourceEffects.HandCostSavings(before.HandCosts, Costs(player), before.Played) * 12);
             var old = _bonuses.GetValueOrDefault(before.Card);
             _bonuses[before.Card] = (old.Total + bonus, old.Samples + 1);
+            _pending = before;
         }
         catch { /* Unknown Mod observations do not alter legal branches or final scoring. */ }
+    }
+
+    public void ResetDecision() { _pending = null; _hints.Clear(); _credits.Clear(); }
+    public void SettleBuffs(Player player)
+    {
+        if (!trackDurations || _credits.Count == 0) return;
+        try
+        {
+            int round = player.Creature.CombatState!.RoundNumber;
+            var remaining = Buffs(player);
+            foreach (var credit in _credits.Where(c => c.Round < round))
+            {
+                var retained = credit.Gained.Select(p => (p.Key, Amount: Math.Min(p.Value,
+                    Math.Max(0, remaining.GetValueOrDefault(p.Key) - credit.Before.GetValueOrDefault(p.Key)))))
+                    .Where(p => p.Amount > 0).ToDictionary(p => p.Key, p => p.Amount, PowerIdentity);
+                var old = _bonuses.GetValueOrDefault(credit.Card);
+                if (old.Samples > 0) _bonuses[credit.Card] = (old.Total + BuffBonus(credit.Before, retained) - credit.Bonus, old.Samples);
+            }
+            _credits.RemoveAll(c => c.Round < round);
+        }
+        catch { /* This corrects exploration hints only; native settlement remains authoritative. */ }
+    }
+    public void ObserveHints(Player player, Dictionary<uint, int> current)
+    {
+        // Reuse previews already computed by native enumeration. No extra card
+        // execution or hypothetical mechanics: compare the same remaining
+        // instances after the preceding real play (upgrades, strength, costs,
+        // and block-driven damage can all improve a following card).
+        var pending = _pending; _pending = null; _hints = current;
+        if (pending == null || player.Creature.CombatState?.RoundNumber != pending.Round) return;
+        int gains = current.Where(p => p.Key != pending.Played && pending.Hints.ContainsKey(p.Key))
+            .Sum(p => Math.Max(0, p.Value - pending.Hints[p.Key]));
+        var old = _bonuses.GetValueOrDefault(pending.Card);
+        if (old.Samples > 0) _bonuses[pending.Card] = (old.Total + Math.Min(80, gains * .75), old.Samples);
     }
 
     public int Priority(CardModel card, int nativePreview) => _bonuses.TryGetValue(Key(card), out var learned)

@@ -37,6 +37,7 @@ public static class LocalWorker
     private static bool _fastNativeWaits;
     private static bool _fastStateSettling;
     private static LocalNativeLearning? _nativeLearning;
+    private static bool _efficientTactics;
     private static LocalChoices? _choices;
     private static Func<bool> _nativeModeBeforeRequest = () => false;
     internal static LocalChoices CurrentChoices => _choices ?? throw new LocalChoiceException("未处于原生选牌操作中。");
@@ -129,7 +130,8 @@ public static class LocalWorker
         _includePotions = false;
         bool systematic = request.SearchOrder != LocalSearchOrder.MonteCarlo;
         bool turnMode = request.SearchOrder == LocalSearchOrder.TurnFrontier;
-        _nativeLearning = request.StrategicRollouts ? new(trackCosts: turnMode) : null;
+        _nativeLearning = request.StrategicRollouts ? new(trackCosts: true, trackDurations: request.LearnBuffDuration) : null;
+        _efficientTactics = request.EfficientTactics;
         _excludedModels = new(request.ExcludedModels ?? [], StringComparer.Ordinal);
         var timer = Stopwatch.StartNew();
         var budget = new Stopwatch();
@@ -159,6 +161,7 @@ public static class LocalWorker
                 coveredTasks + (coverage?.Avoided ?? 0), terminalHistories.Count + repeatedHistories, repeatedHistories);
         var search = noPotionSearch;
         var refiner = new LocalRouteRefiner();
+        var policy = request.CorrelatedRollouts && !systematic ? new LocalRolloutPolicy(314159 + request.Partition) : null;
         LocalCandidate? refinementSeed = null;
         // Turn work uses an exact shared frontier, separate from the old soft
         // improvement proposals. Every claimed history is replayed in its owner.
@@ -174,6 +177,8 @@ public static class LocalWorker
         int executed = 0, restores = 0;
         async Task RestoreMeasured()
         {
+            LocalWorkerOverhead.LeanSearchChecksums = false;
+            _nativeLearning?.ResetDecision();
             var started = Stopwatch.GetTimestamp();
             try { await LocalWorkerLogic.Run(() => Restore(request), () => _choices?.Tick(), Frame, 60); }
             finally { restoreMs += (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds; restores++; }
@@ -182,6 +187,7 @@ public static class LocalWorker
         LocalCandidate? lastPublishedBest = null;
         int route = 0, bestRoute = 0, rootBranches = 0;
         var events = new Queue<LocalSimEvent>();
+        var trials = new List<LocalSearchTrial>();
         LocalAction? pendingAction = null;
         LocalAction? blockedAction = null;
         void Progress(string phase, LocalSimState? state = null, bool force = false, string status = "running")
@@ -213,7 +219,8 @@ public static class LocalWorker
                 Victories: victories, IncludePotions: request.IncludePotions,
                 Timing: new(restoreMs, actionMs, decisionMs, verifyMs, Actions: executed, Restores: restores, Verifications: verifyMs > 0 ? 1 : 0),
                 BlockedAction: blockedAction, MaxRounds: request.MaxRounds,
-                Trace: status == "running" ? null : _timeline!.Snapshot(), StoppedEarly: stoppedEarly, TurnSearch: TurnStats(), RootBranches: rootBranches));
+                Trace: status == "running" ? null : _timeline!.Snapshot(), StoppedEarly: stoppedEarly, TurnSearch: TurnStats(), RootBranches: rootBranches,
+                Trials: status == "running" ? null : trials.ToArray()));
         }
         try
         {
@@ -325,7 +332,7 @@ public static class LocalWorker
             if (work != null && request.Partition == 0)
             {
                 using var scheduling = Trace("schedule");
-                work.Offer("expand", first.OrderByDescending(a => a.Preference).Select(a => new[] { a }));
+                work.Offer("expand", first.OrderByDescending(a => a.Preference).Select(a => new[] { a }), initializeRoot: true);
                 if (request.InitialPlan is { Length: > 0 }) work.Offer("improve", [request.InitialPlan]);
             }
             Progress("已准备可探索分支", force: true);
@@ -349,12 +356,13 @@ public static class LocalWorker
                 // executing the proposed line in this worker, including all native effects and choices.
                 if (!systematic || turnMode) foreach (var peer in Directory.EnumerateDirectories(Path.GetDirectoryName(_root)!, "worker-*"))
                 {
-                    var file = Path.Combine(peer, "result.json");
+                    var file = Path.Combine(peer, "search-seed.json");
                     if (peer == _root || !File.Exists(file)) continue;
                     try
                     {
-                        var result = LocalWire.Read<LocalSearchResult>(file);
-                        if (result.Id == request.Id && result.SnapshotId == request.SnapshotId && result.Best is { } seed &&
+                        var result = LocalWire.Read<LocalSearchSeed>(file);
+                        if (result.Id == request.Id && result.SnapshotId == request.SnapshotId &&
+                            result.NativeHash == request.NativeHash && result.Candidate is { } seed &&
                             LocalSearchPolicy.Better(seed, refinementSeed)) refinementSeed = seed;
                     }
                     catch (IOException) { /* Peer can be replacing its private IPC file. */ }
@@ -378,13 +386,13 @@ public static class LocalWorker
                     boundPruned += turns.DiscardProvenExpenses(LocalWinningBound.From(healthRoot, best));
                     if (!turns.TryTake(out turnTask))
                     {
-                        if (sharedTurns?.Active > 0)
+                        if (sharedTurns != null && (!sharedTurns.RootReady || sharedTurns.Active > 0))
                         {
                             refining?.Dispose(); Progress("等待可探索分支"); await Task.Delay(50); continue;
                         }
                         sharedExhausted = sharedTurns != null; break;
                     }
-                    if (sharedTurns != null) fullRollout = turnTask.FullRollout;
+                    fullRollout = sharedTurns != null ? turnTask.FullRollout : fullRollout || turnTask.FullRollout;
                     planned = turnTask.Prefix;
                     // Skip already completed subtrees before restoring their prefix.
                     if (coverage!.IsClosedPrefix(planned)) { coveredTasks++; sharedTurns?.Finish(turnTask); continue; }
@@ -396,15 +404,18 @@ public static class LocalWorker
                     while (refiner.TryTake(out var proposal)) proposals.Add(proposal);
                     work.Offer("improve", proposals);
                     bool improving = evaluated % 2 == 1 || evaluated == 0 && request.InitialPlan is { Length: > 0 };
-                    sharedTask = work.Take(improving ? "improve" : "expand", request.Partition, evaluated % 3 == 2)
-                        ?? work.Take(improving ? "expand" : "improve", request.Partition, evaluated % 3 == 2);
+                    sharedTask = work.Take(improving ? "improve" : "expand", request.Partition,
+                        evaluated % 8 == 4, focused: evaluated % 8 == 2 || evaluated % 8 == 6)
+                        ?? work.Take(improving ? "expand" : "improve", request.Partition, evaluated % 8 == 4,
+                            focused: evaluated % 8 == 2 || evaluated % 8 == 6);
                     planned = sharedTask?.Plan;
                     if (sharedTask?.Kind == "improve") refinements++;
                     if (sharedTask == null)
                     {
                         // Do not turn an empty shared queue into independent root
                         // rollouts. Peers can publish new branches after their jobs.
-                        if (work.Stats().Active == 0) break;
+                        var workState = work.Stats();
+                        if (workState.RootReady && workState.Active == 0 && workState.Pending == 0) break;
                         refining?.Dispose();
                         Progress("等待可探索分支");
                         await Task.Delay(50);
@@ -427,6 +438,9 @@ public static class LocalWorker
                 if (attempts > 1) await RestoreMeasured();
                 if (StopRequested()) { stoppedEarly = true; break; }
                 var player = LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!;
+                LocalWorkerOverhead.LeanSearchChecksums = request.LeanSearchChecksums;
+                using var checksumListener = request.ProbeChecksumListener
+                    ? LocalWorkerOverhead.ObserveChecksums(RunManager.Instance.ChecksumTracker) : null;
                 var startRound = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
                 var startingHp = player.Creature.CurrentHp;
                 // Always establish a no-potion baseline. Then interleave reserve-potion searches,
@@ -445,6 +459,7 @@ public static class LocalWorker
                 var decisions = new List<LocalDecision>();
                 var partition = systematic && sharedTurns == null ? new LocalBranchPartition(request.Partition, partitions) : null;
                 var trial = search.Begin();
+                policy?.Begin();
                 var coveredTrial = coverage?.Begin();
                 var winningBound = LocalWinningBound.From(healthRoot, best);
                 // Interleave measured winning-tail proposals with fresh native
@@ -543,7 +558,7 @@ public static class LocalWorker
                         var continuations = turnMode && attempts % 3 != 0 ? legal.Where(a => a.PotionSlot == null).ToArray() : legal;
                         if (continuations.Length == 0) continuations = legal;
                         var next = turns != null ? preferred ?? turns.Choose(continuations, coherent) :
-                            search.Select(trial, legal, preferred, greedy: coherent);
+                            search.Select(trial, legal, preferred, greedy: coherent, priority: policy == null ? null : policy.Priority);
                         coverage?.Follow(coveredTrial!, next);
                         var choiceDecisions = new List<LocalChoiceDecision>();
                         decisions.Add(new(actions.Count, legal));
@@ -593,7 +608,7 @@ public static class LocalWorker
                                 if (exactAction && expected != null && fixedChoice == null)
                                     throw new InvalidOperationException("Exact native selection prefix diverged");
                                 var selected = turns != null ? fixedChoice ?? turns.Choose(choices, coherent) :
-                                    search.Select(trial, choices, fixedChoice, greedy: coherent);
+                                    search.Select(trial, choices, fixedChoice, greedy: coherent, priority: policy == null ? null : policy.Priority);
                                 coverage?.Follow(coveredTrial!, selected);
                                 return options.Single(c => c.Index == selected.HandIndex);
                             });
@@ -607,6 +622,7 @@ public static class LocalWorker
                                 throw new InvalidOperationException("Exact native selection history changed");
                         }
                         _nativeLearning?.After(learned, player);
+                        if (next.EndTurn) _nativeLearning?.SettleBuffs(player);
                         decisions[^1] = decisions[^1] with { Choices = choiceDecisions.ToArray() };
                         if (turns != null && actions.Count >= planned!.Length)
                         {
@@ -670,6 +686,10 @@ public static class LocalWorker
                     if (turnMode && IsTerminal(player) && planIndex < planned!.Length)
                         throw new InvalidOperationException("Exact native search prefix terminated early");
                     bool completeAttempt = !turnProbed && !cut && (fullRollout || IsTerminal(player));
+                    if (!turnProbed && !cut && trials.Count < 129)
+                        trials.Add(new(request.Partition, route, _timeline!.ElapsedMs, candidate.Won, candidate.Hp,
+                            candidate.NetHpLoss, candidate.Rounds, actions.Count(a => a.PotionSlot.HasValue), completeAttempt,
+                            sharedTask?.Kind == "expand" ? LocalSearchWork.MatchesPrefix(actions, sharedTask.Plan) : null));
                     using (Trace("trial-result", $"won={won};hp={candidate.Hp};loss={candidate.NetHpLoss};potions={actions.Count(a => a.PotionSlot.HasValue)};" +
                         $"rounds={candidate.Rounds};complete={completeAttempt};probe={turnProbed};cut={cut};limited={stop == "达到时间预算"}")) { }
                     if (turnTask != null && stop != "达到时间预算" && !cut)
@@ -678,12 +698,30 @@ public static class LocalWorker
                     else if (completeAttempt) evaluated++;
                     if (won) victories++;
                     Progress(won ? "路线获胜" : candidate.StopReason, Observe(player), true);
-                    if (completeAttempt && LocalSearchPolicy.Better(candidate, best)) { best = candidate; bestRoute = route; }
-                    if (LocalSearchPolicy.CanStop(best, request.StopOnZeroLoss)) { stoppedEarly = true; break; }
+                    if (completeAttempt && LocalSearchPolicy.Better(candidate, best))
+                    {
+                        best = candidate; bestRoute = route;
+                        LocalWire.Write(Path.Combine(_root, "search-seed.json"),
+                            new LocalSearchSeed(request.Id, request.SnapshotId, request.NativeHash,
+                                candidate with { Continuation = null }));
+                        if (request.GuideWinningRoutes && candidate.Won &&
+                            !LocalSearchPolicy.CanStop(candidate, request.StopOnZeroLoss,
+                                request.TargetVictoryRounds, request.TargetPotionUses))
+                            turns?.PromoteWinning(candidate);
+                    }
+                    if (completeAttempt && stop != "达到时间预算") policy?.Complete(candidate);
+                    if (LocalSearchPolicy.CanStop(best, request.StopOnZeroLoss,
+                        request.TargetVictoryRounds, request.TargetPotionUses)) { stoppedEarly = true; break; }
                     if (work != null)
                     {
                         using var scheduling = Trace("schedule");
                         work.RecordTerminal(candidate);
+                        // Deepen exactly the next observed decision under the claimed
+                        // prefix. Do not replace several unrelated setup decisions with
+                        // independent root noise. Other lanes retain broad coverage.
+                        if (sharedTask?.Kind == "expand" && LocalSearchWork.MatchesPrefix(actions, sharedTask.Plan))
+                            work.Offer("expand", ExpansionPrefixes(candidate).Where(p => p.Length == sharedTask.Plan.Length + 1),
+                                parent: sharedTask.Key);
                         work.Offer("expand", ExpansionPrefixes(candidate).Take(96));
                         if (sharedTask != null && stop != "达到时间预算") work.Complete(sharedTask);
                     }
@@ -712,6 +750,7 @@ public static class LocalWorker
                     }
                 }
             }
+            LocalWorkerOverhead.LeanSearchChecksums = false;
             if (best != null && !request.DeferVerification)
             {
                 Publish("running", "正在从当前状态重新执行最佳路线，复核每步状态与最终结算…");
@@ -754,7 +793,7 @@ public static class LocalWorker
         finally
         {
             try { sharedTurns?.Dispose(); work?.Retire(request.Partition); }
-            finally { NonInteractiveMode.AutoSlayerCheck = originalNativeMode; LocalWorkerOverhead.Enabled = false; LocalWorkerLogic.Enabled = false; LocalWorkerDataMode.Reset(); LocalWorkerVisuals.Reset(); _fastNativeWaits = _fastStateSettling = false; LocalWorkerResources.Retain = LocalWorkerResources.FastCollection = false; Engine.TimeScale = originalScale; Engine.MaxFps = originalFps; _timeline = null; }
+            finally { NonInteractiveMode.AutoSlayerCheck = originalNativeMode; LocalWorkerOverhead.Enabled = false; LocalWorkerOverhead.LeanSearchChecksums = false; LocalWorkerLogic.Enabled = false; LocalWorkerDataMode.Reset(); LocalWorkerVisuals.Reset(); _fastNativeWaits = _fastStateSettling = false; LocalWorkerResources.Retain = LocalWorkerResources.FastCollection = false; Engine.TimeScale = originalScale; Engine.MaxFps = originalFps; _timeline = null; }
         }
     }
 
@@ -1002,21 +1041,27 @@ public static class LocalWorker
         // CanPlay walks the hook chain. Query once per card and reuse within this settled
         // decision, instead of recomputing the full hand for every card/target preview.
         var playable = hand.Where(c => !_excludedModels.Contains(c.Id.ToString()) && c.CanPlay()).ToArray();
-        var tactics = LocalTacticalPreview.Capture(player, playable);
+        var tactics = LocalTacticalPreview.Capture(player, playable, _efficientTactics);
+        var hints = new Dictionary<uint, int>();
         for (var i = 0; i < hand.Count; i++)
         {
             var card = hand[i];
             if (!playable.Contains(card)) continue;
             // Do not assume that attacks precede setup, or that zero damage means no value.
             if (card.IsValidTarget(null)) result.Add(new(i, card.Id.ToString(), null, card.Title, "", hash, state.RoundNumber,
-                Preference: _nativeLearning?.Priority(card, tactics.Priority(card, null)) ?? tactics.Priority(card, null),
+                Preference: tactics.Priority(card, null),
                 CombatCardIndex: NetCombatCard.FromModel(card).CombatCardIndex));
             else foreach (var target in state.Creatures.Where(c => c.IsAlive && card.IsValidTarget(c)))
                 result.Add(new(i, card.Id.ToString(), target.CombatId, card.Title,
                     target.CombatId is { } id && _targetLabels?.TryGetValue(id, out var label) == true ? label : target.Name,
-                    hash, state.RoundNumber, Preference: _nativeLearning?.Priority(card, tactics.Priority(card, target)) ?? tactics.Priority(card, target),
+                    hash, state.RoundNumber, Preference: tactics.Priority(card, target),
                     CombatCardIndex: NetCombatCard.FromModel(card).CombatCardIndex));
         }
+        foreach (var action in result)
+            if (action.CombatCardIndex is { } id) hints[id] = Math.Max(hints.GetValueOrDefault(id, int.MinValue), action.Preference);
+        _nativeLearning?.ObserveHints(player, hints);
+        for (int i = 0; i < result.Count; i++)
+            result[i] = result[i] with { Preference = _nativeLearning?.Priority(hand[result[i].HandIndex], result[i].Preference) ?? result[i].Preference };
         if (_includePotions)
         {
             for (int i = 0; i < player.PotionSlots.Count; i++)

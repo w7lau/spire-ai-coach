@@ -22,6 +22,7 @@ public interface ILocalTurnFrontier
     void Offer(LocalAction[] prefix, int searchRound, LocalTurnHint hint);
     bool TryTake(out LocalTurnTask task);
     void FocusNext(LocalTurnTask task, IReadOnlyList<LocalAction> actions, IReadOnlyList<LocalDecision> decisions);
+    void PromoteWinning(LocalCandidate candidate);
     void ReturnInterrupted(LocalTurnTask task, LocalTurnHint hint);
     int DiscardDescendants(IReadOnlyList<LocalAction> prefix);
     int DiscardProvenExpenses(LocalWinningBound? incumbent);
@@ -41,9 +42,13 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
     private readonly Queue<int> _fair = new();
     private readonly Stack<int[]> _focus = new();
     private readonly Stack<int[]> _descent = new();
+    private readonly Stack<int[]> _winning = new();
     private readonly Random _random;
     private readonly string? _root;
-    private int _next, _taken, _descentTakes;
+    private int _next, _taken, _descentTakes, _guidedTakes;
+    private LocalCandidate? _guidedIncumbent;
+    private int? _winningOwner;
+    private int _ownerGuidedTakes;
     public int Count => _pending.Count;
     public int Offered => _next;
     public int DuplicateOffers { get; private set; }
@@ -80,7 +85,9 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         _fair.Enqueue(entry.Task.Id);
     }
 
-    public bool TryTake(out LocalTurnTask task)
+    public bool TryTake(out LocalTurnTask task) => TryTake(out task, null);
+
+    public bool TryTake(out LocalTurnTask task, int? owner)
     {
         task = null!;
         if (_pending.Count == 0) return false;
@@ -92,7 +99,11 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         LastLane = lane;
         LastFocused = false;
         int id;
-        if (lane == 2 && TryFocus(out id)) { FocusedTakes++; LastFocused = true; }
+        bool guided = false;
+        bool winningAllowed = _winningOwner == null || owner == _winningOwner;
+        bool ownerTurn = _winningOwner.HasValue && owner == _winningOwner && _ownerGuidedTakes++ % 2 == 0;
+        if (ownerTurn && TryStack(_winning, out id)) { guided = true; FocusedTakes++; LastFocused = true; }
+        else if (lane == 2 && TryGuidedFocus(out id, out guided, winningAllowed)) { FocusedTakes++; LastFocused = true; }
         else if (lane == 3)
         {
             do { id = _fair.Dequeue(); } while (!_pending.ContainsKey(id));
@@ -102,10 +113,55 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
             var queue = lane == 1 ? _damage : _health;
             do { id = queue.Dequeue(); } while (!_pending.ContainsKey(id));
         }
-        task = _pending[id].Task;
+        task = _pending[id].Task with { FullRollout = guided };
         _pending.Remove(id);
         return true;
     }
+
+    private bool TryGuidedFocus(out int id, out bool guided, bool winningAllowed)
+    {
+        // Alternate incumbent improvements with compound descent. Every other
+        // scheduler lane and FIFO still retain the unvisited legal histories.
+        guided = false;
+        if (winningAllowed && _guidedTakes++ % 2 == 0 && TryStack(_winning, out id)) { guided = true; return true; }
+        if (TryFocus(out id)) return true;
+        if (winningAllowed && TryStack(_winning, out id)) { guided = true; return true; }
+        return false;
+    }
+
+    public void PromoteWinning(LocalCandidate candidate) => PromoteWinning(candidate, null);
+
+    public void PromoteWinning(LocalCandidate candidate, int? owner)
+    {
+        if (!candidate.Won || candidate.Dead || candidate.Decisions == null ||
+            !LocalSearchPolicy.Better(candidate, _guidedIncumbent)) return;
+        // Cross-worker measurements steer proposals only, never a health cut.
+        // A late, weaker local win must not replace the shared best's focus.
+        _guidedIncumbent = candidate with { Continuation = null, Decisions = null };
+        var options = new List<(int Id, double Priority)>();
+        foreach (var decision in candidate.Decisions)
+        {
+            int step = decision.BeforeStep;
+            if (step < 0 || step >= candidate.Actions.Length) continue;
+            var actual = candidate.Actions[step];
+            foreach (var alternative in decision.Legal.Where(a => !SameAction(a, actual)))
+            {
+                var key = actual.Round + ":" + HistoryKey([.. candidate.Actions.Take(step), alternative]);
+                int id = _seen.GetValueOrDefault(key, -1);
+                if (_pending.ContainsKey(id))
+                    options.Add((id, (alternative.Preference - actual.Preference) / Math.Sqrt(1 + step)));
+            }
+        }
+        var ids = options.OrderByDescending(p => p.Priority).ThenBy(p => p.Id).Select(p => p.Id).Distinct().ToArray();
+        if (ids.Length == 0) return;
+        _winning.Clear(); _winning.Push(ids); _guidedTakes = 0;
+        _winningOwner = owner; _ownerGuidedTakes = 0;
+        // No new branch, state merge or health proof is inferred here. These
+        // are already-observed pending native alternatives of an executed win.
+    }
+
+    public void ReleaseWinningOwner(int owner)
+    { if (_winningOwner == owner) _winningOwner = null; }
 
     private bool TryFocus(out int id)
     {

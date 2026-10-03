@@ -6,6 +6,86 @@ static class SearchAlgorithmTests
 
     public static void Register(Action<string, Action> test)
     {
+        test("search resource priorities preserve lethal and payments while valuing free native block", () =>
+        {
+            var free = new LocalTacticalFeatures(Known: true, Block: 10, Incoming: 26, ResourceCost: 0);
+            var costly = free with { Block = 16, ResourceCost = 2 };
+            Check(LocalTactics.Priority(free) > LocalTactics.Priority(costly),
+                "A larger absolute effect must not always hide a more efficient resource use");
+            Check(LocalTactics.Priority(free with { Incoming = 0 }) == 0,
+                "Free unused block may trigger native effects without spending a resource");
+            Check(LocalTactics.Priority(free with { Incoming = 0, HpCost = 6 }) < 0,
+                "A known HP payment must not become harmless merely because energy is zero");
+            var lethal = new LocalTacticalFeatures(Known: true, Damage: 20, EnemyHp: 10, ResourceCost: 3);
+            Check(LocalTactics.Priority(lethal) == LocalTactics.Priority(lethal with { ResourceCost = null }),
+                "An immediate lethal must not be hidden by cost normalization");
+            Check(LocalTactics.Priority(free with { Known = false }) == 0,
+                "Cost does not invent an effect for an unknown Mod card");
+        });
+        test("search goal gates complete zero-loss victories by rounds and optional potion allowance", () =>
+        {
+            var victory = new LocalCandidate([Move("one"), Move("two")], 80, 12, 0, 0, 80,
+                true, false, false, Rounds: 6, StartingHp: 80);
+            Check(LocalSearchPolicy.CanStop(victory, true, 6, 0), "Healed costs are part of the completed net-loss goal");
+            Check(!LocalSearchPolicy.CanStop(victory with { Rounds = 7 }, true, 6, 0), "A slower victory has not reached this benchmark");
+            Check(!LocalSearchPolicy.CanStop(victory with { Actions = [Move("potion") with { PotionSlot = 0 }] }, true, 6, 0),
+                "A reserve-potion victory is not a no-potion goal");
+            Check(!LocalSearchPolicy.CanStop(victory with { Hp = 79 }, true, 6, 0), "Positive final loss is not a solved goal");
+            Check(!LocalSearchPolicy.CanStop(victory with { Won = false }, true, 6, 0), "A healthy horizon is not a victory");
+            Check(!LocalSearchPolicy.CanStop(victory, false, 6, 0), "A disabled stop remains disabled");
+            Check(LocalSearchPolicy.CanStop(victory with { Rounds = 20, Actions = [Move("potion") with { PotionSlot = 0 }] }, true),
+                "The existing product switch keeps its ordinary first-zero-loss semantics");
+            var request = new LocalSearchRequest("request", "snapshot", [], "native", 0, [], false);
+            Check(request.LeanSearchChecksums && request.EfficientTactics && request.LearnBuffDuration && request.GuideWinningRoutes &&
+                request.TargetVictoryRounds == null && request.TargetPotionUses == null,
+                "The product does not hardcode this user's six-round benchmark");
+        });
+        test("search correlated policies discover repeated delayed setup without an answer seed", () =>
+        {
+            int found = 0;
+            for (int seed = 0; seed < 30; seed++)
+            {
+                var policy = new LocalRolloutPolicy(seed);
+                bool success = false;
+                for (int attempt = 0; attempt < 64 && !success; attempt++)
+                {
+                    policy.Begin();
+                    var actions = new List<LocalAction>();
+                    for (int step = 0; step < 12; step++)
+                    {
+                        var legal = new[] { Move("immediate") with { Preference = 20, BeforeHash = "state-" + step },
+                            Move("delayed") with { BeforeHash = "state-" + step } };
+                        actions.Add(legal.OrderByDescending(policy.Priority).First());
+                    }
+                    // All twelve preparations are needed. There is no intermediate
+                    // reward or improvement for a one-step alteration of the baseline.
+                    success = actions.All(a => a.ModelId == "delayed");
+                    policy.Complete(new(actions.ToArray(), success ? 80 : 40, success ? 0 : 40,
+                        success ? 0 : 20, 0, 80, success, false, false, StartingHp: 80));
+                }
+                if (success) found++;
+            }
+            Check(found == 30, "Independent decision noise must not be required at every step of a long combination");
+        });
+        test("search policy changes never collapse native instances or close untried histories", () =>
+        {
+            var policy = new LocalRolloutPolicy(91);
+            var tree = new LocalSearchTree(22);
+            var a = Move("duplicate") with { CombatCardIndex = 1 };
+            var legal = new[] { a, a with { CombatCardIndex = 2, HandIndex = 1 }, a with { TargetId = 2 } };
+            var seen = new HashSet<string>();
+            for (int i = 0; !tree.Exhausted && i < 20; i++)
+            {
+                policy.Begin();
+                var trial = tree.Begin();
+                var first = tree.Select(trial, legal, greedy: true, priority: policy.Priority);
+                var tail = tree.Select(trial, [Move("tail-a"), Move("tail-b")], greedy: true, priority: policy.Priority);
+                Check(seen.Add(first.CombatCardIndex + ":" + first.TargetId + ":" + tail.ModelId), "An exact terminal history repeated");
+                var result = new LocalCandidate([first, tail], 80, 0, 0, 0, 80, true, false, false, StartingHp: 80);
+                tree.Complete(trial, result, 20, closeExactPrefix: true); policy.Complete(result);
+            }
+            Check(tree.Exhausted && seen.Count == 6, "Perturbations may change ordering, never the legal leaf set");
+        });
         test("search tactics distinguish in-hand turn-end loss from a play payment", () =>
         {
             var payment = LocalTactics.Priority(new(Known: true, HpCost: 6));

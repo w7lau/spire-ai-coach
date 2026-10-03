@@ -13,9 +13,10 @@ public sealed class LocalTurnWork : IDisposable
     internal sealed record Command(string Scope, int Owner, string Operation,
         LocalTurnOffer[]? Offers = null, LocalTurnTask? Task = null,
         LocalAction[]? Actions = null, LocalDecision[]? Decisions = null,
-        LocalTurnHint? Hint = null, LocalWinningBound? Bound = null, string? TerminalDigest = null);
+        LocalTurnHint? Hint = null, LocalWinningBound? Bound = null, string? TerminalDigest = null,
+        LocalCandidate? WinningCandidate = null);
     internal sealed record Reply(LocalTurnTask? Task, int Pending, int Active,
-        int Offered, int Duplicates, int Affected = 0, string? Error = null);
+        int Offered, int Duplicates, int Affected = 0, string? Error = null, bool RootReady = false);
 
     private readonly object _gate = new();
     private readonly LocalTurnSearch _frontier;
@@ -28,7 +29,9 @@ public sealed class LocalTurnWork : IDisposable
     private readonly Task _listener;
     private readonly string _scope;
     private readonly int _maximum;
+    private readonly bool _ownedWinningFocus;
     private int _taken;
+    private bool _rootReady;
     public string PipeName { get; } = "SpireAiCoach-turn-" + Guid.NewGuid().ToString("N");
     public int Pending { get { lock (_gate) return _frontier.Count; } }
     public int Offered { get { lock (_gate) return _frontier.Offered; } }
@@ -39,7 +42,7 @@ public sealed class LocalTurnWork : IDisposable
     public LocalTurnWork(LocalSearchRequest request, int maximum)
     {
         if (maximum is < 1 or > 16) throw new ArgumentOutOfRangeException(nameof(maximum));
-        _maximum = maximum; _scope = Scope(request);
+        _maximum = maximum; _scope = Scope(request); _ownedWinningFocus = request.OwnedWinningFocus;
         _frontier = new(1729, request.SnapshotId + ":" + request.NativeHash);
         _listener = Task.Run(Listen);
     }
@@ -100,24 +103,31 @@ public sealed class LocalTurnWork : IDisposable
     }
 
     private Reply Snapshot(LocalTurnTask? task = null, int affected = 0, string? error = null) =>
-        new(task, _frontier.Count, _active.Count, _frontier.Offered, _frontier.DuplicateOffers, affected, error);
+        new(task, _frontier.Count, _active.Count, _frontier.Offered, _frontier.DuplicateOffers, affected, error, _rootReady);
 
     private Reply Apply(Command command)
     {
         foreach (var offer in command.Offers ?? []) _frontier.Offer(offer.Prefix, offer.SearchRound, offer.Hint);
+        if (command.Offers is { Length: > 0 }) _rootReady = true;
         switch (command.Operation)
         {
             case "offer": return Snapshot();
             case "take":
                 if (_active.ContainsKey(command.Owner)) throw new InvalidOperationException("Worker already owns a turn task");
-                if (!_frontier.TryTake(out var task)) return Snapshot();
-                task = task with { FullRollout = LocalTurnSearch.IsFullRollout(_taken++),
+                if (!_frontier.TryTake(out var task, command.Owner)) return Snapshot();
+                task = task with { FullRollout = LocalTurnSearch.IsFullRollout(_taken++) || task.FullRollout,
                     Lane = _frontier.LastLane, Focused = _frontier.LastFocused };
                 _active.Add(command.Owner, task); return Snapshot(task);
             case "focus":
                 var focused = RequireOwner(command);
                 _frontier.FocusNext(focused, command.Actions ?? [], command.Decisions ?? [], focused.Focused);
                 return Snapshot();
+            case "improve":
+                var incumbentOwner = RequireOwner(command);
+                var incumbent = command.WinningCandidate ?? throw new InvalidDataException("Missing native incumbent");
+                if (!LocalSearchWork.MatchesPrefix(incumbent.Actions, incumbentOwner.Prefix))
+                    throw new InvalidDataException("Incumbent does not belong to its owned native prefix");
+                _frontier.PromoteWinning(incumbent, _ownedWinningFocus ? command.Owner : null); return Snapshot();
             case "finish":
                 RequireOwner(command); _active.Remove(command.Owner);
                 if (command.TerminalDigest is { } digest && !_terminals.Add(digest)) _repeated++;
@@ -142,6 +152,10 @@ public sealed class LocalTurnWork : IDisposable
 
     private void Retire(int owner)
     {
+        _frontier.ReleaseWinningOwner(owner);
+        // A failed root producer cannot leave the remaining clients waiting
+        // forever for a task that will never be published.
+        if (owner == 0) _rootReady = true;
         if (!_active.Remove(owner, out var task)) return;
         // A disconnected/interrupted process does not close a native subtree.
         _frontier.ReturnInterrupted(task, task.Hint ?? throw new InvalidDataException("Turn task lost its observed hint"));
@@ -173,6 +187,7 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
     private long _lastFlush = Environment.TickCount64;
     public int Count => _last.Pending + _offers.Count;
     public int Active => _last.Active;
+    public bool RootReady => _last.RootReady;
     public int Offered => _last.Offered;
     public int DuplicateOffers => _last.Duplicates;
     public int LastLane { get; private set; }
@@ -189,9 +204,10 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
 
     private LocalTurnWork.Reply Exchange(string operation, LocalTurnTask? task = null,
         LocalAction[]? actions = null, LocalDecision[]? decisions = null,
-        LocalTurnHint? hint = null, LocalWinningBound? bound = null, string? terminalDigest = null)
+        LocalTurnHint? hint = null, LocalWinningBound? bound = null, string? terminalDigest = null,
+        LocalCandidate? winningCandidate = null)
     {
-        var command = new LocalTurnWork.Command(_scope, _owner, operation, _offers.ToArray(), task, actions, decisions, hint, bound, terminalDigest);
+        var command = new LocalTurnWork.Command(_scope, _owner, operation, _offers.ToArray(), task, actions, decisions, hint, bound, terminalDigest, winningCandidate);
         _writer.WriteLine(JsonSerializer.Serialize(command));
         var reply = JsonSerializer.Deserialize<LocalTurnWork.Reply>(_reader.ReadLine() ?? throw new IOException("Turn task broker closed"))
             ?? throw new InvalidDataException("Empty turn task reply");
@@ -215,6 +231,11 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
     public void FocusNext(LocalTurnTask task, IReadOnlyList<LocalAction> actions, IReadOnlyList<LocalDecision> decisions) =>
         Exchange("focus", task, actions.Take(task.Prefix.Length + 1).ToArray(),
             decisions.Where(d => d.BeforeStep == task.Prefix.Length).ToArray());
+    public void PromoteWinning(LocalCandidate candidate)
+    {
+        if (!candidate.Won || candidate.Dead || _owned == null) return;
+        Exchange("improve", _owned, winningCandidate: candidate with { Continuation = null });
+    }
     public void ReturnInterrupted(LocalTurnTask task, LocalTurnHint hint)
     { Exchange("return", task, hint: hint); _owned = null; }
     public void Finish(LocalTurnTask task, string? terminalDigest = null)
