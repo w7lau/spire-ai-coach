@@ -1,0 +1,86 @@
+{
+  "source": "frozen latest 0.7.9 player request",
+  "root_original_evaluated": 256,
+  "root_original_victories": 12,
+  "root_original_hp": 16,
+  "root_starting_hp": 40,
+  "root_original_net_loss": 24,
+  "native_beckon_plays_in_original_search": 186,
+  "native_routes_playing_beckon_in_original_search": 109,
+  "improvement_mode": "continue from original published candidate only; improved fixed route not supplied",
+  "Status": "done",
+  "Evaluated": 27,
+  "Rejected": 0,
+  "Victories": 11,
+  "Hp": 28,
+  "NetHpLoss": 12,
+  "Rounds": 6,
+  "Won": true,
+  "used_potion": false,
+  "beckon_plays": [
+    [
+      14,
+      3
+    ],
+    [
+      22,
+      5
+    ]
+  ],
+  "verified_steps": 25,
+  "verification_count": 1,
+  "ElapsedMs": 105618,
+  "Timing": {
+    "RestoreMs": 4890,
+    "ActionMs": 31666,
+    "DecisionMs": 10154,
+    "VerificationMs": 10161,
+    "StartupMs": 31339,
+    "Actions": 1324,
+    "Restores": 27,
+    "Verifications": 1
+  },
+  "Budgets": {
+    "Workers": 1,
+    "MaxNodes": 32,
+    "BudgetSeconds": 60,
+    "MaxRounds": 64
+  },
+  "fresh_unseeded_success_not_proven": true,
+  "globally_optimal_not_proven": true,
+  "installed": true,
+  "prototype_version_identifier": "0.7.10",
+  "release_version": "0.7.11",
+  "combined_release_fixed_acceptance": {
+    "Status": "done",
+    "Evaluated": 1,
+    "Rejected": 0,
+    "Won": true,
+    "StartingHp": 40,
+    "Hp": 28,
+    "NetHpLoss": 12,
+    "Rounds": 6,
+    "used_potion": false,
+    "verified_steps": 25,
+    "ElapsedMs": 33623,
+    "Timing": {
+      "RestoreMs": 1466,
+      "ActionMs": 831,
+      "DecisionMs": 131,
+      "VerificationMs": 4664,
+      "StartupMs": 25460,
+      "Actions": 25,
+      "Restores": 1,
+      "Verifications": 1
+    }
+  },
+  "installation": {
+    "version": "0.7.11",
+    "old_version": "0.7.10",
+    "installed_dll_matches_build": true,
+    "installed_manifest_matches_package": true,
+    "settings_unchanged": true,
+    "dll_sha256": "402a79b4c022574bc8f90f50ed83ef803feb3bb1a1e520e6a9df6c0edb0adf8c",
+    "zip_sha256": "563924d611c63b4e1c14e42087077d0e32fc818cde015470dd64265e919fa918"
+  }
+}

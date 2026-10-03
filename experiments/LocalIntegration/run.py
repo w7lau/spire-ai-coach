@@ -45,6 +45,7 @@ parser.add_argument('--bootstrap-reverse', action='store_true')
 parser.add_argument('--recorded-replay', type=Path)
 parser.add_argument('--numerical-benchmark', action='store_true')
 parser.add_argument('--early-stop-test', action='store_true')
+parser.add_argument('--results-dir', type=Path)
 parser.add_argument('--overhead-benchmark', action='store_true')
 args = parser.parse_args()
 if args.overhead_benchmark and (not args.replay or not args.seed_result):
@@ -150,5 +151,13 @@ with worker_lock(root):
     if (root / 'integration-error.txt').exists():
         print((root / 'integration-error.txt').read_text(encoding='utf-8'))
     passed = (root / 'integration-success').is_file()
+    if args.results_dir:
+        # Preserve this run while the workspace lock is still held. Other local
+        # experiments may reuse the host immediately after it exits.
+        args.results_dir.mkdir(parents=True, exist_ok=True)
+        for name in ['integration-replay-private.json', 'integration-replay-summary.json',
+                     'integration-error.txt', 'integration-stdout.log', 'integration-game.log']:
+            if (root / name).is_file():
+                shutil.copy2(root / name, args.results_dir / name)
     print(json.dumps(dict(exit_code=process.returncode, passed=passed)))
     raise SystemExit(0 if passed and process.returncode == 0 else 1)

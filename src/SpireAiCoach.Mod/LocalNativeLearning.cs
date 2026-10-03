@@ -11,7 +11,7 @@ namespace SpireAiCoach.Mod;
 internal sealed class LocalNativeLearning
 {
     internal sealed record Observation(string Card, int Round, decimal Energy, int PaidEnergy, int Hand,
-        int Upgrades, int Statuses, int Buffs, int Hp);
+        int Upgrades, int Statuses, int Buffs, int Hp, bool HasHandEndEffect);
     private readonly Dictionary<string, (double Total, int Samples)> _bonuses = new(StringComparer.Ordinal);
     private static string Key(CardModel card) => $"{card.Id}:{card.CurrentUpgradeLevel}";
 
@@ -24,7 +24,8 @@ internal sealed class LocalNativeLearning
                 pcs.Hand.Cards.Count, pcs.AllPiles.SelectMany(p => p.Cards).Sum(c => c.CurrentUpgradeLevel),
                 pcs.AllPiles.Where(p => p.Type != PileType.Exhaust).SelectMany(p => p.Cards)
                     .Count(c => c.Type is CardType.Status or CardType.Curse),
-                player.Creature.Powers.Count(p => p.TypeForCurrentAmount == PowerType.Buff), player.Creature.CurrentHp);
+                player.Creature.Powers.Count(p => p.TypeForCurrentAmount == PowerType.Buff), player.Creature.CurrentHp,
+                card.HasTurnEndInHandEffect);
         }
         catch { return null; }
     }
@@ -44,8 +45,12 @@ internal sealed class LocalNativeLearning
                 .SelectMany(p => p.Cards).Count(c => c.Type is CardType.Status or CardType.Curse));
             var buffs = Math.Max(0, player.Creature.Powers.Count(p => p.TypeForCurrentAmount == PowerType.Buff) - before.Buffs);
             var healed = Math.Max(0, player.Creature.CurrentHp - before.Hp);
+            // An end-in-hand flag does not forbid an additional OnPlay cost in a Mod.
+            // Correct that uncertain preview with the HP change actually observed on play.
+            var handEffectPlayCost = before.HasHandEndEffect ? Math.Max(0, before.Hp - player.Creature.CurrentHp) : 0;
             double bonus = Math.Min(36, drawn * 6) + Math.Min(40, (double)energy * 12) +
-                Math.Min(40, upgrades * 6) + Math.Min(24, removed * 6) + Math.Min(40, buffs * 20) + Math.Min(24, healed * 3);
+                Math.Min(40, upgrades * 6) + Math.Min(24, removed * 6) + Math.Min(40, buffs * 20) + Math.Min(24, healed * 3) -
+                Math.Min(40, handEffectPlayCost * 3);
             var old = _bonuses.GetValueOrDefault(before.Card);
             _bonuses[before.Card] = (old.Total + bonus, old.Samples + 1);
         }

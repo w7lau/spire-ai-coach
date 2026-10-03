@@ -430,10 +430,8 @@ public static class LocalWorker
                             {
                                 choiceDecisions.Add(new(choiceDecisions.Count, options));
                                 // A choice is a child of the actual action prefix, so siblings get independent outcomes.
-                                var expected = preferred != null ? plannedAction?.Choices?.ElementAtOrDefault(choiceIndex++) : null;
-                                var match = expected == null ? null : options.SingleOrDefault(c => c.OfferHash == expected.OfferHash &&
-                                    c.Kind == expected.Kind && c.Index == expected.Index && c.ModelId == expected.ModelId &&
-                                    (c.Indices ?? []).SequenceEqual(expected.Indices ?? []));
+                                var match = preferred != null && plannedAction?.Choices is { } intended
+                                    ? LocalRouteRefiner.ProposeNextChoice(intended, options, ref choiceIndex) : null;
                                 var choices = options.Select(c => new LocalAction(c.Index, "choice:" + c.ModelId,
                                     null, c.Name, "", c.OfferHash, round, Preference: c.Preference)).ToArray();
                                 var selected = search.Select(trial, choices, match == null ? null : choices.Single(c => c.HandIndex == match.Index),
