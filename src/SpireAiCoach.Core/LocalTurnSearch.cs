@@ -4,14 +4,35 @@ namespace SpireAiCoach.Core;
 
 public sealed record LocalTurnHint(int Hp, int StartingHp, int EnemyHp, int InitialEnemyHp,
     int Block = 0, int PotionsUsed = 0);
-public sealed record LocalTurnTask(int Id, LocalAction[] Prefix, int SearchRound);
+public sealed record LocalTurnTask(int Id, LocalAction[] Prefix, int SearchRound,
+    bool FullRollout = false, int Lane = 0, bool Focused = false, LocalTurnHint? Hint = null);
 public sealed record LocalTurnSearchStats(int Probes = 0, int BoundPruned = 0, int Offered = 0,
-    int DuplicateOffers = 0, int Pending = 0, int UnknownRecoveryChecks = 0, int CoveredPrefixes = 0);
+    int DuplicateOffers = 0, int Pending = 0, int UnknownRecoveryChecks = 0, int CoveredPrefixes = 0,
+    int CompletedHistories = 0, int RepeatedHistories = 0);
 
 // Exact native histories only. A turn probe executes through enemy settlement,
 // records the resulting next turn, then returns to the scheduler. Scores order
 // work; they never prove HP dominance or discard a low-scoring continuation.
-public sealed class LocalTurnSearch
+public interface ILocalTurnFrontier
+{
+    int Count { get; }
+    int Offered { get; }
+    int DuplicateOffers { get; }
+    int LastLane { get; }
+    void Offer(LocalAction[] prefix, int searchRound, LocalTurnHint hint);
+    bool TryTake(out LocalTurnTask task);
+    void FocusNext(LocalTurnTask task, IReadOnlyList<LocalAction> actions, IReadOnlyList<LocalDecision> decisions);
+    void ReturnInterrupted(LocalTurnTask task, LocalTurnHint hint);
+    int DiscardDescendants(IReadOnlyList<LocalAction> prefix);
+    int DiscardProvenExpenses(LocalWinningBound? incumbent);
+    LocalAction Choose(IReadOnlyList<LocalAction> legal, bool coherent = true);
+    void OfferAlternatives(IReadOnlyList<LocalAction> actions, LocalDecision decision, LocalTurnHint before,
+        LocalTurnTask? owner = null);
+}
+
+public sealed record LocalTurnOffer(LocalAction[] Prefix, int SearchRound, LocalTurnHint Hint);
+
+public sealed class LocalTurnSearch : ILocalTurnFrontier
 {
     private readonly Dictionary<int, Entry> _pending = new();
     private readonly Dictionary<string, int> _seen = new(StringComparer.Ordinal);
@@ -38,9 +59,9 @@ public sealed class LocalTurnSearch
         if (searchRound < 1) throw new ArgumentOutOfRangeException(nameof(searchRound));
         var key = searchRound + ":" + HistoryKey(prefix);
         if (_seen.ContainsKey(key)) { DuplicateOffers++; return; }
-        var task = new LocalTurnTask(_next++, prefix.ToArray(), searchRound);
+        var task = new LocalTurnTask(_next++, prefix.ToArray(), searchRound, Hint: hint);
         _seen.Add(key, task.Id);
-        Queue(new(task, hint));
+        Queue(new(task with { Hint = hint }, hint));
     }
 
     private void Queue(Entry entry)
@@ -116,6 +137,10 @@ public sealed class LocalTurnSearch
     // the root. Never promote across an enemy-turn boundary or by display name.
     public void FocusNext(LocalTurnTask task, IReadOnlyList<LocalAction> actions,
         IReadOnlyList<LocalDecision> decisions)
+        => FocusNext(task, actions, decisions, LastFocused);
+
+    public void FocusNext(LocalTurnTask task, IReadOnlyList<LocalAction> actions,
+        IReadOnlyList<LocalDecision> decisions, bool focused)
     {
         int step = task.Prefix.Length;
         if (step >= actions.Count || actions[step].Round != task.SearchRound) return;
@@ -126,19 +151,20 @@ public sealed class LocalTurnSearch
             .Where(a => !SameAction(a, actions[step]))
             .Select(a => _seen.GetValueOrDefault(task.SearchRound + ":" + HistoryKey([..prefix, a]), -1))
             .Where(id => _pending.ContainsKey(id)).ToArray();
-        if (ids.Length > 0) (LastFocused ? _descent : _focus).Push(ids);
+        if (ids.Length > 0) (focused ? _descent : _focus).Push(ids);
     }
 
-    // Taking a full rollout every fourth trial used to align permanently with
-    // the health lane. Rotate its position so all four scheduling lanes receive
-    // full-battle feedback without changing the one-in-four allocation.
+    // Half the attempts now reach full combat settlement. Rotate complementary
+    // pairs so health, damage, focused and FIFO work all get complete feedback.
+    // Every full trial also publishes its observed alternative action prefixes.
     public static bool IsFullRollout(int completedAttempts) =>
-        completedAttempts % 4 == completedAttempts / 4 % 4;
+        completedAttempts % 4 == completedAttempts / 4 % 4 ||
+        completedAttempts % 4 == (completedAttempts / 4 + 2) % 4;
 
     public void ReturnInterrupted(LocalTurnTask task, LocalTurnHint hint)
     {
         if (_pending.ContainsKey(task.Id)) throw new InvalidOperationException("Task is already pending");
-        Queue(new(task, hint));
+        Queue(new(task with { Hint = hint }, hint));
     }
 
     public int DiscardDescendants(IReadOnlyList<LocalAction> prefix)
@@ -172,15 +198,31 @@ public sealed class LocalTurnSearch
         return legal.OrderByDescending(a => a.Preference).ThenBy(a => a.EndTurn).First();
     }
 
-    public void OfferAlternatives(IReadOnlyList<LocalAction> actions, LocalDecision decision, LocalTurnHint before)
+    public void OfferAlternatives(IReadOnlyList<LocalAction> actions, LocalDecision decision, LocalTurnHint before,
+        LocalTurnTask? owner = null)
+    {
+        foreach (var offer in Alternatives(actions, decision, before, owner))
+            Offer(offer.Prefix, offer.SearchRound, offer.Hint);
+    }
+
+    public static IEnumerable<LocalTurnOffer> Alternatives(IReadOnlyList<LocalAction> actions,
+        LocalDecision decision, LocalTurnHint before, LocalTurnTask? owner = null)
     {
         if (decision.BeforeStep < 0 || decision.BeforeStep >= actions.Count)
             throw new InvalidOperationException("Decision is outside the executed history");
         var actual = actions[decision.BeforeStep];
         var prefix = actions.Take(decision.BeforeStep).ToArray();
-        foreach (var alternate in decision.Legal.OrderByDescending(a => a.Preference))
-            if (!SameAction(actual, alternate)) Offer([..prefix, alternate], actual.Round, before);
+        // A claimed prefix already fixes its actions and earlier choices. Do not
+        // publish its ancestor's siblings from another worker's owned subtree.
+        if (owner != null && decision.BeforeStep < owner.Prefix.Length - 1) yield break;
+        bool fixedAction = owner != null && decision.BeforeStep < owner.Prefix.Length;
+        if (!fixedAction)
+            foreach (var alternate in decision.Legal.OrderByDescending(a => a.Preference))
+                if (!SameAction(actual, alternate)) yield return new([..prefix, alternate], actual.Round, before);
+        int fixedChoices = fixedAction ? owner!.Prefix[decision.BeforeStep].Choices?.Length ?? 0 : 0;
         foreach (var choice in decision.Choices ?? [])
+        {
+            if (choice.AtChoice < fixedChoices) continue;
             foreach (var alternate in choice.Legal.OrderByDescending(c => c.Preference))
             {
                 if (actual.Choices == null || choice.AtChoice < 0 || choice.AtChoice >= actual.Choices.Length)
@@ -190,8 +232,9 @@ public sealed class LocalTurnSearch
                 // A changed earlier selection may produce a different later offer.
                 // Fix only the observed prefix through this selection, never its tail.
                 var choices = actual.Choices.Take(choice.AtChoice).Append(alternate).ToArray();
-                Offer([..prefix, actual with { Choices = choices }], actual.Round, before);
+                yield return new([..prefix, actual with { Choices = choices }], actual.Round, before);
             }
+        }
     }
 
     public static LocalAction ResolveExact(LocalAction planned, IReadOnlyList<LocalAction> legal) =>

@@ -18,9 +18,9 @@ static class TurnSearchTests
                 int complete = 0;
                 for (int lane = 0; lane < 4; lane++)
                     if (LocalTurnSearch.IsFullRollout(block * 4 + lane)) { complete++; counts[lane]++; }
-                Check(complete == 1, "The full-battle allocation must stay one in four");
+                Check(complete == 2, "Half the attempts must execute complete battle feedback");
             }
-            Check(counts.All(n => n == 4), "A fixed scheduler lane must not monopolize complete feedback");
+            Check(counts.All(n => n == 8), "A fixed scheduler lane must not monopolize complete feedback");
         });
 
         test("turn optimization focused work deepens combinations despite a large shallow frontier", () =>

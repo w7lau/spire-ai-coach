@@ -108,7 +108,8 @@ with worker_lock(root):
         description='Synthetic capture, search and read-only integration verification', version='0.0.1',
         has_dll=True, has_pck=False, affects_gameplay=False,
         dependencies=[dict(id='SpireAiCoach', min_version='0.4.0')])), encoding='utf-8')
-    for name in ['integration-success', 'integration-error.txt', 'integration-result.json']:
+    for name in ['integration-success', 'integration-error.txt', 'integration-result.json',
+                 'integration-algorithm-private.json', 'integration-algorithm-summary.json']:
         (root / name).unlink(missing_ok=True)
     env = dict(os.environ, APPDATA=str(root / 'Roaming'), LOCALAPPDATA=str(root / 'Local'),
                SPIRE_LOCAL_INTEGRATION=str(root))
@@ -179,6 +180,7 @@ with worker_lock(root):
         # experiments may reuse the host immediately after it exits.
         args.results_dir.mkdir(parents=True, exist_ok=True)
         for name in ['integration-replay-private.json', 'integration-replay-summary.json',
+                     'integration-algorithm-private.json', 'integration-algorithm-summary.json',
                      'integration-concurrency-summary.json', 'integration-concurrency-MonteCarlo-private.json',
                      'integration-concurrency-TurnFrontier-private.json',
                      'integration-error.txt', 'integration-stdout.log', 'integration-game.log']:

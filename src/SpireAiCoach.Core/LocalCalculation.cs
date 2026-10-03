@@ -24,7 +24,7 @@ public static class LocalCalculation
             MaxNodes = AttemptsPerWorker, BudgetSeconds = SearchSeconds, MaxRounds = Rounds,
             StopOnZeroLoss = stopOnZeroLoss,
             SkipFinalVerification = skipFinalVerification,
-            ShareSearchWork = order == LocalSearchOrder.MonteCarlo && captured.ShareSearchWork,
+            ShareSearchWork = captured.ShareSearchWork,
             // Turn-frontier continuations are generated from the current native state.
             InitialPlan = order == LocalSearchOrder.TurnFrontier ? null : captured.InitialPlan
         };

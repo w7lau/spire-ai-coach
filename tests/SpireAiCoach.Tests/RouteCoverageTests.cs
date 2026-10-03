@@ -23,7 +23,7 @@ static class RouteCoverageTests
                     request.DataOnlyRun && request.TrimWorkerOverhead && request.IncludePotions && !request.StopOnZeroLoss &&
                     request.Workers == 4 && request.ContinueOptimization, "Changing order altered native capture/execution controls");
             }
-            Check(old.InitialPlan == captured.InitialPlan && old.ShareSearchWork && turn.InitialPlan == null && !turn.ShareSearchWork,
+            Check(old.InitialPlan == captured.InitialPlan && old.ShareSearchWork && turn.InitialPlan == null && turn.ShareSearchWork,
                 "An old seed/proposal scheduler overrode turn ordering");
             Check(LocalCalculation.Configure(captured, LocalSearchOrder.TurnFrontier, 0, false, true).StopOnZeroLoss,
                 "Early return must apply to both buttons");

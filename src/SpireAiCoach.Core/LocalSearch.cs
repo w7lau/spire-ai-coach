@@ -16,7 +16,7 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     bool ExperimentalNativeData = false, byte[]? RecordedReplayProbe = null, bool DataOnlyCombat = true,
     bool DataOnlyRun = true, bool NumericalExecution = true, bool StopOnZeroLoss = true, bool TrimWorkerOverhead = true,
     LocalSearchOrder SearchOrder = LocalSearchOrder.MonteCarlo, bool FastVerification = true,
-    bool SkipFinalVerification = false, bool AdaptiveWorkers = true);
+    bool SkipFinalVerification = false, bool AdaptiveWorkers = true, string? TurnWorkPipe = null);
 
 // A stop belongs to one frozen request, never to another battle or final verification.
 public sealed record LocalSearchStop(string Id, string SnapshotId, string NativeHash)
