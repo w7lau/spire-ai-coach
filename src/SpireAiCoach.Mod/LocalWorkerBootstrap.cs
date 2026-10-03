@@ -6,7 +6,8 @@ using MegaCrit.Sts2.Core.Nodes;
 namespace SpireAiCoach.Mod;
 
 // The game already supports starting without a main menu. Keep essential initialization,
-// profiles, models and mods; load native common/run/room assets when restoring the battle.
+// profiles, models and mods. Model-only search does not need menu/run/room graphics;
+// the final regular verification loads its native presentation assets normally.
 internal static class LocalWorkerBootstrap
 {
     public static void Install(Harmony harmony)

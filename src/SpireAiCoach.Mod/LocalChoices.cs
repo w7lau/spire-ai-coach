@@ -91,6 +91,23 @@ public sealed class LocalChoices
         return Select(options, identity);
     }
 
+    // Used only by owned workers replacing presentation. Native CardSelectCmd still reserves
+    // and synchronizes choice IDs, logs the result, and applies the original card effects.
+    internal IEnumerable<CardModel> SelectWithoutPresentation(string kind, CardModel[] cards, CardSelectorPrefs prefs, bool clampCount = false)
+    {
+        var selected = SelectCards(kind, cards, prefs, new object(), clampCount);
+        return selected.Indices!.Select(i => cards[i]).ToArray();
+    }
+
+    internal IEnumerable<CardModel> OfferWithoutPresentation(IReadOnlyList<CardModel> cards, bool canSkip)
+    {
+        var hash = OfferHash("offer", cards, canSkip ? 0 : 1, 1);
+        var options = cards.Select((c, i) => new LocalCardChoice(hash, i, c.Id.ToString(), c.Title)).ToList();
+        if (canSkip) options.Add(new(hash, -1, "", "跳过"));
+        var selected = Select(options.ToArray(), new object());
+        return selected.Index < 0 ? [] : [cards[selected.Index]];
+    }
+
     public void Tick(CancellationToken token = default)
     {
         token.ThrowIfCancellationRequested();

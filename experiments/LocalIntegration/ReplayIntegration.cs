@@ -32,11 +32,15 @@ public static class ReplayIntegration
         // Preserve the frozen user's search/potion settings; only raise the old turn horizon.
         var request = original with { Id = Guid.NewGuid().ToString("N"), LoadedMods = loaded, MaxRounds = 64,
             TimelineOrigin = 0, InitialTrace = null };
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_DATA_COMBAT") == "1") request = request with { DataOnlyCombat = true };
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_DATA_RUN") == "1") request = request with { DataOnlyRun = true };
         if (int.TryParse(System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_WORKERS"), out var workers))
             request = request with { Workers = workers };
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SHARED_WORK") is { Length: > 0 } sharing)
             request = request with { ShareSearchWork = sharing == "on" };
-        var installation = new LocalInstallation(game, directories);
+        // Frozen execution controls retain the same startup; bootstrap has its own paired
+        // cold measurements. Ordinary integration fixtures use the product's default.
+        var installation = new LocalInstallation(game, directories, MinimalWorkerBootstrap: false);
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_RECORDED_REPLAY") is { Length: > 0 } recordedPath)
         {
             await Task.Run(() => pool.Prepare(installation, 1, CancellationToken.None));
@@ -71,7 +75,8 @@ public static class ReplayIntegration
                 InitialPlan = LocalWire.Read<LocalSearchResult>(System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT")!).Best!.Actions };
             LocalCandidate? baseline = null;
             var records = new List<object>();
-            foreach (var minimal in new[] { false, true })
+            bool reverse = System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_BOOTSTRAP_REVERSE") == "1";
+            foreach (var minimal in reverse ? new[] { true, false } : new[] { false, true })
             {
                 // A separate owned pool/configuration per mode includes cold startup and the
                 // first native restoration; moving resource loading later does not count as a win.
@@ -79,7 +84,8 @@ public static class ReplayIntegration
                 var sample = await Task.Run(() => cold.Analyze(request with { Id = Guid.NewGuid().ToString("N") },
                     installation with { MinimalWorkerBootstrap = minimal }, _ => { }, CancellationToken.None));
                 var best = sample.Best ?? throw new InvalidOperationException("Bootstrap returned no route");
-                if (sample.Status != "done" || sample.Rejected != 0 || !best.Won || best.Continuation?.Length != best.Actions.Length)
+                if (sample.Status != "done" || sample.Rejected != 0 || !best.Won || best.Continuation?.Length != best.Actions.Length ||
+                    sample.Timing?.Verifications != 1 || request.DataOnlyCombat && sample.Message.StartsWith("常规执行", StringComparison.Ordinal))
                     throw new InvalidOperationException("Bootstrap did not restore and independently verify a complete line");
                 if (baseline != null && (JsonSerializer.Serialize(best.Actions) != JsonSerializer.Serialize(baseline.Actions) ||
                     !best.Continuation!.SequenceEqual(baseline.Continuation!) || best.Hp != baseline.Hp || best.HpLost != baseline.HpLost ||
@@ -88,7 +94,7 @@ public static class ReplayIntegration
                 baseline ??= best;
                 LocalWire.Write(Path.Combine(root, $"integration-bootstrap-private-{records.Count}.json"), sample);
                 var firstDecision = sample.Trace!.Spans.First(s => s.Stage == "search" && s.Phase == "decision").StartMs;
-                records.Add(new { minimal_bootstrap = minimal, sample.ElapsedMs, sample.Timing,
+                records.Add(new { minimal_bootstrap = minimal, request.DataOnlyCombat, request.DataOnlyRun, sample.ElapsedMs, sample.Timing,
                     first_decision_ms = firstDecision, sample.WorkerMemoryBytes, best.Hp, best.HpLost,
                     native_states_and_history_match = true });
             }
@@ -172,8 +178,77 @@ public static class ReplayIntegration
             LocalWire.Write(Path.Combine(root, "integration-work-summary.json"), records);
             return;
         }
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_EXECUTION_SEARCH_BENCHMARK") == "1")
+        {
+            var seed = LocalWire.Read<LocalSearchResult>(System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT")!).Best!.Actions;
+            foreach (var data in new[] { false, true })
+                await Task.Run(() => pool.Analyze(request with { Id = Guid.NewGuid().ToString("N"), MaxNodes = 1, InitialPlan = seed,
+                    DataOnlyCombat = data, DataOnlyRun = data }, installation, _ => { }, CancellationToken.None));
+            var records = new List<object>();
+            foreach (var data in new[] { false, true })
+            {
+                var sample = await Task.Run(() => pool.Analyze(request with { Id = Guid.NewGuid().ToString("N"), InitialPlan = null,
+                    DataOnlyCombat = data, DataOnlyRun = data }, installation, _ => { }, CancellationToken.None));
+                LocalWire.Write(Path.Combine(root, $"integration-execution-search-private-{records.Count}.json"), sample);
+                var best = sample.Best ?? throw new InvalidOperationException(sample.Message);
+                if (sample.Status != "done" || sample.Rejected != 0 || !best.Won || best.Continuation?.Length != best.Actions.Length ||
+                    sample.Timing?.Verifications != 1 || data && sample.Message.StartsWith("常规执行", StringComparison.Ordinal))
+                    throw new InvalidOperationException("Full search did not complete on its requested execution mode");
+                records.Add(new { data_execution = data, request.BudgetSeconds, request.MaxNodes, request.MaxRounds,
+                    sample.Workers, sample.Evaluated, sample.Victories, sample.ElapsedMs, sample.SearchElapsedMs, sample.Timing,
+                    sample.WorkerMemoryBytes, best.Hp, best.HpLost, best.NetHpLoss, best.Rounds,
+                    used_potion = best.Actions.Any(a => a.PotionSlot.HasValue), steps = best.Actions.Length });
+                LocalWire.Write(Path.Combine(root, "integration-execution-search-summary.json"), records);
+            }
+            return;
+        }
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT") is { Length: > 0 } seedPath)
             request = request with { InitialPlan = LocalWire.Read<LocalSearchResult>(seedPath).Best!.Actions };
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_DATA_COMBAT_BENCHMARK") == "1")
+        {
+            if (request.InitialPlan is not { Length: > 0 }) throw new InvalidOperationException("A fixed complete line is required");
+            bool requireDeath = System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_DEATH_ROUTE") == "1";
+            if (requireDeath)
+            {
+                // Let the real enemy commands kill the player. This covers pending loss,
+                // native death hooks, run settlement and reuse after the losing route.
+                var firstRound = request.InitialPlan[0].Round;
+                var end = request.InitialPlan.First(a => a.EndTurn);
+                request = request with { InitialPlan = Enumerable.Range(firstRound, request.MaxRounds)
+                    .Select(round => end with { Round = round }).ToArray() };
+            }
+            request = request with { Workers = 1, MaxNodes = 1, BudgetSeconds = 60 };
+            LocalCandidate? baseline = null;
+            var records = new List<object>();
+            async Task<LocalSearchResult> Sample(bool data)
+            {
+                var sample = await Task.Run(() => pool.Analyze(request with { Id = Guid.NewGuid().ToString("N"),
+                    DataOnlyCombat = data, DataOnlyRun = data && request.DataOnlyRun }, installation, _ => { }, CancellationToken.None));
+                LocalWire.Write(Path.Combine(root, $"integration-data-combat-private-{records.Count}.json"), sample);
+                var best = sample.Best ?? throw new InvalidOperationException(sample.Message);
+                if (sample.Status != "done" || (requireDeath ? !best.Dead || best.Won : !best.Won) || sample.Rejected != 0 ||
+                    requireDeath && best.Actions.Any(a => !a.EndTurn) ||
+                    best.Continuation?.Length != best.Actions.Length || sample.Timing?.Verifications != 1 ||
+                    data && (sample.Message.StartsWith("常规执行", StringComparison.Ordinal) ||
+                        !sample.Trace!.Spans.Any(s => s.Stage == "search" && s.Phase == "scene" && s.Detail == "原生战斗初始化")))
+                    throw new InvalidOperationException("Data combat sample did not produce a verified complete route: " + sample.Message);
+                if (baseline != null && (best.Hp != baseline.Hp || best.HpLost != baseline.HpLost || best.Gold != baseline.Gold ||
+                    best.MaxHp != baseline.MaxHp || best.Rounds != baseline.Rounds || best.StartingHp != baseline.StartingHp ||
+                    JsonSerializer.Serialize(best.Actions) != JsonSerializer.Serialize(baseline.Actions) ||
+                    !best.Continuation!.SequenceEqual(baseline.Continuation!)))
+                    throw new InvalidOperationException("Data combat changed actions, native states, history or settlement");
+                baseline ??= best;
+                records.Add(new { data_combat = data, data_run = data && request.DataOnlyRun, best.Won, best.Dead, sample.ElapsedMs, sample.Timing, sample.WorkerMemoryBytes,
+                    best.Hp, best.HpLost, best.NetHpLoss, best.Rounds, steps = best.Actions.Length,
+                    native_states_and_history_match = true, final_verification_uses_regular_scene = true });
+                LocalWire.Write(Path.Combine(root, "integration-data-combat-summary.json"), records);
+                return sample;
+            }
+            await Sample(false); await Sample(true);
+            records.Clear();
+            foreach (var data in new[] { false, true, true, false }) await Sample(data);
+            return;
+        }
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SETTLE_BENCHMARK") == "1")
         {
             if (request.InitialPlan is not { Length: > 0 }) throw new InvalidOperationException("A fixed complete line is required");

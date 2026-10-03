@@ -112,6 +112,8 @@ public static class MechanicsIntegration
                     DebugEncounter = "SLUMBERING_BEETLE_NORMAL" };
             if (int.TryParse(System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_WORKERS"), out var workers))
                 request = request with { Workers = workers };
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_DATA_COMBAT") == "1") request = request with { DataOnlyCombat = true };
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_DATA_RUN") == "1") request = request with { DataOnlyRun = true };
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SHARED_WORK") is { Length: > 0 } sharing)
                 request = request with { ShareSearchWork = sharing == "on" };
             LocalSearchResult? baseline = null;
@@ -151,7 +153,7 @@ public static class MechanicsIntegration
                     // A fresh root from the ordinary-speed endpoint must restore exactly with
                     // the optimized turn-end path, including damage, exhausted cards and history.
                     var after = LocalCapture.Capture(capture.Capture(true)!.Fingerprint(), true) with
-                        { Workers = 1, MaxNodes = 1, MaxRounds = 1, BudgetSeconds = 25, DebugEncounter = "SLUMBERING_BEETLE_NORMAL" };
+                        { Workers = 1, MaxNodes = 1, MaxRounds = 1, BudgetSeconds = 25, DebugEncounter = "SLUMBERING_BEETLE_NORMAL", DataOnlyCombat = request.DataOnlyCombat, DataOnlyRun = request.DataOnlyRun };
                     var replay = await Task.Run(() => pool.Analyze(after, LocalCapture.Installation(), _ => { }, CancellationToken.None));
                     if (replay.Best == null || replay.Rejected != 0 || replay.Best.Continuation?.Length != replay.Best.Actions.Length ||
                         after.NativeHash != LocalCapture.Fingerprint()) throw new InvalidOperationException("Turn-end endpoint restoration changed native effects/history");
@@ -166,7 +168,7 @@ public static class MechanicsIntegration
                 await new LocalPlanExecutor(tree).Execute(new(snapshot.CombatId, request.LoadedMods, result),
                     () => capture.Capture(false)?.CombatId, true, messages.Add, CancellationToken.None);
                 var after = LocalCapture.Capture(capture.Capture(true)!.Fingerprint(), true) with
-                    { Workers = 1, MaxNodes = 1, MaxRounds = 1, BudgetSeconds = 20, DebugEncounter = "SLUMBERING_BEETLE_NORMAL" };
+                    { Workers = 1, MaxNodes = 1, MaxRounds = 1, BudgetSeconds = 20, DebugEncounter = "SLUMBERING_BEETLE_NORMAL", DataOnlyCombat = request.DataOnlyCombat, DataOnlyRun = request.DataOnlyRun };
                 var replay = await Task.Run(() => pool.Analyze(after, LocalCapture.Installation(), _ => { }, CancellationToken.None));
                 if (replay.Best == null || replay.Rejected != 0 || replay.Best.Continuation?.Length != replay.Best.Actions.Length ||
                     after.NativeHash != LocalCapture.Fingerprint()) throw new InvalidOperationException(kind + ": completed choice continuation failed");

@@ -35,7 +35,13 @@ parser.add_argument('--work-benchmark', action='store_true')
 parser.add_argument('--settle-benchmark', action='store_true')
 parser.add_argument('--quality-benchmark', action='store_true')
 parser.add_argument('--native-data-probe', action='store_true')
+parser.add_argument('--data-combat-benchmark', action='store_true')
+parser.add_argument('--death-route', action='store_true')
+parser.add_argument('--data-combat', action='store_true')
+parser.add_argument('--data-run', action='store_true')
+parser.add_argument('--execution-search-benchmark', action='store_true')
 parser.add_argument('--bootstrap-benchmark', action='store_true')
+parser.add_argument('--bootstrap-reverse', action='store_true')
 parser.add_argument('--recorded-replay', type=Path)
 args = parser.parse_args()
 if args.workers is not None and not 1 <= args.workers <= 16:
@@ -48,8 +54,16 @@ if args.quality_benchmark and (not args.replay or not args.seed_result):
     parser.error('--quality-benchmark requires --replay and --seed-result')
 if args.native_data_probe and (not args.replay or not args.seed_result):
     parser.error('--native-data-probe requires --replay and --seed-result')
+if args.data_combat_benchmark and (not args.replay or not args.seed_result):
+    parser.error('--data-combat-benchmark requires --replay and --seed-result')
+if args.death_route and not args.data_combat_benchmark:
+    parser.error('--death-route requires --data-combat-benchmark')
+if args.execution_search_benchmark and (not args.replay or not args.seed_result):
+    parser.error('--execution-search-benchmark requires --replay and --seed-result')
 if args.bootstrap_benchmark and (not args.replay or not args.seed_result):
     parser.error('--bootstrap-benchmark requires --replay and --seed-result')
+if args.bootstrap_reverse and not args.bootstrap_benchmark:
+    parser.error('--bootstrap-reverse requires --bootstrap-benchmark')
 if args.visual_benchmark and (not args.replay or not args.seed_result or args.speed_benchmark):
     parser.error('--visual-benchmark requires --replay and --seed-result, without --speed-benchmark')
 root = args.workspace.resolve()
@@ -99,7 +113,13 @@ with worker_lock(root):
     env['SPIRE_LOCAL_SETTLE_BENCHMARK'] = '1' if args.settle_benchmark else '0'
     env['SPIRE_LOCAL_QUALITY_BENCHMARK'] = '1' if args.quality_benchmark else '0'
     env['SPIRE_LOCAL_NATIVE_DATA_PROBE'] = '1' if args.native_data_probe else '0'
+    env['SPIRE_LOCAL_DATA_COMBAT_BENCHMARK'] = '1' if args.data_combat_benchmark else '0'
+    env['SPIRE_LOCAL_DEATH_ROUTE'] = '1' if args.death_route else '0'
+    env['SPIRE_LOCAL_DATA_COMBAT'] = '1' if args.data_combat else '0'
+    env['SPIRE_LOCAL_DATA_RUN'] = '1' if args.data_run else '0'
+    env['SPIRE_LOCAL_EXECUTION_SEARCH_BENCHMARK'] = '1' if args.execution_search_benchmark else '0'
     env['SPIRE_LOCAL_BOOTSTRAP_BENCHMARK'] = '1' if args.bootstrap_benchmark else '0'
+    env['SPIRE_LOCAL_BOOTSTRAP_REVERSE'] = '1' if args.bootstrap_reverse else '0'
     env['SPIRE_LOCAL_RECORDED_REPLAY'] = str(args.recorded_replay.resolve()) if args.recorded_replay else ''
     settings = root / 'Roaming/SlayTheSpire2/default/1/settings.save'
     settings_data = json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}

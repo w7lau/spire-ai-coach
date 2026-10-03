@@ -18,6 +18,8 @@ python experiments/LocalIntegration/run.py --workspace C:\path\owned-native-work
 - `--execution` / `--optimization` / `--features`：执行保护、路线续用、药水与进度。
 - `--fallback`：保留旧命令名称；原先的普通武装失败夹具现在断言手牌选择正常参与、无排除，不再期待不支持武装。
 - `--replay <private-request.json> --game <installed-game> --mods <matching-frozen-mods>`：冻结故障记录，只替换本项目 DLL/版本及旧轮数上限，保留请求的并发、药水和搜索预算。原始记录、完整结果及日志仅留本机，提交验证摘要前必须去除真实记录、身份和本机路径。
+- `--data-combat-benchmark --data-run --seed-result <private-result.json>`：常规执行与省去冒险/战斗场景的固定路线交错对照，逐步比较原生状态、历史和完整结算；两种模式的最终复核都使用常规场景。需要上面的冻结请求参数。单条路线限制只用于速度配对，不改变产品预算。加 `--death-route` 使用连续结束回合的种子，比较原生死亡、失败结算与失败后的实例复用。
+- `--execution-search-benchmark --seed-result <private-result.json>`：预热两种执行路径后，保留冻结请求的时间与路线数量预算，测量常规／无场景完整搜索。固定路线只用于预热，正式搜索不注入种子；要求所有进程完成、无拒绝、只复核最终路线一次，禁止用常规回退的结果冒充无场景通过。
 
 另建含旋风斩和四张放血的人工牌组，捕获放血后的 68 HP 局面，检查后台胜利后燃烧之血回血至 74 HP，而前台仍保持 68 HP。该断言针对本合成场景的原生遗物效果，不是通用奖励计算规则。
 

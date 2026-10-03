@@ -38,6 +38,8 @@ public static class LocalWorker
     private static bool _fastStateSettling;
     private static LocalNativeLearning? _nativeLearning;
     private static LocalChoices? _choices;
+    private static Func<bool> _nativeModeBeforeRequest = () => false;
+    internal static LocalChoices CurrentChoices => _choices ?? throw new LocalChoiceException("未处于原生选牌操作中。");
     private static HashSet<string> _excludedModels = [];
     private static string? _assetsRequest;
     private static LocalTimeline? _timeline;
@@ -61,6 +63,7 @@ public static class LocalWorker
         LocalWorkerResources.Install(harmony);
         LocalWorkerVisuals.Install(harmony);
         LocalWorkerBootstrap.Install(harmony);
+        LocalWorkerDataMode.Install(harmony);
         Callable.From(Run).CallDeferred();
         return true;
     }
@@ -133,6 +136,7 @@ public static class LocalWorker
         var originalScale = Engine.TimeScale;
         var originalFps = Engine.MaxFps;
         var originalNativeMode = NonInteractiveMode.AutoSlayerCheck;
+        _nativeModeBeforeRequest = originalNativeMode;
         long restoreMs = 0, actionMs = 0, decisionMs = 0, verifyMs = 0;
         int executed = 0, restores = 0;
         async Task RestoreMeasured()
@@ -141,7 +145,8 @@ public static class LocalWorker
             try { await Restore(request); }
             finally { restoreMs += (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds; restores++; }
         }
-        long sequence = 0, lastProgress = -1000;
+        long sequence = 0, lastProgress = -1000, lastResult = -1000;
+        LocalCandidate? lastPublishedBest = null;
         int route = 0, bestRoute = 0;
         var events = new Queue<LocalSimEvent>();
         LocalAction? pendingAction = null;
@@ -157,7 +162,14 @@ public static class LocalWorker
         }
         void Publish(string status, string message)
         {
+            // The parent polls every 250 ms. Rewriting the unchanged, potentially large
+            // candidate after every fast route does not provide any newer recommendation.
+            if (status == "running" && ReferenceEquals(best, lastPublishedBest) && timer.ElapsedMilliseconds - lastResult < 250) return;
             using var publishing = Trace("publish", "候选结果");
+            lastResult = timer.ElapsedMilliseconds; lastPublishedBest = best;
+            if (status != "running") LocalWire.Write(Path.Combine(_root, "runtime.json"), new
+                { status, mode = LocalWorkerDataMode.MinimalRun ? "native-model" : LocalWorkerDataMode.Active ? "no-combat-scene" : "regular-scene",
+                    max_fps = Engine.MaxFps, observed_fps = Engine.GetFramesPerSecond() });
             LocalWire.Write(Path.Combine(_root, "result.json"),
             new LocalSearchResult(request.Id, request.SnapshotId, status, message, evaluated, rejected, timer.ElapsedMilliseconds, best,
                 Victories: victories, IncludePotions: request.IncludePotions,
@@ -178,6 +190,8 @@ public static class LocalWorker
             _fastNativeWaits = request.SimulationSpeed > 1 && request.FastNativeWaits;
             _fastStateSettling = request.SimulationSpeed > 1 && request.FastStateSettling;
             LocalWorkerResources.FastCollection = request.SimulationSpeed > 1 && request.FastAssetCollection;
+            LocalWorkerDataMode.Active = request.DataOnlyCombat && LocalWorkerDataMode.Available;
+            LocalWorkerDataMode.MinimalRun = LocalWorkerDataMode.Active && request.DataOnlyRun;
             if (request.ExperimentalNativeData) NonInteractiveMode.AutoSlayerCheck = () => true;
             if (request.ModelHash != ModelIdSerializationCache.Hash || !request.LoadedMods.SequenceEqual(LocalCapture.LoadedMods()))
                 throw new InvalidOperationException("后台的游戏模型或 Mod 清单与当前游戏不一致，请重启游戏后重试。");
@@ -482,7 +496,7 @@ public static class LocalWorker
             Publish("failed", ex.Message);
             return false;
         }
-        finally { NonInteractiveMode.AutoSlayerCheck = originalNativeMode; LocalWorkerVisuals.Reset(); _fastNativeWaits = _fastStateSettling = false; LocalWorkerResources.Retain = LocalWorkerResources.FastCollection = false; Engine.TimeScale = originalScale; Engine.MaxFps = originalFps; _timeline = null; }
+        finally { NonInteractiveMode.AutoSlayerCheck = originalNativeMode; LocalWorkerDataMode.Reset(); LocalWorkerVisuals.Reset(); _fastNativeWaits = _fastStateSettling = false; LocalWorkerResources.Retain = LocalWorkerResources.FastCollection = false; Engine.TimeScale = originalScale; Engine.MaxFps = originalFps; _timeline = null; }
     }
 
     private static IEnumerable<LocalAction[]> ExpansionPrefixes(LocalCandidate candidate)
@@ -542,6 +556,11 @@ public static class LocalWorker
         Action<LocalAction, int, LocalSimState?, LocalSimState?> progress)
     {
         _traceStage = "verify"; _traceRoute = _traceStep = 0;
+        // Only the selected result is checked on the regular combat scene. Accelerated
+        // execution must reproduce the real game's state and history before publication.
+        LocalWorkerDataMode.Active = false;
+        LocalWorkerDataMode.MinimalRun = false;
+        NonInteractiveMode.AutoSlayerCheck = _nativeModeBeforeRequest;
         await Restore(request);
         var player = LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!;
         _includePotions = request.IncludePotions;
@@ -577,6 +596,7 @@ public static class LocalWorker
     private static async Task Cleanup(int depth = 1)
     {
         using var cleanup = Trace("cleanup", depth: depth);
+        LocalWorkerDataMode.FreeSelections();
         if (RunManager.Instance.IsInProgress) RunManager.Instance.CleanUp();
         NGame.Instance!.RootSceneContainer.SetCurrentScene(new Control());
         await Frame(); await Frame();
@@ -621,7 +641,7 @@ public static class LocalWorker
             manager.RewardsSetSynchronizer.FastForwardRewardIds(replay.rewardIds);
             using var historical = new LocalReplayChoices(replay.events);
             setup?.Dispose();
-            if (_assetsRequest != request.Id)
+            if (!LocalWorkerDataMode.MinimalRun && _assetsRequest != request.Id)
             {
                 using var assets = Trace("assets", depth: 2);
                 await WaitAssets();
@@ -629,9 +649,9 @@ public static class LocalWorker
                 await PreloadManager.LoadActAssets(run.Acts[run.CurrentActIndex]);
                 _assetsRequest = request.Id;
             }
-            using var scene = Trace("scene", depth: 2);
+            using var scene = Trace("scene", LocalWorkerDataMode.Active ? "原生战斗初始化" : "场景与战斗初始化", depth: 2);
             manager.Launch();
-            NGame.Instance!.RootSceneContainer.SetCurrentScene(NRun.Create(run));
+            if (!LocalWorkerDataMode.MinimalRun) NGame.Instance!.RootSceneContainer.SetCurrentScene(NRun.Create(run));
             await manager.GenerateMap();
             if (request.DebugEncounter is { } encounter)
                 await manager.EnterRoomDebug(RoomType.Monster, MapPointType.Monster,
@@ -835,6 +855,9 @@ public static class LocalWorker
         while (true)
         {
             if (_fastStateSettling) await WaitExecutor();
+            if (LocalWorkerDataMode.MinimalRun && typeof(CombatStateTracker)
+                .GetField("_combatStateChangedDeferredTask", BindingFlags.NonPublic | BindingFlags.Instance)!
+                .GetValue(CombatManager.Instance.StateTracker) is Task notification) await notification;
             if (IsTerminal(player))
             {
                 // CombatEnded fires after native victory/death hooks, not when the final enemy merely reaches 0 HP.

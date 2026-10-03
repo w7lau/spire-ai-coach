@@ -80,7 +80,7 @@ public sealed class LocalTimeline
         "files" => "共享资源、加载 Mod 配置", "launch" => "创建计算进程", "engine" => "引擎与 Mod 启动",
         "reuse" => "复用已启动进程", "session" => "搜索", "restore" => "恢复路线起点",
         "cleanup" => "清理上次模拟", "decode" => "解码战斗记录", "setup" => "建立运行状态",
-        "assets" => "准备角色与地图资源", "scene" => "建立战斗场景", "history" => "恢复已完成操作",
+        "assets" => "准备角色与地图资源", "scene" => "初始化战斗", "history" => "恢复已完成操作",
         "fingerprint" => "核对状态", "decision" => "枚举与选择动作", "refine" => "生成改进路线",
         "schedule" => "分配搜索分支",
         "card" => "出牌并结算", "potion" => "药水并结算", "end_turn" => "敌方行动与下回合",
@@ -90,6 +90,7 @@ public sealed class LocalTimeline
         "receive" => "接收候选与检查运行日志", "dispatch" => "等待计算进程接收请求",
         "result_transfer" => "结果传递与轮询等待", "display_wait" => "等待界面显示",
         "verify" => "独立复核最终路线", "display" => "核对并显示结果", "result" => "结果就绪",
+        "fallback" => "切换兼容执行",
         _ => phase
     };
 

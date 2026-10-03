@@ -1,5 +1,17 @@
 # 设计与合同
 
+## 0.7.7 原生模型执行与常规复核
+
+LocalWorkerDataMode 只在目录所有权标记和独立可执行文件路径核对后安装，使用独立 Harmony owner；任何受检查的原生 IL 边界变化会撤回这一组补丁，继续常规执行。DataOnlyCombat / DataOnlyRun 默认开启，不属于玩家设置；只影响后台搜索 scope。普通玩家进程不安装这些边界，最终 VerifyBest 关闭它们并恢复原生动作入口，重建常规场景后核对每步状态、历史及完整终局。
+
+快速路径省去 NRun、NCombatRoom、卡牌节点、房间/角色画面资产准备、伤害数字、预览、画面震动和选择页面。原生 run/combat model、ActionExecutor、RNG、怪物初始化及全部战斗效果仍保留。GetTweenForCardsChangingPiles 的画面部分由添加/移除完成通知替代；标准选牌在原生 CardSelectCmd 包装内部复用 LocalChoices 的合法分支、身份和计划核对，选择编号及 SyncLocalChoice 不改变。CombatStateTracker 延迟重算保留，只将缺失 NRun 的帧宿主改成 NGame，下一步等待这个原生任务完成。
+
+死亡只替换停止音乐和显示失败页面两个纯画面入口，CreatureCmd.Kill 的死亡防止、死亡钩子、RunManager.OnEnded 和 pending loss / CombatEnded 保留。ForgeCmd 只省 PreviewSovereignBlade，实际锻造及后续钩子保留。没有全局开启 TestMode 或默认开启 NonInteractiveMode，没有卡名效果副本或新增分支删除。
+
+后台默认使用游戏的 StartOnMainMenu=false 入口，模型和 Mod 初始化保留，不创建主菜单；最终常规复核正常准备其画面资产。任一路快速执行失败、unsupported、partial 或最终校验不一致，LocalWorkerPool 先保存实际阶段/动作 trace，再以独立请求 ID 和完整菜单启动重新进行常规执行，使用原预算、原牌组及操作集合。回退原因进入同一时间轴。常规执行本身仍有既有的自定义选择兼容边界；快速路径故障不直接触发卡牌排除。进度中的请求 ID 映射回原请求，序号高于首次搜索及复核，取消及状态过期规则继续生效。
+
+候选没有变化时，result.json 最多每 250ms 重写；候选改变和最终状态立即写入。过程预览仍按原 100ms 上限更新，不跳过原生动作状态核对。资源复用比较 NTFS 的卷及文件 ID：已是同一硬链接则原样保留；仅解除过期目标入口再建立链接，不能用相同大小和时间戳推断文件身份，也不写共享源文件。防止其他计算实例仍映射相同文件时重复删除链接而失败。
+
 ## 0.7.5 多路公共分支提案
 
 LocalSearchWork 保存同一请求的公共提案队列，作用域包含请求 ID、快照、原生根指纹、模型表和已加载 Mod。目录由拥有的 worker 根路径推导，不接受请求传入任意共享路径。文件门锁只覆盖提案发布、领取及计数，不持有它执行游戏；每个不可变任务完全写入后才原子发布索引。全部队列访问共用该门锁，不再为每份提案额外创建 IPC 命名互斥锁。

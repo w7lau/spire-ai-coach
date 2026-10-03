@@ -42,6 +42,29 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
     public async Task<LocalSearchResult> Analyze(LocalSearchRequest request, LocalInstallation installation,
         Action<string> progress, CancellationToken cancellation, Action<LocalProgress>? simulationProgress = null)
     {
+        var origin = new LocalTimeline(request.TimelineOrigin);
+        request = request with { TimelineOrigin = origin.Origin };
+        try { return await AnalyzePass(request, installation, progress, cancellation, simulationProgress); }
+        catch (CoachException ex) when (request.DataOnlyCombat && ex.Category is "local_data_unavailable" or "local_failed" or "local_verify_failed")
+        {
+            // A Mod can depend on an actual UI node. Repeat through the regular native
+            // execution instead of removing that card or weakening replay validation.
+            progress("正在继续计算…");
+            origin.Import(ex.Data["local_trace"] as LocalTrace);
+            origin.Add(new(-1, "main", "fallback", ex.Category + ": " + ex.Message, origin.ElapsedMs, 0));
+            var regular = request with { Id = request.Id + "-regular", DataOnlyCombat = false, DataOnlyRun = false,
+                ExperimentalNativeData = false, InitialTrace = origin.Snapshot() };
+            var result = await AnalyzePass(regular, installation with { MinimalWorkerBootstrap = false }, progress, cancellation,
+                // A compatibility pass restarts each worker's sequence; keep it above
+                // the first pass's search/refinement/verification offsets in the UI.
+                simulationProgress == null ? null : p => simulationProgress(p with { Id = request.Id, Sequence = p.Sequence + 4_000_000 }));
+            return result with { Id = request.Id, Message = "常规执行完成。" + result.Message };
+        }
+    }
+
+    private async Task<LocalSearchResult> AnalyzePass(LocalSearchRequest request, LocalInstallation installation,
+        Action<string> progress, CancellationToken cancellation, Action<LocalProgress>? simulationProgress = null)
+    {
         var timeline = new LocalTimeline(request.TimelineOrigin, 65536);
         timeline.Import(request.InitialTrace);
         request = request with { TimelineOrigin = timeline.Origin, InitialTrace = null };
@@ -61,6 +84,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             progress("准备计算…");
             var results = (await Task.WhenAll(_workers.Take(count).Select((worker, index) => Task.Run(() => Run(worker, index), cancellation)))).ToList();
             cancellation.ThrowIfCancellationRequested();
+            if (request.DataOnlyCombat && results.Any(r => r.Status is "failed" or "unsupported" or "partial"))
+                throw new CoachException("local_data_unavailable", string.Join("\n", results.Select(r => r.Message).Distinct()));
             // Pending native selectors own callbacks. Retire their processes; never reset underneath them.
             // If every lane failed before producing a route, spend only the remaining search budget on
             // one fresh lane excluding the reported actions. This is an explicitly incomplete fallback.
@@ -98,7 +123,6 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 string.Join("\n", verificationResults.Select(r => r.Message).Distinct()));
             var best = verifiedBest;
             var allRuns = results.Concat(verificationResults).ToArray();
-            foreach (var run in allRuns) timeline.Import(run.Trace);
             LocalWorkStats? workStats = null;
             if (request.ShareSearchWork && count > 1)
             {
@@ -174,15 +198,25 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                                             "result_transfer", "写入结果与轮询等待", finished, timeline.ElapsedMs - finished, Depth: 1));
                                     }
                                     using var receiving = timeline.Measure(index, verifying ? "verify" : "search", "receive", depth: 1);
+                                    timeline.Import(result.Trace);
                                     result = result with { Timing = (result.Timing ?? new()) with { StartupMs = preparation.ElapsedMilliseconds } };
                                     if (worker.Process?.HasExited == false)
                                     { worker.Process.Refresh(); result = result with { WorkerMemoryBytes = worker.Process.PrivateMemorySize64 }; }
                                     if (worker.GameErrors())
                                     {
+                                        if (command.DataOnlyCombat)
+                                        {
+                                            LocalWire.Write(Path.Combine(worker.Root, "last-data-failure.json"), result);
+                                            File.Copy(Path.Combine(worker.Root, "game.log"), Path.Combine(worker.Root, "last-data-failure.log"), true);
+                                        }
                                         worker.Stop();
                                         return result with { Status = "failed", Best = null, Message = "后台游戏报告运行错误，未采用该进程的结果。" };
                                     }
-                                    if (result.Status is not ("done" or "searched")) worker.Stop();
+                                    if (result.Status is not ("done" or "searched"))
+                                    {
+                                        if (command.DataOnlyCombat) LocalWire.Write(Path.Combine(worker.Root, "last-data-failure.json"), result);
+                                        worker.Stop();
+                                    }
                                     return result;
                                 }
                                 progress($"正在计算 · 已评估 {result.Evaluated} 条路线");
@@ -203,6 +237,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 }
             }
         }
+        catch (CoachException ex) { ex.Data["local_trace"] = timeline.Snapshot(); throw; }
         finally { _gate.Release(); }
     }
 
@@ -320,18 +355,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             if (!prior.Exists || prior.Length != info.Length || prior.LastWriteTimeUtc != info.LastWriteTimeUtc)
                 File.Copy(source, target, true); // Never hardlink a writable worker to the live installation.
         }
-        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool CreateHardLink(string newName, string existingName, IntPtr security);
-
-        private static void ShareFile(string source, string target, CancellationToken token)
-        {
-            token.ThrowIfCancellationRequested();
-            // Remove the old directory entry, never overwrite a shared inode (including after Steam updates).
-            if (File.Exists(target)) File.Delete(target);
-            if (!CreateHardLink(target, source, IntPtr.Zero))
-                throw new IOException("无法共享游戏资源文件（需要同盘 NTFS）；未回退为复制整套资源。", Marshal.GetLastWin32Error());
-        }
+        private static void ShareFile(string source, string target, CancellationToken token) =>
+            LocalWorkerFileSharing.Share(source, target, token);
         private static void ShareTree(string source, string target, CancellationToken token)
         {
             Directory.CreateDirectory(target);
