@@ -14,7 +14,7 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     bool FastCardPresentation = true, bool FastNativeWaits = true, bool ShareSearchWork = true,
     bool FastStateSettling = true, bool FastAssetCollection = false, bool StrategicRollouts = true,
     bool ExperimentalNativeData = false, byte[]? RecordedReplayProbe = null, bool DataOnlyCombat = true,
-    bool DataOnlyRun = true, bool NumericalExecution = true, bool StopOnZeroLoss = true);
+    bool DataOnlyRun = true, bool NumericalExecution = true, bool StopOnZeroLoss = true, bool TrimWorkerOverhead = true);
 
 // A stop belongs to one frozen request, never to another battle or final verification.
 public sealed record LocalSearchStop(string Id, string SnapshotId, string NativeHash)

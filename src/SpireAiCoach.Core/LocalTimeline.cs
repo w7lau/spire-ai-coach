@@ -6,7 +6,12 @@ namespace SpireAiCoach.Core;
 // monotonic clock. Durations are wall time, including awaited native work, not CPU time.
 public sealed record LocalTraceSpan(int Worker, string Stage, string Phase, string Detail,
     double StartMs, double DurationMs, int Route = 0, int Step = 0, int Depth = 0);
-public sealed record LocalTrace(long OriginTimestamp, long Frequency, LocalTraceSpan[] Spans, int Dropped = 0);
+// Method totals include nested calls. Source identifies cumulative snapshots from
+// one process/request so importing a newer snapshot does not count it twice.
+public sealed record LocalMethodTiming(string Source, int Worker, string Stage, string Method,
+    long Calls, long Skipped, double TotalMs, double MaxMs);
+public sealed record LocalTrace(long OriginTimestamp, long Frequency, LocalTraceSpan[] Spans, int Dropped = 0,
+    LocalMethodTiming[]? Methods = null);
 
 public sealed class LocalTimeline
 {
@@ -14,6 +19,9 @@ public sealed class LocalTimeline
     private readonly List<LocalTraceSpan> _spans = [];
     private readonly Func<long> _clock;
     private readonly int _capacity;
+    private readonly string _methodSource = Guid.NewGuid().ToString("N");
+    private readonly Dictionary<(int Worker, string Stage, string Method), MethodCounter> _methodCounters = [];
+    private readonly Dictionary<(string Source, int Worker, string Stage, string Method), LocalMethodTiming> _methods = [];
     private int _dropped;
     public long Origin { get; }
     public long Frequency { get; }
@@ -30,6 +38,52 @@ public sealed class LocalTimeline
     public double ElapsedMs => (_clock() - Origin) * 1000d / Frequency;
     public IDisposable Measure(int worker, string stage, string phase, string detail = "",
         int route = 0, int step = 0, int depth = 0) => new Scope(this, worker, stage, phase, detail, route, step, depth);
+
+    // Synchronous boundaries only. Aggregate in memory instead of creating a
+    // timeline span or writing a file for every native call.
+    public MethodScope MeasureMethod(int worker, string stage, string method) => new(this, worker, stage, method);
+    public void SkipMethod(int worker, string stage, string method) => RecordMethod(worker, stage, method, 0, true);
+    private void RecordMethod(int worker, string stage, string method, double durationMs, bool skipped)
+    {
+        var key = (worker, stage, method);
+        lock (_gate)
+        {
+            if (!_methodCounters.TryGetValue(key, out var counter))
+            {
+                if (_methodCounters.Count >= 4096) { _dropped++; return; }
+                _methodCounters.Add(key, counter = new());
+            }
+            counter.Calls++; if (skipped) counter.Skipped++;
+            counter.TotalMs += durationMs; counter.MaxMs = Math.Max(counter.MaxMs, durationMs);
+        }
+    }
+
+    private sealed class MethodCounter
+    {
+        public long Calls, Skipped;
+        public double TotalMs, MaxMs;
+    }
+
+    public struct MethodScope : IDisposable
+    {
+        private readonly LocalTimeline? _timeline;
+        private readonly int _worker;
+        private readonly string _stage, _method;
+        private readonly long _started;
+        private bool _disposed;
+        internal MethodScope(LocalTimeline timeline, int worker, string stage, string method)
+        {
+            _timeline = timeline; _worker = worker; _stage = stage; _method = method;
+            _started = timeline._clock(); _disposed = false;
+        }
+        public void Dispose()
+        {
+            if (_timeline == null || _disposed) return;
+            _disposed = true;
+            _timeline.RecordMethod(_worker, _stage, _method,
+                (_timeline._clock() - _started) * 1000d / _timeline.Frequency, false);
+        }
+    }
 
     public void Add(LocalTraceSpan span)
     {
@@ -53,12 +107,28 @@ public sealed class LocalTimeline
             var end = Math.Min(toMs, span.StartMs + offset + span.DurationMs);
             if (end >= start) Add(span with { StartMs = start, DurationMs = end - start });
         }
-        lock (_gate) _dropped += trace.Dropped;
+        // Method aggregates cover the completed worker request, not a clipped
+        // prewarming interval. Preparation traces do not contain method samples.
+        lock (_gate)
+        {
+            foreach (var method in trace.Methods ?? [])
+            {
+                var key = (method.Source, method.Worker, method.Stage, method.Method);
+                if (_methods.TryGetValue(key, out var previous))
+                { if (method.Calls >= previous.Calls) _methods[key] = method; }
+                else if (_methods.Count < 4096) _methods.Add(key, method);
+                else _dropped++;
+            }
+            _dropped += trace.Dropped;
+        }
     }
 
     public LocalTrace Snapshot()
     {
-        lock (_gate) return new(Origin, Frequency, _spans.OrderBy(s => s.StartMs).ThenBy(s => s.Depth).ToArray(), _dropped);
+        lock (_gate) return new(Origin, Frequency, _spans.OrderBy(s => s.StartMs).ThenBy(s => s.Depth).ToArray(), _dropped,
+            _methods.Values.Concat(_methodCounters.Select(p => new LocalMethodTiming(_methodSource, p.Key.Worker, p.Key.Stage,
+                p.Key.Method, p.Value.Calls, p.Value.Skipped, p.Value.TotalMs, p.Value.MaxMs)))
+                .OrderBy(m => m.Worker).ThenBy(m => m.Stage).ThenBy(m => m.Method).ToArray());
     }
 
     private sealed class Scope(LocalTimeline timeline, int worker, string stage, string phase,
@@ -110,6 +180,14 @@ public sealed class LocalTimeline
             lines.Add($"—— 计算 {worker.Key + 1}：各阶段内部累计 ——");
             foreach (var group in worker.Where(s => s.Depth == 1).GroupBy(s => (s.Stage, s.Phase)))
                 lines.Add($"{(group.Key.Stage == "verify" ? "复核 / " : "")}{Label(group.Key.Phase)}：{group.Sum(s => s.DurationMs) / 1000:F2}s，{group.Count()} 次");
+        }
+        if (trace.Methods is { Length: > 0 })
+        {
+            lines.Add("—— 方法累计（含内部调用，不能相加作为总耗时）——");
+            foreach (var group in trace.Methods.GroupBy(m => (m.Worker, m.Stage, m.Method))
+                .OrderBy(g => g.Key.Worker).ThenBy(g => g.Key.Stage).ThenByDescending(g => g.Sum(m => m.TotalMs)))
+                lines.Add($"计算 {group.Key.Worker + 1} / {(group.Key.Stage == "verify" ? "复核" : "搜索")} / {group.Key.Method}：" +
+                    $"{group.Sum(m => m.TotalMs):F2}ms，调用 {group.Sum(m => m.Calls)} 次，跳过 {group.Sum(m => m.Skipped)} 次，最长 {group.Max(m => m.MaxMs):F2}ms");
         }
         if (trace.Dropped > 0) lines.Add($"细节达到记录上限，省略 {trace.Dropped} 条；总用时不受影响。");
         return string.Join("\n", lines);

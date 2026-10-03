@@ -1,5 +1,17 @@
 # 设计与合同
 
+## 0.7.10 展示和输出开销、方法计时
+
+LocalWorkerOverhead 仅在已核对所有权标记与可执行路径的独立实例安装。TrimWorkerOverhead 默认 true；实际跳过还要求 NumericalExecution、DataOnlyCombat、DataOnlyRun，且不是 VerifyCandidate 请求。VerifyBest 关闭数据场景模式时，跳过入口自动失效。每组原生方法用独立 Harmony owner 安装，签名不支持时撤回该组并在私有 runtime.json 留下失败原因。
+
+SfxCmd 的播放入口、NAudioManager 的单次播放/循环/参数入口、VfxCmd 的返回 void 的展示入口在此范围内直接返回；声音停止与清理方法保留。特效的集合包装仍枚举调用方传入的序列，只跳过叶调用。ConsoleLogPrinter.Print 仅跳过普通输出，Warn/Error 和 Logger.LogCallback 保留。CombatReplayWriter.WriteReplay 跳过匿名化、序列化和写盘，仍执行要求的 StopRecording；没有开始录制或已禁用的原生行为继续执行，不隐藏错误。内存重放事件、历史选择、所有规则效果和原生校验继续保留。
+
+快速搜索中 force 标志不再绕开每 100ms 的运行中进度节流；结束/失败状态仍立即写入。运行中候选统一最多每 250ms 发布，最终候选立即写入。父进程仍按原生状态和历史检查方案，搜索分支、预算、评分和无伤提前停止条件没有变化。
+
+LocalTrace.Methods 用 Source/Worker/Stage/Method 区分一次后台请求的同步方法累计，包含 Calls、Skipped、TotalMs、MaxMs。Native checksum、NetFullCombatState.FromRun/Serialize、PlayerCombatState.RecalculateCardValues 用原入口的 prefix/finalizer 计时；finalizer 不替换或吞掉原异常。LocalCapture.Fingerprint 和进度/候选发布在所属流程计时。结构体计时范围与原地计数器避免逐调用分配记录、生成时间线项或写盘，完成快照时才物化记录；每类累计有容量上限。Source 保留跨进程导入身份，更新的累计快照替换旧值，独立请求相加。旧诊断缺少 Methods 时仍可读取。方法累计包含内部调用，不能与父操作或其他嵌套方法相加；最终结果文件自身正在进行的最后一次写入不在它自己的快照中。
+
+Mod/模型清单不一致时保存私有 model-mismatch.json，含预期/实际模型哈希及程序集身份，不放宽校验。速度验证必须使用同一根状态、同一动作/选牌路线和实际相同的 Mod 副本，测试入口先检查固定路线首步指纹与冻结请求相同。
+
 ## 0.7.9 无伤获胜后停止全部搜索
 
 CoachSettings.LocalStopOnZeroLoss 和 LocalSearchRequest.StopOnZeroLoss 默认 true；旧配置/旧请求省略时继承默认值，显式 false 保留。面板勾选后自动保存，不要求 AI 配置；计算入口冻结该值。停止标准仅为 Won、未死亡、已知 StartingHp 且 NetHpLoss=0，包含原生战中及战后回血。不再依赖 RewardCoverageKnown、ContinueOptimization 或未喝药条件；使用药水的合法性仍由请求 IncludePotions 控制。当前不搜索额外奖励收益，关闭开关才继续优化无伤路线。
