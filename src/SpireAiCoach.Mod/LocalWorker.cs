@@ -49,6 +49,9 @@ public static class LocalWorker
         _timeline?.Measure(_traceWorker, _traceStage, phase, detail, _traceRoute, _traceStep, depth);
     internal static IDisposable? TracePreloadCollection() => Trace("asset_gc", depth: 3);
     internal static IDisposable? TraceLogicFrame() => Trace("logic_frame", "原生外部依赖", depth: _restoreDepth > 0 ? 3 : 2);
+    internal static LocalTimeline.MethodScope MeasureMethod(string name) =>
+        _timeline?.MeasureMethod(_traceWorker, _traceStage, name) ?? default;
+    internal static void SkipMethod(string name) => _timeline?.SkipMethod(_traceWorker, _traceStage, name);
     private static Task Frame() => _tree.ToSignal(_tree, SceneTree.SignalName.ProcessFrame).AsTask();
 
     public static bool TryStart()
@@ -66,6 +69,7 @@ public static class LocalWorker
         LocalWorkerBootstrap.Install(harmony);
         LocalWorkerDataMode.Install(harmony);
         LocalWorkerLogic.Install();
+        LocalWorkerOverhead.Install();
         Callable.From(Run).CallDeferred();
         return true;
     }
@@ -164,8 +168,10 @@ public static class LocalWorker
         LocalAction? blockedAction = null;
         void Progress(string phase, LocalSimState? state = null, bool force = false, string status = "running")
         {
-            if (!force && timer.ElapsedMilliseconds - lastProgress < 100) return;
+            if ((!force || LocalWorkerOverhead.Active && status == "running") && timer.ElapsedMilliseconds - lastProgress < 100)
+            { SkipMethod("LocalWorker.Progress"); return; }
             using var publishing = Trace("publish", "过程进度");
+            using var measuring = MeasureMethod("LocalWorker.Progress");
             lastProgress = timer.ElapsedMilliseconds;
             LocalWire.Write(Path.Combine(_root, "progress.json"), new LocalProgress(request.Id, request.SnapshotId,
                 request.Partition, request.Partitions, ++sequence, route, evaluated, request.MaxNodes, victories,
@@ -175,12 +181,14 @@ public static class LocalWorker
         {
             // The parent polls every 250 ms. Rewriting the unchanged, potentially large
             // candidate after every fast route does not provide any newer recommendation.
-            if (status == "running" && ReferenceEquals(best, lastPublishedBest) && timer.ElapsedMilliseconds - lastResult < 250) return;
+            if (status == "running" && (LocalWorkerOverhead.Active || ReferenceEquals(best, lastPublishedBest)) && timer.ElapsedMilliseconds - lastResult < 250)
+            { SkipMethod("LocalWorker.Publish"); return; }
             using var publishing = Trace("publish", "候选结果");
+            using var measuring = MeasureMethod("LocalWorker.Publish");
             lastResult = timer.ElapsedMilliseconds; lastPublishedBest = best;
             if (status != "running") LocalWire.Write(Path.Combine(_root, "runtime.json"), new
                 { status, mode = LocalWorkerDataMode.MinimalRun ? "native-model" : LocalWorkerDataMode.Active ? "no-combat-scene" : "regular-scene",
-                    max_fps = Engine.MaxFps, observed_fps = Engine.GetFramesPerSecond(), numerical = LocalWorkerLogic.Counters() });
+                    max_fps = Engine.MaxFps, observed_fps = Engine.GetFramesPerSecond(), numerical = LocalWorkerLogic.Counters(), overhead = LocalWorkerOverhead.Status() });
             LocalWire.Write(Path.Combine(_root, "result.json"),
             new LocalSearchResult(request.Id, request.SnapshotId, status, message, evaluated, rejected, timer.ElapsedMilliseconds, best,
                 Victories: victories, IncludePotions: request.IncludePotions,
@@ -204,9 +212,16 @@ public static class LocalWorker
             LocalWorkerDataMode.Active = request.DataOnlyCombat && LocalWorkerDataMode.Available;
             LocalWorkerDataMode.MinimalRun = LocalWorkerDataMode.Active && request.DataOnlyRun;
             LocalWorkerLogic.Enabled = request.NumericalExecution;
+            LocalWorkerOverhead.Enabled = request.TrimWorkerOverhead && request.NumericalExecution && request.VerifyCandidate == null;
             if (request.ExperimentalNativeData) NonInteractiveMode.AutoSlayerCheck = () => true;
-            if (request.ModelHash != ModelIdSerializationCache.Hash || !request.LoadedMods.SequenceEqual(LocalCapture.LoadedMods()))
+            var actualMods = LocalCapture.LoadedMods();
+            if (request.ModelHash != ModelIdSerializationCache.Hash || !request.LoadedMods.SequenceEqual(actualMods))
+            {
+                LocalWire.Write(Path.Combine(_root, "model-mismatch.json"), new
+                    { expected_model_hash = request.ModelHash, actual_model_hash = ModelIdSerializationCache.Hash,
+                        expected_mods = request.LoadedMods, actual_mods = actualMods });
                 throw new InvalidOperationException("后台的游戏模型或 Mod 清单与当前游戏不一致，请重启游戏后重试。");
+            }
             if (request.RecordedReplayProbe is { } recorded)
             {
                 int startHp = 0, lost = 0;
@@ -517,7 +532,7 @@ public static class LocalWorker
             Publish("failed", ex.Message);
             return false;
         }
-        finally { NonInteractiveMode.AutoSlayerCheck = originalNativeMode; LocalWorkerLogic.Enabled = false; LocalWorkerDataMode.Reset(); LocalWorkerVisuals.Reset(); _fastNativeWaits = _fastStateSettling = false; LocalWorkerResources.Retain = LocalWorkerResources.FastCollection = false; Engine.TimeScale = originalScale; Engine.MaxFps = originalFps; _timeline = null; }
+        finally { NonInteractiveMode.AutoSlayerCheck = originalNativeMode; LocalWorkerOverhead.Enabled = false; LocalWorkerLogic.Enabled = false; LocalWorkerDataMode.Reset(); LocalWorkerVisuals.Reset(); _fastNativeWaits = _fastStateSettling = false; LocalWorkerResources.Retain = LocalWorkerResources.FastCollection = false; Engine.TimeScale = originalScale; Engine.MaxFps = originalFps; _timeline = null; }
     }
 
     private static IEnumerable<LocalAction[]> ExpansionPrefixes(LocalCandidate candidate)

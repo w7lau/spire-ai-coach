@@ -333,3 +333,12 @@ Mod 与集成项目构建零警告零错误。合成选择链路在同一功能�
 The default-off `NumericalExecution` experiment passed same-worker old/new/new/old comparisons of the recorded 6-round/49-action route and a fixed 10-round/60-action search route. Every native action/state fingerprint and final settlement matched; the search route's full card choices also matched and its final candidate passed 60/60 ordinary-scene continuation checks. Warm full-route times were 2.023 → 0.845 seconds and 2.212 → 1.202 seconds. The 60-action execution portion was 1.536 → 0.654 seconds. New samples retained only 3 root-restoration frame waits and none in cards/enemy turns. Startup and independent verification are outside these figures. Details and limitations are in [numerical-execution-experiment.md](numerical-execution-experiment.md).
 
 The first reuse prototype failed; late continuations and cross-action turn-loop dispatch were corrected before the final repeated comparisons. Installed-game build: zero warnings/errors. Targeted core checks: search 14/14, timeline 5/5. No unseeded quality search or full suite was run. This experimental branch has not replaced the installed Mod and does not establish arbitrary-Mod compatibility or optimality.
+# 0.7.10 展示/输出开销与方法计时（2026-10-03）
+
+核心检查 111/111，通过；本机 v0.111.0 游戏适配层及隔离宿主编译零警告、零错误。固定同一根状态与相同 Mod 副本，在单个已准备的实例内先预热两种路径，再按关/开/开/关执行 10 回合 60 步路线。动作、卡牌实例、原生选牌、每步指纹、起点/最终生命、累计扣血、金币、最大生命、敌人剩余生命和回合数全部一致；每条均最终生命 87、净损失 0。常规场景最终复核 60/60，通过，新增展示快捷入口不在复核中生效。20 组原生边界全部安装成功，无安装失败。
+
+记录用时为关闭 1423/1036ms、开启 1353/1314ms；常规复核 7985ms。同机游戏和多个计算实例仍在运行，样本不足且总用时有波动；这些结果没有证明稳定的总体提速，不以最佳单次或缩短预算宣称收益。新路径确实跳过重放文件输出、音效入口、特效叶入口及普通日志。关闭路径中的重放输出约 9ms、音频底层调用约 13–19ms；完整状态复制 224 次、累计约 520–726ms，是目前可观察的主要成本。方法累计包含嵌套调用，同名重载也合并累计，不能与指纹或原生校验再次相加。
+
+开始对照时两次输入准备被真实 Mod/模型清单校验拒绝；改用同一历史战斗对应的已保存 Mod 副本。随后发现最初配对的请求属于另一场战斗，改用与固定路线首步指纹完全相同的冻结请求，并加入测试入口的根一致性检查。没有修改模型哈希、忽略 Mod 身份、取消原生状态校验或冒充获胜。
+
+上述验证是固定路线的执行兼容与方法观察，不是无提示最优解搜索、任意 Mod 兼容证明或并发吞吐测试。当前完整状态复制仍调用原生卡牌费用和遗物序列化等逻辑，不共享未证明完整的中途状态。源码/包已准备，安装仍需游戏退出；用户实际重启加载和后续战斗进度显示尚未验证。

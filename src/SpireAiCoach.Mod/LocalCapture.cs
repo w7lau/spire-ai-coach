@@ -68,6 +68,7 @@ public static class LocalCapture
 
     public static string Fingerprint()
     {
+        using var measuring = LocalWorker.MeasureMethod("LocalCapture.Fingerprint");
         var state = CombatManager.Instance.DebugOnlyGetState() ?? throw new InvalidOperationException("No combat");
         var writer = new PacketWriter();
         NetFullCombatState.FromRun(state.RunState, null).Serialize(writer);

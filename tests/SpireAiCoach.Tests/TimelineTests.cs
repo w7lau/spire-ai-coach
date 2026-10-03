@@ -59,5 +59,46 @@ static class TimelineTests
             Check(text.Contains("已模拟到的生命") && text.Contains("战斗尚未完成") && !text.Contains("预测战后生命"),
                 "An unfinished horizon has no final combat/victory healing result");
         });
+        test("method timings retain nesting, skipped calls and latest snapshots across processes", () =>
+        {
+            long ticks = 1000;
+            var worker = new LocalTimeline(1000, clock: () => ticks, frequency: 1000);
+            var outer = worker.MeasureMethod(0, "search", "checksum");
+            ticks += 2;
+            var inner = worker.MeasureMethod(0, "search", "snapshot");
+            ticks += 3; inner.Dispose(); ticks += 4; outer.Dispose(); outer.Dispose();
+            worker.SkipMethod(0, "search", "sound");
+            var first = worker.Snapshot();
+            var again = worker.MeasureMethod(0, "search", "checksum");
+            ticks += 5; again.Dispose();
+            var parent = new LocalTimeline(1000, clock: () => ticks, frequency: 1000);
+            parent.Import(first); parent.Import(worker.Snapshot()); parent.Import(first);
+            var independent = new LocalTimeline(1000, clock: () => ticks, frequency: 1000);
+            var other = independent.MeasureMethod(0, "search", "checksum");
+            ticks += 7; other.Dispose(); parent.Import(independent.Snapshot());
+            var trace = JsonSerializer.Deserialize<LocalTrace>(JsonSerializer.Serialize(parent.Snapshot()))!;
+            var methods = trace.Methods!;
+            var sums = methods.Where(m => m.Method == "checksum").ToArray();
+            Check(sums.Sum(m => m.Calls) == 3 && sums.Sum(m => m.TotalMs) == 21 && sums.Max(m => m.MaxMs) == 9,
+                "Repeated snapshots must replace, older snapshots cannot regress, independent requests must add");
+            Check(methods.Single(m => m.Method == "snapshot").TotalMs == 3 && trace.Spans.Length == 0,
+                "Nested method time is inclusive and never added as another top-level timeline interval");
+            Check(methods.Single(m => m.Method == "sound") is { Calls: 1, Skipped: 1, TotalMs: 0 },
+                "Skipped native bodies have a count, not an invented saved duration");
+            var text = LocalTimeline.Format(new("id", "state", "done", "", 1, 0, 21, null, Trace: trace));
+            Check(text.Contains("不能相加") && text.Contains("调用 3 次") && text.Contains("跳过 1 次"),
+                "UI must separate method totals and explain that nested costs overlap");
+        });
+        test("method profiling is bounded and old trace JSON remains readable", () =>
+        {
+            var legacy = JsonSerializer.Deserialize<LocalTrace>("{\"OriginTimestamp\":1,\"Frequency\":1000,\"Spans\":[],\"Dropped\":0}")!;
+            Check(legacy.Methods == null, "Legacy diagnostics need no fabricated method samples");
+            var timer = new LocalTimeline();
+            for (int i = 0; i < 4097; i++) timer.SkipMethod(0, "search", "unknown-" + i);
+            Check(timer.Snapshot().Methods!.Length == 4096 && timer.Snapshot().Dropped == 1,
+                "Method aggregation cannot grow without bound for unexpected Mod names");
+            var old = JsonSerializer.Deserialize<LocalSearchRequest>("{\"Id\":\"id\",\"SnapshotId\":\"s\",\"Replay\":\"\",\"NativeHash\":\"h\",\"ModelHash\":0,\"LoadedMods\":[],\"ContinueOptimization\":false}")!;
+            Check(old.TrimWorkerOverhead, "Older requests must receive the product default for the owned worker");
+        });
     }
 }
