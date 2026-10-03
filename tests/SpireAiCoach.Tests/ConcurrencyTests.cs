@@ -69,11 +69,42 @@ static class ConcurrencyTests
         {
             var request = LocalCalculation.Configure(new("id", "snap", [], "native", 1, [], true),
                 LocalSearchOrder.MonteCarlo, 8, true, false);
-            var result = await LocalConcurrency.Run(8, true, true, i => Task.FromResult(i),
+            var workers = Enumerable.Range(0, 8).Select(_ => new TaskCompletionSource<int>()).ToArray();
+            var result = await LocalConcurrency.Run(8, true, true, i =>
+            {
+                if (i == 7) for (int j = 0; j < 8; j++) workers[j].SetResult(j);
+                return workers[i].Task;
+            },
                 _ => new(100, 0, 20, 8), () => false, CancellationToken.None, 1);
             Check(result.SequenceEqual(Enumerable.Range(0, 8)) && request.AdaptiveWorkers && request.Workers == 8 &&
                 request.MaxNodes == 64 && request.BudgetSeconds == 60 && request.MaxRounds == 64 &&
                 request.IncludePotions && !request.StopOnZeroLoss);
+        });
+        asyncTest("shared concurrency does not start new searches after all admitted workers finish", async () =>
+        {
+            int launched = 0;
+            var result = await LocalConcurrency.Run(8, true, true, i =>
+            { launched++; return Task.FromResult(i); },
+                _ => new(100, 0, 20, 8), () => false, CancellationToken.None, 1);
+            Check(result.SequenceEqual([0]) && launched == 1);
+        });
+        asyncTest("shared concurrency does not reopen admission when a finished worker releases memory", async () =>
+        {
+            var first = new TaskCompletionSource<int>();
+            var second = new TaskCompletionSource<int>();
+            var launches = new List<int>();
+            int pollsWithTwo = 0;
+            var result = await LocalConcurrency.Run(8, true, true, i =>
+            { launches.Add(i); return i == 0 ? first.Task : second.Task; }, n =>
+            {
+                if (n == 2 && ++pollsWithTwo == 2)
+                {
+                    first.SetResult(0);
+                    _ = Task.Run(async () => { await Task.Delay(20); second.SetResult(1); });
+                }
+                return new(100, 0, 20, pollsWithTwo > 2 ? 8 : 2);
+            }, () => false, CancellationToken.None, 1);
+            Check(result.SequenceEqual([0, 1]) && launches.SequenceEqual([0, 1]));
         });
         asyncTest("adaptive concurrency cancellation joins every admitted worker cleanup", async () =>
         {

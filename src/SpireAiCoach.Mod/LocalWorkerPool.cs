@@ -44,10 +44,12 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
         var origin = new LocalTimeline(request.TimelineOrigin);
         request = request with { TimelineOrigin = origin.Origin };
         try { return await AnalyzePass(request, installation, progress, cancellation, simulationProgress); }
-        catch (CoachException ex) when (request.DataOnlyCombat && ex.Category is "local_data_unavailable" or "local_failed" or "local_verify_failed")
+        catch (CoachException ex) when (request.DataOnlyCombat && ex.Category is "local_data_unavailable" or "local_failed")
         {
             // A Mod can depend on an actual UI node. Repeat through the regular native
             // execution instead of removing that card or weakening replay validation.
+            // Final verification already retries the same candidate normally;
+            // a verification failure must not restart all full-budget searches.
             progress("正在继续计算…");
             origin.Import(ex.Data["local_trace"] as LocalTrace);
             origin.Add(new(-1, "main", "fallback", ex.Category + ": " + ex.Message, origin.ElapsedMs, 0));
@@ -354,7 +356,14 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             get
             {
                 var process = Process;
-                try { return process?.HasExited == false ? Math.Max(0, process.PrivateMemorySize64) : 0; }
+                try
+                {
+                    if (process?.HasExited != false) return 0;
+                    // Process caches this snapshot. Refresh before estimating
+                    // the memory already held by reusable workers.
+                    process.Refresh();
+                    return Math.Max(0, process.PrivateMemorySize64);
+                }
                 catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { return 0; }
             }
         }
