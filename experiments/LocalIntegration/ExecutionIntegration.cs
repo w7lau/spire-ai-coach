@@ -12,14 +12,17 @@ public static class ExecutionIntegration
     public static async Task Run(string root, SceneTree tree, LocalWorkerPool pool, StateCapture capture, Player player)
     {
         var snapshot = capture.Capture(true)!;
-        var request = LocalCapture.Capture(snapshot.Fingerprint(), true) with { Workers = 1, MaxNodes = 4, BudgetSeconds = 15 };
+        bool skip = System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SKIP_FINAL_VERIFICATION") == "1";
+        var request = LocalCapture.Capture(snapshot.Fingerprint(), true) with { Workers = 1, MaxNodes = skip ? 1 : 4, BudgetSeconds = 15,
+            SkipFinalVerification = skip };
         var installation = LocalCapture.Installation();
         var preparation = Stopwatch.StartNew();
         await Task.Run(() => pool.Prepare(installation, 1, CancellationToken.None));
         preparation.Stop();
         var result = await Task.Run(() => pool.Analyze(request, installation, _ => { }, CancellationToken.None));
-        if (request.NativeHash != LocalCapture.Fingerprint() || result.Best is not { Won: true, Continuation.Length: > 1 })
-            throw new InvalidOperationException("Need an unchanged host and verified winning plan");
+        if (request.NativeHash != LocalCapture.Fingerprint() || result.Best is not { Won: true, Continuation.Length: > 1 } ||
+            !LocalSearchPolicy.HasExecutionPoints(result) || result.VerificationSkipped != skip || skip && result.Timing?.Verifications != 0)
+            throw new InvalidOperationException("Need an unchanged host and complete native execution points");
         var executor = new LocalPlanExecutor(tree);
         LocalContinuation Plan(LocalSearchResult? r = null) => new(snapshot.CombatId, request.LoadedMods, r ?? result);
         string? CombatId() => capture.Capture(false)?.CombatId;
@@ -38,6 +41,8 @@ public static class ExecutionIntegration
         await Reject(new LocalContinuation("wrong-combat", request.LoadedMods, result));
         using var canceled = new CancellationTokenSource(); canceled.Cancel(); await Reject(Plan(), canceled.Token);
         var first = result.Best.Actions[0];
+        if (!first.EndTurn && first.PotionSlot == null)
+            await Reject(Plan(result with { Best = result.Best with { Actions = [first with { CombatCardIndex = 999_999 }, .. result.Best.Actions.Skip(1)] } }));
         await Reject(Plan(result with { Best = result.Best with { Actions = [first with { BeforeHash = "stale" }, .. result.Best.Actions.Skip(1)] } }));
         await Reject(Plan(result with { IncludePotions = true, Best = result.Best with
         { Actions = [first with { EndTurn = false, PotionSlot = 0 }, .. result.Best.Actions.Skip(1)] } }));
@@ -63,6 +68,7 @@ public static class ExecutionIntegration
             executed_steps = messages.Count, expected_steps = result.Best.Actions.Length,
             includes_end_turn = result.Best.Actions.Any(a => a.EndTurn), final_hp = player.Creature.CurrentHp,
             expected_hp = result.Best.Hp, rejected_wrong_combat = true, rejected_stale = true,
+            result.VerificationSkipped, result.Timing, result.Best.ContinuationFromSearch, rejected_wrong_instance = true,
             rejected_disabled_potion = true, canceled_without_mutation = true, final });
     }
 }

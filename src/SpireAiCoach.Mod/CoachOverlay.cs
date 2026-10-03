@@ -150,12 +150,12 @@ public sealed class CoachOverlay
         };
         body.AddChild(_localStopOnZeroLoss);
         _localSkipVerification = new Button { Name = "LocalSkipVerification", Text = "跳过最终复核：关闭", ToggleMode = true,
-            TooltipText = "本次游戏默认关闭。开启后省去最终路线的独立重放，直接显示模拟结果供手动对照；未复核路线不能自动执行或续用。" };
+            TooltipText = "默认关闭。开启后省去最终路线的独立重放，仍可点击执行方案；执行时逐步核对首次模拟记录，偏离即停止。" };
         _localSkipVerification.Toggled += enabled =>
         {
             _localSkipVerification.Text = enabled ? "跳过最终复核：开启" : "跳过最终复核：关闭";
             if (_localAnalyzing) Cancel("复核选项已改变，请重新计算。");
-            _status.Text = enabled ? "下次本地计算跳过最终复核，结果供手动对照。" : "下次本地计算会复核最终路线。";
+            _status.Text = enabled ? "下次本地计算跳过最终复核，仍可执行取得完整逐步记录的方案。" : "下次本地计算会复核最终路线。";
         };
         body.AddChild(_localSkipVerification);
         _localProgress = new LocalProgressPanel(); body.AddChild(_localProgress.View);
@@ -525,17 +525,19 @@ public sealed class CoachOverlay
                         try
                         {
                             Directory.CreateDirectory(Path.GetDirectoryName(timingPath)!);
-                            LocalWire.Write(timingPath, new { version = "0.7.16", request.SearchOrder, request.MaxNodes, request.BudgetSeconds,
+                            LocalWire.Write(timingPath, new { version = "0.7.17", request.SearchOrder, request.MaxNodes, request.BudgetSeconds,
                                 request.SkipFinalVerification, result.VerificationSkipped, result.ElapsedMs, result.Workers,
                                 result.Evaluated, result.Victories, result.Timing, result.Trace });
                         }
                         catch (Exception ex) { GD.Print("[SpireAiCoach] Timing save failed: " + ex.GetType().Name); }
                     });
                     _adviceHash = request.SnapshotId;
-                    _freshness.Text = result.VerificationSkipped ? "路线未复核，供手动对照；当前为预算内候选，尚未证明全局最优。" :
+                    _freshness.Text = result.VerificationSkipped ? LocalSearchPolicy.HasExecutionPoints(result) ?
+                        "已跳过最终复核；可执行方案，实际状态偏离时自动停止。当前为预算内候选。" :
+                        "已跳过最终复核，但逐步记录不完整；目前仅供手动查看。" :
                         "路线已复核；按建议操作可续用。当前为预算内最佳候选，尚未证明全局最优。";
                     _status.Text = LocalCalculation.Name(order) + "完成 · 不消耗 API";
-                    if (!result.VerificationSkipped && result.Best?.Continuation is { Length: > 0 })
+                    if (LocalSearchPolicy.HasExecutionPoints(result))
                     {
                         _continuation = new(_snapshot!.CombatId, request.LoadedMods, result);
                         _continuationPending = false;
