@@ -225,7 +225,7 @@ static class DiscrepancyTests
         test("discrepancy parallel ownership ignores changing previews display names and native hand positions", () =>
         {
             var legal = Enumerable.Range(0, 5).Select(i => Move(i)).ToArray();
-            var altered = legal.Reverse().Select(a => a with { Preference = 500 - a.HandIndex, CardName = "new name", HandIndex = 10 }).ToArray();
+            var altered = Enumerable.Reverse(legal).Select(a => a with { Preference = 500 - a.HandIndex, CardName = "new name", HandIndex = 10 }).ToArray();
             for (int worker = 0; worker < 4; worker++)
             {
                 var first = new LocalBranchPartition(worker, 4).Assign(legal).Select(a => a.CombatCardIndex);
