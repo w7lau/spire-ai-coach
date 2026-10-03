@@ -1,12 +1,22 @@
 # 设计与合同
 
-## 0.7.13 可选最终复核与收尾计时
+## 0.7.14 可选最终复核与收尾计时
 
 本地面板新增默认关闭、不持久保存的「跳过最终复核」切换按钮。两个算法共用的 LocalCalculation 将其冻结为 SkipFinalVerification；旧请求省略该字段仍复核。它不同于各搜索 worker 的 DeferVerification：后者只把复核推迟到父池选路，并不跳过最终复核。所有原生游戏规则、Mod 钩子、状态/模型核对、完整胜利结算、搜索停止与清理仍执行，64 次/60 秒/64 回合预算不变。
 
 父池收到全部搜索结果或停止确认后，显式开启时直接按相同 Better 规则选择已模拟候选，不发送 VerifyCandidate 请求；结果置 VerificationSkipped，清除 Continuation，提示未复核。默认路径仍逐个复核最终候选，失败候选不发布为已复核。前台显示仍检查当前快照和原生根指纹；未复核结果不能建立续用路线，LocalContinuation 即使收到遗留续用点也会拒绝该标志，自动执行仍只接受复核路线。开关改变时取消进行中的计算，下一次计算使用新值。
 
 时间轴总条目容量不变，大容量记录单独保留128个概要/收尾条目；详细动作记录最多占其余空间。概要含各路完整 session、最终 verify、准备、主线程显示，以及结果传递、接收和停止通知。概要区满时保留最新概要并累计 Dropped，细节满时继续保留之后的概要；导入跨进程记录沿用同一规则。方法累计仍独立且有界。诊断保存 SkipFinalVerification、VerificationSkipped 和 Timing，以便条目被省略后仍能读取复核次数/用时。
+
+## 0.7.13 最终复核的展示与资源开销
+
+FastVerification 是本地 IPC 的内部对照开关，默认 true，旧请求省略时继承默认值；显式 false 保留原有复核。LocalWorkerVerification 只在已验证所有权的后台进程安装，每个边界用独立 Harmony owner；四个边界均可安装且 SimulationSpeed>1 时才生效。VerifyBestCore 仍关闭 DataOnlyCombat/DataOnlyRun 并恢复普通 NonInteractiveMode：完整 NRun/NCombatRoom、原生执行器调度、状态通知、选择页面、所有模型效果、Mod 钩子、校验与逐步历史都保留，不使用搜索中的连续数值队列替代复核。
+
+Scope 保存并恢复 PreloadManager.Enabled，采用原生关闭预加载的受支持路径：LoadRunAssets/LoadActAssets/LoadRoomAssets 仍执行资源集合维护，AssetCache.GetAsset 在实际使用时同步加载所需资源；不以角色或卡名缓存规则状态。MegaLabel/MegaRichTextLabel 的 AdjustFontSize 只跳过字体二分适配；SetTextAutoSize、文本赋值、NCard.UpdateVisuals 和模型动态预览继续执行。RunManager.FadeIn/FadeOut 只跳过原生房间过渡；TestMode 的自定义过渡回调沿用原路径。
+
+LocalWorkerOverhead 的音效/特效叶入口、普通日志和重放文件输出也在这个 Scope 生效。Warn/Error、日志订阅、停止录制收尾、内存操作/选择记录和原生 checksum 不省略。Scope 在成功及异常退出时恢复资源开关，清理和普通玩家进程不继承它；runtime.json 记录实际采用的方式、可用边界、失败原因和原生资源开关状态。AssetCache.GetAsset、NCard.UpdateVisuals 及字体适配增加同步方法计时；资源等待/角色资源/章节资源分段记录，不能把这些嵌套时间相加为总等待。
+
+快速复核失败只对同一选中候选重新执行一次常规复核，保留 verification-fallback.txt 和 verify_fallback 时间段，不重跑整场搜索。回退清除本次按需加载的资源请求标记，常规路径重新完成角色和章节资源预加载。最终状态/结算仍不一致时沿用失败出口，Best=null，不生成续用点或可执行方案。普通请求、其他战斗、每次请求的 Scope 与回退原因独立；药水、搜索预算、候选排名和无伤停止标准均不变。
 
 ## 0.7.12 独立算法入口与完整路线去重
 

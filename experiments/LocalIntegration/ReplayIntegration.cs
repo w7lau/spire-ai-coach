@@ -69,6 +69,12 @@ public static class ReplayIntegration
                     ?? throw new InvalidOperationException("A fixed winning seed is required"));
             return;
         }
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_VERIFICATION_BENCHMARK") == "1")
+        {
+            await VerificationIntegration.Run(root, pool, request, installation,
+                System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT")!);
+            return;
+        }
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_OVERHEAD_BENCHMARK") == "1")
         {
             await OverheadIntegration.Run(root, pool, request, installation,

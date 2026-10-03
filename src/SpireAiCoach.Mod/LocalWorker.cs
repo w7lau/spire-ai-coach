@@ -70,6 +70,7 @@ public static class LocalWorker
         LocalWorkerDataMode.Install(harmony);
         LocalWorkerLogic.Install();
         LocalWorkerOverhead.Install();
+        LocalWorkerVerification.Install();
         Callable.From(Run).CallDeferred();
         return true;
     }
@@ -119,6 +120,7 @@ public static class LocalWorker
     private static async Task<bool> Search(LocalSearchRequest request)
     {
         LocalWorkerLogic.ResetCounters();
+        LocalWorkerVerification.Reset();
         _timeline = new(request.TimelineOrigin);
         _traceWorker = request.Partition; _traceRoute = _traceStep = _restoreDepth = 0;
         _traceStage = request.VerifyCandidate == null ? "search" : "verify";
@@ -201,7 +203,8 @@ public static class LocalWorker
             lastResult = timer.ElapsedMilliseconds; lastPublishedBest = best;
             if (status != "running") LocalWire.Write(Path.Combine(_root, "runtime.json"), new
                 { status, mode = LocalWorkerDataMode.MinimalRun ? "native-model" : LocalWorkerDataMode.Active ? "no-combat-scene" : "regular-scene",
-                    max_fps = Engine.MaxFps, observed_fps = Engine.GetFramesPerSecond(), numerical = LocalWorkerLogic.Counters(), overhead = LocalWorkerOverhead.Status() });
+                    max_fps = Engine.MaxFps, observed_fps = Engine.GetFramesPerSecond(), numerical = LocalWorkerLogic.Counters(),
+                    overhead = LocalWorkerOverhead.Status(), verification = LocalWorkerVerification.Status(), preload_enabled = PreloadManager.Enabled });
             LocalWire.Write(Path.Combine(_root, "result.json"),
             new LocalSearchResult(request.Id, request.SnapshotId, status, message, evaluated, rejected, timer.ElapsedMilliseconds, best,
                 Victories: victories, IncludePotions: request.IncludePotions,
@@ -225,7 +228,7 @@ public static class LocalWorker
             LocalWorkerDataMode.Active = request.DataOnlyCombat && LocalWorkerDataMode.Available;
             LocalWorkerDataMode.MinimalRun = LocalWorkerDataMode.Active && request.DataOnlyRun;
             LocalWorkerLogic.Enabled = request.NumericalExecution;
-            LocalWorkerOverhead.Enabled = request.TrimWorkerOverhead && request.NumericalExecution && request.VerifyCandidate == null;
+            LocalWorkerOverhead.Enabled = request.TrimWorkerOverhead && (request.NumericalExecution || request.FastVerification);
             if (request.ExperimentalNativeData) NonInteractiveMode.AutoSlayerCheck = () => true;
             var actualMods = LocalCapture.LoadedMods();
             if (request.ModelHash != ModelIdSerializationCache.Hash || !request.LoadedMods.SequenceEqual(actualMods))
@@ -743,12 +746,31 @@ public static class LocalWorker
     private static async Task<(LocalSimState? State, LocalContinuationPoint[] Points)> VerifyBest(LocalSearchRequest request, LocalCandidate candidate,
         Action<LocalAction, int, LocalSimState?, LocalSimState?> progress)
     {
+        try { return await VerifyBestCore(request, candidate, progress); }
+        catch (Exception ex) when (request.FastVerification && LocalWorkerVerification.UsedFast && ex is not OperationCanceledException)
+        {
+            // Retry only this final candidate in the unchanged regular scene path.
+            // Do not redo search or publish an unverified/partially replayed plan.
+            LocalWorkerVerification.Fallback = ex.GetType().Name + ": " + ex.Message;
+            File.WriteAllText(Path.Combine(_root, "verification-fallback.txt"), ex.ToString());
+            // Lazy collection did not certify the normal eager preload. Restore its
+            // resource path as well as the real executor for this same candidate.
+            _assetsRequest = "";
+            using var fallback = Trace("verify_fallback", LocalWorkerVerification.Fallback);
+            return await VerifyBestCore(request with { FastVerification = false }, candidate, progress);
+        }
+    }
+
+    private static async Task<(LocalSimState? State, LocalContinuationPoint[] Points)> VerifyBestCore(LocalSearchRequest request, LocalCandidate candidate,
+        Action<LocalAction, int, LocalSimState?, LocalSimState?> progress)
+    {
         _traceStage = "verify"; _traceRoute = _traceStep = 0;
-        // Only the selected result is checked on the regular combat scene. Accelerated
-        // execution must reproduce the real game's state and history before publication.
+        // Keep real scenes, executor scheduling, choices and native state notifications.
+        // The optional scope trims only font fitting, fades and eager asset loading.
         LocalWorkerDataMode.Active = false;
         LocalWorkerDataMode.MinimalRun = false;
         NonInteractiveMode.AutoSlayerCheck = _nativeModeBeforeRequest;
+        using var presentation = LocalWorkerVerification.Begin(request.FastVerification);
         await Restore(request);
         var player = LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!;
         _includePotions = request.IncludePotions;
@@ -832,9 +854,9 @@ public static class LocalWorker
             if (!LocalWorkerDataMode.MinimalRun && _assetsRequest != request.Id)
             {
                 using var assets = Trace("assets", depth: 2);
-                await WaitAssets();
-                await PreloadManager.LoadRunAssets(run.Players.Select(p => p.Character));
-                await PreloadManager.LoadActAssets(run.Acts[run.CurrentActIndex]);
+                using (Trace("assets_wait", depth: 3)) await WaitAssets();
+                using (Trace("assets_run", depth: 3)) await PreloadManager.LoadRunAssets(run.Players.Select(p => p.Character));
+                using (Trace("assets_act", depth: 3)) await PreloadManager.LoadActAssets(run.Acts[run.CurrentActIndex]);
                 _assetsRequest = request.Id;
             }
             using var scene = Trace("scene", LocalWorkerDataMode.Active ? "原生战斗初始化" : "场景与战斗初始化", depth: 2);

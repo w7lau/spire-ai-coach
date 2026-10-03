@@ -1,19 +1,22 @@
 {
-  "version": "0.7.13",
+  "version": "0.7.14",
   "ui_toggle_mounted": true,
   "default_verification": true,
+  "same_frozen_root": true,
+  "supplied_initial_plan": true,
+  "same_observed_route": true,
   "results": [
     {
       "skip": true,
       "Status": "done",
       "VerificationSkipped": true,
       "Evaluated": 1,
-      "ElapsedMs": 7910,
-      "SearchElapsedMs": 7349,
+      "ElapsedMs": 6136,
+      "SearchElapsedMs": 5818,
       "Timing": {
-        "RestoreMs": 2763,
-        "ActionMs": 3113,
-        "DecisionMs": 829,
+        "RestoreMs": 2118,
+        "ActionMs": 2514,
+        "DecisionMs": 670,
         "VerificationMs": 0,
         "StartupMs": 0,
         "Actions": 96,
@@ -36,13 +39,13 @@
       "Status": "done",
       "VerificationSkipped": false,
       "Evaluated": 1,
-      "ElapsedMs": 17032,
-      "SearchElapsedMs": 3755,
+      "ElapsedMs": 13473,
+      "SearchElapsedMs": 2768,
       "Timing": {
-        "RestoreMs": 249,
-        "ActionMs": 2105,
-        "DecisionMs": 881,
-        "VerificationMs": 12845,
+        "RestoreMs": 212,
+        "ActionMs": 1573,
+        "DecisionMs": 600,
+        "VerificationMs": 10148,
         "StartupMs": 0,
         "Actions": 96,
         "Restores": 1,
@@ -56,11 +59,8 @@
       "Rounds": 22,
       "steps": 96,
       "verified_steps": 96,
-      "verification_spans": 618,
+      "verification_spans": 619,
       "Dropped": 0
     }
-  ],
-  "same_frozen_root": true,
-  "supplied_initial_plan": true,
-  "same_observed_route": true
+  ]
 }
