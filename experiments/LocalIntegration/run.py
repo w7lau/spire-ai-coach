@@ -18,6 +18,7 @@ parser.add_argument('--benchmark', action='store_true')
 parser.add_argument('--features', action='store_true')
 parser.add_argument('--optimization', action='store_true')
 parser.add_argument('--execution', action='store_true')
+parser.add_argument('--skip-final-verification', action='store_true')
 parser.add_argument('--choices', action='store_true')
 parser.add_argument('--fallback', action='store_true')
 parser.add_argument('--mechanics', action='store_true')
@@ -119,6 +120,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_FEATURES'] = '1' if args.features else '0'
     env['SPIRE_LOCAL_OPTIMIZATION'] = '1' if args.optimization else '0'
     env['SPIRE_LOCAL_EXECUTION'] = '1' if args.execution else '0'
+    env['SPIRE_LOCAL_SKIP_FINAL_VERIFICATION'] = '1' if args.skip_final_verification else '0'
     env['SPIRE_LOCAL_CHOICES'] = '1' if args.choices else '0'
     env['SPIRE_LOCAL_FALLBACK'] = '1' if args.fallback else '0'
     env['SPIRE_LOCAL_MECHANICS'] = '1' if args.mechanics else '0'

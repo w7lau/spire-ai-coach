@@ -43,22 +43,23 @@ internal static class FinalVerificationIntegration
                 throw new InvalidOperationException("Unexpected native calculation outcome: " + result.Message);
             if (skip)
             {
-                if (result.Timing is not { Verifications: 0, VerificationMs: 0 } || best.Continuation != null ||
+                if (result.Timing is not { Verifications: 0, VerificationMs: 0 } || !best.ContinuationFromSearch || !LocalSearchPolicy.HasExecutionPoints(result) ||
                     result.Trace!.Spans.Any(s => s.Stage == "verify") || messages.Any(m => m.Contains("正在复核")))
-                    throw new InvalidOperationException("Opt-out still ran final verification or retained execution points");
+                    throw new InvalidOperationException("Opt-out ran final verification or lost first-pass execution points");
                 skippedCandidate = best;
             }
             else if (result.Timing?.Verifications != 1 || best.Continuation?.Length != best.Actions.Length ||
                 best.Hp != skippedCandidate!.Hp || best.HpLost != skippedCandidate.HpLost || best.Gold != skippedCandidate.Gold ||
-                best.MaxHp != skippedCandidate.MaxHp || LocalTurnSearch.HistoryKey(best.Actions) != LocalTurnSearch.HistoryKey(skippedCandidate.Actions))
+                best.MaxHp != skippedCandidate.MaxHp || LocalTurnSearch.HistoryKey(best.Actions) != LocalTurnSearch.HistoryKey(skippedCandidate.Actions) ||
+                !best.Continuation.SequenceEqual(skippedCandidate.Continuation!))
                 throw new InvalidOperationException("The paired native result or verified action history diverged");
             summaries.Add(new { skip, result.Status, result.VerificationSkipped, result.Evaluated, result.ElapsedMs,
                 result.SearchElapsedMs, result.Timing, best.Won, best.StartingHp, best.Hp, best.HpLost, best.NetHpLoss,
-                best.Rounds, steps = best.Actions.Length, verified_steps = best.Continuation?.Length ?? 0,
+                best.Rounds, steps = best.Actions.Length, checkpoint_steps = best.Continuation?.Length ?? 0, best.ContinuationFromSearch,
                 verification_spans = result.Trace!.Spans.Count(s => s.Stage == "verify"), result.Trace.Dropped });
         }
         LocalWire.Write(Path.Combine(root, "integration-final-verification-summary.json"), new
-            { version = "0.7.14", ui_toggle_mounted = true, default_verification = true,
+            { version = "0.7.16", ui_toggle_mounted = true, default_verification = true,
                 same_frozen_root = true, supplied_initial_plan = true, same_observed_route = true, results = summaries });
     }
 }

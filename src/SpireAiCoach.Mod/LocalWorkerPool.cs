@@ -108,13 +108,13 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 throw new CoachException("local_failed", string.Join("\n", results.Select(r => r.Message).Distinct()));
             // Every lane has now completed or acknowledged the goal stop. Only the
             // selected candidate is independently replayed by default. The explicit
-            // comparison option publishes native search observations without execution points.
+            // comparison option uses the selected search's own native execution points.
             var verificationResults = new List<LocalSearchResult>();
             LocalSearchResult? selectedBest = null;
             if (request.SkipFinalVerification)
             {
                 var proposed = valid.Aggregate((a, b) => LocalSearchPolicy.Better(b.Best!, a.Best) ? b : a);
-                selectedBest = proposed with { Best = proposed.Best! with { Continuation = null }, VerificationSkipped = true };
+                selectedBest = proposed with { VerificationSkipped = true };
             }
             while (selectedBest == null && valid.Length > 0)
             {
@@ -167,8 +167,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     allRuns.Sum(r => r.Timing?.Verifications ?? 0)),
                 Status = goalReached.IsCancellationRequested || results.All(r => r.Status is "searched" or "done") && verificationResults.All(r => r.Status == "done") ? "done" : "partial",
                 Message = goalReached.IsCancellationRequested ? "已找到战后无伤获胜路线，已停止全部后续搜索。" +
-                    (request.SkipFinalVerification ? "已跳过最终复核，供手动对照。" : "路线已通过复核。") :
-                    "本地整场计算完成。" + (request.SkipFinalVerification ? "已跳过最终复核，供手动对照。" : "") +
+                    (request.SkipFinalVerification ? "已跳过最终复核，执行时逐步核对模拟记录。" : "路线已通过复核。") :
+                    "本地整场计算完成。" + (request.SkipFinalVerification ? "已跳过最终复核，执行时逐步核对模拟记录。" : "") +
                     (results.Any(r => r.Status is not ("searched" or "done")) || verificationResults.Any(r => r.Status != "done") ?
                         request.SkipFinalVerification ? "部分搜索未完成，显示已取得的模拟路线。" : "部分搜索未完成，显示已复核的可用路线。" : "") +
                     (results.Count > used ? "本次补充搜索未纳入：" + string.Join("、", blocked.Select(a => a.CardName)) + "。" : "") +
