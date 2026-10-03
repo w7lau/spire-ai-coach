@@ -392,7 +392,7 @@ public static class LocalWorker
                         }
                         sharedExhausted = sharedTurns != null; break;
                     }
-                    if (sharedTurns != null) fullRollout = turnTask.FullRollout;
+                    fullRollout = sharedTurns != null ? turnTask.FullRollout : fullRollout || turnTask.FullRollout;
                     planned = turnTask.Prefix;
                     // Skip already completed subtrees before restoring their prefix.
                     if (coverage!.IsClosedPrefix(planned)) { coveredTasks++; sharedTurns?.Finish(turnTask); continue; }
@@ -704,6 +704,10 @@ public static class LocalWorker
                         LocalWire.Write(Path.Combine(_root, "search-seed.json"),
                             new LocalSearchSeed(request.Id, request.SnapshotId, request.NativeHash,
                                 candidate with { Continuation = null }));
+                        if (request.GuideWinningRoutes && candidate.Won &&
+                            !LocalSearchPolicy.CanStop(candidate, request.StopOnZeroLoss,
+                                request.TargetVictoryRounds, request.TargetPotionUses))
+                            turns?.PromoteWinning(candidate);
                     }
                     if (completeAttempt && stop != "达到时间预算") policy?.Complete(candidate);
                     if (LocalSearchPolicy.CanStop(best, request.StopOnZeroLoss,

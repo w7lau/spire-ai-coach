@@ -36,7 +36,7 @@ static class SearchAlgorithmTests
             Check(LocalSearchPolicy.CanStop(victory with { Rounds = 20, Actions = [Move("potion") with { PotionSlot = 0 }] }, true),
                 "The existing product switch keeps its ordinary first-zero-loss semantics");
             var request = new LocalSearchRequest("request", "snapshot", [], "native", 0, [], false);
-            Check(request.LeanSearchChecksums && request.EfficientTactics && request.LearnBuffDuration &&
+            Check(request.LeanSearchChecksums && request.EfficientTactics && request.LearnBuffDuration && request.GuideWinningRoutes &&
                 request.TargetVictoryRounds == null && request.TargetPotionUses == null,
                 "The product does not hardcode this user's six-round benchmark");
         });

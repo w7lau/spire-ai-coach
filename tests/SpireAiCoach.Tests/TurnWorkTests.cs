@@ -11,6 +11,25 @@ static class TurnWorkTests
 
     public static void Register(Action<string, Action> test, Action<string, Func<Task>> asyncTest)
     {
+        test("shared turn work winning improvement requires its exact owned native history", () =>
+        {
+            var captured = Request(); using var broker = new LocalTurnWork(captured, 2);
+            using var owner = new LocalTurnWorkClient(captured with { TurnWorkPipe = broker.PipeName });
+            var start = Move(0); owner.Offer([start], 1, Hint());
+            Check(owner.TryTake(out var task), "Missing owned task");
+            var actual = Move(1, "after"); var other = Move(2, "after");
+            var decision = new LocalDecision(1, [actual, other]);
+            owner.OfferAlternatives([start, actual], decision, Hint(), task);
+            var win = new LocalCandidate([start, actual], 50, 0, 0, 0, 100, true, false, false,
+                Decisions: [decision], StartingHp: 50);
+            bool rejected = false;
+            try { owner.PromoteWinning(win with { Actions = [start with { CombatCardIndex = 99 }, actual] }); }
+            catch (InvalidOperationException) { rejected = true; }
+            Check(rejected, "A different native prefix must not steer this owned task's improvements");
+            owner.PromoteWinning(win); owner.Finish(task);
+            Check(broker.Pending == 1, "Owned winning feedback duplicated or deleted pending siblings");
+        });
+
         asyncTest("shared turn work early consumers distinguish startup from exhausted work", async () =>
         {
             var captured = Request(); using var broker = new LocalTurnWork(captured, 4);

@@ -15,7 +15,8 @@ internal static class SelfSearchIntegration
             throw new InvalidOperationException("Autonomous search comparison rejects answer seeds");
         var names = cases.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         string[] allowed = ["baseline", "correlated", "fast", "correlated-fast", "turn-fast", "refine-fast", "turn-goal",
-            "efficient-turn-goal", "efficient-fast-goal", "duration-turn-goal", "efficient-duration-turn-goal", "release-turn-goal"];
+            "efficient-turn-goal", "efficient-fast-goal", "duration-turn-goal", "efficient-duration-turn-goal", "release-turn-goal",
+            "guided-release-turn-goal", "guided-release-turn-full"];
         if (names.Length is < 1 or > 4 || names.Any(n => !allowed.Contains(n)))
             throw new InvalidOperationException("Expected one to four supported frozen search comparisons: " + string.Join(", ", allowed));
         var records = new List<object>();
@@ -26,8 +27,9 @@ internal static class SelfSearchIntegration
             if (names[i] == "refine-fast" && discovered == null)
                 throw new InvalidOperationException("Continued optimization needs a preceding autonomous result from this frozen request");
             bool goalCase = names[i].EndsWith("-goal", StringComparison.Ordinal);
-            bool releaseCase = names[i] == "release-turn-goal";
-            var request = LocalCalculation.Configure(captured, names[i] == "turn-fast" || names[i].EndsWith("turn-goal", StringComparison.Ordinal)
+            bool releaseCase = names[i].Contains("release-turn-", StringComparison.Ordinal);
+            var request = LocalCalculation.Configure(captured, names[i] == "turn-fast" || names[i].EndsWith("turn-goal", StringComparison.Ordinal) ||
+                names[i].EndsWith("turn-full", StringComparison.Ordinal)
                 ? LocalSearchOrder.TurnFrontier : LocalSearchOrder.MonteCarlo,
                 captured.Workers, captured.IncludePotions, goalCase) with
             {
@@ -38,7 +40,8 @@ internal static class SelfSearchIntegration
                 TargetVictoryRounds = goalCase ? 6 : null,
                 TargetPotionUses = goalCase ? 0 : null,
                 EfficientTactics = releaseCase || names[i].StartsWith("efficient-", StringComparison.Ordinal),
-                LearnBuffDuration = releaseCase || names[i].Contains("duration", StringComparison.Ordinal)
+                LearnBuffDuration = releaseCase || names[i].Contains("duration", StringComparison.Ordinal),
+                GuideWinningRoutes = names[i].StartsWith("guided-", StringComparison.Ordinal)
             };
             var timer = Stopwatch.StartNew();
             var result = await Task.Run(() => pool.Analyze(request, installation, _ => { }, CancellationToken.None));
@@ -58,8 +61,10 @@ internal static class SelfSearchIntegration
                 computer_seed_from_prior_sample = names[i] == "refine-fast",
                 request.MaxNodes, request.BudgetSeconds, request.MaxRounds, request.Workers,
                 request.IncludePotions, request.StopOnZeroLoss, request.TargetVictoryRounds, request.TargetPotionUses,
-                request.EfficientTactics, request.LearnBuffDuration, request.AdaptiveWorkers,
+                request.EfficientTactics, request.LearnBuffDuration, request.AdaptiveWorkers, request.GuideWinningRoutes,
                 actual_workers = result.Workers,
+                participating_search_workers = result.Trace?.Spans.Where(s => s.Stage == "search" && s.Phase == "session")
+                    .Select(s => s.Worker).Distinct().Order().ToArray(),
                 result.Status, result.Evaluated,
                 result.Victories, result.Rejected, result.ElapsedMs, controller_ms = timer.ElapsedMilliseconds,
                 result.Timing, result.Work, fallback, verified,

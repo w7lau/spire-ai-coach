@@ -19,7 +19,7 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     bool SkipFinalVerification = false, bool AdaptiveWorkers = true, bool CorrelatedRollouts = false,
     bool LeanSearchChecksums = true, string? TurnWorkPipe = null, bool ProbeChecksumListener = false,
     int? TargetVictoryRounds = null, int? TargetPotionUses = null,
-    bool EfficientTactics = true, bool LearnBuffDuration = true);
+    bool EfficientTactics = true, bool LearnBuffDuration = true, bool GuideWinningRoutes = true);
 
 // A stop belongs to one frozen request, never to another battle or final verification.
 public sealed record LocalSearchStop(string Id, string SnapshotId, string NativeHash)
@@ -113,7 +113,7 @@ public static class LocalSearchPolicy
     {
         if (result.Best is not { } best) return result.Message;
         var lines = new List<string> { best.Won ? "本地整场战斗 · 已找到获胜路线" : "本地整场战斗 · 尚未找到获胜路线", result.Message,
-            $"{result.Workers} 路并发，评估 {result.Evaluated} 条路线，其中 {result.Victories} 条获胜，不支持 {result.Rejected}。",
+            $"启用 {result.Workers} 路，评估 {result.Evaluated} 条路线，其中 {result.Victories} 条获胜，不支持 {result.Rejected}。",
             best.StartingHp is { } initial ?
                 $"{(best.Won ? "预测战后生命" : "已模拟到的生命")} {initial} → {best.Hp}/{best.MaxHp}；净生命损失 {best.NetHpLoss}{(best.Won ? "（包含战中、战后回血）" : "（战斗尚未完成）")}。" :
                 $"{(best.Won ? "预测战后生命" : "已模拟到的生命")} {best.Hp}/{best.MaxHp}。",

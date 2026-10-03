@@ -13,7 +13,8 @@ public sealed class LocalTurnWork : IDisposable
     internal sealed record Command(string Scope, int Owner, string Operation,
         LocalTurnOffer[]? Offers = null, LocalTurnTask? Task = null,
         LocalAction[]? Actions = null, LocalDecision[]? Decisions = null,
-        LocalTurnHint? Hint = null, LocalWinningBound? Bound = null, string? TerminalDigest = null);
+        LocalTurnHint? Hint = null, LocalWinningBound? Bound = null, string? TerminalDigest = null,
+        LocalCandidate? WinningCandidate = null);
     internal sealed record Reply(LocalTurnTask? Task, int Pending, int Active,
         int Offered, int Duplicates, int Affected = 0, string? Error = null, bool RootReady = false);
 
@@ -113,13 +114,19 @@ public sealed class LocalTurnWork : IDisposable
             case "take":
                 if (_active.ContainsKey(command.Owner)) throw new InvalidOperationException("Worker already owns a turn task");
                 if (!_frontier.TryTake(out var task)) return Snapshot();
-                task = task with { FullRollout = LocalTurnSearch.IsFullRollout(_taken++),
+                task = task with { FullRollout = LocalTurnSearch.IsFullRollout(_taken++) || task.FullRollout,
                     Lane = _frontier.LastLane, Focused = _frontier.LastFocused };
                 _active.Add(command.Owner, task); return Snapshot(task);
             case "focus":
                 var focused = RequireOwner(command);
                 _frontier.FocusNext(focused, command.Actions ?? [], command.Decisions ?? [], focused.Focused);
                 return Snapshot();
+            case "improve":
+                var incumbentOwner = RequireOwner(command);
+                var incumbent = command.WinningCandidate ?? throw new InvalidDataException("Missing native incumbent");
+                if (!LocalSearchWork.MatchesPrefix(incumbent.Actions, incumbentOwner.Prefix))
+                    throw new InvalidDataException("Incumbent does not belong to its owned native prefix");
+                _frontier.PromoteWinning(incumbent); return Snapshot();
             case "finish":
                 RequireOwner(command); _active.Remove(command.Owner);
                 if (command.TerminalDigest is { } digest && !_terminals.Add(digest)) _repeated++;
@@ -195,9 +202,10 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
 
     private LocalTurnWork.Reply Exchange(string operation, LocalTurnTask? task = null,
         LocalAction[]? actions = null, LocalDecision[]? decisions = null,
-        LocalTurnHint? hint = null, LocalWinningBound? bound = null, string? terminalDigest = null)
+        LocalTurnHint? hint = null, LocalWinningBound? bound = null, string? terminalDigest = null,
+        LocalCandidate? winningCandidate = null)
     {
-        var command = new LocalTurnWork.Command(_scope, _owner, operation, _offers.ToArray(), task, actions, decisions, hint, bound, terminalDigest);
+        var command = new LocalTurnWork.Command(_scope, _owner, operation, _offers.ToArray(), task, actions, decisions, hint, bound, terminalDigest, winningCandidate);
         _writer.WriteLine(JsonSerializer.Serialize(command));
         var reply = JsonSerializer.Deserialize<LocalTurnWork.Reply>(_reader.ReadLine() ?? throw new IOException("Turn task broker closed"))
             ?? throw new InvalidDataException("Empty turn task reply");
@@ -221,6 +229,11 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
     public void FocusNext(LocalTurnTask task, IReadOnlyList<LocalAction> actions, IReadOnlyList<LocalDecision> decisions) =>
         Exchange("focus", task, actions.Take(task.Prefix.Length + 1).ToArray(),
             decisions.Where(d => d.BeforeStep == task.Prefix.Length).ToArray());
+    public void PromoteWinning(LocalCandidate candidate)
+    {
+        if (!candidate.Won || candidate.Dead || _owned == null) return;
+        Exchange("improve", _owned, winningCandidate: candidate with { Continuation = null });
+    }
     public void ReturnInterrupted(LocalTurnTask task, LocalTurnHint hint)
     { Exchange("return", task, hint: hint); _owned = null; }
     public void Finish(LocalTurnTask task, string? terminalDigest = null)
