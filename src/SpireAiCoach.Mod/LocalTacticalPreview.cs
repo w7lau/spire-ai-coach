@@ -74,7 +74,9 @@ internal sealed class LocalTacticalPreview(Player player)
                 Damage: enemy ? Math.Max(Value("Damage"), Value("CalculatedDamage")) * repeat : 0,
                 EnemyHp: enemy ? target!.CurrentHp : 0, EnemyBlock: enemy ? target!.Block : 0,
                 TargetThreat: enemy ? _threats[target!] : 0, Incoming: _incoming,
-                CurrentBlock: player.Creature.Block, Block: Math.Max(Value("Block"), Value("CalculatedBlock")),
+                // Modal cards can carry variables for several inactive effects.
+                // Use the native capability, not the existence of a Block variable.
+                CurrentBlock: player.Creature.Block, Block: card.GainsBlock ? Math.Max(Value("Block"), Value("CalculatedBlock")) : 0,
                 Hp: player.Creature.CurrentHp, Strength: Value("StrengthPower"),
                 Vulnerable: enemy ? Value("VulnerablePower") : 0, Weak: enemy ? Value("WeakPower") : 0,
                 // "Cards" can mean discard/exhaust/selection count, so it is not a generic draw hint.

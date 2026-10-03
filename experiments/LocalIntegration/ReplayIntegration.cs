@@ -36,6 +36,12 @@ public static class ReplayIntegration
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_DATA_RUN") == "1") request = request with { DataOnlyRun = true };
         if (int.TryParse(System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_WORKERS"), out var workers))
             request = request with { Workers = workers };
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_CORRELATED_ROLLOUTS") == "1")
+        {
+            if (request.InitialPlan is { Length: > 0 } || request.VerifyCandidate != null || request.RecordedReplayProbe != null)
+                throw new InvalidOperationException("Policy comparison requires an unseeded frozen request");
+            request = request with { CorrelatedRollouts = true };
+        }
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SHARED_WORK") is { Length: > 0 } sharing)
             request = request with { ShareSearchWork = sharing == "on" };
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEARCH_ORDER") is { Length: > 0 } ordering)
@@ -50,6 +56,17 @@ public static class ReplayIntegration
         // Frozen execution controls retain the same startup; bootstrap has its own paired
         // cold measurements. Ordinary integration fixtures use the product's default.
         var installation = new LocalInstallation(game, directories, MinimalWorkerBootstrap: false);
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_LEAN_CHECKSUM_TEST") == "1")
+        {
+            await LeanChecksumIntegration.Run(root, pool, request, installation,
+                System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT")!);
+            return;
+        }
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEARCH_CASES") is { Length: > 0 } cases)
+        {
+            await SelfSearchIntegration.Run(root, pool, request, installation, cases);
+            return;
+        }
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_INCIDENT_VERIFICATION") == "1")
         {
             await IncidentVerification.Run(root, pool, request, installation,

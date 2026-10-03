@@ -7,7 +7,7 @@ namespace SpireAiCoach.Core;
 
 public sealed record LocalWorkTask(string Key, string Kind, LocalAction[] Plan);
 public sealed record LocalWorkStats(int Submitted, int Claimed, int Completed, int DuplicateOffers,
-    int Pending = 0, int Active = 0, int CoveredJobs = 0);
+    int Pending = 0, int Active = 0, int CoveredJobs = 0, bool RootReady = false);
 
 // A bounded shared frontier of exact action-history jobs. It stores proposals, never a
 // substitute combat state or a transferable score. Every claimed job runs natively.
@@ -38,6 +38,7 @@ public sealed class LocalSearchWork
     }
     private sealed class Index
     {
+        public bool RootInitialized { get; set; }
         public List<Entry> Entries { get; set; } = [];
         public int DuplicateOffers { get; set; }
         public int CoveredJobs { get; set; }
@@ -57,7 +58,12 @@ public sealed class LocalSearchWork
             Choices = (a.Choices ?? []).Select(c => new { c.Kind, c.OfferHash, c.Index, c.ModelId, Indices = c.Indices ?? [] })
         })));
 
-    public void Offer(string kind, IEnumerable<LocalAction[]> plans)
+    public static bool MatchesPrefix(IReadOnlyList<LocalAction> executed, IReadOnlyList<LocalAction> planned) =>
+        executed.Count >= planned.Count && planned.Select((expected, i) => LocalTurnSearch.SameAction(expected, executed[i]) &&
+            (expected.Choices ?? []).Select((choice, j) => j < (executed[i].Choices?.Length ?? 0) &&
+                LocalTurnSearch.SameChoice(choice, executed[i].Choices![j])).All(match => match)).All(match => match);
+
+    public void Offer(string kind, IEnumerable<LocalAction[]> plans, bool initializeRoot = false)
     {
         if (kind is not ("expand" or "improve")) throw new ArgumentException("Unknown search job kind", nameof(kind));
         using var gate = Lock();
@@ -80,6 +86,9 @@ public sealed class LocalSearchWork
             index.Entries.Add(new() { Key = key, Kind = kind, Depth = plan.Length, Order = index.Entries.Count, HistoryKey = history });
             count++;
         }
+        // Publish readiness under the same gate as the first root jobs. A worker
+        // reaching this queue first must not confuse startup with exhaustion.
+        if (initializeRoot) index.RootInitialized = true;
         Save(index);
     }
 
@@ -117,7 +126,8 @@ public sealed class LocalSearchWork
         return new(index.Entries.Count, index.Entries.Count(e => e.Owner.HasValue),
             index.Entries.Count(e => e.Completed), index.DuplicateOffers,
             index.Entries.Count(e => !e.Owner.HasValue && !e.Covered),
-            index.Entries.Count(e => e.Owner.HasValue && !e.Completed && !index.RetiredOwners.Contains(e.Owner.Value)), index.CoveredJobs);
+            index.Entries.Count(e => e.Owner.HasValue && !e.Completed && !index.RetiredOwners.Contains(e.Owner.Value)), index.CoveredJobs,
+            index.RootInitialized || index.RetiredOwners.Contains(0));
     }
 
     // Close only the exact settled terminal history. No HP/block state merging,
