@@ -29,6 +29,7 @@ public sealed class LocalTurnWork : IDisposable
     private readonly Task _listener;
     private readonly string _scope;
     private readonly int _maximum;
+    private readonly bool _ownedWinningFocus;
     private int _taken;
     private bool _rootReady;
     public string PipeName { get; } = "SpireAiCoach-turn-" + Guid.NewGuid().ToString("N");
@@ -41,7 +42,7 @@ public sealed class LocalTurnWork : IDisposable
     public LocalTurnWork(LocalSearchRequest request, int maximum)
     {
         if (maximum is < 1 or > 16) throw new ArgumentOutOfRangeException(nameof(maximum));
-        _maximum = maximum; _scope = Scope(request);
+        _maximum = maximum; _scope = Scope(request); _ownedWinningFocus = request.OwnedWinningFocus;
         _frontier = new(1729, request.SnapshotId + ":" + request.NativeHash);
         _listener = Task.Run(Listen);
     }
@@ -113,7 +114,7 @@ public sealed class LocalTurnWork : IDisposable
             case "offer": return Snapshot();
             case "take":
                 if (_active.ContainsKey(command.Owner)) throw new InvalidOperationException("Worker already owns a turn task");
-                if (!_frontier.TryTake(out var task)) return Snapshot();
+                if (!_frontier.TryTake(out var task, command.Owner)) return Snapshot();
                 task = task with { FullRollout = LocalTurnSearch.IsFullRollout(_taken++) || task.FullRollout,
                     Lane = _frontier.LastLane, Focused = _frontier.LastFocused };
                 _active.Add(command.Owner, task); return Snapshot(task);
@@ -126,7 +127,7 @@ public sealed class LocalTurnWork : IDisposable
                 var incumbent = command.WinningCandidate ?? throw new InvalidDataException("Missing native incumbent");
                 if (!LocalSearchWork.MatchesPrefix(incumbent.Actions, incumbentOwner.Prefix))
                     throw new InvalidDataException("Incumbent does not belong to its owned native prefix");
-                _frontier.PromoteWinning(incumbent); return Snapshot();
+                _frontier.PromoteWinning(incumbent, _ownedWinningFocus ? command.Owner : null); return Snapshot();
             case "finish":
                 RequireOwner(command); _active.Remove(command.Owner);
                 if (command.TerminalDigest is { } digest && !_terminals.Add(digest)) _repeated++;
@@ -151,6 +152,7 @@ public sealed class LocalTurnWork : IDisposable
 
     private void Retire(int owner)
     {
+        _frontier.ReleaseWinningOwner(owner);
         // A failed root producer cannot leave the remaining clients waiting
         // forever for a task that will never be published.
         if (owner == 0) _rootReady = true;

@@ -19,7 +19,8 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     bool SkipFinalVerification = false, bool AdaptiveWorkers = true, bool CorrelatedRollouts = false,
     bool LeanSearchChecksums = true, string? TurnWorkPipe = null, bool ProbeChecksumListener = false,
     int? TargetVictoryRounds = null, int? TargetPotionUses = null,
-    bool EfficientTactics = true, bool LearnBuffDuration = true, bool GuideWinningRoutes = true);
+    bool EfficientTactics = true, bool LearnBuffDuration = true, bool GuideWinningRoutes = true,
+    bool OwnedWinningFocus = true);
 
 // A stop belongs to one frozen request, never to another battle or final verification.
 public sealed record LocalSearchStop(string Id, string SnapshotId, string NativeHash)

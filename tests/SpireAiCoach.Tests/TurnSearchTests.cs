@@ -10,6 +10,27 @@ static class TurnSearchTests
 
     public static void Register(Action<string, Action> test)
     {
+        test("turn optimization winning focus returns to its native learning owner without reserving unrelated work", () =>
+        {
+            var search = new LocalTurnSearch(1);
+            var start = Move(0); var hint = new LocalTurnHint(50, 50, 100, 100);
+            search.Offer([start], 1, hint); search.TryTake(out _, 0);
+            for (int i = 10; i < 1010; i++) search.Offer([Move(i)], 1, hint);
+            var actual = Move(1, "after", preference: 80);
+            var alternate = Move(2, "after", preference: 30);
+            var point = new LocalDecision(1, [actual, alternate]);
+            search.OfferAlternatives([start, actual], point, hint);
+            search.PromoteWinning(Win(actions: [start, actual]) with { Decisions = [point] }, 0);
+            Check(search.TryTake(out var broad, 1) && !broad.FullRollout,
+                "Other owners must retain independent work instead of taking the winning guide");
+            Check(search.TryTake(out var guided, 0) && guided.FullRollout && guided.Prefix.Length == 2,
+                "The winning owner's next decision must not depend on the global lane counter");
+            search.ReleaseWinningOwner(0);
+            int count = 0;
+            while (search.TryTake(out _, 1)) count++;
+            Check(count == 999, "Owner retirement must not strand or remove legal work");
+        });
+
         test("turn optimization winning feedback promotes pending native siblings without merging or closing others", () =>
         {
             var search = new LocalTurnSearch(1);
