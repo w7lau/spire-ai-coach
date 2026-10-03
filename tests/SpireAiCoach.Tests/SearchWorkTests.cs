@@ -78,5 +78,46 @@ public static class SearchWorkTests
             Check(work.Stats() == stats);
             Check(!Directory.EnumerateFiles(dir, job.Key + ".json", SearchOption.AllDirectories).Any());
         }));
+        test("search work exposes backlog and stops waiting for retired owners", () => WithQueue(dir =>
+        {
+            var work = new LocalSearchWork(dir, request);
+            work.Offer("expand", [new[] { action }, new[] { action with { TargetId = 2 } }]);
+            Check(work.Stats() is { Pending: 2, Active: 0 });
+            var job = work.Take("expand", 0)!;
+            Check(work.Stats() is { Pending: 1, Active: 1 });
+            work.Retire(0);
+            Check(work.Stats() is { Pending: 1, Active: 0, Completed: 0 });
+            work.Complete(job);
+            Check(work.Stats().Completed == 1);
+        }));
+        test("search work skips queued and later exact terminal plans across job classes", () => WithQueue(dir =>
+        {
+            var work = new LocalSearchWork(dir, request);
+            work.Offer("expand", [new[] { action }]);
+            work.Offer("improve", [new[] { action }]);
+            var candidate = new LocalCandidate([action], 40, 0, 0, 1, 40, true, false, false);
+            work.RecordTerminal(candidate);
+            Check(work.Take("expand", 0) == null && work.Take("improve", 1) == null && work.Stats().CoveredJobs == 2);
+            work.Offer("expand", [new[] { action with { BeforeHash = "different" } }]);
+            work.Offer("improve", [new[] { action with { CombatCardIndex = 7 } }]);
+            Check(work.Take("expand", 0) != null && work.Take("improve", 1) != null);
+            var fresh = new LocalSearchWork(dir, request with { Id = "other" });
+            fresh.Offer("expand", [candidate.Actions]);
+            Check(fresh.Take("expand", 0) != null);
+        }));
+        test("search work never closes unfinished horizons or different native selections", () => WithQueue(dir =>
+        {
+            var work = new LocalSearchWork(dir, request);
+            var choice = new LocalCardChoice("offer", 0, "model", "same", [1, 2], "multi");
+            var played = action with { Choices = [choice] };
+            var candidate = new LocalCandidate([played], 40, 0, 0, 1, 40, false, false, false);
+            work.RecordTerminal(candidate);
+            work.Offer("expand", [candidate.Actions]);
+            Check(work.Take("expand", 0) != null);
+            work.RecordTerminal(candidate with { Won = true });
+            var other = played with { Choices = [choice with { Indices = [1, 3] }] };
+            work.Offer("expand", [new[] { other }]);
+            Check(work.Take("expand", 1)!.Plan[0].Choices![0].Indices!.SequenceEqual([1, 3]));
+        }));
     }
 }
