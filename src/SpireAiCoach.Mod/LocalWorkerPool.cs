@@ -142,7 +142,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             }
             return best with { Evaluated = results.Sum(r => r.Evaluated), Rejected = results.Sum(r => r.Rejected),
                 Duplicates = results.Sum(r => r.Duplicates), BudgetPruned = results.Sum(r => r.BudgetPruned),
-                Victories = valid.Sum(r => r.Victories), Workers = used, WorkerLimit = count,
+                Victories = valid.Sum(r => r.Victories), Workers = used, WorkerLimit = count, RootBranches = Volatile.Read(ref rootBranches[0]),
                 ElapsedMs = (long)timeline.ElapsedMs, Trace = timeline.Snapshot(), SearchElapsedMs = results.Take(used).Max(r => r.ElapsedMs) +
                     (results.Count > used ? results[^1].ElapsedMs : 0),
                 WorkerMemoryBytes = (results.Count > used ? results.Skip(1) : results).Sum(r => r.WorkerMemoryBytes),

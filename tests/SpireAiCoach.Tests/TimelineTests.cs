@@ -99,6 +99,10 @@ static class TimelineTests
                 "Method aggregation cannot grow without bound for unexpected Mod names");
             var old = JsonSerializer.Deserialize<LocalSearchRequest>("{\"Id\":\"id\",\"SnapshotId\":\"s\",\"Replay\":\"\",\"NativeHash\":\"h\",\"ModelHash\":0,\"LoadedMods\":[],\"ContinueOptimization\":false}")!;
             Check(old.TrimWorkerOverhead, "Older requests must receive the product default for the owned worker");
+            Check(old.FastVerification, "Older requests use presentation-only final verification acceleration");
+            var ordinary = System.Text.Json.JsonSerializer.Deserialize<LocalSearchRequest>(
+                "{\"Id\":\"ordinary\",\"SnapshotId\":\"snapshot\",\"Replay\":\"\",\"NativeHash\":\"native\",\"ModelHash\":0,\"LoadedMods\":[],\"ContinueOptimization\":false,\"FastVerification\":false}")!;
+            Check(!ordinary.FastVerification, "Ordinary final verification remains available for comparison and fallback");
         });
     }
 }

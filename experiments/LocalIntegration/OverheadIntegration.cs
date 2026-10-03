@@ -63,7 +63,7 @@ internal static class OverheadIntegration
             }
         }
         var verified = await Submit(command with { VerifyCandidate = candidate, InitialPlan = null,
-            NumericalExecution = false, DeferVerification = false, TrimWorkerOverhead = true });
+            NumericalExecution = false, DeferVerification = false, TrimWorkerOverhead = true, FastVerification = false });
         LocalWire.Write(Path.Combine(root, "integration-overhead-verification-private.json"), verified);
         if (verified.Status != "done" || verified.Best?.Continuation?.Length != candidate!.Actions.Length ||
             verified.Trace!.Methods!.Any(m => m.Stage == "verify" && m.Skipped > 0 &&
