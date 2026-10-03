@@ -175,7 +175,7 @@ public static class LocalWorker
         }
         long sequence = 0, lastProgress = -1000, lastResult = -1000;
         LocalCandidate? lastPublishedBest = null;
-        int route = 0, bestRoute = 0;
+        int route = 0, bestRoute = 0, rootBranches = 0;
         var events = new Queue<LocalSimEvent>();
         LocalAction? pendingAction = null;
         LocalAction? blockedAction = null;
@@ -188,7 +188,7 @@ public static class LocalWorker
             lastProgress = timer.ElapsedMilliseconds;
             LocalWire.Write(Path.Combine(_root, "progress.json"), new LocalProgress(request.Id, request.SnapshotId,
                 request.Partition, request.Partitions, ++sequence, route, evaluated, request.MaxNodes, victories,
-                budget.ElapsedMilliseconds, request.BudgetSeconds, phase, state, events.ToArray(), status, probes, boundPruned));
+                budget.ElapsedMilliseconds, request.BudgetSeconds, phase, state, events.ToArray(), status, probes, boundPruned, rootBranches));
         }
         void Publish(string status, string message)
         {
@@ -207,7 +207,7 @@ public static class LocalWorker
                 Victories: victories, IncludePotions: request.IncludePotions,
                 Timing: new(restoreMs, actionMs, decisionMs, verifyMs, Actions: executed, Restores: restores, Verifications: verifyMs > 0 ? 1 : 0),
                 BlockedAction: blockedAction, MaxRounds: request.MaxRounds,
-                Trace: status == "running" ? null : _timeline!.Snapshot(), StoppedEarly: stoppedEarly, TurnSearch: TurnStats()));
+                Trace: status == "running" ? null : _timeline!.Snapshot(), StoppedEarly: stoppedEarly, TurnSearch: TurnStats(), RootBranches: rootBranches));
         }
         try
         {
@@ -308,15 +308,19 @@ public static class LocalWorker
             LocalAction[] first;
             using (Trace("decision")) first = EnumerateActions();
             decisionMs += (long)Stopwatch.GetElapsedTime(decisionStarted).TotalMilliseconds;
-            var roots = first.Where((_, i) => i % request.Partitions == request.Partition).ToArray();
+            rootBranches = first.Length;
+            int partitions = systematic ? LocalConcurrency.Partitions(request.Partitions, rootBranches, request.AdaptiveWorkers) : request.Partitions;
+            if (request.Partition >= partitions) throw new InvalidDataException("Worker is outside the admitted native root partition");
+            var roots = first.Where((_, i) => i % partitions == request.Partition).ToArray();
             // More workers than first moves explore different continuations of the same first move.
             if (roots.Length == 0) roots = [first[request.Partition % first.Length]];
-            if (work != null)
+            if (work != null && request.Partition == 0)
             {
                 using var scheduling = Trace("schedule");
                 work.Offer("expand", first.OrderByDescending(a => a.Preference).Select(a => new[] { a }));
                 if (request.InitialPlan is { Length: > 0 }) work.Offer("improve", [request.InitialPlan]);
             }
+            Progress("已准备可探索分支", force: true);
             var initialEnemyHp = CombatManager.Instance.DebugOnlyGetState()!.Enemies.Sum(e => Math.Max(0, e.CurrentHp));
             LocalTurnHint TurnHint(Player p, int hp, IReadOnlyList<LocalAction> line) =>
                 new(p.Creature.CurrentHp, hp, CombatManager.Instance.DebugOnlyGetState()?.Enemies.Sum(e => Math.Max(0, e.CurrentHp)) ?? 0,
@@ -347,7 +351,7 @@ public static class LocalWorker
                     catch (IOException) { /* Peer can be replacing its private IPC file. */ }
                 }
                 if (best != null && LocalSearchPolicy.Better(best, refinementSeed)) refinementSeed = best;
-                if (!systematic && refinementSeed != null) refiner.Offer(refinementSeed, work == null ? request.Partition : 0,
+                if (!systematic && refinementSeed != null && (work == null || ReferenceEquals(best, refinementSeed))) refiner.Offer(refinementSeed, work == null ? request.Partition : 0,
                     work == null ? request.Partitions : 1);
                 LocalAction[]? planned = null;
                 LocalTurnTask? turnTask = null;
@@ -374,6 +378,16 @@ public static class LocalWorker
                         ?? work.Take(improving ? "expand" : "improve", request.Partition, evaluated % 3 == 2);
                     planned = sharedTask?.Plan;
                     if (sharedTask?.Kind == "improve") refinements++;
+                    if (sharedTask == null)
+                    {
+                        // Do not turn an empty shared queue into independent root
+                        // rollouts. Peers can publish new branches after their jobs.
+                        if (work.Stats().Active == 0) break;
+                        refining?.Dispose();
+                        Progress("等待可探索分支");
+                        await Task.Delay(50);
+                        continue;
+                    }
                 }
                 else
                 {
@@ -406,7 +420,7 @@ public static class LocalWorker
                 }
                 var actions = new List<LocalAction>();
                 var decisions = new List<LocalDecision>();
-                var partition = systematic ? new LocalBranchPartition(request.Partition, request.Partitions) : null;
+                var partition = systematic ? new LocalBranchPartition(request.Partition, partitions) : null;
                 var trial = search.Begin();
                 var coveredTrial = coverage?.Begin();
                 var winningBound = LocalWinningBound.From(healthRoot, best);
@@ -626,6 +640,7 @@ public static class LocalWorker
                     if (work != null)
                     {
                         using var scheduling = Trace("schedule");
+                        work.RecordTerminal(candidate);
                         work.Offer("expand", ExpansionPrefixes(candidate).Take(96));
                         if (sharedTask != null && stop != "达到时间预算") work.Complete(sharedTask);
                     }
@@ -684,7 +699,11 @@ public static class LocalWorker
             Publish("failed", ex.Message);
             return false;
         }
-        finally { NonInteractiveMode.AutoSlayerCheck = originalNativeMode; LocalWorkerOverhead.Enabled = false; LocalWorkerLogic.Enabled = false; LocalWorkerDataMode.Reset(); LocalWorkerVisuals.Reset(); _fastNativeWaits = _fastStateSettling = false; LocalWorkerResources.Retain = LocalWorkerResources.FastCollection = false; Engine.TimeScale = originalScale; Engine.MaxFps = originalFps; _timeline = null; }
+        finally
+        {
+            try { work?.Retire(request.Partition); }
+            finally { NonInteractiveMode.AutoSlayerCheck = originalNativeMode; LocalWorkerOverhead.Enabled = false; LocalWorkerLogic.Enabled = false; LocalWorkerDataMode.Reset(); LocalWorkerVisuals.Reset(); _fastNativeWaits = _fastStateSettling = false; LocalWorkerResources.Retain = LocalWorkerResources.FastCollection = false; Engine.TimeScale = originalScale; Engine.MaxFps = originalFps; _timeline = null; }
+        }
     }
 
     private static IEnumerable<LocalAction[]> ExpansionPrefixes(LocalCandidate candidate)

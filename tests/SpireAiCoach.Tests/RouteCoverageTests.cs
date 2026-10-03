@@ -136,5 +136,37 @@ static class RouteCoverageTests
             }
             Check(seen.Count == 16, "Worker partition omitted legal histories");
         });
+        test("adaptive concurrency smaller root partition preserves every later legal history", () =>
+        {
+            foreach (int rootBranches in new[] { 1, 2, 3 })
+            {
+                int workers = LocalConcurrency.Partitions(8, rootBranches, true);
+                var seen = new HashSet<string>();
+                for (int worker = 0; worker < workers; worker++)
+                {
+                    var coverage = new LocalRouteCoverage();
+                    while (!coverage.Exhausted)
+                    {
+                        var trial = coverage.Begin();
+                        var partition = new LocalBranchPartition(worker, workers);
+                        var path = new List<int>();
+                        for (int depth = 0; depth < 4; depth++)
+                        {
+                            var all = Enumerable.Range(0, depth == 0 ? rootBranches : 2)
+                                .Select(i => Move(i, string.Join(',', path))).ToArray();
+                            var open = coverage.Open(trial, partition.Assign(all));
+                            Check(open.Length > 0, "Adaptive partition lost an open continuation");
+                            coverage.Follow(trial, open[0]); path.Add(open[0].HandIndex);
+                        }
+                        Check(seen.Add(string.Join(',', path)), "Adaptive workers repeated a terminal history");
+                        coverage.Complete(trial, true);
+                    }
+                }
+                var oracle = new HashSet<string>();
+                for (int a = 0; a < rootBranches; a++) for (int b = 0; b < 2; b++)
+                    for (int c = 0; c < 2; c++) for (int d = 0; d < 2; d++) oracle.Add($"{a},{b},{c},{d}");
+                Check(seen.SetEquals(oracle), "Reducing worker count omitted a later fork");
+            }
+        });
     }
 }

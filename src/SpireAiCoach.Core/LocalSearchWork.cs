@@ -6,7 +6,8 @@ using System.Text.Json;
 namespace SpireAiCoach.Core;
 
 public sealed record LocalWorkTask(string Key, string Kind, LocalAction[] Plan);
-public sealed record LocalWorkStats(int Submitted, int Claimed, int Completed, int DuplicateOffers);
+public sealed record LocalWorkStats(int Submitted, int Claimed, int Completed, int DuplicateOffers,
+    int Pending = 0, int Active = 0, int CoveredJobs = 0);
 
 // A bounded shared frontier of exact action-history jobs. It stores proposals, never a
 // substitute combat state or a transferable score. Every claimed job runs natively.
@@ -32,11 +33,16 @@ public sealed class LocalSearchWork
         public int Order { get; set; }
         public int? Owner { get; set; }
         public bool Completed { get; set; }
+        public bool Covered { get; set; }
+        public string HistoryKey { get; set; } = "";
     }
     private sealed class Index
     {
         public List<Entry> Entries { get; set; } = [];
         public int DuplicateOffers { get; set; }
+        public int CoveredJobs { get; set; }
+        public HashSet<string> TerminalHistories { get; set; } = new(StringComparer.Ordinal);
+        public HashSet<int> RetiredOwners { get; set; } = [];
     }
 
     // Exclude display text and mutable hand positions when a native card instance exists.
@@ -48,7 +54,7 @@ public sealed class LocalSearchWork
             a.Round, a.EndTurn, a.PotionSlot, a.CombatCardIndex,
             Hand = a.CombatCardIndex.HasValue ? null : (int?)a.HandIndex,
             a.ModelId, a.TargetId, Before = kind == "expand" ? a.BeforeHash : null,
-            Choices = (a.Choices ?? []).Select(c => new { c.Kind, c.OfferHash, c.Index, c.ModelId, c.Indices })
+            Choices = (a.Choices ?? []).Select(c => new { c.Kind, c.OfferHash, c.Index, c.ModelId, Indices = c.Indices ?? [] })
         })));
 
     public void Offer(string kind, IEnumerable<LocalAction[]> plans)
@@ -63,13 +69,15 @@ public sealed class LocalSearchWork
             if (plan.Length == 0) continue;
             var key = Key(kind, plan);
             if (!known.Add(key)) { index.DuplicateOffers++; continue; }
+            var history = kind == "expand" ? key : Key("expand", plan);
+            if (index.TerminalHistories.Contains(history)) { index.CoveredJobs++; continue; }
             // Frontier expansion must not fill the space reserved for improvements of a
             // later, better candidate. Each class has its own bounded capacity.
             if (count >= _capacityPerKind) break;
             // Every queue access holds the same gate. Immutable jobs are fully written
             // before publishing the index, without acquiring an extra IPC mutex per job.
             File.WriteAllText(Path.Combine(_directory, key + ".json"), JsonSerializer.Serialize(new LocalWorkTask(key, kind, plan)));
-            index.Entries.Add(new() { Key = key, Kind = kind, Depth = plan.Length, Order = index.Entries.Count });
+            index.Entries.Add(new() { Key = key, Kind = kind, Depth = plan.Length, Order = index.Entries.Count, HistoryKey = history });
             count++;
         }
         Save(index);
@@ -79,7 +87,7 @@ public sealed class LocalSearchWork
     {
         using var gate = Lock();
         var index = Read();
-        var candidates = index.Entries.Where(e => e.Kind == kind && !e.Owner.HasValue);
+        var candidates = index.Entries.Where(e => e.Kind == kind && !e.Owner.HasValue && !e.Covered);
         // Interleave shallow and deeper frontier work, rather than starving late-battle forks.
         var entry = deeper ? candidates.OrderByDescending(e => e.Depth).ThenBy(e => e.Order).FirstOrDefault()
             : candidates.OrderBy(e => e.Depth).ThenBy(e => e.Order).FirstOrDefault();
@@ -107,7 +115,32 @@ public sealed class LocalSearchWork
         using var gate = Lock();
         var index = Read();
         return new(index.Entries.Count, index.Entries.Count(e => e.Owner.HasValue),
-            index.Entries.Count(e => e.Completed), index.DuplicateOffers);
+            index.Entries.Count(e => e.Completed), index.DuplicateOffers,
+            index.Entries.Count(e => !e.Owner.HasValue && !e.Covered),
+            index.Entries.Count(e => e.Owner.HasValue && !e.Completed && !index.RetiredOwners.Contains(e.Owner.Value)), index.CoveredJobs);
+    }
+
+    // Close only the exact settled terminal history. No HP/block state merging,
+    // transfer of a candidate score, or closure of interrupted/horizon trials.
+    public void RecordTerminal(LocalCandidate candidate)
+    {
+        if ((!candidate.Won && !candidate.Dead) || candidate.Actions.Length == 0) return;
+        var history = Key("expand", candidate.Actions);
+        using var gate = Lock();
+        var index = Read();
+        if (!index.TerminalHistories.Add(history)) return;
+        foreach (var entry in index.Entries.Where(e => !e.Owner.HasValue && !e.Covered && e.HistoryKey == history))
+        { entry.Covered = true; index.CoveredJobs++; }
+        Save(index);
+    }
+
+    // An interrupted job is not a completed route. It also must not make idle
+    // peers wait for new proposals from a worker that has already returned.
+    public void Retire(int owner)
+    {
+        using var gate = Lock();
+        var index = Read();
+        if (index.RetiredOwners.Add(owner)) Save(index);
     }
 
     // Only the pool calls this after all search/verification lanes have finished.

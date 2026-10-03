@@ -121,7 +121,7 @@ public sealed class CoachOverlay
         body.AddChild(Wrapped("两种算法共用后台模拟。每路最多 64 次整场尝试、60 秒搜索，先达到一项即结束；准备和最终复核另计。"));
         body.AddChild(Wrapped("规划整场战斗，最多 64 轮，优先减少战后净生命损失、保留药水。关闭“无伤通关后立即返回”可继续优化无伤路线。"));
         var localOptions = new HBoxContainer(); body.AddChild(localOptions);
-        localOptions.AddChild(new Label { Text = "本地并发（0 自动，1–16 手动）" });
+        localOptions.AddChild(new Label { Text = "并发上限（0 自动，1–16）" });
         _localWorkers = new SpinBox { MinValue = 0, MaxValue = 16, Step = 1, Value = Math.Clamp(_settings.LocalWorkers, 0, 16) };
         localOptions.AddChild(_localWorkers);
         var saveLocal = new Button { Text = "保存本地设置" }; localOptions.AddChild(saveLocal);

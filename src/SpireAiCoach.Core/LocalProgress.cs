@@ -7,7 +7,8 @@ public sealed record LocalSimState(int Round, int Hp, int MaxHp, int Block, deci
 public sealed record LocalSimEvent(int Step, int Round, string Action, string Changes);
 public sealed record LocalProgress(string Id, string SnapshotId, int Worker, int Workers, long Sequence,
     int Route, int Evaluated, int MaxNodes, int Victories, long ElapsedMs, int BudgetSeconds,
-    string Phase, LocalSimState? State, LocalSimEvent[] Events, string Status = "running", int TurnProbes = 0, int BoundPruned = 0);
+    string Phase, LocalSimState? State, LocalSimEvent[] Events, string Status = "running", int TurnProbes = 0, int BoundPruned = 0,
+    int RootBranches = 0);
 
 public sealed class LocalProgressBook(string id, string snapshotId)
 {

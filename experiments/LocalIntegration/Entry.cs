@@ -89,6 +89,12 @@ public static class Entry
             var player = LocalContext.GetMe(run)!;
             var capture = new StateCapture();
             while (capture.Capture(true)?.CanAdvise != true) await Frame();
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_CONCURRENCY_TEST") == "1")
+            {
+                await ConcurrencyIntegration.Run(root, pool, capture);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_CHECKPOINT") == "1")
             {
                 await CheckpointIntegration.Run(root, tree, pool, capture, player);

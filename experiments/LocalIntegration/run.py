@@ -49,6 +49,7 @@ parser.add_argument('--early-stop-test', action='store_true')
 parser.add_argument('--results-dir', type=Path)
 parser.add_argument('--overhead-benchmark', action='store_true')
 parser.add_argument('--algorithm-test', action='store_true')
+parser.add_argument('--concurrency-test', action='store_true')
 args = parser.parse_args()
 if args.algorithm_test and (not args.replay or args.seed_result or args.recorded_replay):
     parser.error('--algorithm-test requires an unseeded --replay')
@@ -146,6 +147,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_EARLY_STOP_TEST'] = '1' if args.early_stop_test else '0'
     env['SPIRE_LOCAL_OVERHEAD_BENCHMARK'] = '1' if args.overhead_benchmark else '0'
     env['SPIRE_LOCAL_ALGORITHM_TEST'] = '1' if args.algorithm_test else '0'
+    env['SPIRE_LOCAL_CONCURRENCY_TEST'] = '1' if args.concurrency_test else '0'
     settings = root / 'Roaming/SlayTheSpire2/default/1/settings.save'
     settings_data = json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}
     settings_data.update(volume_master=0, volume_bgm=0, volume_sfx=0, volume_ambience=0)
@@ -168,6 +170,8 @@ with worker_lock(root):
         # experiments may reuse the host immediately after it exits.
         args.results_dir.mkdir(parents=True, exist_ok=True)
         for name in ['integration-replay-private.json', 'integration-replay-summary.json',
+                     'integration-concurrency-summary.json', 'integration-concurrency-MonteCarlo-private.json',
+                     'integration-concurrency-TurnFrontier-private.json',
                      'integration-error.txt', 'integration-stdout.log', 'integration-game.log']:
             if (root / name).is_file():
                 shutil.copy2(root / name, args.results_dir / name)
