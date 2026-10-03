@@ -48,6 +48,7 @@ public static class LocalWorker
     private static IDisposable? Trace(string phase, string detail = "", int depth = 1) =>
         _timeline?.Measure(_traceWorker, _traceStage, phase, detail, _traceRoute, _traceStep, depth);
     internal static IDisposable? TracePreloadCollection() => Trace("asset_gc", depth: 3);
+    internal static IDisposable? TraceLogicFrame() => Trace("logic_frame", "原生外部依赖", depth: _restoreDepth > 0 ? 3 : 2);
     private static Task Frame() => _tree.ToSignal(_tree, SceneTree.SignalName.ProcessFrame).AsTask();
 
     public static bool TryStart()
@@ -64,6 +65,7 @@ public static class LocalWorker
         LocalWorkerVisuals.Install(harmony);
         LocalWorkerBootstrap.Install(harmony);
         LocalWorkerDataMode.Install(harmony);
+        LocalWorkerLogic.Install();
         Callable.From(Run).CallDeferred();
         return true;
     }
@@ -113,6 +115,7 @@ public static class LocalWorker
     private static async Task<bool> Search(LocalSearchRequest request)
     {
         _nativeLearning = request.StrategicRollouts ? new() : null;
+        LocalWorkerLogic.ResetCounters();
         _timeline = new(request.TimelineOrigin);
         _traceWorker = request.Partition; _traceRoute = _traceStep = _restoreDepth = 0;
         _traceStage = request.VerifyCandidate == null ? "search" : "verify";
@@ -142,7 +145,7 @@ public static class LocalWorker
         async Task RestoreMeasured()
         {
             var started = Stopwatch.GetTimestamp();
-            try { await Restore(request); }
+            try { await LocalWorkerLogic.Run(() => Restore(request), () => _choices?.Tick(), Frame, 60); }
             finally { restoreMs += (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds; restores++; }
         }
         long sequence = 0, lastProgress = -1000, lastResult = -1000;
@@ -169,7 +172,7 @@ public static class LocalWorker
             lastResult = timer.ElapsedMilliseconds; lastPublishedBest = best;
             if (status != "running") LocalWire.Write(Path.Combine(_root, "runtime.json"), new
                 { status, mode = LocalWorkerDataMode.MinimalRun ? "native-model" : LocalWorkerDataMode.Active ? "no-combat-scene" : "regular-scene",
-                    max_fps = Engine.MaxFps, observed_fps = Engine.GetFramesPerSecond() });
+                    max_fps = Engine.MaxFps, observed_fps = Engine.GetFramesPerSecond(), numerical = LocalWorkerLogic.Counters() });
             LocalWire.Write(Path.Combine(_root, "result.json"),
             new LocalSearchResult(request.Id, request.SnapshotId, status, message, evaluated, rejected, timer.ElapsedMilliseconds, best,
                 Victories: victories, IncludePotions: request.IncludePotions,
@@ -192,6 +195,7 @@ public static class LocalWorker
             LocalWorkerResources.FastCollection = request.SimulationSpeed > 1 && request.FastAssetCollection;
             LocalWorkerDataMode.Active = request.DataOnlyCombat && LocalWorkerDataMode.Available;
             LocalWorkerDataMode.MinimalRun = LocalWorkerDataMode.Active && request.DataOnlyRun;
+            LocalWorkerLogic.Enabled = request.NumericalExecution;
             if (request.ExperimentalNativeData) NonInteractiveMode.AutoSlayerCheck = () => true;
             if (request.ModelHash != ModelIdSerializationCache.Hash || !request.LoadedMods.SequenceEqual(LocalCapture.LoadedMods()))
                 throw new InvalidOperationException("后台的游戏模型或 Mod 清单与当前游戏不一致，请重启游戏后重试。");
@@ -204,7 +208,7 @@ public static class LocalWorker
                 try
                 {
                     var bound = LocalRecordedProbe.Bind(recorded, request.Replay);
-                    await Restore(request with { Replay = bound.Replay }, true, player =>
+                    await LocalWorkerLogic.Run(() => Restore(request with { Replay = bound.Replay }, true, player =>
                     { recordedPlayer = player; startHp = player.Creature.CurrentHp; player.Creature.CurrentHpChanged += HpChanged; },
                     (action, player) =>
                     {
@@ -217,7 +221,8 @@ public static class LocalWorker
                             _ => false
                         });
                         recordedActions.Add(next);
-                    }, bound.PrefixEvents);
+                        _traceStep = recordedActions.Count;
+                    }, bound.PrefixEvents), () => _choices?.Tick(), Frame, 60);
                     var player = recordedPlayer ?? throw new InvalidOperationException("Recorded root was not validated");
                     best = new(recordedActions.ToArray(), player.Creature.CurrentHp, lost,
                         CombatManager.Instance.DebugOnlyGetState()!.Enemies.Sum(e => Math.Max(0, e.CurrentHp)), player.Gold,
@@ -496,7 +501,7 @@ public static class LocalWorker
             Publish("failed", ex.Message);
             return false;
         }
-        finally { NonInteractiveMode.AutoSlayerCheck = originalNativeMode; LocalWorkerDataMode.Reset(); LocalWorkerVisuals.Reset(); _fastNativeWaits = _fastStateSettling = false; LocalWorkerResources.Retain = LocalWorkerResources.FastCollection = false; Engine.TimeScale = originalScale; Engine.MaxFps = originalFps; _timeline = null; }
+        finally { NonInteractiveMode.AutoSlayerCheck = originalNativeMode; LocalWorkerLogic.Enabled = false; LocalWorkerDataMode.Reset(); LocalWorkerVisuals.Reset(); _fastNativeWaits = _fastStateSettling = false; LocalWorkerResources.Retain = LocalWorkerResources.FastCollection = false; Engine.TimeScale = originalScale; Engine.MaxFps = originalFps; _timeline = null; }
     }
 
     private static IEnumerable<LocalAction[]> ExpansionPrefixes(LocalCandidate candidate)
@@ -682,12 +687,16 @@ public static class LocalWorker
                     throw new InvalidOperationException("本地重放暂不支持这场战斗中的额外选择。");
                 var action = item.action.ToGameAction(player);
                 if (eventIndex >= rootAfterEvents) atAction?.Invoke(action, player);
+                using var recordedStep = completedReplayProbe && eventIndex >= rootAfterEvents && action is not ReadyToBeginEnemyTurnAction
+                    ? Trace(action is EndPlayerTurnAction ? "end_turn" : action is UsePotionAction ? "potion" : "card",
+                        action.GetType().Name, depth: 3) : null;
                 if (action is UsePotionAction use)
                 {
                     var potion = player.GetPotionAtSlotIndex((int)use.PotionIndex) ?? throw new InvalidOperationException("历史药水槽不一致。");
                     var target = use.TargetId == null ? null : player.Creature.CombatState!.Creatures.Single(c => c.CombatId == use.TargetId);
                     potion.EnqueueManualUse(target);
-                    await Frame(); await WaitActionQueue(); await StableOrTerminal(player);
+                    if (!LocalWorkerLogic.Active) await Frame();
+                    await WaitActionQueue(); await StableOrTerminal(player);
                 }
                 else if (action is PlayCardAction)
                 {
@@ -761,7 +770,7 @@ public static class LocalWorker
         _choices = session;
         try
         {
-            await PlayNative(action);
+            await LocalWorkerLogic.Run(() => PlayNative(action), () => _choices?.Tick(), Frame);
             session.Finish();
             return action with { Choices = session.Completed };
         }
@@ -783,7 +792,8 @@ public static class LocalWorker
             if (!_includePotions || potion == null || potion.Id.ToString() != action.ModelId || !PotionUsable(potion) || !potion.IsValidTarget(target))
                 throw new InvalidOperationException("药水实例或目标不再合法。");
             potion.EnqueueManualUse(target);
-            await Frame(); await WaitActionQueue(); await StableOrTerminal(player);
+            if (!LocalWorkerLogic.Active) await Frame();
+            await WaitActionQueue(); await StableOrTerminal(player);
             return;
         }
         var card = player.PlayerCombatState!.Hand.Cards[action.HandIndex];
@@ -805,6 +815,7 @@ public static class LocalWorker
         using var waiting = Trace("action_queue", depth: _restoreDepth > 0 ? 3 : 2);
         var timer = Stopwatch.StartNew();
         var pending = RunManager.Instance.ActionQueueSet.BecameEmpty();
+        if (LocalWorkerLogic.Active) { await pending; return; }
         while (!pending.IsCompleted)
         {
             _choices?.Tick();
@@ -821,6 +832,7 @@ public static class LocalWorker
         // An empty queue can be reported before CheckWinCondition and executor cleanup.
         // Await the real completion instead of using a whole frame as a proxy for it.
         var pending = RunManager.Instance.ActionExecutor.FinishedExecutingActions();
+        if (LocalWorkerLogic.Active) { await pending; return; }
         var timer = Stopwatch.StartNew();
         while (!pending.IsCompleted)
         {
@@ -838,6 +850,12 @@ public static class LocalWorker
     {
         var round = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
         RunManager.Instance.ActionQueueSet.EnqueueWithoutSynchronizing(new EndPlayerTurnAction(player, player.PlayerCombatState!.TurnNumber));
+        if (LocalWorkerLogic.Active)
+        {
+            await LocalWorkerLogic.Until(() => IsTerminal(player) || CombatManager.Instance.DebugOnlyGetState()!.RoundNumber > round);
+            await StableOrTerminal(player);
+            return;
+        }
         var timer = Stopwatch.StartNew();
         while (!IsTerminal(player) && CombatManager.Instance.DebugOnlyGetState()!.RoundNumber <= round)
         {
@@ -873,7 +891,11 @@ public static class LocalWorker
             { if (!_fastStateSettling) await Frame(); return; }
             _choices?.Tick();
             if (timer.Elapsed.TotalSeconds > 8) throw new LocalChoiceException("等待战斗稳定超时（" + LocalChoices.PendingDescription() + "）。");
-            await Frame();
+            if (LocalWorkerLogic.Active)
+                await LocalWorkerLogic.Until(() => IsTerminal(player) ? _combatSettled :
+                    player.PlayerCombatState?.Phase == PlayerTurnPhase.Play && !CombatManager.Instance.PlayerActionsDisabled &&
+                    player.PlayerCombatState.PlayPile.IsEmpty && RunManager.Instance.ActionQueueSet.BecameEmpty().IsCompletedSuccessfully);
+            else await Frame();
         }
     }
 

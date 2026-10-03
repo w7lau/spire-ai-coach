@@ -310,3 +310,8 @@ Mod 与集成项目构建零警告零错误。合成选择链路在同一功能�
 12. 观察胆小首次受到穿透伤害的卡牌攻击及再次攻击：首次伤害不能被事后格挡追溯抵消；used_up 随真实触发改变。连续请求核对 system_prompt_hash 一致；服务商统计没返回时显示未返回，返回0时显示0。
 
 13. 对比同场战斗两次请求：system 和角色／遗物段相同，实时快照更新；遗物计数或使用状态改变时上下文同步更新。诊断面板可直接阅读消息，复制完整诊断仍能还原实际请求；不要将假 HTTP 测试中的 cache 数值当作真实命中。
+# Direct native rule execution prototype (2026-10-03)
+
+The default-off `NumericalExecution` experiment passed same-worker old/new/new/old comparisons of the recorded 6-round/49-action route and a fixed 10-round/60-action search route. Every native action/state fingerprint and final settlement matched; the search route's full card choices also matched and its final candidate passed 60/60 ordinary-scene continuation checks. Warm full-route times were 2.023 → 0.845 seconds and 2.212 → 1.202 seconds. The 60-action execution portion was 1.536 → 0.654 seconds. New samples retained only 3 root-restoration frame waits and none in cards/enemy turns. Startup and independent verification are outside these figures. Details and limitations are in [numerical-execution-experiment.md](numerical-execution-experiment.md).
+
+The first reuse prototype failed; late continuations and cross-action turn-loop dispatch were corrected before the final repeated comparisons. Installed-game build: zero warnings/errors. Targeted core checks: search 14/14, timeline 5/5. No unseeded quality search or full suite was run. This experimental branch has not replaced the installed Mod and does not establish arbitrary-Mod compatibility or optimality.

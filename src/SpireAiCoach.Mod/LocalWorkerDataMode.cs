@@ -224,7 +224,7 @@ internal static class LocalWorkerDataMode
         if (receivers != 1 || calls != 1) throw new InvalidOperationException("Native hand choice boundary changed");
     }
     private static NPlayerHand? HandReceiver() => Active ? null : NCombatRoom.Instance!.Ui.Hand;
-    private static Node? TrackerOwner() => MinimalRun ? NGame.Instance : NRun.Instance;
+    private static Node? TrackerOwner() => LocalWorkerLogic.Active ? null : MinimalRun ? NGame.Instance : NRun.Instance;
     private static void StopRunMusic() { if (!MinimalRun) NRun.Instance!.RunMusicController.StopMusic(); }
     private static void ShowGameOver(NRun? run, SerializableRun state) { if (!MinimalRun) run!.ShowGameOverScreen(state); }
     private static IEnumerable<CodeInstruction> DeathPresentation(IEnumerable<CodeInstruction> instructions)
