@@ -8,7 +8,7 @@ Scope 保存并恢复 PreloadManager.Enabled，采用原生关闭预加载的受
 
 LocalWorkerOverhead 的音效/特效叶入口、普通日志和重放文件输出也在这个 Scope 生效。Warn/Error、日志订阅、停止录制收尾、内存操作/选择记录和原生 checksum 不省略。Scope 在成功及异常退出时恢复资源开关，清理和普通玩家进程不继承它；runtime.json 记录实际采用的方式、可用边界、失败原因和原生资源开关状态。AssetCache.GetAsset、NCard.UpdateVisuals 及字体适配增加同步方法计时；资源等待/角色资源/章节资源分段记录，不能把这些嵌套时间相加为总等待。
 
-快速复核失败只对同一选中候选重新执行一次常规复核，保留 verification-fallback.txt 和 verify_fallback 时间段，不重跑整场搜索。最终状态/结算仍不一致时沿用失败出口，Best=null，不生成续用点或可执行方案。普通请求、其他战斗、每次请求的 Scope 与回退原因独立；药水、搜索预算、候选排名和无伤停止标准均不变。
+快速复核失败只对同一选中候选重新执行一次常规复核，保留 verification-fallback.txt 和 verify_fallback 时间段，不重跑整场搜索。回退清除本次按需加载的资源请求标记，常规路径重新完成角色和章节资源预加载。最终状态/结算仍不一致时沿用失败出口，Best=null，不生成续用点或可执行方案。普通请求、其他战斗、每次请求的 Scope 与回退原因独立；药水、搜索预算、候选排名和无伤停止标准均不变。
 
 ## 0.7.12 独立算法入口与完整路线去重
 

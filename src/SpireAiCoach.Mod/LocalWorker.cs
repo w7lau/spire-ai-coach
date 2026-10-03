@@ -753,6 +753,9 @@ public static class LocalWorker
             // Do not redo search or publish an unverified/partially replayed plan.
             LocalWorkerVerification.Fallback = ex.GetType().Name + ": " + ex.Message;
             File.WriteAllText(Path.Combine(_root, "verification-fallback.txt"), ex.ToString());
+            // Lazy collection did not certify the normal eager preload. Restore its
+            // resource path as well as the real executor for this same candidate.
+            _assetsRequest = "";
             using var fallback = Trace("verify_fallback", LocalWorkerVerification.Fallback);
             return await VerifyBestCore(request with { FastVerification = false }, candidate, progress);
         }

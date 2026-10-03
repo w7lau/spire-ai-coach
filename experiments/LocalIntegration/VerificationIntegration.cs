@@ -67,7 +67,8 @@ internal static class VerificationIntegration
         }
         // A wrong final settlement must remain unusable after the ordinary fallback.
         var invalid = await Submit(command with { FastVerification = true, VerifyCandidate = seed with { Hp = seed.Hp - 1 } });
-        if (invalid.Status != "failed" || invalid.Best != null || !invalid.Trace!.Spans.Any(s => s.Phase == "verify_fallback"))
+        if (invalid.Status != "failed" || invalid.Best != null || !invalid.Trace!.Spans.Any(s => s.Phase == "verify_fallback") ||
+            invalid.Trace.Spans.Count(s => s.Phase == "assets_run") != 2 || invalid.Trace.Spans.Count(s => s.Phase == "assets_act") != 2)
             throw new InvalidOperationException("A settlement mismatch escaped final verification");
         LocalWire.Write(Path.Combine(root, "integration-verification-rejection-private.json"), invalid);
 
