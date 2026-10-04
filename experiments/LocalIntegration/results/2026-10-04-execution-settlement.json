@@ -1,0 +1,37 @@
+{
+  "version": "0.7.33",
+  "game_version": "v0.111.0",
+  "core_checks": { "passed": 245, "total": 245 },
+  "build": { "warnings": 0, "errors": 0 },
+  "dll_sha256": "9955a7461fa8dd463ba9ad2886818ac92c5068b7690cd024307f1edb98947bb3",
+  "installation": {
+    "version": "0.7.33",
+    "zip_sha256": "0c5a0cf5522c24b9b8fe99ab75a25b32564214340b7404db800ad7ac8ea5805a",
+    "same_dll_as_native_host_and_package": true,
+    "selected_files_checked": 213,
+    "selected_files_unchanged": true,
+    "old_binary_and_manifest_backed_up": true,
+    "game_started": false
+  },
+  "fixture": "frozen regent combat after forging and drawing",
+  "isolation": { "owned_executable_and_marker": true, "private_appdata": true, "original_mod_copies": 6 },
+  "execution": {
+    "exact_incident_root": true,
+    "frozen_history_entries": 12,
+    "withheld_dispatch_until_notification_completed": true,
+    "canceled_before_enqueue": true,
+    "cancellation_preserved_native_state_and_history": true,
+    "rejected_truncated_victory": true,
+    "executed_steps": 5,
+    "expected_steps": 5,
+    "final_hp": 28,
+    "expected_hp": 28,
+    "battle_ended": true,
+    "complete_first_pass_route_without_independent_verification": true
+  },
+  "limits": [
+    "The original thirteen-step candidate was overwritten by later requests.",
+    "The five-step continuation is a different complete route from the frozen stopped state.",
+    "These checks do not prove the original prediction discrepancy is resolved or guarantee optimality or arbitrary Mod compatibility."
+  ]
+}

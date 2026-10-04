@@ -21,6 +21,8 @@ namespace SpireAiCoach.Mod;
 
 public static class LocalCapture
 {
+    private static readonly FieldInfo? PendingStateChange = typeof(CombatStateTracker)
+        .GetField("_combatStateChangedDeferredTask", BindingFlags.NonPublic | BindingFlags.Instance);
     [ThreadStatic] private static PacketWriter? _fingerprintWriter;
     [ThreadStatic] private static bool _writerInUse;
     [ThreadStatic] private static int _snapshotDepth;
@@ -67,6 +69,19 @@ public static class LocalCapture
         var pcs = state == null ? null : LocalContext.GetMe(state)?.PlayerCombatState;
         return pcs?.Phase == PlayerTurnPhase.Play && pcs.PlayPile.IsEmpty && !CombatManager.Instance.PlayerActionsDisabled &&
             RunManager.Instance.ActionQueueSet.BecameEmpty().IsCompletedSuccessfully;
+    }
+
+    // Queue-empty precedes executor cleanup and deferred state notifications in the native game.
+    // Live execution must wait for both before comparing the next recorded decision.
+    internal static bool ExecutionSettled()
+    {
+        if (PendingStateChange == null)
+            throw new InvalidOperationException("当前游戏版本的结算接口不可用，已停止执行。");
+        var executor = RunManager.Instance.ActionExecutor.FinishedExecutingActions();
+        if (executor.IsCompleted) executor.GetAwaiter().GetResult();
+        var notification = PendingStateChange.GetValue(CombatManager.Instance.StateTracker) as Task;
+        if (notification?.IsCompleted == true) notification.GetAwaiter().GetResult();
+        return executor.IsCompletedSuccessfully && (notification == null || notification.IsCompletedSuccessfully);
     }
 
     public static string Fingerprint()

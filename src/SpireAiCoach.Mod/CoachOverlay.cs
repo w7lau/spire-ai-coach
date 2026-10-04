@@ -380,7 +380,8 @@ public sealed class CoachOverlay
                 $"第 {snapshot.Round} 回合 · 生命 {snapshot.Player.Hp}/{snapshot.Player.MaxHp} · 能量 {snapshot.Player.Energy}";
             _analyze.Disabled = _executing || _request != null || snapshot?.CanAdvise != true;
             _localAnalyze.Disabled = _turnAnalyze.Disabled = _analyze.Disabled;
-            _execute.Disabled = _analyze.Disabled || _continuation == null || _continuation.Invalid || !LocalCapture.Stable();
+            _execute.Disabled = _analyze.Disabled || _continuation == null || _continuation.Invalid ||
+                !LocalCapture.Stable() || !LocalCapture.ExecutionSettled();
             _continueOptimize.Disabled = _execute.Disabled;
             _stopExecution.Disabled = !_executing;
             var resources = _localPool.Resources();
@@ -427,7 +428,7 @@ public sealed class CoachOverlay
         if (_continuation == null) return;
         if (snapshot == null)
         { _continuation = null; _adviceHash = null; _advice.Text = "当前战斗已结束，路线已清除。"; return; }
-        if (!snapshot.CanAdvise || !LocalCapture.Stable())
+        if (!snapshot.CanAdvise || !LocalCapture.Stable() || !LocalCapture.ExecutionSettled())
         {
             _continuationPending = true;
             _freshness.Text = "正在结算，暂停建议；稳定后核对操作历史与预测状态。";
@@ -766,9 +767,10 @@ public sealed class CoachOverlay
         _continueOptimize.Disabled = true;
         _analyze.Disabled = true; _localAnalyze.Disabled = _turnAnalyze.Disabled = true;
         _freshness.Text = "正在按方案执行。点击停止或按 Esc 可随时停止后续动作。";
+        var executor = new LocalPlanExecutor(_tree);
         try
         {
-            _status.Text = await new LocalPlanExecutor(_tree).Execute(plan,
+            _status.Text = await executor.Execute(plan,
                 () => _capture.Capture(false)?.CombatId, _localPotions.ButtonPressed,
                 text => _status.Text = text, cancellation.Token);
         }
@@ -776,11 +778,31 @@ public sealed class CoachOverlay
         catch (Exception ex) { if (!_disposed) _status.Text = ex.Message; }
         finally
         {
+            if (executor.Report is { } report)
+            {
+                GD.Print($"[SpireAiCoach] execution request={report.RequestId} " +
+                    $"settled={report.StartingActionIndex + report.SettledActions}/{report.PlannedActions} " +
+                    $"dispatched={report.DispatchedActions} stage={report.Stage}: {report.Message}");
+                var directory = ProjectSettings.GlobalizePath("user://spire_ai_coach/diagnostics");
+                _ = Task.Run(() =>
+                {
+                    try
+                    {
+                        Directory.CreateDirectory(directory);
+                        var json = System.Text.Json.JsonSerializer.Serialize(report);
+                        LocalWire.WriteJson(Path.Combine(directory, $"local-execution-{report.Id}.json"), json);
+                        LocalWire.WriteJson(Path.Combine(directory, "local-execution-latest.json"), json);
+                    }
+                    catch (Exception ex) { GD.Print("[SpireAiCoach] Execution diagnostic save failed: " + ex.GetType().Name); }
+                });
+            }
             _execution = null; _executing = false; _continuation = null; _adviceHash = null;
             if (!_disposed)
             {
                 _stopExecution.Disabled = true; _execute.Disabled = true;
-                _freshness.Text = "执行已停止。若需继续，请重新计算当前状态。";
+                _freshness.Text = executor.Report?.BattleEnded == true ? "战斗已结束。" :
+                    executor.Report?.ExpectedVictory == false && executor.Report.Stage == "partial-route" ?
+                    "已到达部分路线的末尾，尚未完成战斗。" : "执行已停止。原因见上方状态，请重新计算当前状态。";
                 RefreshSnapshot();
             }
         }

@@ -5,6 +5,7 @@ public sealed record LocalContinuationPoint(int ActionIndex, string NativeHash, 
 
 public sealed class LocalContinuation(string combatId, string[] mods, LocalSearchResult original)
 {
+    internal LocalSearchResult Original => original;
     public int CompletedActions { get; private set; }
     public bool Invalid { get; private set; }
 
