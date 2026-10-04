@@ -5,6 +5,7 @@
     <GameDataDir>$(GameDir)/data_sts2_windows_x86_64</GameDataDir>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="0Harmony" HintPath="$(GameDir)/data_sts2_windows_x86_64/0Harmony.dll" Private="false" />
     <ProjectReference Include="../../src/SpireAiCoach.Mod/SpireAiCoach.Mod.csproj" />
     <Reference Include="sts2" HintPath="$(GameDataDir)/sts2.dll" Private="false" />
     <Reference Include="GodotSharp" HintPath="$(GameDataDir)/GodotSharp.dll" Private="false" />

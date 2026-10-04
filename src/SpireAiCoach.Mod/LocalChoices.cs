@@ -235,6 +235,9 @@ public sealed class LocalChoices
             var filter = Field<Func<CardModel, bool>?>(hand, "_currentSelectionFilter");
             var cards = LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!.PlayerCombatState!.Hand.Cards
                 .Where(filter ?? (_ => true)).ToArray();
+            // Native selection mode can become visible before restored card holders
+            // finish entering the hand. Defer the click, not the native command.
+            if (cards.Any(c => hand.GetCardHolder(c) is not NHandCardHolder)) return;
             var selected = SelectCards("hand", cards, prefs, completion);
             token.ThrowIfCancellationRequested();
             foreach (var index in selected.Indices!)
