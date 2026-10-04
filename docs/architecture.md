@@ -1,5 +1,13 @@
 # 设计与合同
 
+## 0.7.29 后台快照及任务传输开销
+
+两个算法共用一次性 LocalDecisionFingerprint：原生合法性、预览和提示读取结束后，采集完整指纹；仅在同一后台数值实例、同一线程、同一战斗对象、相同状态通知/原生动作代次且没有帧推进、没有待结算通知时，为紧接着的动作复用这次采集。令牌消费一次即失效，恢复、请求结束和不符合条件的执行均清空；未知/普通场景及独立复核仍重新采集。实际玩家执行的逐步完整指纹、Mod/操作历史校验不变。
+
+Progress 仍按原 100ms 间隔产生纯 DTO，通过容量为一的 LocalLatestWriter 合并积压，在独立线程执行序列化、文件锁、写入和原子替换。原生模型或 Godot 对象不进入输出队列。终态结果前等待此前进度写完，退出前排空所有输出，之后才允许 idle 确认和下一请求。输出异常传回计算调用，不伪造成功。新增 ProgressWrite 和 LocalProgress.Lock/Serialize/Write/Replace 累计计时；后台写入与原生执行可能重叠，不应再次相加成等待时间。
+
+旧算法默认通过 LocalSearchWorkBroker 在父进程保留原 LocalSearchWork 队列，私有命名管道只传已观察操作前缀、领取身份与终局历史摘要。原浅/深、集中深入、容量、去重与终局关闭规则不变；根就绪与任务发布保持原子，完成任务必须属于当前领取者。请求、原生根、模型/Mod 和连接所有者不匹配即拒绝；断线及退出退休相应所有者。新算法仍使用已有 LocalTurnWork。验证及单路兼容路径不接入共享 broker。内部 ReuseDecisionFingerprint/AsyncProgressOutput/MemorySearchWork 开关供冻结输入对照，搜索预算、回合和次数上限不变。
+
 ## 0.7.28 默认简洁视图、持久复选框与路线图
 
 CoachSettings.LocalSkipFinalVerification 默认为 true；旧配置缺字段时采用新默认，显式 false 保持不变。SettingsStore.SaveLocalOptions 只合并对应字段，不要求 AI 模型或密钥，不重写加密密钥。药水、无伤返回、跳过复核三个复选框即时保存同一份本地配置；保存 AI 配置也保留它们。两种算法及继续优化仍经过 ConfigureLocalRequest 冻结这些值；低层 LocalSearchRequest 的独立复核缺省保持不变，实际产品请求明确传入设置。取消勾选恢复原独立复核流程，执行所需逐步记录和状态/历史校验不变。
