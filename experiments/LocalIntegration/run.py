@@ -34,7 +34,7 @@ parser.add_argument('--workers', type=int)
 parser.add_argument('--shared-work', choices=['on', 'off'])
 parser.add_argument('--search-order', choices=['monte-carlo', 'limited', 'depth', 'portfolio', 'turn-frontier'])
 parser.add_argument('--correlated-rollouts', action='store_true')
-parser.add_argument('--search-cases', help='One to four comma-separated baseline/correlated comparisons in one owned pool')
+parser.add_argument('--search-cases', help='One to four comma-separated frozen comparisons; efficient-duration-turn-goal requires a six-round, zero-loss, no-potion victory without an answer seed')
 parser.add_argument('--lean-checksum-test', action='store_true')
 parser.add_argument('--work-benchmark', action='store_true')
 parser.add_argument('--settle-benchmark', action='store_true')
@@ -137,7 +137,7 @@ with worker_lock(root):
         for name in ['integration-self-search-summary.json', *[f'integration-self-search-private-{i}.json' for i in range(4)]]:
             (root / name).unlink(missing_ok=True)
     if args.lean_checksum_test:
-        for name in ['integration-lean-checksum-summary.json', 'integration-lean-checksum-private-0.json', 'integration-lean-checksum-private-1.json']:
+        for name in ['integration-lean-checksum-summary.json', *[f'integration-lean-checksum-private-{i}.json' for i in range(5)]]:
             (root / name).unlink(missing_ok=True)
     env = dict(os.environ, APPDATA=str(root / 'Roaming'), LOCALAPPDATA=str(root / 'Local'),
                SPIRE_LOCAL_INTEGRATION=str(root))
@@ -201,7 +201,9 @@ with worker_lock(root):
                                     '--force-steam=off', '--log-file', str(root / 'integration-game.log')],
             cwd=root / 'game', env=env, stdout=output, stderr=output, creationflags=subprocess.CREATE_NO_WINDOW)
         try:
-            process.wait(timeout=300)
+            # Each comparison retains the full product search budget. Several
+            # resident-pool samples need a larger outer harness timeout.
+            process.wait(timeout=max(300, 90 + 75 * len(args.search_cases.split(','))) if args.search_cases else 300)
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait(timeout=10)

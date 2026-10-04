@@ -6,6 +6,40 @@ static class SearchAlgorithmTests
 
     public static void Register(Action<string, Action> test)
     {
+        test("search resource priorities preserve lethal and payments while valuing free native block", () =>
+        {
+            var free = new LocalTacticalFeatures(Known: true, Block: 10, Incoming: 26, ResourceCost: 0);
+            var costly = free with { Block = 16, ResourceCost = 2 };
+            Check(LocalTactics.Priority(free) > LocalTactics.Priority(costly),
+                "A larger absolute effect must not always hide a more efficient resource use");
+            Check(LocalTactics.Priority(free with { Incoming = 0 }) == 0,
+                "Free unused block may trigger native effects without spending a resource");
+            Check(LocalTactics.Priority(free with { Incoming = 0, HpCost = 6 }) < 0,
+                "A known HP payment must not become harmless merely because energy is zero");
+            var lethal = new LocalTacticalFeatures(Known: true, Damage: 20, EnemyHp: 10, ResourceCost: 3);
+            Check(LocalTactics.Priority(lethal) == LocalTactics.Priority(lethal with { ResourceCost = null }),
+                "An immediate lethal must not be hidden by cost normalization");
+            Check(LocalTactics.Priority(free with { Known = false }) == 0,
+                "Cost does not invent an effect for an unknown Mod card");
+        });
+        test("search goal gates complete zero-loss victories by rounds and optional potion allowance", () =>
+        {
+            var victory = new LocalCandidate([Move("one"), Move("two")], 80, 12, 0, 0, 80,
+                true, false, false, Rounds: 6, StartingHp: 80);
+            Check(LocalSearchPolicy.CanStop(victory, true, 6, 0), "Healed costs are part of the completed net-loss goal");
+            Check(!LocalSearchPolicy.CanStop(victory with { Rounds = 7 }, true, 6, 0), "A slower victory has not reached this benchmark");
+            Check(!LocalSearchPolicy.CanStop(victory with { Actions = [Move("potion") with { PotionSlot = 0 }] }, true, 6, 0),
+                "A reserve-potion victory is not a no-potion goal");
+            Check(!LocalSearchPolicy.CanStop(victory with { Hp = 79 }, true, 6, 0), "Positive final loss is not a solved goal");
+            Check(!LocalSearchPolicy.CanStop(victory with { Won = false }, true, 6, 0), "A healthy horizon is not a victory");
+            Check(!LocalSearchPolicy.CanStop(victory, false, 6, 0), "A disabled stop remains disabled");
+            Check(LocalSearchPolicy.CanStop(victory with { Rounds = 20, Actions = [Move("potion") with { PotionSlot = 0 }] }, true),
+                "The existing product switch keeps its ordinary first-zero-loss semantics");
+            var request = new LocalSearchRequest("request", "snapshot", [], "native", 0, [], false);
+            Check(request.LeanSearchChecksums && request.EfficientTactics && request.LearnBuffDuration && request.GuideWinningRoutes &&
+                request.TargetVictoryRounds == null && request.TargetPotionUses == null,
+                "The product does not hardcode this user's six-round benchmark");
+        });
         test("search correlated policies discover repeated delayed setup without an answer seed", () =>
         {
             int found = 0;

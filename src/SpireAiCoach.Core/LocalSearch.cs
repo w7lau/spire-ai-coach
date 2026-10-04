@@ -17,8 +17,10 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     bool DataOnlyRun = true, bool NumericalExecution = true, bool StopOnZeroLoss = true, bool TrimWorkerOverhead = true,
     LocalSearchOrder SearchOrder = LocalSearchOrder.MonteCarlo, bool FastVerification = true,
     bool SkipFinalVerification = false, bool AdaptiveWorkers = true, bool CorrelatedRollouts = false,
-    bool LeanSearchChecksums = false, string? TurnWorkPipe = null,
-    int? TargetVictoryRounds = null, int? TargetPotionUses = null, bool RequireKnownZeroEnemyDamage = false);
+    bool LeanSearchChecksums = true, string? TurnWorkPipe = null, bool ProbeChecksumListener = false,
+    int? TargetVictoryRounds = null, int? TargetPotionUses = null, bool RequireKnownZeroEnemyDamage = false,
+    bool EfficientTactics = true, bool LearnBuffDuration = true, bool GuideWinningRoutes = true,
+    bool OwnedWinningFocus = true);
 
 // A stop belongs to one frozen request, never to another battle or final verification.
 public sealed record LocalSearchStop(string Id, string SnapshotId, string NativeHash)
@@ -46,7 +48,7 @@ public sealed record LocalCandidate(LocalAction[] Actions, int Hp, int HpLost, i
     int Gold, int MaxHp, bool Won, bool Dead, bool RewardCoverageKnown,
     int Rounds = 0, string StopReason = "", LocalContinuationPoint[]? Continuation = null,
     LocalDecision[]? Decisions = null, int? StartingHp = null, bool ContinuationFromSearch = false,
-    LocalDamageSources? DamageSources = null)
+    LocalDamageSources? DamageSources = null, LocalRolloutStyle RolloutStyle = LocalRolloutStyle.Balanced)
 {
     // Gross HP costs remain useful diagnostics, but healing and victory hooks are part of the goal.
     public int? NetHpLoss => StartingHp.HasValue ? Math.Max(0, StartingHp.Value - Hp) : null;
@@ -58,6 +60,10 @@ public sealed record LocalChoiceDecision(int AtChoice, LocalCardChoice[] Legal);
 // Bounded per-trial metrics survive truncation of detailed native event traces.
 public sealed record LocalSearchTrial(int Worker, int Attempt, double FinishedMs, bool Won,
     int Hp, int? NetHpLoss, int Rounds, int PotionsUsed, bool Complete, bool? ClaimedPrefixMatched = null);
+
+// A peer's measured route is an exploration proposal. Keep diagnostic traces
+// out of the scheduling protocol; it does not certify a result or an HP bound.
+public sealed record LocalSearchSeed(string Id, string SnapshotId, string NativeHash, LocalCandidate Candidate);
 
 public sealed record LocalSearchResult(string Id, string SnapshotId, string Status,
     string Message, int Evaluated, int Rejected, long ElapsedMs, LocalCandidate? Best,
@@ -127,7 +133,7 @@ public static class LocalSearchPolicy
     {
         if (result.Best is not { } best) return result.Message;
         var lines = new List<string> { best.Won ? "本地整场战斗 · 已找到获胜路线" : "本地整场战斗 · 尚未找到获胜路线", result.Message,
-            $"{result.Workers} 路并发，评估 {result.Evaluated} 条路线，其中 {result.Victories} 条获胜，不支持 {result.Rejected}。",
+            $"启用 {result.Workers} 路，评估 {result.Evaluated} 条路线，其中 {result.Victories} 条获胜，不支持 {result.Rejected}。",
             best.StartingHp is { } initial ?
                 $"{(best.Won ? "预测战后生命" : "已模拟到的生命")} {initial} → {best.Hp}/{best.MaxHp}；净生命损失 {best.NetHpLoss}{(best.Won ? "（包含战中、战后回血）" : "（战斗尚未完成）")}。" :
                 $"{(best.Won ? "预测战后生命" : "已模拟到的生命")} {best.Hp}/{best.MaxHp}。",

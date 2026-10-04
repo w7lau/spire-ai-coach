@@ -38,6 +38,7 @@ public static class LocalWorker
     private static bool _fastStateSettling;
     private static LocalNativeLearning? _nativeLearning;
     private static LocalRolloutStyle _rolloutStyle;
+    private static bool _efficientTactics;
     private static LocalChoices? _choices;
     private static Func<bool> _nativeModeBeforeRequest = () => false;
     internal static LocalChoices CurrentChoices => _choices ?? throw new LocalChoiceException("未处于原生选牌操作中。");
@@ -131,7 +132,23 @@ public static class LocalWorker
         bool systematic = request.SearchOrder != LocalSearchOrder.MonteCarlo;
         bool turnMode = request.SearchOrder == LocalSearchOrder.TurnFrontier;
         _rolloutStyle = LocalRolloutStyle.Balanced;
-        _nativeLearning = request.StrategicRollouts ? new(trackCosts: true) : null;
+        var learningByStyle = new Dictionary<LocalRolloutStyle, LocalNativeLearning>();
+        LocalNativeLearning? Learning(LocalRolloutStyle style)
+        {
+            if (!request.StrategicRollouts) return null;
+            if (!learningByStyle.TryGetValue(style, out var learner))
+            {
+                // Preparation explores complete combinations with absolute gains.
+                // Other policies measure individual efficiency and buff retention.
+                // Mixing their observations changes the units of the learned hints.
+                learner = new(trackCosts: true, trackDurations: request.LearnBuffDuration &&
+                    (!turnMode || style != LocalRolloutStyle.Preparation));
+                learningByStyle.Add(style, learner);
+            }
+            return learner;
+        }
+        _nativeLearning = Learning(_rolloutStyle);
+        _efficientTactics = request.EfficientTactics;
         _excludedModels = new(request.ExcludedModels ?? [], StringComparer.Ordinal);
         var timer = Stopwatch.StartNew();
         var budget = new Stopwatch();
@@ -369,12 +386,13 @@ public static class LocalWorker
                 // executing the proposed line in this worker, including all native effects and choices.
                 if (!systematic || turnMode) foreach (var peer in Directory.EnumerateDirectories(Path.GetDirectoryName(_root)!, "worker-*"))
                 {
-                    var file = Path.Combine(peer, "result.json");
+                    var file = Path.Combine(peer, "search-seed.json");
                     if (peer == _root || !File.Exists(file)) continue;
                     try
                     {
-                        var result = LocalWire.Read<LocalSearchResult>(file);
-                        if (result.Id == request.Id && result.SnapshotId == request.SnapshotId && result.Best is { } seed &&
+                        var result = LocalWire.Read<LocalSearchSeed>(file);
+                        if (result.Id == request.Id && result.SnapshotId == request.SnapshotId &&
+                            result.NativeHash == request.NativeHash && result.Candidate is { } seed &&
                             LocalSearchPolicy.Better(seed, refinementSeed)) refinementSeed = seed;
                     }
                     catch (IOException) { /* Peer can be replacing its private IPC file. */ }
@@ -404,8 +422,8 @@ public static class LocalWorker
                         }
                         sharedExhausted = sharedTurns != null; break;
                     }
-                    if (sharedTurns != null) fullRollout = turnTask.FullRollout;
-                    else if (turnTask.Prefix.Length == 1) fullRollout = true;
+                    fullRollout = sharedTurns != null ? turnTask.FullRollout : fullRollout || turnTask.FullRollout;
+                    if (turnTask.Prefix.Length == 1) fullRollout = true;
                     planned = turnTask.Prefix;
                     // Skip already completed subtrees before restoring their prefix.
                     if (coverage!.IsClosedPrefix(planned)) { coveredTasks++; sharedTurns?.Finish(turnTask); continue; }
@@ -417,8 +435,10 @@ public static class LocalWorker
                     while (refiner.TryTake(out var proposal)) proposals.Add(proposal);
                     work.Offer("improve", proposals);
                     bool improving = evaluated % 2 == 1 || evaluated == 0 && request.InitialPlan is { Length: > 0 };
-                    sharedTask = work.Take(improving ? "improve" : "expand", request.Partition, evaluated % 3 == 2)
-                        ?? work.Take(improving ? "expand" : "improve", request.Partition, evaluated % 3 == 2);
+                    sharedTask = work.Take(improving ? "improve" : "expand", request.Partition,
+                        evaluated % 8 == 4, focused: evaluated % 8 == 2 || evaluated % 8 == 6)
+                        ?? work.Take(improving ? "expand" : "improve", request.Partition, evaluated % 8 == 4,
+                            focused: evaluated % 8 == 2 || evaluated % 8 == 6);
                     planned = sharedTask?.Plan;
                     if (sharedTask?.Kind == "improve") refinements++;
                     if (sharedTask == null)
@@ -440,9 +460,11 @@ public static class LocalWorker
                     { planned = proposal; refinements++; }
                 }
                 route = ++attempts;
-                _rolloutStyle = turnMode && fullRollout ? sharedTurns != null ? turnTask!.Style :
+                _rolloutStyle = turnMode && fullRollout ? sharedTurns != null || turnTask!.FullRollout ? turnTask!.Style :
                     turnTask!.Prefix.Length <= 1 ? LocalRolloutStyle.Preparation :
                     (LocalRolloutStyle)(fullTrials % 4) : LocalRolloutStyle.Balanced;
+                _nativeLearning = Learning(_rolloutStyle);
+                _nativeLearning?.ResetDecision();
                 if (fullRollout)
                 {
                     fullTrials++;
@@ -459,6 +481,8 @@ public static class LocalWorker
                 if (StopRequested()) { stoppedEarly = true; break; }
                 var player = LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!;
                 LocalWorkerOverhead.LeanSearchChecksums = request.LeanSearchChecksums;
+                using var checksumListener = request.ProbeChecksumListener
+                    ? LocalWorkerOverhead.ObserveChecksums(RunManager.Instance.ChecksumTracker) : null;
                 var startRound = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
                 var startingHp = player.Creature.CurrentHp;
                 // Always establish a no-potion baseline. Then interleave reserve-potion searches,
@@ -661,6 +685,7 @@ public static class LocalWorker
                                 throw new InvalidOperationException("Exact native selection history changed");
                         }
                         _nativeLearning?.After(learned, player);
+                        if (next.EndTurn) _nativeLearning?.SettleBuffs(player);
                         decisions[^1] = decisions[^1] with { Choices = choiceDecisions.ToArray() };
                         if (turns != null && actions.Count >= planned!.Length)
                         {
@@ -719,7 +744,7 @@ public static class LocalWorker
                         StopReason: won ? "胜利结算完成" : player.Creature.IsDead ? "玩家死亡" :
                             string.IsNullOrEmpty(stop) ? "战斗结束但未确认胜利" : stop, Decisions: decisions.ToArray(), StartingHp: startingHp,
                         Continuation: continuationPoints?.ToArray(), ContinuationFromSearch: continuationPoints != null,
-                        DamageSources: damageSources.Snapshot(lost));
+                        DamageSources: damageSources.Snapshot(lost), RolloutStyle: _rolloutStyle);
                     if (turnTask != null && stop == "达到时间预算")
                         turns!.ReturnInterrupted(turnTask, TurnHint(player, startingHp, actions));
                     if (turnMode && IsTerminal(player) && planIndex < planned!.Length)
@@ -742,8 +767,17 @@ public static class LocalWorker
                     Progress(won ? "路线获胜" : candidate.StopReason, Observe(player), true);
                     if (completeAttempt && LocalSearchPolicy.BetterForGoal(candidate, best, request))
                     {
-                        if (turns != null) turns.ObserveOutcome(candidate);
+                        if (turns != null && request.GuideWinningRoutes)
+                        {
+                            // One broker message carries both measured feedback
+                            // and affinity; avoid sending the same native route twice.
+                            turns.ObserveOutcome(candidate);
+                            if (sharedTurns == null) turns.PromoteWinning(candidate);
+                        }
                         best = candidate; bestRoute = route;
+                        LocalWire.Write(Path.Combine(_root, "search-seed.json"),
+                            new LocalSearchSeed(request.Id, request.SnapshotId, request.NativeHash,
+                                candidate with { Continuation = null }));
                     }
                     if (completeAttempt && stop != "达到时间预算") activePolicy?.Complete(candidate);
                     if (LocalSearchPolicy.CanStop(best, request.StopOnZeroLoss, request.TargetVictoryRounds,
@@ -752,6 +786,12 @@ public static class LocalWorker
                     {
                         using var scheduling = Trace("schedule");
                         work.RecordTerminal(candidate);
+                        // Deepen exactly the next observed decision under the claimed
+                        // prefix. Do not replace several unrelated setup decisions with
+                        // independent root noise. Other lanes retain broad coverage.
+                        if (sharedTask?.Kind == "expand" && LocalSearchWork.MatchesPrefix(actions, sharedTask.Plan))
+                            work.Offer("expand", ExpansionPrefixes(candidate).Where(p => p.Length == sharedTask.Plan.Length + 1),
+                                parent: sharedTask.Key);
                         work.Offer("expand", ExpansionPrefixes(candidate).Take(96));
                         if (sharedTask != null && stop != "达到时间预算") work.Complete(sharedTask);
                     }
@@ -1073,7 +1113,7 @@ public static class LocalWorker
         // CanPlay walks the hook chain. Query once per card and reuse within this settled
         // decision, instead of recomputing the full hand for every card/target preview.
         var playable = hand.Where(c => !_excludedModels.Contains(c.Id.ToString()) && c.CanPlay()).ToArray();
-        var tactics = LocalTacticalPreview.Capture(player, playable);
+        var tactics = LocalTacticalPreview.Capture(player, playable, _efficientTactics);
         var hints = new Dictionary<uint, int>();
         for (var i = 0; i < hand.Count; i++)
         {

@@ -9,7 +9,7 @@ using SpireAiCoach.Core;
 
 namespace SpireAiCoach.Mod;
 
-internal sealed class LocalTacticalPreview(Player player)
+internal sealed class LocalTacticalPreview(Player player, bool efficient = false)
 {
     private readonly Dictionary<Creature, double> _threats = new();
     private double _incoming;
@@ -17,9 +17,9 @@ internal sealed class LocalTacticalPreview(Player player)
     private bool _retainsBlock;
     private CardModel[] _playable = [];
 
-    public static LocalTacticalPreview Capture(Player player, CardModel[] playable)
+    public static LocalTacticalPreview Capture(Player player, CardModel[] playable, bool efficient = false)
     {
-        var result = new LocalTacticalPreview(player);
+        var result = new LocalTacticalPreview(player, efficient);
         result._playable = playable;
         foreach (var card in player.PlayerCombatState!.Hand.Cards)
         {
@@ -83,7 +83,9 @@ internal sealed class LocalTacticalPreview(Player player)
                 EnergyGain: Value("Energy"), HpCost: card.HasTurnEndInHandEffect ? 0 : Value("HpLoss"),
                 FollowupAttacks: affordable, FollowupDamage: followup, Known: known, RetainsBlock: _retainsBlock,
                 HandEndHpLoss: handEndHpLoss, PersistentSetup: card.Type == CardType.Power,
-                EnergyCost: card.EnergyCost.GetAmountToSpend()), style);
+                EnergyCost: card.EnergyCost.GetAmountToSpend(),
+                ResourceCost: efficient ? Math.Max(0, card.EnergyCost.GetAmountToSpend()) +
+                    Math.Max(0, card.HasStarCostX ? player.PlayerCombatState!.Stars : card.GetStarCostWithModifiers()) : null), style);
         }
         catch { return 0; }
     }
