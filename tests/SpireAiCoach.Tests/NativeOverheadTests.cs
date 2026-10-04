@@ -6,6 +6,17 @@ public static class NativeOverheadTests
     public static void Register(Action<string, Action> test, Action<string, Func<Task>> asyncTest)
     {
         void Check(bool condition) { if (!condition) throw new Exception("Native overhead assertion failed"); }
+        test("optional visual factories require a leading null guard without effects or cleanup", () =>
+        {
+            var disabled = typeof(NativeOverheadTests).GetProperty(nameof(PresentationDisabled))!.GetMethod!;
+            foreach (var name in new[] { nameof(OptionalVisual), nameof(EffectBeforeGuard), nameof(RequiredVisual), nameof(FactoryWithCleanup) })
+            {
+                var method = typeof(NativeOverheadTests).GetMethod(name)!;
+                Check(LocalPresentationGuard.OptionalNullFactory(method, disabled) == (name == nameof(OptionalVisual)));
+            }
+            // Metadata inspection must never execute even the disabled getter.
+            Check(_effects == 0);
+        });
         test("decision fingerprints invalidate on state notifications frames state identity and reuse", () =>
         {
             var cache = new LocalDecisionFingerprint(); var state = new object();
@@ -128,5 +139,16 @@ public static class NativeOverheadTests
             Check(interrupted.Key != task.Key);
             broker.Dispose(); broker.Dispose();
         });
+    }
+
+    private static int _effects;
+    public static bool PresentationDisabled => throw new InvalidOperationException("A metadata probe executed a getter");
+    public static object? OptionalVisual() { if (PresentationDisabled) return null; return new object(); }
+    public static object? EffectBeforeGuard() { Interlocked.Increment(ref _effects); if (PresentationDisabled) return null; return new object(); }
+    public static object? RequiredVisual() { if (PresentationDisabled) return new object(); return null; }
+    public static object? FactoryWithCleanup()
+    {
+        try { if (PresentationDisabled) return null; return new object(); }
+        finally { Interlocked.Increment(ref _effects); }
     }
 }

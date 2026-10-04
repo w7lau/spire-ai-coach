@@ -103,7 +103,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             int launched = 0;
             progress("准备计算…");
             var results = (await LocalConcurrency.Run(count, request.AdaptiveWorkers, shared, Launch, Demand,
-                () => goalReached.IsCancellationRequested, cancellation)).ToList();
+                () => goalReached.IsCancellationRequested,
+                r => request.DataOnlyCombat && r.Status is "failed" or "unsupported" or "partial", cancellation)).ToList();
             int used = results.Count;
             cancellation.ThrowIfCancellationRequested();
             if (request.DataOnlyCombat && !goalReached.IsCancellationRequested && results.Any(r => r.Status is "failed" or "unsupported" or "partial"))
@@ -208,14 +209,14 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     (results.Count > used ? "本次补充搜索未纳入：" + string.Join("、", blocked.Select(a => a.CardName)) + "。" : "") +
                     "按战后净生命损失选路，同等净损失优先保留药水；预算内候选，未证明全局最优。" };
 
-            Task<LocalSearchResult> Launch(int index)
+            Task<LocalSearchResult> Launch(int index, CancellationToken passFailure)
             {
                 Volatile.Write(ref launched, index + 1);
                 Volatile.Write(ref starting[index], 1);
                 using (timeline.Measure(index, "main", "admit_worker", $"计算 {index + 1}；上限 {count}")) { }
                 return Task.Run(async () =>
                 {
-                    try { return await Run(_workers[index], index); }
+                    try { return await Run(_workers[index], index, passFailure: passFailure); }
                     finally { Volatile.Write(ref starting[index], 0); }
                 }, cancellation);
             }
@@ -237,7 +238,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 return new(pending, Enumerable.Range(0, admitted).Count(i => Volatile.Read(ref starting[i]) != 0), roots, allowed);
             }
 
-            async Task<LocalSearchResult> Run(Worker worker, int index, LocalSearchRequest? fallback = null)
+            async Task<LocalSearchResult> Run(Worker worker, int index, LocalSearchRequest? fallback = null,
+                CancellationToken passFailure = default)
             {
                 var command = fallback ?? request with { Partition = index, Partitions = count, DeferVerification = true };
                 bool verifying = command.VerifyCandidate != null;
@@ -247,6 +249,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     { Status = "searched", Best = null, StoppedEarly = true, Message = "已停止其余搜索。" };
                 try
                 {
+                    passFailure.ThrowIfCancellationRequested();
                     if (!verifying && goalReached.IsCancellationRequested) return Stopped();
                     simulationProgress?.Invoke(new(request.Id, request.SnapshotId, index, count, 0, 0, 0, request.MaxNodes, 0,
                         0, request.BudgetSeconds, "准备计算", null, []));
@@ -254,10 +257,11 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     // Cancel this wait, not the worker's tracked preparation. A peer
                     // can reach its goal while an admitted instance is still booting.
                     using var preparing = CancellationTokenSource.CreateLinkedTokenSource(cancellation,
-                        verifying ? CancellationToken.None : goalReached.Token);
+                        verifying ? CancellationToken.None : goalReached.Token, passFailure);
                     await worker.Ensure(directory, index, installation, preparing.Token, timeline);
                     preparation.Stop();
                     cancellation.ThrowIfCancellationRequested();
+                    passFailure.ThrowIfCancellationRequested();
                     if (!verifying && goalReached.IsCancellationRequested) return Stopped();
                     progress("正在计算…");
                     File.Delete(Path.Combine(worker.Root, "stop-search.json"));
@@ -276,6 +280,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     while (timer.Elapsed.TotalSeconds < timeoutSeconds)
                     {
                         cancellation.ThrowIfCancellationRequested();
+                        passFailure.ThrowIfCancellationRequested();
                         if (!verifying && goalReached.IsCancellationRequested && stopping == null)
                         {
                             using var stopScope = timeline.Measure(index, "search", "stop_search", "停止其余搜索", depth: 1);
@@ -311,6 +316,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                                     if (result.Status is "searched" or "done" && !await worker.WaitIdle(command, timeline, index))
                                         throw new IOException("Worker did not finish request cleanup");
                                     cancellation.ThrowIfCancellationRequested();
+                                    passFailure.ThrowIfCancellationRequested();
                                     if (result.Trace?.Spans is { Length: > 0 } spans)
                                     {
                                         double received = spans.Min(s => s.StartMs);
@@ -370,6 +376,16 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                         await Task.Delay(250, cancellation);
                     }
                     throw new CoachException("local_timeout", "计算超时，已停止；可以重试或使用 AI 分析。");
+                }
+                catch (OperationCanceledException) when (passFailure.IsCancellationRequested && !cancellation.IsCancellationRequested)
+                {
+                    using var stopping = timeline.Measure(index, "search", "stop_failed_pass", "同组数值计算失败，停止本路", depth: 1);
+                    if (requestDispatched) await worker.CancelRequest(command, timeline, index);
+                    // Unlike a user/goal stop, fallback changes bootstrap mode.
+                    // Retire this owned preparation instead of letting it keep booting.
+                    worker.Stop("同组数值计算失败，释放实例以切换执行方式", timeline, index);
+                    await worker.DrainPreparation();
+                    return Stopped() with { Message = "同组数值计算失败，本路已停止。" };
                 }
                 catch (OperationCanceledException) when (!verifying && goalReached.IsCancellationRequested && !cancellation.IsCancellationRequested)
                 { if (requestDispatched) await worker.CancelRequest(command, timeline, index); return Stopped(); }

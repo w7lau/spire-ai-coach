@@ -1,5 +1,15 @@
 # 设计与合同
 
+## 0.7.31 常规后台展示与失败分组收尾
+
+LocalWorkerOverhead 仍只在可执行路径和 `.coach-worker` 所有权核对通过的独立实例安装。TrimWorkerOverhead 开启时，展示、普通控制台输出和重放文件输出的跳过不再依赖 DataOnlyCombat/DataOnlyRun；常规兼容搜索也不需要渲染卡面和播放音效。卡面图片、标题、费用、附魔状态和字体适配在展示叶入口省略。NCard.UpdateVisuals 保留原生 DisplayingPile、DynamicVars.ClearPreview、UpdateDynamicVarPreview 和附魔数值预览；仅在完整预览结束后绕过说明文字格式化/排版。该 IL 边界不符时撤回本组补丁，原有方法继续执行。没有替换卡牌效果、选择、牌堆完成通知、RNG 或 Mod 规则钩子。
+
+形态特效工厂按原生 `Nodes.Vfx.Forms` 家族及方法结构统一识别：静态 Create、返回 Godot Node、无异常收尾块、开头严格为 `if (TestMode.IsOn) return null`。只扩展这个局部展示条件，不修改全局 TestMode。v0.111.0 已检查该家族原生调用点使用可为空的 power Vfx，实际虚空形态路径通过隔离原生试走；不把这种省略应用到负责牌堆完成回调的飞牌工厂，也不跳过未知 Mod 工厂。
+
+LeanSearchChecksums 同样可在常规搜索生效，但仍要求单人、没有第三方 Harmony owner 和外部 ChecksumGenerated 监听。发现外部监听时照常生成完整原生状态并通知；当前决策指纹和逐步执行/复核检查保持原行为。LocalWorkerVerification.Running 与 Active 分开表示“正在复核”和“启用了快速展示”；显式关闭快速复核时，这个 scope 内恢复原生展示和 checksum 路径。数值预览、动作历史、选择身份和最终结算始终执行原生代码。
+
+LocalConcurrency 的兼容分组重载向每个已准入路提供独立的失败取消信号，首个 failed/unsupported/partial 结果使同组数值 pass 立即关闭准入并通知其他路。准备中的所属实例退役并 DrainPreparation，执行中的路先发送绑定原请求的取消信号并完成清理。所有已准入路收尾后才切换常规方式，避免继续等待已经注定废弃的启动/搜索。用户取消仍以取消返回，无伤目标仍用原来的成功停止信号；搜索预算、轮数和尝试上限没有缩短。时间轴增加 stop_failed_pass，实际停止/清理耗时可与准备和搜索分开查看。
+
 ## 0.7.30 后台快照及任务传输开销
 
 两个算法共用一次性 LocalDecisionFingerprint：原生合法性、预览和提示读取结束后，采集完整指纹；仅在同一后台数值实例、同一线程、同一战斗对象、相同状态通知/原生动作代次且没有帧推进、没有待结算通知时，为紧接着的动作复用这次采集。令牌消费一次即失效，恢复、请求结束和不符合条件的执行均清空；未知/普通场景及独立复核仍重新采集。实际玩家执行的逐步完整指纹、Mod/操作历史校验不变。

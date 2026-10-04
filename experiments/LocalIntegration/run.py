@@ -61,7 +61,10 @@ parser.add_argument('--concurrency-test', action='store_true')
 parser.add_argument('--incident-verification', action='store_true')
 parser.add_argument('--limits-test', action='store_true')
 parser.add_argument('--native-overhead-test', action='store_true')
+parser.add_argument('--scene-overhead-test', action='store_true')
 args = parser.parse_args()
+if args.scene_overhead_test and (not args.replay or not args.seed_result):
+    parser.error('--scene-overhead-test requires a frozen --replay and --seed-result')
 if args.native_overhead_test and (not args.replay or not args.seed_result):
     parser.error('--native-overhead-test requires a frozen --replay and --seed-result')
 if args.limits_test and (not args.replay or not args.seed_result):
@@ -209,6 +212,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_INCIDENT_VERIFICATION'] = '1' if args.incident_verification else '0'
     env['SPIRE_LOCAL_LIMITS_TEST'] = '1' if args.limits_test else '0'
     env['SPIRE_LOCAL_NATIVE_OVERHEAD_TEST'] = '1' if args.native_overhead_test else '0'
+    env['SPIRE_LOCAL_SCENE_OVERHEAD_TEST'] = '1' if args.scene_overhead_test else '0'
     settings = root / 'Roaming/SlayTheSpire2/default/1/settings.save'
     settings_data = json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}
     settings_data.update(volume_master=0, volume_bgm=0, volume_sfx=0, volume_ambience=0)
@@ -259,6 +263,11 @@ with worker_lock(root):
                      *[f'integration-native-overhead-private-{i}.json' for i in range(4)],
                      'integration-native-overhead-verification-private.json', 'integration-success',
                      'integration-native-overhead-shared-private.json',
+                     'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.scene_overhead_test:
+            names = ['integration-scene-overhead-summary.json',
+                     *[f'integration-scene-overhead-private-{i}.json' for i in range(8)], 'integration-success',
+                     'integration-scene-overhead-failure-private.json',
                      'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
         if args.survival_test:
             names = ['integration-survival-summary.json', 'integration-survival-private.json',
