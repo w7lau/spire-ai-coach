@@ -268,6 +268,53 @@ internal static class WorkerReuseTests
                 Console.WriteLine($"  minimum-loss protocol evidence: algorithm={algorithm}; scenario={scenario}; loss=12; peers=2; elapsed_ms={watch.ElapsedMilliseconds}; confirmed={result.MinimumLoss!.Confirmed}; verifications={result.Timing!.Verifications}; peer_budget_ms=10000; native_game=false");
             }
         });
+        asyncTest("both algorithms return a first costly victory and stop peers under either loss-stop setting", async () =>
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            await using var f = new Fixture();
+            foreach (var algorithm in new[] { LocalSearchOrder.MonteCarlo, LocalSearchOrder.TurnFrontier })
+            foreach (bool lossStop in new[] { false, true })
+            {
+                var r = Request("first-win") with { SearchOrder = algorithm, ShareSearchWork = true,
+                    StopOnFirstWin = true, StopOnZeroLoss = lossStop, SkipFinalVerification = lossStop, IncludePotions = true,
+                    TargetVictoryRounds = 6, TargetPotionUses = 0, RequireKnownZeroEnemyDamage = true,
+                    CardGoals = new("play", "finish", 5) };
+                var watch = Stopwatch.StartNew();
+                var result = await f.Pool.Analyze(r, f.Installation, _ => { }, CancellationToken.None);
+                Check(result.Status == "done" && result.StoppedEarly && result.StoppedOnFirstWin &&
+                    result.Best is { Won: true, Dead: false, Hp: 8, Rounds: 10 } && result.Best.Actions.Count(a => a.PotionSlot.HasValue) == 1,
+                    "Costly victory waited for minimum-loss or the optional zero-loss target");
+                Check(result.MinimumLoss == null && result.Timing?.Verifications == (lossStop ? 0 : 1) &&
+                    result.Trace!.Spans.Any(s => s.Phase == "stop_search") && watch.Elapsed < TimeSpan.FromSeconds(8),
+                    "Proof tracking, repeated verification or full peer budget delayed the result");
+                Check(LocalSearchPolicy.HasExecutionPoints(result), "First-win result lost its execution checkpoints");
+                Console.WriteLine($"  first-win protocol evidence: algorithm={algorithm}; loss_stop={lossStop}; skip_verify={lossStop}; elapsed_ms={watch.ElapsedMilliseconds}; loss=42; potions=1; rounds=10; verifications={result.Timing!.Verifications}; peer_budget_ms=10000; native_game=false");
+            }
+        });
+        asyncTest("first-win result still rejects a failed final victory verification", async () =>
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            await using var f = new Fixture();
+            try
+            {
+                await f.Pool.Analyze(Request("first-win-verify-mismatch") with { Workers = 1, StopOnFirstWin = true, IncludePotions = true },
+                    f.Installation, _ => { }, CancellationToken.None);
+                throw new Exception("A first-win route returned after verification lost the victory");
+            }
+            catch (CoachException ex) when (ex.Category == "local_verify_failed") { }
+        });
+        asyncTest("first-win result still rejects a winning worker runtime error", async () =>
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            await using var f = new Fixture();
+            try
+            {
+                await f.Pool.Analyze(Request("first-win-errors") with { Workers = 1, StopOnFirstWin = true, IncludePotions = true },
+                    f.Installation, _ => { }, CancellationToken.None);
+                throw new Exception("An erroring worker supplied the first-win route");
+            }
+            catch (CoachException ex) when (ex.Category == "local_failed") { }
+        });
         asyncTest("positive minimum does not survive a contributing worker runtime error", async () =>
         {
             if (!OperatingSystem.IsWindows()) return;
@@ -299,7 +346,13 @@ internal static class WorkerReuseTests
             [new(0, "synthetic", null, "fake", "", request.NativeHash)], 50, 0, 0, 0, 50, true, false, false, StartingHp: 50);
         if (request.VerifyCandidate == null && request.DebugEncounter is "minimum-goal" or "minimum-errors" or "minimum-late-proof")
             candidate = candidate with { Hp = 38, HpLost = 12, Actions = [MinimumLossTests.FirstTurn(request, request.Partition).Steps[0].Action] };
-        return candidate with { Continuation = [new(0, request.NativeHash, new(0, "synthetic"), 0, 50)] };
+        if (request.VerifyCandidate == null && request.DebugEncounter?.StartsWith("first-win", StringComparison.Ordinal) == true)
+            candidate = candidate with { Hp = 8, HpLost = 42, Rounds = 10, DamageSources = new(42, 0, 0, 0, true),
+                Actions = [candidate.Actions[0] with { PotionSlot = 0, Round = 10 }] };
+        if (request.VerifyCandidate != null && request.DebugEncounter == "first-win-verify-mismatch")
+            candidate = candidate with { Won = false, EnemyHp = 10 };
+        return candidate with { Continuation = [new(0, request.NativeHash, new(0, "synthetic"), 0, 50)],
+            ContinuationFromSearch = request.SkipFinalVerification && request.VerifyCandidate == null };
     }
 
     public static async Task<int> Child()
@@ -341,6 +394,8 @@ internal static class WorkerReuseTests
                     int delay = request.DebugEncounter is "slow" or "ignore-stop" or "cancel-errors" || request.DebugEncounter == "slow-verify" && request.VerifyCandidate != null ||
                         request.DebugEncounter == "peer-slow" && request.Partition == 1 && request.VerifyCandidate == null ? 10000 : 60;
                     if (minimum) delay = request.Partition == 0 ? 600 : 10000;
+                    if (request.DebugEncounter?.StartsWith("first-win", StringComparison.Ordinal) == true && request.VerifyCandidate == null)
+                        delay = request.Partition == 0 ? 600 : 10000;
                     var timer = Stopwatch.StartNew(); bool cancelled = false, goal = false;
                     while (timer.ElapsedMilliseconds < delay)
                     {
@@ -362,6 +417,8 @@ internal static class WorkerReuseTests
                     if (cancelled && request.DebugEncounter == "cancel-errors") File.AppendAllText(Path.Combine(root, "game.log"), "[ERROR] synthetic native error\n");
                     if (minimum && request.Partition == 1 && request.DebugEncounter == "minimum-errors")
                         File.AppendAllText(Path.Combine(root, "game.log"), "[ERROR] synthetic invalid proof contributor\n");
+                    if (request.DebugEncounter == "first-win-errors" && request.VerifyCandidate == null)
+                        File.AppendAllText(Path.Combine(root, "game.log"), "[ERROR] synthetic invalid first-win worker\n");
                     // Deliberately publish before teardown, like the native worker.
                     await Task.Delay(80); client?.Dispose();
                     LocalWire.Write(Path.Combine(root, "idle.json"), new LocalWorkerIdle(request.Id, request.SnapshotId, request.NativeHash, request.Partition,

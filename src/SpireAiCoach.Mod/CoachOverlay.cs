@@ -47,6 +47,7 @@ public sealed class CoachOverlay
     private LocalWorkerPool _localPool = null!;
     private bool _localAnalyzing;
     private CheckBox _localStopOnZeroLoss = null!;
+    private CheckBox _localStopOnFirstWin = null!;
     private SpinBox _localTargetVictoryRounds = null!;
     private CheckBox _localSkipVerification = null!;
     private bool _executing;
@@ -186,6 +187,18 @@ public sealed class CoachOverlay
             catch (Exception ex) { _status.Text = "选项本次已生效，保存失败：" + ex.GetType().Name; }
         };
         options.AddChild(_localStopOnZeroLoss);
+        _localStopOnFirstWin = new CheckBox { Name = "LocalStopOnFirstWin", Text = "找到获胜路线即返回",
+            ButtonPressed = _settings.LocalStopOnFirstWin,
+            TooltipText = "适合最终 Boss 等只需获胜的战斗。找到完整获胜路线后立即停止搜索，允许掉血或用药；不再继续优化损失、补刀或使用次数。与最低损失、目标回合或可选出牌目标同时设置时，优先按此选项返回。最终复核仍由下方开关决定。" };
+        _localStopOnFirstWin.Toggled += enabled =>
+        {
+            _settings = _settings with { LocalStopOnFirstWin = enabled };
+            if (_localAnalyzing) Cancel("停止条件已改变，请重新计算。");
+            UpdateCardGoalNotice();
+            try { SaveLocalSettings(); }
+            catch (Exception ex) { _status.Text = "选项本次已生效，保存失败：" + ex.GetType().Name; }
+        };
+        options.AddChild(_localStopOnFirstWin);
         var targetOptions = new GridContainer { Columns = 2 }; advanced.AddChild(targetOptions);
         targetOptions.AddChild(new Label { Text = "目标回合", TooltipText = "提前返回的目标回合数；0 不限。不是战斗搜索的回合上限。" });
         _localTargetVictoryRounds = new SpinBox { Name = "LocalTargetVictoryRounds", MinValue = 0, MaxValue = _localMaxRounds.Value,
@@ -497,6 +510,7 @@ public sealed class CoachOverlay
         LocalWorkers = (int)_localWorkers.Value,
         LocalIncludePotions = _localPotions.ButtonPressed,
         LocalStopOnZeroLoss = _localStopOnZeroLoss.ButtonPressed,
+        LocalStopOnFirstWin = _localStopOnFirstWin.ButtonPressed,
         LocalSkipFinalVerification = _localSkipVerification.ButtonPressed,
         LocalTargetVictoryRounds = (int)_localTargetVictoryRounds.Value,
         LocalMaxAttempts = (int)_localMaxAttempts.Value,
@@ -513,7 +527,7 @@ public sealed class CoachOverlay
         _store.SaveLocalOptions(next.LocalWorkers, next.LocalIncludePotions, next.LocalStopOnZeroLoss,
             next.LocalTargetVictoryRounds, next.LocalMaxAttempts, next.LocalMaxRounds, next.LocalSearchSeconds,
             next.LocalSkipFinalVerification, next.LocalPlayCardModelId, next.LocalFinisherCardModelId,
-            next.LocalCardGoalThresholdEnabled, next.LocalCardGoalHpLossThreshold);
+            next.LocalCardGoalThresholdEnabled, next.LocalCardGoalHpLossThreshold, next.LocalStopOnFirstWin);
         _settings = next;
     }
 
@@ -521,7 +535,7 @@ public sealed class CoachOverlay
         LocalCalculation.Configure(captured, order, (int)_localWorkers.Value, _localPotions.ButtonPressed,
             _localStopOnZeroLoss.ButtonPressed, _localSkipVerification.ButtonPressed,
             (int)_localTargetVictoryRounds.Value, (int)_localMaxAttempts.Value, (int)_localMaxRounds.Value,
-            (int)_localSearchSeconds.Value, CurrentCardGoals());
+            (int)_localSearchSeconds.Value, CurrentCardGoals(), _localStopOnFirstWin.ButtonPressed);
 
     private static string SelectedCard(OptionButton picker) => picker.Selected > 0 && !picker.IsItemDisabled(picker.Selected)
         ? picker.GetItemMetadata(picker.Selected).AsString() : "";
@@ -590,6 +604,12 @@ public sealed class CoachOverlay
 
     private void UpdateCardGoalNotice()
     {
+        if (_localStopOnFirstWin.ButtonPressed)
+        {
+            _localCardGoalLoss.Editable = false;
+            _localCardGoalNotice.Text = "找到获胜路线即返回；多打牌、补刀和损血阈值暂不参与优化。取消勾选后恢复已保存的目标。";
+            return;
+        }
         _localCardGoalLoss.Editable = _localCardGoalThreshold.ButtonPressed && !_executing;
         _localCardGoalNotice.Text = CurrentCardGoals() is not { Enabled: true } ? "未启用可选目标，按原生命与药水策略选路。" :
             (_localCardGoalThreshold.ButtonPressed ? "在所填净损血范围内优先补刀及多打牌；没有符合路线时优先少损血。" :
@@ -783,7 +803,7 @@ public sealed class CoachOverlay
                                 request.Id, request.SnapshotId, request.NativeHash, completed_at = DateTimeOffset.UtcNow,
                                 version = typeof(ModEntry).Assembly.GetName().Version!.ToString(3), request.SearchOrder, request.MaxNodes, request.MaxRounds, request.BudgetSeconds,
                                 ConfiguredWorkers = request.Workers, result.WorkerLimit,
-                                request.SkipFinalVerification, request.StopOnZeroLoss, request.TargetVictoryRounds,
+                                request.SkipFinalVerification, request.StopOnZeroLoss, request.StopOnFirstWin, result.StoppedOnFirstWin, request.TargetVictoryRounds,
                                 request.TargetPotionUses, request.RequireKnownZeroEnemyDamage, result.VerificationSkipped, result.ElapsedMs, result.Workers,
                                 request.CardGoals,
                                 result.Evaluated, result.Victories, result.HealthBounds, result.RecoveredFailures,
@@ -797,7 +817,8 @@ public sealed class CoachOverlay
                         catch (Exception ex) { GD.Print("[SpireAiCoach] Timing save failed: " + ex.GetType().Name); }
                     });
                     _adviceHash = request.SnapshotId;
-                    string optimality = LocalSearchPolicy.HasMinimumProof(result) ? "已达到最低净损失。" : "候选路线尚未证明最优。";
+                    string optimality = result.StoppedOnFirstWin ? "已找到获胜路线，未继续优化损失。" :
+                        LocalSearchPolicy.HasMinimumProof(result) ? "已达到最低净损失。" : "候选路线尚未证明最优。";
                     _freshness.Text = result.VerificationSkipped ? LocalSearchPolicy.HasExecutionPoints(result) ?
                         "可执行方案，偏离时自动停止。" + optimality :
                         "暂不能自动执行，可手动参考。" :

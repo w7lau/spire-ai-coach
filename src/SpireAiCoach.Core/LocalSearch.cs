@@ -23,14 +23,15 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     bool OwnedWinningFocus = true, string? SearchWorkPipe = null,
     bool ReuseDecisionFingerprint = true, bool AsyncProgressOutput = true, bool MemorySearchWork = true,
     bool MemoryProgress = true, string? ProgressPipe = null, bool ReuseFingerprintBuffer = true,
-    LocalCardGoals? CardGoals = null, string? MinimumLossPipe = null);
+    LocalCardGoals? CardGoals = null, string? MinimumLossPipe = null, bool StopOnFirstWin = false);
 
 // A stop belongs to one frozen request. Goal stops exclude verification;
 // explicit caller cancellation also applies during verification or with goals off.
 public sealed record LocalSearchStop(string Id, string SnapshotId, string NativeHash, bool Cancel = false)
 {
     public bool Matches(LocalSearchRequest request) =>
-        (Cancel || request.StopOnZeroLoss && request.CardGoals?.Enabled != true && request.VerifyCandidate == null) &&
+        (Cancel || (request.StopOnFirstWin || request.StopOnZeroLoss && request.CardGoals?.Enabled != true) &&
+            request.VerifyCandidate == null) &&
         Id == request.Id && SnapshotId == request.SnapshotId && NativeHash == request.NativeHash;
 }
 
@@ -81,7 +82,8 @@ public sealed record LocalSearchResult(string Id, string SnapshotId, string Stat
     int RootBranches = 0, int WorkerLimit = 0, LocalSearchTrial[]? Trials = null,
     LocalHealthBoundStats? HealthBounds = null, LocalSimulationFailure? Failure = null,
     LocalSimulationFailure[]? RecoveredFailures = null, LocalCardGoals? CardGoals = null,
-    LocalMinimumLossStatus? MinimumLoss = null, LocalSearchEvidence? Evidence = null);
+    LocalMinimumLossStatus? MinimumLoss = null, LocalSearchEvidence? Evidence = null,
+    bool StoppedOnFirstWin = false);
 
 public static class LocalSearchPolicy
 {
@@ -106,19 +108,31 @@ public static class LocalSearchPolicy
         (!targetPotions.HasValue || candidate.Actions.Count(a => a.PotionSlot.HasValue) <= targetPotions.Value) &&
         (!requireKnownZeroEnemyDamage || candidate.DamageSources is { Complete: true, Enemy: 0 });
 
-    public static bool HasSpecificGoal(LocalSearchRequest request) => request.TargetVictoryRounds.HasValue ||
-        request.TargetPotionUses.HasValue || request.RequireKnownZeroEnemyDamage || request.CardGoals?.Enabled == true;
+    // First-win mode is an explicit product choice, independent of loss and
+    // potion targets. Only a complete victory from this frozen root qualifies.
+    public static bool CanStopAtFirstWin(LocalCandidate? candidate, LocalSearchRequest request) =>
+        request.StopOnFirstWin && request.VerifyCandidate == null &&
+        candidate is { Won: true, Dead: false, Hp: > 0, Actions.Length: > 0 } &&
+        candidate.Actions[0].BeforeHash == request.NativeHash;
+    public static bool CanStopAfterVictory(LocalCandidate? candidate, LocalSearchRequest request,
+        LocalMinimumLossCertificate? certificate = null) => request.VerifyCandidate == null &&
+        (CanStop(candidate, request) || CanStopAtMinimum(candidate, request, certificate));
+    public static bool HasSpecificGoal(LocalSearchRequest request) => !request.StopOnFirstWin &&
+        (request.TargetVictoryRounds.HasValue || request.TargetPotionUses.HasValue || request.RequireKnownZeroEnemyDamage ||
+            request.CardGoals?.Enabled == true);
     public static bool CanStop(LocalCandidate? candidate, LocalSearchRequest request) =>
+        request.StopOnFirstWin ? CanStopAtFirstWin(candidate, request) :
         request.CardGoals?.Enabled != true && CanStop(candidate, request.StopOnZeroLoss,
             request.TargetVictoryRounds, request.TargetPotionUses, request.RequireKnownZeroEnemyDamage);
     public static bool CanStopAtMinimum(LocalCandidate? candidate, LocalSearchRequest request,
-        LocalMinimumLossCertificate? certificate) => request.StopOnZeroLoss && !HasSpecificGoal(request) &&
+        LocalMinimumLossCertificate? certificate) => request.StopOnZeroLoss && !request.StopOnFirstWin && !HasSpecificGoal(request) &&
         candidate is { Won: true, Dead: false, NetHpLoss: > 0, Actions.Length: > 0 } && certificate != null &&
         candidate.Actions[0].BeforeHash == request.NativeHash &&
         certificate.Scope == LocalMinimumLossProof.Scope(request) && certificate.StartingHp == candidate.StartingHp &&
         certificate.MinimumNetHpLoss == candidate.NetHpLoss && certificate.MinimumNetHpLoss > 0 &&
         certificate.MinimumPotionsUsed == candidate.Actions.Count(a => a.PotionSlot.HasValue);
-    public static bool HasMinimumProof(LocalSearchResult result) => result.CardGoals?.Enabled != true && result.Status == "done" &&
+    public static bool HasMinimumProof(LocalSearchResult result) => result.CardGoals?.Enabled != true &&
+        result.Status == "done" && !result.StoppedOnFirstWin &&
         result.Best is { Won: true, Dead: false, NetHpLoss: > 0 } best &&
         result.MinimumLoss is { Confirmed: true, Certificate: { } proof } &&
         proof.StartingHp == best.StartingHp && proof.MinimumNetHpLoss == best.NetHpLoss &&
@@ -129,7 +143,7 @@ public static class LocalSearchPolicy
     {
         if (request.CardGoals?.Enabled != true && prior != null && HasSpecificGoal(request) && MeetsGoal(candidate, request) != MeetsGoal(prior, request))
             return MeetsGoal(candidate, request);
-        return Better(candidate, prior, request.CardGoals);
+        return Better(candidate, prior, request.StopOnFirstWin ? null : request.CardGoals);
     }
 
     // An unfinished horizon supplies a search hint, never a predicted victory or
@@ -211,6 +225,8 @@ public static class LocalSearchPolicy
             lines.Insert(1, HasExecutionPoints(result) ?
                 "已跳过最终复核：可点击执行方案，执行时逐步核对首次模拟记录，偏离即停止。" :
                 "已跳过最终复核，但未取得完整逐步记录；目前仅供手动查看，暂不能自动执行。");
+        if (result.StoppedOnFirstWin && best is { Won: true, Dead: false })
+            lines.Add("已按「找到获胜路线即返回」停止搜索，未继续优化损失或用药。");
         if (best.DamageSources is { } damage)
             lines.Add($"伤害来源：敌方 {damage.Enemy}，自身 {damage.Self}，来源未明 {damage.Unknown + damage.Unattributed}" +
                 (damage.AccountingMatches ? "。" : "（来源记录与扣血统计不一致）。"));
@@ -258,6 +274,8 @@ public static class LocalSearchPolicy
         };
         if (result.Evidence is { } evidence) lines.Insert(0, evidence.Description);
         if (best.Dead) lines.Add("注意：这条路线会死亡，不能保证存活。");
+        if (result.StoppedOnFirstWin && best is { Won: true, Dead: false })
+            lines.Add("已按「找到获胜路线即返回」停止搜索，未继续优化损失或用药。");
         if (HasMinimumProof(result)) lines.Add($"已证明最低净损失为 {best.NetHpLoss}；同等损失下用药也已达下界。");
         if (!best.Won) lines.Add("尚未找到能打赢的路线，请继续优化或重新计算。");
         if (result.Status == "partial") lines.Add("部分搜索未完成，显示当前取得的路线。");
@@ -277,7 +295,7 @@ public static class LocalSearchPolicy
 
     private static IEnumerable<string> CardGoalAdvice(LocalSearchResult result)
     {
-        if (result.CardGoals is not { Enabled: true } goals || result.Best is not { } best) yield break;
+        if (result.StoppedOnFirstWin || result.CardGoals is not { Enabled: true } goals || result.Best is not { } best) yield break;
         var (plays, kills) = goals.Counts(best);
         if (!string.IsNullOrEmpty(goals.PlayModelId)) yield return $"「{goals.PlayName ?? goals.PlayModelId}」预计使用 {plays} 次。";
         if (!string.IsNullOrEmpty(goals.FinisherModelId)) yield return $"「{goals.FinisherName ?? goals.FinisherModelId}」预计补刀 {kills} 次。";

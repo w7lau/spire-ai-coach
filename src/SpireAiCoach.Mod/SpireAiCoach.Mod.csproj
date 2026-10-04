@@ -2,7 +2,7 @@
   <Import Project="../../GamePath.props" Condition="Exists('../../GamePath.props')" />
   <PropertyGroup>
     <AssemblyName>SpireAiCoach</AssemblyName>
-    <Version>0.7.39</Version>
+    <Version>0.7.40</Version>
     <EnableDynamicLoading>true</EnableDynamicLoading>
     <GenerateDependencyFile>false</GenerateDependencyFile>
     <GenerateRuntimeConfigurationFiles>false</GenerateRuntimeConfigurationFiles>

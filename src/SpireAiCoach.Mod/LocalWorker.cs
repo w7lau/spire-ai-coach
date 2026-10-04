@@ -180,7 +180,7 @@ public static class LocalWorker
         int knownRecoveryChecks = 0, sharedIncumbentUpdates = 0;
         string unknownRecoveryReason = "";
         var recovery = new LocalRecoveryEstimator(request);
-        bool trackMinimum = request.StopOnZeroLoss && request.VerifyCandidate == null &&
+        bool trackMinimum = request.StopOnZeroLoss && !request.StopOnFirstWin && request.VerifyCandidate == null &&
             !LocalSearchPolicy.HasSpecificGoal(request) && request.ExcludedModels is not { Length: > 0 };
         var minimumProof = trackMinimum && request.MinimumLossPipe == null ? new LocalMinimumLossProof(request) : null;
         LocalMinimumLossClient? minimumClient = null;
@@ -223,7 +223,7 @@ public static class LocalWorker
         bool StopRequested()
         {
             CheckCancellation();
-            if (!request.StopOnZeroLoss || request.VerifyCandidate != null) return false;
+            if ((!request.StopOnZeroLoss && !request.StopOnFirstWin) || request.VerifyCandidate != null) return false;
             var path = Path.Combine(_root, "stop-search.json");
             if (!File.Exists(path)) return false;
             return LocalWire.Read<LocalSearchStop>(path).Matches(request);
@@ -336,7 +336,8 @@ public static class LocalWorker
                 Trials: status == "running" ? null : trials.ToArray(), CardGoals: request.CardGoals, MinimumLoss: minimumStatus,
                 Evidence: status == "running" ? null : audit.Snapshot(request, best, coverage?.Exhausted == true,
                     turns?.Count, evaluated, searchFinished ? searchTimeReached : budget.Elapsed.TotalSeconds >= request.BudgetSeconds,
-                    stoppedEarly, boundPruned, independentlyVerified)));
+                    stoppedEarly, boundPruned, independentlyVerified),
+                StoppedOnFirstWin: stoppedEarly && LocalSearchPolicy.CanStopAtFirstWin(best, request)));
         }
         try
         {
@@ -970,8 +971,8 @@ public static class LocalWorker
                                 candidate with { Continuation = null }));
                     }
                     if (completeAttempt && stop != "达到时间预算") activePolicy?.Complete(candidate);
-                    if (LocalSearchPolicy.CanStop(best, request) ||
-                        LocalSearchPolicy.CanStopAtMinimum(best, request, minimumStatus?.Certificate)) { stoppedEarly = true; break; }
+                    if (LocalSearchPolicy.CanStopAfterVictory(best, request, minimumStatus?.Certificate))
+                    { stoppedEarly = true; break; }
                     if (work != null)
                     {
                         using var scheduling = Trace("schedule");
@@ -1047,7 +1048,9 @@ public static class LocalWorker
             await Cleanup();
             session?.Dispose();
             Publish(best == null ? stoppedEarly || sharedExhausted ? "searched" : "unsupported" : request.DeferVerification ? "searched" : "done",
-                stoppedEarly ? best?.NetHpLoss is > 0 ? $"已达到最低净损失 {best.NetHpLoss}，停止后续搜索。" :
+                stoppedEarly ? request.StopOnFirstWin ? best?.Won == true ?
+                    "已找到获胜路线，停止后续搜索。" : "已停止其余搜索。" :
+                    best?.NetHpLoss is > 0 ? $"已达到最低净损失 {best.NetHpLoss}，停止后续搜索。" :
                     "已达到无伤通关停止条件，停止后续搜索。" : best == null ? "没有找到可完整结算的路线。" :
                 turns != null ? $"已完成当前预算；评估 {evaluated} 条整场路线，另探查 {probes} 个回合组合，剪枝 {boundPruned} 次；尚未证明全局最优。" :
                 $"已完成当前预算，操作树 {noPotionSearch.Nodes + (request.IncludePotions ? potionSearch.Nodes : 0)} 个节点，比较了 {refinements} 条补牌、删牌、换牌和选牌路线。");
