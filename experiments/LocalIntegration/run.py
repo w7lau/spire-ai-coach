@@ -258,6 +258,7 @@ with worker_lock(root):
             names = ['integration-native-overhead-summary.json',
                      *[f'integration-native-overhead-private-{i}.json' for i in range(4)],
                      'integration-native-overhead-verification-private.json', 'integration-success',
+                     'integration-native-overhead-shared-private.json',
                      'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
         if args.survival_test:
             names = ['integration-survival-summary.json', 'integration-survival-private.json',

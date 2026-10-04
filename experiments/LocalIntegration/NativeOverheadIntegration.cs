@@ -57,11 +57,25 @@ internal static class NativeOverheadIntegration
             verified.Trace!.Methods!.Any(m => m.Method == "LocalCapture.ReusedDecisionFingerprint" && m.Calls > 0))
             throw new InvalidOperationException("Independent native verification changed or reused a decision: " + verified.Message);
         LocalWire.Write(Path.Combine(root, "integration-native-overhead-verification-private.json"), verified);
+        // Exercise the actual parent/worker wiring with two owned native lanes.
+        // One attempt per lane bounds this mechanism check; product limits stay unchanged.
+        var shared = await Task.Run(() => pool.Analyze(command with { Id = Guid.NewGuid().ToString("N"),
+            Workers = 2, AdaptiveWorkers = false, ShareSearchWork = true, MemorySearchWork = true,
+            MaxNodes = 1, SkipFinalVerification = true, InitialPlan = seed.Actions }, installation, _ => { }, CancellationToken.None));
+        LocalWire.Write(Path.Combine(root, "integration-native-overhead-shared-private.json"), shared);
+        var participants = shared.Trace?.Spans.Where(s => s.Stage == "search" && s.Phase == "session")
+            .Select(s => s.Worker).Distinct().Order().ToArray() ?? [];
+        if (shared.Status != "done" || shared.Workers != 2 || shared.Evaluated != 2 || shared.Rejected != 0 ||
+            shared.Work is not { Claimed: >= 2, Completed: >= 2 } || !participants.SequenceEqual(new[] { 0, 1 }) ||
+            shared.Best is not { } sharedBest || sharedBest.Continuation?.Length != sharedBest.Actions.Length)
+            throw new InvalidOperationException("Owned native shared transport did not complete both lanes: " + shared.Message);
         LocalWire.Write(Path.Combine(root, "integration-native-overhead-summary.json"), new
         {
             samples, equivalent_native_history_and_settlement = true,
             independent_verified_steps = verified.Best.Continuation.Length,
             verified.Best.Hp, verification_ms = verified.ElapsedMs,
+            shared_transport = new { shared.Workers, shared.Evaluated, shared.Rejected, shared.Work,
+                participants, native_checkpoints = shared.Best!.Continuation!.Length },
             product_limits_unchanged = true, whole_search_speed_unmeasured = true
         });
 
@@ -78,7 +92,12 @@ internal static class NativeOverheadIntegration
                 if (result.Id != next.Id || result.Status == "running") continue;
                 // Wait for writer drain, broker retirement and cleanup before reusing it.
                 var idlePath = Path.Combine(workerRoot, "idle.json");
-                if (File.Exists(idlePath) && LocalWire.Read<LocalWorkerIdle>(idlePath).Id == next.Id) return result;
+                if (File.Exists(idlePath) && LocalWire.Read<LocalWorkerIdle>(idlePath).Id == next.Id)
+                {
+                    if ((bool)worker.GetType().GetMethod("GameErrors")!.Invoke(worker, null)!)
+                        throw new InvalidOperationException("Owned native worker reported a runtime error");
+                    return result;
+                }
                 if (result.Status is "failed" or "unsupported" or "partial") throw new InvalidOperationException(result.Message);
             }
             throw new TimeoutException("Owned native overhead check did not finish");
