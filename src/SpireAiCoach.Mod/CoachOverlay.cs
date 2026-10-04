@@ -607,7 +607,11 @@ public sealed class CoachOverlay
                                 ConfiguredWorkers = request.Workers, result.WorkerLimit,
                                 request.SkipFinalVerification, request.StopOnZeroLoss, request.TargetVictoryRounds,
                                 request.TargetPotionUses, request.RequireKnownZeroEnemyDamage, result.VerificationSkipped, result.ElapsedMs, result.Workers,
-                                result.Evaluated, result.Victories, result.Timing, result.Trace });
+                                result.Evaluated, result.Victories, result.HealthBounds,
+                                turn_search = result.TurnSearch is { } turns ? new { turns.Probes, turns.BoundPruned,
+                                    turns.Offered, turns.DuplicateOffers, turns.Pending, turns.UnknownRecoveryChecks,
+                                    turns.CoveredPrefixes, turns.CompletedHistories, turns.RepeatedHistories } : null,
+                                result.Timing, result.Trace });
                         }
                         catch (Exception ex) { GD.Print("[SpireAiCoach] Timing save failed: " + ex.GetType().Name); }
                     });

@@ -86,6 +86,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             int count = Count(request.Workers, request.AdaptiveWorkers);
+            var boundPublishers = new Dictionary<string, LocalSharedHealthBound>();
+            var boundPublishGate = new object();
             foreach (var idle in _workers.Skip(count)) idle.Stop("并发上限或可用内存减少", timeline, Array.IndexOf(_workers, idle));
             using var goalReached = new CancellationTokenSource();
             int goalWorker = -1;
@@ -171,6 +173,11 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 StoppedEarly = goalReached.IsCancellationRequested,
                 Id = request.Id,
                 Trials = results.SelectMany(r => r.Trials ?? []).OrderBy(t => t.FinishedMs).ToArray(),
+                HealthBounds = new(results.Sum(r => r.HealthBounds?.Pruned ?? 0),
+                    results.Sum(r => r.HealthBounds?.KnownRecoveryChecks ?? 0),
+                    results.Sum(r => r.HealthBounds?.UnknownRecoveryChecks ?? 0),
+                    results.Sum(r => r.HealthBounds?.SharedIncumbentUpdates ?? 0),
+                    string.Join("；", results.Select(r => r.HealthBounds?.UnknownReason).Where(r => !string.IsNullOrEmpty(r)).Distinct())),
                 Work = workStats,
                 TurnSearch = request.SearchOrder != LocalSearchOrder.TurnFrontier ? null : new(
                     results.Sum(r => r.TurnSearch?.Probes ?? 0), results.Sum(r => r.TurnSearch?.BoundPruned ?? 0),
@@ -324,6 +331,19 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                                     {
                                         RememberFailure(result);
                                         worker.Stop("上次模拟未完成：" + result.Message, timeline, index);
+                                    }
+                                    if (!verifying && result.Status is "searched" or "done")
+                                    {
+                                        // Publish only after complete native execution and the
+                                        // parent's game-error gate. Never certify a running seed.
+                                        lock (boundPublishGate)
+                                        {
+                                            string parent = Path.GetDirectoryName(worker.Root)!;
+                                            string key = parent + "\n" + command.Id;
+                                            if (!boundPublishers.TryGetValue(key, out var exchange))
+                                                boundPublishers.Add(key, exchange = new(parent, command));
+                                            exchange.PublishFinished(result);
+                                        }
                                     }
                                     if (!verifying && result.Status is "searched" or "done" &&
                                         request.StopOnZeroLoss && LocalSearchPolicy.MeetsGoal(result.Best, request) &&

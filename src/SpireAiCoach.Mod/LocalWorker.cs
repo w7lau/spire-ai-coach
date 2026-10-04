@@ -162,9 +162,32 @@ public static class LocalWorker
         var timer = Stopwatch.StartNew();
         var budget = new Stopwatch();
         LocalCandidate? best = null;
-        LocalWinningBound? WinningBound() => LocalSearchPolicy.HasSpecificGoal(request) && !LocalSearchPolicy.MeetsGoal(best, request)
-            ? null : LocalWinningBound.From(request.SnapshotId + ":" + request.NativeHash, best);
         int evaluated = 0, rejected = 0, victories = 0, attempts = 0, probes = 0, boundPruned = 0, unknownRecoveryChecks = 0;
+        int knownRecoveryChecks = 0, sharedIncumbentUpdates = 0;
+        string unknownRecoveryReason = "";
+        var recovery = new LocalRecoveryEstimator(request);
+        var sharedBounds = new LocalSharedHealthBound(Path.GetDirectoryName(_root)!, request);
+        LocalWinningBound? lastSharedBound = null;
+        LocalWinningBound? WinningBound()
+        {
+            var own = LocalSearchPolicy.HasSpecificGoal(request) && !LocalSearchPolicy.MeetsGoal(best, request)
+                ? null : LocalWinningBound.From(sharedBounds.Root, best);
+            var peer = sharedBounds.Read();
+            var selected = LocalHealthBound.Better(own, peer);
+            if (selected != null && Equals(selected, peer) && !Equals(selected, own) && !Equals(peer, lastSharedBound))
+            { sharedIncumbentUpdates++; lastSharedBound = peer; }
+            return selected;
+        }
+        LocalHealthBoundStats HealthStats() => new(boundPruned, knownRecoveryChecks, unknownRecoveryChecks,
+            sharedIncumbentUpdates, unknownRecoveryReason);
+        LocalHealthEnvelope Envelope(Player p, int hp, IReadOnlyList<LocalAction> line)
+        {
+            var allowance = recovery.Estimate(p);
+            if (allowance.MaximumFurtherHpGain.HasValue) knownRecoveryChecks++;
+            else { unknownRecoveryChecks++; unknownRecoveryReason = allowance.Reason; }
+            return new(sharedBounds.Root, hp, p.Creature.CurrentHp, line.Count(a => a.PotionSlot.HasValue),
+                allowance.MaximumFurtherHpGain);
+        }
         bool stoppedEarly = false;
         bool StopRequested()
         {
@@ -254,6 +277,7 @@ public static class LocalWorker
                 Timing: new(restoreMs, actionMs, decisionMs, verifyMs, Actions: executed, Restores: restores, Verifications: verifyMs > 0 ? 1 : 0),
                 BlockedAction: blockedAction, MaxRounds: request.MaxRounds,
                 Trace: status == "running" ? null : _timeline!.Snapshot(), StoppedEarly: stoppedEarly, TurnSearch: TurnStats(), RootBranches: rootBranches,
+                HealthBounds: HealthStats(),
                 Trials: status == "running" ? null : trials.ToArray()));
         }
         try
@@ -381,7 +405,7 @@ public static class LocalWorker
             var initialEnemyHp = CombatManager.Instance.DebugOnlyGetState()!.Enemies.Sum(e => Math.Max(0, e.CurrentHp));
             LocalTurnHint TurnHint(Player p, int hp, IReadOnlyList<LocalAction> line) =>
                 new(p.Creature.CurrentHp, hp, CombatManager.Instance.DebugOnlyGetState()?.Enemies.Sum(e => Math.Max(0, e.CurrentHp)) ?? 0,
-                    initialEnemyHp, p.Creature.Block, line.Count(a => a.PotionSlot.HasValue));
+                    initialEnemyHp, p.Creature.Block, line.Count(a => a.PotionSlot.HasValue), recovery.Estimate(p).MaximumFurtherHpGain);
             if (turns != null)
             {
                 if (request.InitialPlan is { Length: > 0 }) throw new InvalidDataException("Turn frontier requires an unseeded frozen root");
@@ -423,8 +447,8 @@ public static class LocalWorker
                 if (turns != null)
                 {
                     using var turnScheduling = MeasureMethod("LocalTurnFrontier.Take");
-                    // Only this worker's completed native victory supplies a bound.
-                    // Peer results may suggest a continuation, never certify a cut.
+                    // The parent can also certify a finished peer's native victory.
+                    // Running peer seeds remain exploration proposals only.
                     boundPruned += turns.DiscardProvenExpenses(WinningBound());
                     if (!turns.TryTake(out turnTask))
                     {
@@ -562,7 +586,10 @@ public static class LocalWorker
                             legal = coverage.Open(coveredTrial!, legal);
                             if (legal.Length == 0) { covered = true; stop = "该操作前缀已全部评估"; break; }
                         }
-                        if (turns != null && winningBound?.NetHpLoss == 0)
+                        // An incumbent may arrive from another worker during exact
+                        // replay. Keep prescribed actions intact; prune their state
+                        // after execution rather than making replay appear illegal.
+                        if (winningBound?.NetHpLoss == 0 && planIndex >= (planned?.Length ?? 0))
                         {
                             int spent = actions.Count(a => a.PotionSlot.HasValue);
                             var admissible = legal.Where(a => !LocalHealthBound.CannotImprove(new(healthRoot, startingHp,
@@ -644,6 +671,7 @@ public static class LocalWorker
                         decisionMs += (long)Stopwatch.GetElapsedTime(decisionStarted).TotalMilliseconds;
                         deciding?.Dispose();
                         var before = Observe(player);
+                        int previousHp = player.Creature.CurrentHp;
                         var beforeHint = turns == null ? null : TurnHint(player, startingHp, actions);
                         var learned = !next.EndTurn && next.PotionSlot == null
                             ? _nativeLearning?.Before(player.PlayerCombatState!.Hand.Cards[next.HandIndex], player) : null;
@@ -724,23 +752,20 @@ public static class LocalWorker
                         while (events.Count > 12) events.Dequeue();
                         Progress("试走路线", after);
                         plays = next.EndTurn ? 0 : plays + 1;
-                        if (turns != null && !IsTerminal(player) &&
-                            (next.PotionSlot.HasValue || CombatManager.Instance.DebugOnlyGetState()!.RoundNumber > round))
+                        if (!IsTerminal(player) &&
+                            (next.PotionSlot.HasValue || player.Creature.CurrentHp < previousHp ||
+                             CombatManager.Instance.DebugOnlyGetState()!.RoundNumber > round))
                         {
-                            // Native learning/preview cannot certify that no future generated
-                            // effect can heal. Keep that ceiling unknown in this adapter.
-                            if (winningBound != null) unknownRecoveryChecks++;
-                            var envelope = new LocalHealthEnvelope(healthRoot, startingHp, player.Creature.CurrentHp,
-                                actions.Count(a => a.PotionSlot.HasValue));
-                            if (LocalHealthBound.CannotImprove(envelope, winningBound))
+                            winningBound = WinningBound();
+                            if (winningBound != null && LocalHealthBound.CannotImprove(Envelope(player, startingHp, actions), winningBound))
                             {
-                                cut = true; boundPruned += 1 + turns.DiscardDescendants(actions);
+                                cut = true; boundPruned += 1 + (turns?.DiscardDescendants(actions) ?? 0);
                                 stop = "分支已无法优于现有获胜路线"; break;
                             }
                             int nextRound = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
                             // A full trial already continues this exact turn boundary.
                             // Only a short probe needs to publish that open continuation.
-                            if (!fullRollout && nextRound > round && actions.Count >= planned!.Length)
+                            if (turns != null && !fullRollout && nextRound > round && actions.Count >= planned!.Length)
                                 turns.Offer(actions.ToArray(), nextRound, TurnHint(player, startingHp, actions));
                         }
                     }
@@ -785,7 +810,7 @@ public static class LocalWorker
                         turns!.ReturnInterrupted(turnTask, TurnHint(player, startingHp, actions));
                     if (turnMode && IsTerminal(player) && planIndex < planned!.Length)
                         throw new InvalidOperationException("Exact native search prefix terminated early");
-                    bool completeAttempt = !turnProbed && !cut && (fullRollout || IsTerminal(player));
+                    bool completeAttempt = !turnProbed && !cut && !covered && (fullRollout || IsTerminal(player));
                     if (turnMode && completeAttempt)
                         turnOutcomes.Add(new(request.Partition, route, _timeline!.ElapsedMs, won, candidate.Hp, lost,
                             candidate.Rounds, actions.Count(a => a.PotionSlot.HasValue), _rolloutStyle, candidate.DamageSources));
@@ -832,6 +857,8 @@ public static class LocalWorker
                         if (sharedTask != null && stop != "达到时间预算") work.Complete(sharedTask);
                     }
                     // A wall-clock interruption says nothing about the strength of this continuation.
+                    // A proven bound closes only this exact native prefix; it is
+                    // not counted as a completed rollout or a winning candidate.
                     if (!turnMode && stop != "达到时间预算") search.Complete(trial, candidate, initialEnemyHp, closeExactPrefix: true);
                     Publish("running", turns != null ? $"已找到 {victories} 条整场获胜路线；另探查 {probes} 个回合组合，剪枝 {boundPruned} 次，等待 {turns.Count} 个操作前缀。" :
                         $"已找到 {victories} 条整场获胜路线；已记录 {noPotionSearch.Nodes + (request.IncludePotions ? potionSearch.Nodes : 0)} 个操作树节点，按实际结算反馈选路。");

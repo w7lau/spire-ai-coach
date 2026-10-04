@@ -73,7 +73,8 @@ public sealed record LocalSearchResult(string Id, string SnapshotId, string Stat
     long WorkerMemoryBytes = 0, long SearchElapsedMs = 0, bool IncludePotions = false, LocalSearchTiming? Timing = null,
     LocalAction? BlockedAction = null, int MaxRounds = 64, LocalTrace? Trace = null, LocalWorkStats? Work = null,
     bool StoppedEarly = false, LocalTurnSearchStats? TurnSearch = null, bool VerificationSkipped = false,
-    int RootBranches = 0, int WorkerLimit = 0, LocalSearchTrial[]? Trials = null);
+    int RootBranches = 0, int WorkerLimit = 0, LocalSearchTrial[]? Trials = null,
+    LocalHealthBoundStats? HealthBounds = null);
 
 public static class LocalSearchPolicy
 {
@@ -156,6 +157,15 @@ public static class LocalSearchPolicy
         if (result.WorkerLimit > 0) lines.Add($"本次使用 {result.Workers} 路计算，并发上限 {result.WorkerLimit}。");
         if (result.Work is { CoveredJobs: > 0 } covered) lines.Add($"跳过 {covered.CoveredJobs} 项已经完成的相同路线任务。");
         if (result.TurnSearch is { } turns) lines.Add($"另探查 {turns.Probes} 个回合组合，按可证明的界限剪枝 {turns.BoundPruned} 次，跳过 {turns.CoveredPrefixes} 个已评估前缀，仍待搜索 {turns.Pending} 个操作前缀。");
+        if (result.HealthBounds is { } bounds)
+        {
+            if (result.TurnSearch == null) lines.Add($"按可证明的界限剪枝 {bounds.Pruned} 次。");
+            if (result.Victories == 0 && bounds.KnownRecoveryChecks == 0 && bounds.UnknownRecoveryChecks == 0 &&
+                bounds.SharedIncumbentUpdates == 0) lines.Add("尚未取得完整获胜基准，暂未进行收益界限剪枝。");
+            lines.Add($"回复上界可判定 {bounds.KnownRecoveryChecks} 次，未知 {bounds.UnknownRecoveryChecks} 次；采用共享获胜基准 {bounds.SharedIncumbentUpdates} 次。");
+            if (bounds.UnknownRecoveryChecks > 0 && bounds.UnknownReason.Length > 0)
+                lines.Add($"部分分支保留搜索：{bounds.UnknownReason}。");
+        }
         lines.Add($"计算用时 {result.ElapsedMs / 1000d:F1} 秒。");
         int round = -1;
         for (var i = 0; i < best.Actions.Length; i++)

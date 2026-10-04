@@ -3,7 +3,7 @@ using System.Text.Json;
 namespace SpireAiCoach.Core;
 
 public sealed record LocalTurnHint(int Hp, int StartingHp, int EnemyHp, int InitialEnemyHp,
-    int Block = 0, int PotionsUsed = 0);
+    int Block = 0, int PotionsUsed = 0, long? MaximumFurtherHpGain = null);
 public sealed record LocalTurnTask(int Id, LocalAction[] Prefix, int SearchRound,
     bool FullRollout = false, int Lane = 0, bool Focused = false, LocalTurnHint? Hint = null,
     LocalRolloutStyle Style = LocalRolloutStyle.Balanced, LocalAction[]? Continuation = null);
@@ -357,12 +357,13 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
 
     public int DiscardProvenExpenses(LocalWinningBound? incumbent)
     {
-        if (incumbent == null || incumbent.NetHpLoss != 0 || _root == null || incumbent.Root != _root) return 0;
-        // Every action in this prefix is mandatory, even though its native
-        // execution has not happened yet. No recovery can reduce net loss below
-        // zero or undo the objective's already-prescribed potion expense.
+        if (incumbent == null || _root == null || incumbent.Root != _root) return 0;
+        // Every action in the prefix is mandatory. Its last native observation
+        // carries a certified recovery ceiling, or null when effects are unknown.
+        // Potion expense alone can still bound a no-loss incumbent with null.
         var ids = _pending.Where(p => LocalHealthBound.CannotImprove(new(_root,
-            p.Value.Hint.StartingHp, p.Value.Hint.Hp, p.Value.Task.Prefix.Count(a => a.PotionSlot.HasValue)), incumbent))
+            p.Value.Hint.StartingHp, p.Value.Hint.Hp, p.Value.Task.Prefix.Count(a => a.PotionSlot.HasValue),
+            p.Value.Hint.MaximumFurtherHpGain), incumbent))
             .Select(p => p.Key).ToArray();
         foreach (int id in ids) _pending.Remove(id);
         return ids.Length;

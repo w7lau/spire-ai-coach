@@ -15,6 +15,15 @@ public sealed record LocalWinningBound(string Root, int StartingHp, int NetHpLos
 
 public static class LocalHealthBound
 {
+    public static LocalWinningBound? Better(LocalWinningBound? current, LocalWinningBound? proposed)
+    {
+        if (proposed == null) return current;
+        if (current == null) return proposed;
+        if (current.Root != proposed.Root || current.StartingHp != proposed.StartingHp) return current;
+        return proposed.NetHpLoss < current.NetHpLoss || proposed.NetHpLoss == current.NetHpLoss &&
+            proposed.PotionsUsed < current.PotionsUsed ? proposed : current;
+    }
+
     public static bool CannotImprove(LocalHealthEnvelope branch, LocalWinningBound? incumbent)
     {
         if (branch.PotionsUsed < 0 || branch.MaximumFurtherHpGain < 0)
