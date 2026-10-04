@@ -98,11 +98,23 @@ public static class ExecutionReplayIntegration
         var result = LocalWire.Read<LocalSearchResult>(resultPath) with { VerificationSkipped = true };
         if (!LocalSearchPolicy.HasExecutionPoints(result) || result.Best is not { Won: true } best)
             throw new InvalidOperationException("A complete frozen first-pass winner is required");
+        using var diagnostic = System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_EXECUTION_DIAGNOSE") == "1"
+            ? new ExecutionDivergenceProbe(root) : null;
         var player = await Restore();
         var capture = new StateCapture();
         LocalContinuation Plan(LocalSearchResult r) => new(capture.Capture(false)!.CombatId, LocalCapture.LoadedMods(), r);
         string? CombatId() => capture.Capture(false)?.CombatId;
         var executor = new LocalPlanExecutor(tree);
+
+        if (diagnostic != null)
+        {
+            diagnostic.SetActions(best.Actions);
+            Exception? failure = null;
+            try { await executor.Execute(Plan(result), CombatId, true, diagnostic.BeforeAction, CancellationToken.None); }
+            catch (InvalidOperationException ex) { failure = ex; }
+            diagnostic.Save(executor.Report ?? throw new InvalidOperationException("Missing execution report"), failure);
+            return;
+        }
 
         // Queue-empty with a pending native notification is not ready to execute.
         var tracker = CombatManager.Instance.StateTracker;
