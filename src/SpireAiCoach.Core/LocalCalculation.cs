@@ -27,7 +27,7 @@ public static class LocalCalculation
     public static LocalSearchRequest Configure(LocalSearchRequest captured, LocalSearchOrder order,
         int workers, bool includePotions, bool stopOnZeroLoss, bool skipFinalVerification = false,
         int targetVictoryRounds = 0, int maxAttempts = AttemptsPerWorker, int maxRounds = Rounds,
-        int searchSeconds = SearchSeconds, LocalCardGoals? cardGoals = null)
+        int searchSeconds = SearchSeconds, LocalCardGoals? cardGoals = null, bool stopOnFirstWin = false)
     {
         _ = Name(order);
         cardGoals?.Validate();
@@ -38,12 +38,13 @@ public static class LocalCalculation
             SearchOrder = order, Workers = Math.Clamp(workers, 0, 16), IncludePotions = includePotions,
             MaxNodes = maxAttempts, BudgetSeconds = searchSeconds, MaxRounds = maxRounds,
             StopOnZeroLoss = stopOnZeroLoss,
+            StopOnFirstWin = stopOnFirstWin,
             SkipFinalVerification = skipFinalVerification,
-            CardGoals = cardGoals?.Enabled == true ? cardGoals : null,
+            CardGoals = !stopOnFirstWin && cardGoals?.Enabled == true ? cardGoals : null,
             // Optional return target; never reduces the search horizon or budget.
-            TargetVictoryRounds = targetVictoryRounds > 0 ? Math.Clamp(targetVictoryRounds, 1, maxRounds) : null,
-            TargetPotionUses = targetVictoryRounds > 0 ? 0 : null,
-            RequireKnownZeroEnemyDamage = targetVictoryRounds > 0,
+            TargetVictoryRounds = !stopOnFirstWin && targetVictoryRounds > 0 ? Math.Clamp(targetVictoryRounds, 1, maxRounds) : null,
+            TargetPotionUses = !stopOnFirstWin && targetVictoryRounds > 0 ? 0 : null,
+            RequireKnownZeroEnemyDamage = !stopOnFirstWin && targetVictoryRounds > 0,
             ShareSearchWork = captured.ShareSearchWork,
             // Turn-frontier continuations are generated from the current native state.
             InitialPlan = order == LocalSearchOrder.TurnFrontier ? null : captured.InitialPlan

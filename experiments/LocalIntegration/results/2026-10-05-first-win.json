@@ -1,0 +1,54 @@
+{
+  "version": "0.7.39",
+  "validation_date": "2026-10-05",
+  "kind": "Isolated synthetic process protocol and deterministic policy checks; not a native-game benchmark",
+  "preserved_installed_baseline": {
+    "version": "0.7.38",
+    "commit": "af9858baa6842a678738d1246871dd76e891fad7",
+    "dll_sha256": "d6a1a6c6cbe9b52a2212fdbd822cea419e2b50e34d5f0e9c69e3a956e3d7eacf"
+  },
+  "core_checks_passed": 285,
+  "stop_on_first_win_default": false,
+  "original_goal_settings_preserved": true,
+  "configuration_budgets_unchanged": true,
+  "minimum_loss_proof_disabled_in_first_win_mode": true,
+  "runs": [
+    { "algorithm": "MonteCarlo", "loss_stop": false, "skip_verification": false, "elapsed_ms": 2831, "final_verifications": 1 },
+    { "algorithm": "MonteCarlo", "loss_stop": true, "skip_verification": true, "elapsed_ms": 1278, "final_verifications": 0 },
+    { "algorithm": "TurnFrontier", "loss_stop": false, "skip_verification": false, "elapsed_ms": 1552, "final_verifications": 1 },
+    { "algorithm": "TurnFrontier", "loss_stop": true, "skip_verification": true, "elapsed_ms": 1278, "final_verifications": 0 }
+  ],
+  "synthetic_scenario": {
+    "workers": 2,
+    "winner_net_hp_loss": 42,
+    "winner_potions_used": 1,
+    "winner_rounds": 10,
+    "overridden_target_rounds": 6,
+    "overridden_card_goal_loss_threshold": 5,
+    "synthetic_peer_wait_ms": 10000,
+    "peer_stopped_early": true,
+    "execution_checkpoints_preserved": true,
+    "native_game": false
+  },
+  "winning_worker_error_rejected": true,
+  "failed_victory_verification_rejected": true,
+  "game_adapter_build": { "warnings": 0, "errors": 0 },
+  "native_integration_host_build": { "warnings": 0, "errors": 0 },
+  "installed": true,
+  "installation": {
+    "installed_at": "2026-10-05T01:54:01.2730274+08:00",
+    "game_was_closed": true,
+    "dll_sha256": "188e4a66c62d67164f17bddce7eee6a93170c07fbf7c2dae5734715eb03044fb",
+    "package_sha256": "7708e07929cd8ef8afcdd53b02db9c3641b8a0438d1e5770660ec42844f3aef9",
+    "package_matches_compiled_dll": true,
+    "previous_mod_files_backed_up": 2,
+    "protected_file_count": 244,
+    "protected_files_unchanged": true,
+    "worker_cache_unchanged": true
+  },
+  "native_combat_tested": false,
+  "limitations": [
+    "Synthetic process timings are not native-game latency or search throughput",
+    "Actual first-win frequency and UI interaction still need game logs"
+  ]
+}
