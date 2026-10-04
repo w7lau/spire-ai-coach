@@ -79,7 +79,7 @@ public sealed record LocalSearchResult(string Id, string SnapshotId, string Stat
     bool StoppedEarly = false, LocalTurnSearchStats? TurnSearch = null, bool VerificationSkipped = false,
     int RootBranches = 0, int WorkerLimit = 0, LocalSearchTrial[]? Trials = null,
     LocalHealthBoundStats? HealthBounds = null, LocalSimulationFailure? Failure = null,
-    LocalSimulationFailure[]? RecoveredFailures = null);
+    LocalSimulationFailure[]? RecoveredFailures = null, LocalSearchEvidence? Evidence = null);
 
 public static class LocalSearchPolicy
 {
@@ -162,7 +162,7 @@ public static class LocalSearchPolicy
 
     public static string Format(LocalSearchResult result)
     {
-        if (result.Best is not { } best) return result.Message;
+        if (result.Best is not { } best) return result.Evidence?.Description ?? result.Message;
         var lines = new List<string> { best.Won ? "本地整场战斗 · 已找到获胜路线" : "本地整场战斗 · 尚未找到获胜路线", result.Message,
             $"启用 {result.Workers} 路，评估 {result.Evaluated} 条路线，其中 {result.Victories} 条获胜，不支持 {result.Rejected}。",
             best.StartingHp is { } initial ?
@@ -170,6 +170,12 @@ public static class LocalSearchPolicy
                 $"{(best.Won ? "预测战后生命" : "已模拟到的生命")} {best.Hp}/{best.MaxHp}。",
             $"过程累计扣血 {best.HpLost}" + (best.StartingHp is { } start ? $"，已恢复或增加生命 {Math.Max(0, best.Hp - start + best.HpLost)}" : "") +
                 $"；敌人剩余生命合计 {best.EnemyHp}。" };
+        if (result.Evidence is { } evidence)
+        {
+            lines.Insert(1, evidence.Description);
+            lines.Add($"原生终局：获胜 {evidence.TerminalWins}，死亡 {evidence.TerminalLosses}；回合上限 {evidence.RoundLimitHits}，操作上限 {evidence.ActionLimitHits}，时间中断 {evidence.TimeLimitHits}。" +
+                $"分页选牌观察 {evidence.PagedChoiceObservations} 次，重放中补交 {evidence.PagedReplayBranches} 个选牌前缀（提交数含去重前重复，不代表已完成搜索）。");
+        }
         if (result.VerificationSkipped)
             lines.Insert(1, HasExecutionPoints(result) ?
                 "已跳过最终复核：可点击执行方案，执行时逐步核对首次模拟记录，偏离即停止。" :
@@ -211,13 +217,14 @@ public static class LocalSearchPolicy
     // search accounting and native identities in Format above.
     public static string FormatAdvice(LocalSearchResult result)
     {
-        if (result.Best is not { } best) return result.Message;
+        if (result.Best is not { } best) return result.Evidence?.Description ?? result.Message;
         var lines = new List<string>
         {
             best.Won ? $"预计获胜 · {best.Rounds} 回合" : "战斗尚未打完，以下是部分路线。",
             $"{(best.Won ? "预计战后生命" : "当前模拟生命")} {best.Hp}/{best.MaxHp}" +
                 (best.NetHpLoss is { } loss ? $" · 净损失 {loss}（含回血）" : "")
         };
+        if (result.Evidence is { } evidence) lines.Insert(0, evidence.Description);
         if (best.Dead) lines.Add("注意：这条路线会死亡，不能保证存活。");
         if (!best.Won) lines.Add("尚未找到能打赢的路线，请继续优化或重新计算。");
         if (result.Status == "partial") lines.Add("部分搜索未完成，显示当前取得的路线。");

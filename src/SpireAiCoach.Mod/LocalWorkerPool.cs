@@ -75,7 +75,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 // A compatibility pass restarts each worker's sequence; keep it above
                 // the first pass's search/refinement/verification offsets in the UI.
                 simulationProgress == null ? null : p => simulationProgress(p with { Id = request.Id, Sequence = p.Sequence + 4_000_000 }));
-            return result with { Id = request.Id, Message = "常规执行完成。" + result.Message,
+            var evidence = result.Evidence?.WithFailedPass(result.Best, failures.Length);
+            return result with { Id = request.Id, Message = "常规执行完成。" + result.Message, Evidence = evidence,
                 RecoveredFailures = failures.Concat(result.RecoveredFailures ?? []).ToArray() };
         }
     }
@@ -179,7 +180,9 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 { /* Completed native result remains valid if private diagnostic cleanup is busy. */ }
             }
-            return best with { Evaluated = results.Sum(r => r.Evaluated), Rejected = results.Sum(r => r.Rejected),
+            var evidence = LocalSearchEvidence.Merge(request, best, results,
+                turnWork?.Pending ?? workStats?.Pending ?? (count == 1 ? best.TurnSearch?.Pending : null));
+            return best with { Evidence = evidence, Evaluated = results.Sum(r => r.Evaluated), Rejected = results.Sum(r => r.Rejected),
                 Duplicates = results.Sum(r => r.Duplicates), BudgetPruned = results.Sum(r => r.BudgetPruned),
                 Victories = valid.Sum(r => r.Victories), Workers = used, WorkerLimit = count, RootBranches = Volatile.Read(ref rootBranches[0]),
                 ElapsedMs = (long)timeline.ElapsedMs, Trace = timeline.Snapshot(), SearchElapsedMs = results.Take(used).Max(r => r.ElapsedMs) +

@@ -42,6 +42,48 @@ public interface ILocalTurnFrontier
 
 public sealed record LocalTurnOffer(LocalAction[] Prefix, int SearchRound, LocalTurnHint Hint);
 
+// Request-local tracking of observed choice edges, keyed by the complete parent
+// history. Replaying another history with the same visible offer cannot consume
+// its siblings. One parent serialization per choice avoids one per combination.
+public sealed class LocalPagedReplayTracker
+{
+    private readonly Dictionary<string, HashSet<LocalCardChoice>> _observed = new(StringComparer.Ordinal);
+    private sealed class ChoiceComparer : IEqualityComparer<LocalCardChoice>
+    {
+        public bool Equals(LocalCardChoice? a, LocalCardChoice? b) => a != null && b != null && LocalTurnSearch.SameChoice(a, b);
+        public int GetHashCode(LocalCardChoice choice)
+        {
+            var hash = new HashCode();
+            hash.Add(choice.OfferHash); hash.Add(choice.Kind); hash.Add(choice.Index); hash.Add(choice.ModelId);
+            foreach (int index in choice.Indices ?? []) hash.Add(index);
+            return hash.ToHashCode();
+        }
+    }
+    private static readonly ChoiceComparer Comparer = new();
+
+    public IEnumerable<LocalTurnOffer> Observe(IReadOnlyList<LocalAction> actions, LocalDecision decision,
+        LocalTurnHint before, bool replaying)
+    {
+        if (decision.Choices?.Any(d => d.Legal.Any(c => !c.CompleteOffer)) != true) yield break;
+        if (decision.BeforeStep < 0 || decision.BeforeStep >= actions.Count)
+            throw new InvalidOperationException("Decision is outside the executed history");
+        var actual = actions[decision.BeforeStep];
+        foreach (var choice in decision.Choices.Where(d => d.Legal.Any(c => !c.CompleteOffer)))
+        {
+            if (actual.Choices == null || choice.AtChoice < 0 || choice.AtChoice >= actual.Choices.Length)
+                throw new InvalidOperationException("Choice is outside the executed action");
+            var parent = LocalTurnSearch.HistoryKey(actions.Take(decision.BeforeStep).Append(
+                actual with { Choices = actual.Choices.Take(choice.AtChoice).ToArray() }));
+            if (!_observed.TryGetValue(parent, out var seen)) _observed.Add(parent, seen = new(Comparer));
+            var fresh = choice.Legal.Where(c => seen.Add(c)).ToArray();
+            // Ordinary expansion already submitted every observed sibling.
+            if (!replaying || fresh.Length == 0) continue;
+            var page = decision with { Legal = [], Choices = [choice with { Legal = fresh }] };
+            foreach (var offer in LocalTurnSearch.PagedReplayAlternatives(actions, page, before)) yield return offer;
+        }
+    }
+}
+
 public sealed class LocalTurnSearch : ILocalTurnFrontier
 {
     private readonly Dictionary<int, Entry> _pending = new();
@@ -430,6 +472,19 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
     public static LocalAction ResolveExact(LocalAction planned, IReadOnlyList<LocalAction> legal) =>
         legal.SingleOrDefault(a => SameAction(planned, a)) ??
             throw new InvalidOperationException("Exact native search prefix diverged");
+
+    // Replaying a mandatory prefix can reveal a new lazy page at an ancestor.
+    // Normal owned-subtree expansion intentionally skips that ancestor; submit
+    // only its observed paged choices, using the shared exact-history deduper.
+    // Changing a choice drops the later choice/action tail, never invents one.
+    public static IEnumerable<LocalTurnOffer> PagedReplayAlternatives(IReadOnlyList<LocalAction> actions,
+        LocalDecision decision, LocalTurnHint before)
+    {
+        if (decision.Choices?.Any(d => d.Legal.Any(c => !c.CompleteOffer)) != true) yield break;
+        var paged = decision with { Legal = [], Choices = decision.Choices
+            .Where(d => d.Legal.Any(c => !c.CompleteOffer)).ToArray() };
+        foreach (var offer in Alternatives(actions, paged, before)) yield return offer;
+    }
 
     public static bool SameAction(LocalAction a, LocalAction b) =>
         a.BeforeHash == b.BeforeHash && a.Round == b.Round && a.EndTurn == b.EndTurn &&

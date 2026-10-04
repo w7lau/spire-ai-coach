@@ -224,6 +224,9 @@ public static class LocalWorker
         int repeatedHistories = 0;
         var rolloutStyles = new Dictionary<string, int>();
         var turnOutcomes = new List<LocalTurnOutcome>();
+        var audit = new LocalSearchAudit();
+        var pagedReplays = new LocalPagedReplayTracker();
+        bool searchFinished = false, searchTimeReached = false, independentlyVerified = false;
         int fullTrials = 0;
         LocalTurnSearchStats? TurnStats() => turns == null ? null :
             new(probes, boundPruned, turns.Offered, turns.DuplicateOffers, turns.Count, unknownRecoveryChecks,
@@ -313,7 +316,10 @@ public static class LocalWorker
                 BlockedAction: blockedAction, MaxRounds: request.MaxRounds,
                 Trace: status == "running" ? null : _timeline!.Snapshot(), StoppedEarly: stoppedEarly, TurnSearch: TurnStats(), RootBranches: rootBranches,
                 HealthBounds: HealthStats(), Failure: failure,
-                Trials: status == "running" ? null : trials.ToArray()));
+                Trials: status == "running" ? null : trials.ToArray(),
+                Evidence: status == "running" ? null : audit.Snapshot(request, best, coverage?.Exhausted == true,
+                    turns?.Count, evaluated, searchFinished ? searchTimeReached : budget.Elapsed.TotalSeconds >= request.BudgetSeconds,
+                    stoppedEarly, boundPruned, independentlyVerified)));
         }
         try
         {
@@ -402,6 +408,7 @@ public static class LocalWorker
                 });
                 verifyMs += (long)Stopwatch.GetElapsedTime(verifyStarted).TotalMilliseconds;
                 best = best with { Continuation = verified.Points, ContinuationFromSearch = false };
+                independentlyVerified = true;
                 Progress("计算完成 · 最终候选复核通过", verified.State, true, "done");
                 await Cleanup();
                 session?.Dispose();
@@ -612,13 +619,14 @@ public static class LocalWorker
                     {
                         if (StopRequested()) { stoppedEarly = true; break; }
                         var round = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
-                        if (round - startRound >= request.MaxRounds) { stop = "达到轮数上限"; break; }
-                        if (budget.Elapsed.TotalSeconds >= request.BudgetSeconds) { stop = "达到时间预算"; break; }
+                        if (round - startRound >= request.MaxRounds) { audit.RoundLimitHits++; stop = "达到轮数上限"; break; }
+                        if (budget.Elapsed.TotalSeconds >= request.BudgetSeconds) { audit.TimeLimitHits++; stop = "达到时间预算"; break; }
                         if (turnTask != null && !fullRollout && planIndex >= planned!.Length && round > turnTask.SearchRound)
                         { turnProbed = true; stop = "本回合及敌方结算完成"; break; }
                         if (plays >= request.MaxDepth)
                         {
                             // Infinite/very long zero-cost cycles are bounded, not assumed equivalent or worthless.
+                            audit.ActionLimitHits++;
                             stop = "达到单回合操作上限"; break;
                         }
                         decisionStarted = Stopwatch.GetTimestamp();
@@ -756,6 +764,7 @@ public static class LocalWorker
                                 var choices = options.Select(c => LocalRouteCoverage.ChoiceAction(c, round)).ToArray();
                                 if (partition != null) choices = partition.Assign(choices);
                                 bool completeOffer = options.All(c => c.CompleteOffer);
+                                if (!completeOffer) audit.PagedChoiceObservations++;
                                 if (coverage != null) choices = coverage.Open(coveredTrial!, choices, completeOffer);
                                 if (choices.Length == 0) { covered = true; stop = "本组选牌已评估，继续探索其他组合"; return options[0]; }
                                 bool SameOption(LocalCardChoice c, LocalAction a) =>
@@ -792,6 +801,33 @@ public static class LocalWorker
                         {
                             using var offering = MeasureMethod("LocalTurnFrontier.OfferAlternatives");
                             turns.OfferAlternatives(actions, decisions[^1], beforeHint!, turnTask);
+                        }
+                        // New lazy pages observed while replaying fixed ancestors must
+                        // still reach the common frontier. Exact-history ownership and
+                        // deduplication are unchanged; ordinary ancestor siblings stay suppressed.
+                        if (turns != null)
+                        {
+                            using var paging = MeasureMethod("LocalTurnFrontier.ReplayPages");
+                            foreach (var offer in pagedReplays.Observe(actions, decisions[^1], beforeHint!, exactAction))
+                            {
+                                turns.Offer(offer.Prefix, offer.SearchRound, offer.Hint);
+                                audit.PagedReplayBranches++;
+                            }
+                        }
+                        else if (work != null && preferred != null &&
+                            decisions[^1].Choices?.Any(d => d.Legal.Any(c => !c.CompleteOffer)) == true)
+                        {
+                            using var paging = MeasureMethod("LocalSearchWork.ReplayPages");
+                            // The old broker consumes prefixes only. Reuse the
+                            // existing pre-action observation, without querying rules.
+                            var hint = new LocalTurnHint(previousHp, startingHp,
+                                before?.Enemies.Sum(e => Math.Max(0, e.Hp)) ?? initialEnemyHp, initialEnemyHp);
+                            var pages = pagedReplays.Observe(actions, decisions[^1], hint, replaying: true).ToArray();
+                            if (pages.Length > 0)
+                            {
+                                work.Offer("expand", pages.Select(p => p.Prefix));
+                                audit.PagedReplayBranches += pages.Length;
+                            }
                         }
                         pendingAction = null;
                         var after = Observe(player);
@@ -835,7 +871,9 @@ public static class LocalWorker
                         continue;
                     }
                     await StableOrTerminal(player);
-                    coverage?.Complete(coveredTrial!, IsTerminal(player));
+                    // An ended combat without native victory/death confirmation does
+                    // not certify a failed leaf in a reachability proof.
+                    coverage?.Complete(coveredTrial!, _combatWon || player.Creature.IsDead);
                     if (coverage != null && IsTerminal(player))
                     {
                         terminalDigest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
@@ -857,6 +895,7 @@ public static class LocalWorker
                         Continuation: continuationPoints?.ToArray(), ContinuationFromSearch: continuationPoints != null,
                         DamageSources: damageSources.Snapshot(lost), RolloutStyle: _rolloutStyle,
                         InitialEnemyHp: initialEnemyHp, EndTurnHpLossHint: endTurnRisk);
+                    audit.Outcome(candidate, IsTerminal(player));
                     if (turnTask != null && stop == "达到时间预算")
                         turns!.ReturnInterrupted(turnTask, TurnHint(player, startingHp, actions));
                     if (turnMode && IsTerminal(player) && planIndex < planned!.Length)
@@ -921,6 +960,7 @@ public static class LocalWorker
                 }
                 catch (LocalChoiceException ex)
                 {
+                    audit.SimulationErrors++;
                     rejected++;
                     blockedAction = pendingAction;
                     session?.Dispose();
@@ -939,6 +979,8 @@ public static class LocalWorker
                     }
                 }
             }
+            searchFinished = true;
+            searchTimeReached = budget.Elapsed.TotalSeconds >= request.BudgetSeconds;
             LocalWorkerOverhead.LeanSearchChecksums = false;
             if (best != null && !request.DeferVerification)
             {
@@ -956,6 +998,7 @@ public static class LocalWorker
                 });
                 verifyMs += (long)Stopwatch.GetElapsedTime(verifyStarted).TotalMilliseconds;
                 best = best with { Continuation = verified.Points, ContinuationFromSearch = false };
+                independentlyVerified = true;
                 Progress("计算完成 · 最佳路线复核通过", verified.State, true, "done");
             }
             else if (stoppedEarly) Progress("已停止搜索，等待返回路线", force: true, status: "searched");
@@ -981,6 +1024,7 @@ public static class LocalWorker
         }
         catch (Exception ex)
         {
+            audit.SimulationErrors++;
             // Any replay divergence invalidates this worker's result, including previous candidates.
             best = null;
             failure = LocalSimulationFailure.Capture(ex, request.Partition, _traceStage);

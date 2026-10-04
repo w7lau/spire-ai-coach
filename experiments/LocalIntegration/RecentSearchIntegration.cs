@@ -31,7 +31,7 @@ internal static class RecentSearchIntegration
                 result.TurnSearch.Offered, result.TurnSearch.DuplicateOffers, result.TurnSearch.Pending,
                 result.TurnSearch.CoveredPrefixes, result.TurnSearch.CompletedHistories, result.TurnSearch.RepeatedHistories,
                 result.TurnSearch.ClaimedByRound, result.TurnSearch.RolloutStyles },
-            result.Work, result.HealthBounds,
+            result.Work, result.HealthBounds, result.Evidence,
             recoveredFailures = failures, result.Failure,
             foundVictory = result.Best?.Won == true,
             best = result.Best == null ? null : new { result.Best.Won, result.Best.Dead,
@@ -41,6 +41,8 @@ internal static class RecentSearchIntegration
                 potions = result.Best.Actions.Count(a => a.PotionSlot.HasValue) },
             note = "Historical baseline is reused. Sampled failure to win does not prove impossibility. Worker count override is explicit."
         });
+        if (result.Evidence == null || result.Best?.Won != true && !result.Evidence.ExactRootCovered && result.Evidence.Conclusion != "unknown")
+            throw new InvalidOperationException("A bounded sampled loss must retain unknown reachability");
         if (result.Status is not ("done" or "partial") || result.Best == null || result.Rejected != 0 ||
             result.Failure != null || failures != 0 || request.SkipFinalVerification && result.Timing?.Verifications != 0)
             throw new InvalidOperationException("Recent incident still has a simulation failure: " + result.Message);
