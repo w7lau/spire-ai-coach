@@ -42,7 +42,7 @@ public sealed class LocalMinimumLossProof(LocalSearchRequest request, int capaci
     private string _invalid = "";
     public static string Scope(LocalSearchRequest r) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
         JsonSerializer.Serialize(new { r.Id, r.SnapshotId, r.NativeHash, r.ModelHash, r.LoadedMods,
-            r.IncludePotions, r.ExcludedModels, r.DataOnlyCombat, r.DataOnlyRun, r.NumericalExecution }))));
+            r.IncludePotions, r.ExcludedModels, r.CardGoals, r.DataOnlyCombat, r.DataOnlyRun, r.NumericalExecution }))));
     public LocalMinimumLossStatus Status => new(_trials, _nodes,
         _invalid.Length == 0 && _startingHp is { } hp && _root.Minimum.Loss <= hp
             ? new(_scope, hp, _root.Minimum.Loss, _root.Minimum.Potions) : null, _invalid);

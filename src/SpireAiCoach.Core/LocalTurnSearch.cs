@@ -107,6 +107,7 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
     private readonly Dictionary<int, LocalAction[]> _winningTails = new();
     private readonly Random _random;
     private readonly string? _root;
+    private readonly LocalCardGoals? _cardGoals;
     private int _next, _taken, _descentTakes, _guidedTakes;
     private LocalCandidate? _guidedIncumbent;
     private int? _winningOwner;
@@ -125,7 +126,8 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         public readonly Queue<int> Fair = new();
     }
 
-    public LocalTurnSearch(int seed, string? root = null) { _random = new(seed); _root = root; }
+    public LocalTurnSearch(int seed, string? root = null, LocalCardGoals? cardGoals = null)
+    { _random = new(seed); _root = root; _cardGoals = cardGoals; }
 
     public void Offer(LocalAction[] prefix, int searchRound, LocalTurnHint hint)
     {
@@ -263,7 +265,7 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
 
     public void ObserveOutcome(LocalCandidate candidate)
     {
-        if (!candidate.Won || candidate.Dead || !LocalSearchPolicy.Better(candidate, _winningOutcome)) return;
+        if (!candidate.Won || candidate.Dead || !LocalSearchPolicy.Better(candidate, _winningOutcome, _cardGoals)) return;
         _winningOutcome = candidate;
         _winner.Clear();
         // Complete native outcomes guide exploration around the actual incumbent.
@@ -303,7 +305,7 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
     public void PromoteWinning(LocalCandidate candidate, int? owner)
     {
         if (!candidate.Won || candidate.Dead || candidate.Decisions == null ||
-            !LocalSearchPolicy.Better(candidate, _guidedIncumbent)) return;
+            !LocalSearchPolicy.Better(candidate, _guidedIncumbent, _cardGoals)) return;
         // Cross-worker measurements steer proposals only, never a health cut.
         // A late, weaker local win must not replace the shared best's focus.
         _guidedIncumbent = candidate with { Continuation = null, Decisions = null };
@@ -417,7 +419,7 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         // Potion expense alone can still bound a no-loss incumbent with null.
         var ids = _pending.Where(p => LocalHealthBound.CannotImprove(new(_root,
             p.Value.Hint.StartingHp, p.Value.Hint.Hp, p.Value.Task.Prefix.Count(a => a.PotionSlot.HasValue),
-            p.Value.Hint.MaximumFurtherHpGain), incumbent))
+            p.Value.Hint.MaximumFurtherHpGain), incumbent, _cardGoals))
             .Select(p => p.Key).ToArray();
         foreach (int id in ids) _pending.Remove(id);
         return ids.Length;

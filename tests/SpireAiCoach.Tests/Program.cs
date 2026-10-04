@@ -17,6 +17,8 @@ TurnWorkTests.Register(Test, AsyncTest);
 MinimumLossTests.Register(Test, AsyncTest);
 SelectionSpaceTests.Register(Test);
 SearchEvidenceTests.Register(Test);
+
+CardGoalTests.Register(Test);
 NativeOverheadTests.Register(Test, AsyncTest);
 ProgressTransportTests.Register(Test, AsyncTest);
 WorkerReuseTests.Register(Test, AsyncTest);

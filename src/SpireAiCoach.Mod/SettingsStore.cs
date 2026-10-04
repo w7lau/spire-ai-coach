@@ -39,9 +39,12 @@ public sealed class SettingsStore
 
     public void SaveLocalOptions(int workers, bool? includePotions, bool? stopOnZeroLoss = null,
         int? targetVictoryRounds = null, int? maxAttempts = null, int? maxRounds = null,
-        int? searchSeconds = null, bool? skipFinalVerification = null)
+        int? searchSeconds = null, bool? skipFinalVerification = null,
+        string? playCardModelId = null, string? finisherCardModelId = null,
+        bool? cardGoalThresholdEnabled = null, int? cardGoalHpLossThreshold = null)
     {
         if (workers is < 0 or > 16) throw new ArgumentOutOfRangeException(nameof(workers));
+        if (cardGoalHpLossThreshold is < 1) throw new ArgumentOutOfRangeException(nameof(cardGoalHpLossThreshold));
         if (targetVictoryRounds is < 0 or > LocalCalculation.MaximumRounds) throw new ArgumentOutOfRangeException(nameof(targetVictoryRounds));
         if (!LocalCalculation.ValidLimits(maxAttempts ?? LocalCalculation.AttemptsPerWorker,
             maxRounds ?? LocalCalculation.Rounds, searchSeconds ?? LocalCalculation.SearchSeconds))
@@ -55,6 +58,10 @@ public sealed class SettingsStore
         if (maxRounds.HasValue) settings["local_max_rounds"] = maxRounds.Value;
         if (searchSeconds.HasValue) settings["local_search_seconds"] = searchSeconds.Value;
         if (skipFinalVerification.HasValue) settings["local_skip_final_verification"] = skipFinalVerification.Value;
+        if (playCardModelId != null) settings["local_play_card_model_id"] = playCardModelId;
+        if (finisherCardModelId != null) settings["local_finisher_card_model_id"] = finisherCardModelId;
+        if (cardGoalThresholdEnabled.HasValue) settings["local_card_goal_threshold_enabled"] = cardGoalThresholdEnabled.Value;
+        if (cardGoalHpLossThreshold.HasValue) settings["local_card_goal_hp_loss_threshold"] = cardGoalHpLossThreshold.Value;
         Directory.CreateDirectory(_directory);
         AtomicWrite(ConfigPath, Encoding.UTF8.GetBytes(settings.ToJsonString()));
         // Local-only preferences must not require AI credentials or rewrite the encrypted key.
