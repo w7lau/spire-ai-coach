@@ -60,6 +60,10 @@ public static class ReplayIntegration
         {
             await ExecutionReplayIntegration.Run(root, original,
                 System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT")!);
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_DRAW_GATE_TEST") == "1")
+                await DrawGateIntegration.Run(root, pool, request, installation,
+                    System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT")!,
+                    System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_EXECUTION_REPORT")!);
             return;
         }
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_PROGRESS_TRANSPORT_TEST") == "1")
