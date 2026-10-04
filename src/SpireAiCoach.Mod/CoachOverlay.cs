@@ -52,6 +52,9 @@ public sealed class CoachOverlay
     private LocalContinuation? _continuation;
     private bool _continuationPending;
     private SpinBox _localWorkers = null!;
+    private SpinBox _localMaxAttempts = null!;
+    private SpinBox _localMaxRounds = null!;
+    private SpinBox _localSearchSeconds = null!;
     private CheckBox _localPotions = null!;
     private LocalProgressPanel _localProgress = null!;
     private TextEdit _localTiming = null!;
@@ -120,18 +123,33 @@ public sealed class CoachOverlay
         _localAnalyze.Pressed += () => AnalyzeLocal(LocalSearchOrder.MonteCarlo);
         _turnAnalyze = new Button { Name = "LocalTurnSearch", Text = "新算法整场计算（实验）", Disabled = true }; localRow.AddChild(_turnAnalyze);
         _turnAnalyze.Pressed += () => AnalyzeLocal(LocalSearchOrder.TurnFrontier);
-        body.AddChild(Wrapped("两种算法共用后台模拟。每路最多 64 次整场尝试、60 秒搜索，先达到一项即结束；准备和最终复核另计。"));
-        body.AddChild(Wrapped("规划整场战斗，最多 64 轮，优先减少战后净生命损失、保留药水。关闭“无伤通关后立即返回”可继续优化无伤路线。"));
+        body.AddChild(Wrapped("两种算法共用下方搜索设置。每路达到尝试次数或时间上限即结束；准备和最终复核另计。"));
+        body.AddChild(Wrapped("规划整场战斗，优先减少战后净生命损失、保留药水。关闭“无伤通关后立即返回”可继续优化无伤路线。"));
         var localOptions = new HBoxContainer(); body.AddChild(localOptions);
         localOptions.AddChild(new Label { Text = "并发上限（0 自动，1–16）" });
-        _localWorkers = new SpinBox { MinValue = 0, MaxValue = 16, Step = 1, Value = Math.Clamp(_settings.LocalWorkers, 0, 16) };
+        _localWorkers = new SpinBox { Name = "LocalWorkers", MinValue = 0, MaxValue = 16, Step = 1, Value = Math.Clamp(_settings.LocalWorkers, 0, 16),
+            TooltipText = "0 按 CPU 和内存自动估算；手动值为实际并发上限。按待办任务逐步增加，无伤返回或任务结束后停止扩并。" };
         localOptions.AddChild(_localWorkers);
-        var saveLocal = new Button { Text = "保存本地设置" }; localOptions.AddChild(saveLocal);
+        var saveLocal = new Button { Name = "LocalSaveSettings", Text = "保存本地设置" }; localOptions.AddChild(saveLocal);
         saveLocal.Pressed += () =>
         {
-            try { _store.SaveLocalOptions((int)_localWorkers.Value, _localPotions.ButtonPressed, _localStopOnZeroLoss.ButtonPressed, (int)_localTargetVictoryRounds.Value); _settings = _settings with { LocalWorkers = (int)_localWorkers.Value, LocalIncludePotions = _localPotions.ButtonPressed, LocalStopOnZeroLoss = _localStopOnZeroLoss.ButtonPressed, LocalTargetVictoryRounds = (int)_localTargetVictoryRounds.Value }; _status.Text = "本地设置已保存，下次计算生效。"; }
-            catch (Exception ex) { _status.Text = "本地并发保存失败：" + ex.GetType().Name; }
+            try { SaveLocalSettings(); _status.Text = "本地设置已保存，下次计算生效。"; }
+            catch (Exception ex) { _status.Text = "本地设置保存失败：" + ex.GetType().Name; }
         };
+        var limits = new HBoxContainer(); body.AddChild(limits);
+        limits.AddChild(new Label { Text = "每路尝试上限" });
+        _localMaxAttempts = new SpinBox { Name = "LocalMaxAttempts", MinValue = 1, MaxValue = LocalCalculation.MaximumAttempts, Step = 1,
+            Value = Math.Clamp(_settings.LocalMaxAttempts, 1, LocalCalculation.MaximumAttempts) };
+        limits.AddChild(_localMaxAttempts);
+        limits.AddChild(new Label { Text = "最大规划回合" });
+        _localMaxRounds = new SpinBox { Name = "LocalMaxRounds", MinValue = 1, MaxValue = LocalCalculation.MaximumRounds, Step = 1,
+            Value = Math.Clamp(_settings.LocalMaxRounds, 1, LocalCalculation.MaximumRounds) };
+        limits.AddChild(_localMaxRounds);
+        var timeLimit = new HBoxContainer(); body.AddChild(timeLimit);
+        timeLimit.AddChild(new Label { Text = "每路搜索上限（秒）" });
+        _localSearchSeconds = new SpinBox { Name = "LocalSearchSeconds", MinValue = 1, MaxValue = LocalCalculation.MaximumSearchSeconds, Step = 1,
+            Value = Math.Clamp(_settings.LocalSearchSeconds, 1, LocalCalculation.MaximumSearchSeconds) };
+        timeLimit.AddChild(_localSearchSeconds);
         _localPotions = new CheckBox { Text = "必要时考虑药水（优先保留）", ButtonPressed = _settings.LocalIncludePotions };
         _localPotions.Toggled += _ =>
         {
@@ -146,16 +164,17 @@ public sealed class CoachOverlay
         {
             _settings = _settings with { LocalStopOnZeroLoss = enabled };
             if (_localAnalyzing) Cancel("停止条件已改变，请重新计算。");
-            try { _store.SaveLocalOptions((int)_localWorkers.Value, _localPotions.ButtonPressed, enabled, (int)_localTargetVictoryRounds.Value); }
+            try { SaveLocalSettings(); }
             catch (Exception ex) { _status.Text = "选项本次已生效，保存失败：" + ex.GetType().Name; }
         };
         body.AddChild(_localStopOnZeroLoss);
         var targetOptions = new HBoxContainer(); body.AddChild(targetOptions);
         targetOptions.AddChild(new Label { Text = "提前返回目标回合（0 不限）" });
-        _localTargetVictoryRounds = new SpinBox { Name = "LocalTargetVictoryRounds", MinValue = 0, MaxValue = LocalCalculation.Rounds,
-            Step = 1, Value = Math.Clamp(_settings.LocalTargetVictoryRounds, 0, LocalCalculation.Rounds),
-            TooltipText = "填 6：只有六回合内获胜、战后生命不低于起点、不主动用药且确认敌方伤害为 0，才提前返回。允许自身扣血后回复。0 沿用原无伤条件；搜索仍可走到 64 回合，预算不变。" };
+        _localTargetVictoryRounds = new SpinBox { Name = "LocalTargetVictoryRounds", MinValue = 0, MaxValue = _localMaxRounds.Value,
+            Step = 1, Value = Math.Clamp(_settings.LocalTargetVictoryRounds, 0, (int)_localMaxRounds.Value),
+            TooltipText = "填 6：只有六回合内获胜、战后生命不低于起点、不主动用药且确认敌方伤害为 0，才提前返回。允许自身扣血后回复。0 沿用原无伤条件；搜索上限由本地设置决定。" };
         targetOptions.AddChild(_localTargetVictoryRounds);
+        _localMaxRounds.ValueChanged += value => _localTargetVictoryRounds.MaxValue = value;
         _localTargetVictoryRounds.ValueChanged += value =>
         {
             _settings = _settings with { LocalTargetVictoryRounds = (int)value };
@@ -366,14 +385,38 @@ public sealed class CoachOverlay
         }
     }
 
+    private CoachSettings ReadLocalSettings() => _settings with
+    {
+        LocalWorkers = (int)_localWorkers.Value,
+        LocalIncludePotions = _localPotions.ButtonPressed,
+        LocalStopOnZeroLoss = _localStopOnZeroLoss.ButtonPressed,
+        LocalTargetVictoryRounds = (int)_localTargetVictoryRounds.Value,
+        LocalMaxAttempts = (int)_localMaxAttempts.Value,
+        LocalMaxRounds = (int)_localMaxRounds.Value,
+        LocalSearchSeconds = (int)_localSearchSeconds.Value
+    };
+
+    private void SaveLocalSettings()
+    {
+        var next = ReadLocalSettings();
+        _store.SaveLocalOptions(next.LocalWorkers, next.LocalIncludePotions, next.LocalStopOnZeroLoss,
+            next.LocalTargetVictoryRounds, next.LocalMaxAttempts, next.LocalMaxRounds, next.LocalSearchSeconds);
+        _settings = next;
+    }
+
+    private LocalSearchRequest ConfigureLocalRequest(LocalSearchRequest captured, LocalSearchOrder order) =>
+        LocalCalculation.Configure(captured, order, (int)_localWorkers.Value, _localPotions.ButtonPressed,
+            _localStopOnZeroLoss.ButtonPressed, _localSkipVerification.ButtonPressed,
+            (int)_localTargetVictoryRounds.Value, (int)_localMaxAttempts.Value, (int)_localMaxRounds.Value,
+            (int)_localSearchSeconds.Value);
+
     private void SaveSettings()
     {
         try
         {
-            var next = _settings with { BaseUrl = _url.Text.Trim(), Model = _model.Text.Trim(),
+            var next = ReadLocalSettings() with { BaseUrl = _url.Text.Trim(), Model = _model.Text.Trim(),
                 RememberKey = _remember.ButtonPressed, RevealDrawOrder = _reveal.ButtonPressed,
-                IncludeStreamUsage = _usage.ButtonPressed, LocalWorkers = (int)_localWorkers.Value,
-                LocalIncludePotions = _localPotions.ButtonPressed, LocalStopOnZeroLoss = _localStopOnZeroLoss.ButtonPressed };
+                IncludeStreamUsage = _usage.ButtonPressed };
             _store.Save(next, _apiKey.Text.Trim());
             Cancel("设置已保存，可以开始分析。");
             _settings = next; _key = _apiKey.Text.Trim();
@@ -479,9 +522,7 @@ public sealed class CoachOverlay
         LocalInstallation installation;
         try
         {
-            request = LocalCalculation.Configure(LocalCapture.Capture(_snapshotHash!, continueOptimization), order,
-                (int)_localWorkers.Value, _localPotions.ButtonPressed, _localStopOnZeroLoss.ButtonPressed,
-                _localSkipVerification.ButtonPressed, (int)_localTargetVictoryRounds.Value);
+            request = ConfigureLocalRequest(LocalCapture.Capture(_snapshotHash!, continueOptimization), order);
             // Reuse only the suffix matching this combat, mods, native state and complete history.
             // It is an exploration seed; the worker re-executes and verifies it, never copies its score.
             if (order == LocalSearchOrder.MonteCarlo && _continuation != null && request.History != null)
@@ -541,7 +582,8 @@ public sealed class CoachOverlay
                         try
                         {
                             Directory.CreateDirectory(Path.GetDirectoryName(timingPath)!);
-                            LocalWire.Write(timingPath, new { version = typeof(ModEntry).Assembly.GetName().Version!.ToString(3), request.SearchOrder, request.MaxNodes, request.BudgetSeconds,
+                            LocalWire.Write(timingPath, new { version = typeof(ModEntry).Assembly.GetName().Version!.ToString(3), request.SearchOrder, request.MaxNodes, request.MaxRounds, request.BudgetSeconds,
+                                ConfiguredWorkers = request.Workers, result.WorkerLimit,
                                 request.SkipFinalVerification, request.StopOnZeroLoss, request.TargetVictoryRounds,
                                 request.TargetPotionUses, request.RequireKnownZeroEnemyDamage, result.VerificationSkipped, result.ElapsedMs, result.Workers,
                                 result.Evaluated, result.Victories, result.Timing, result.Trace });

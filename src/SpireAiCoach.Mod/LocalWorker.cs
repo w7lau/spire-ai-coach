@@ -248,8 +248,8 @@ public static class LocalWorker
         try
         {
             if (request.Partitions is < 1 or > 16 || request.Partition < 0 || request.Partition >= request.Partitions ||
-                request.MaxNodes is < 1 or > 128 || request.MaxDepth is < 1 or > 64 || request.BudgetSeconds is < 1 or > 120 ||
-                request.MaxRounds is < 1 or > 128 || request.SimulationSpeed is < 1 or > 16)
+                !LocalCalculation.ValidLimits(request.MaxNodes, request.MaxRounds, request.BudgetSeconds) ||
+                request.MaxDepth is < 1 or > 64 || request.SimulationSpeed is < 1 or > 16)
                 throw new InvalidDataException("Invalid search limits");
             // Owned worker only. Accelerate native animation/timer waits, never model effects/RNG.
             if (request.SimulationSpeed > 1) { Engine.TimeScale = request.SimulationSpeed; Engine.MaxFps = 240; }

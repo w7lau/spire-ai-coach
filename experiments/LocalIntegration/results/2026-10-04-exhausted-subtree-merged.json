@@ -1,0 +1,86 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "version": "0.7.24",
+  "dll_sha256": "BD31E50A264F90AB99E6C077A935F5FF9DEC6A203A348513351F3A9698912E36",
+  "merged_main": "a4f77e7",
+  "preserved_main_features": [
+    "Manual concurrency ceiling",
+    "Configurable attempts, rounds and seconds for both algorithms"
+  ],
+  "earlier_full_search": {
+    "version": "0.7.23",
+    "dll_sha256": "812EAA6F0E4E9BFF33C3ABFDFF2D85966A4B1BE9968A23ADDFD94FFEAF87155A",
+    "report": "2026-10-04-exhausted-subtree.json",
+    "completed_trials": 256,
+    "covered_proposals": 3,
+    "fallbacks": 0
+  },
+  "merged_native_fixed_route": {
+    "Status": "done",
+    "Evaluated": 1,
+    "Rejected": 0,
+    "Victories": 0,
+    "ElapsedMs": 26031,
+    "Timing": {
+      "RestoreMs": 1086,
+      "ActionMs": 544,
+      "DecisionMs": 106,
+      "VerificationMs": 2673,
+      "StartupMs": 20640,
+      "Actions": 20,
+      "Restores": 1,
+      "Verifications": 1
+    },
+    "Workers": 1,
+    "MaxRounds": 64,
+    "BudgetSeconds": 60,
+    "MaxNodes": 1,
+    "IncludePotions": true,
+    "FastCardPresentation": true,
+    "FastNativeWaits": true,
+    "FastStateSettling": true,
+    "FastAssetCollection": false,
+    "ShareSearchWork": false,
+    "SearchOrder": 0,
+    "Work": null,
+    "TurnSearch": null,
+    "Won": false,
+    "StartingHp": 6,
+    "Hp": 0,
+    "NetHpLoss": 6,
+    "HpLost": 6,
+    "Rounds": 4,
+    "EnemyHp": 16,
+    "StopReason": "玩家死亡",
+    "used_potion": true,
+    "choices": 1,
+    "verified_steps": 20
+  },
+  "semantic_actions_native_states_full_history_and_settlement_match": true,
+  "comparison_note": "Only learned Preference scores differ from the prior full search; all native operations, choices, before-state/history checkpoints and settlement are identical.",
+  "parent_game_errors_gate_passed": true,
+  "fallbacks": 0,
+  "validation": {
+    "core_passed": 207,
+    "core_total": 207,
+    "adapter_and_host_build_warnings": 0,
+    "adapter_and_host_build_errors": 0
+  },
+  "limits": [
+    "The 256-trial exhaustion regression used the premerge binary, retained above with its exact hash.",
+    "The final merged binary replays one prior computer-generated 20-step route and independently verifies it; no new full search benchmark is claimed.",
+    "The retained route is a player-death outcome, not a victory or optimal solution.",
+    "The reopened player window and arbitrary Mod combinations have not been independently accepted."
+  ],
+  "installation": {
+    "installed_at": "2026-10-04T06:39:56.229643+00:00",
+    "version": "0.7.24",
+    "installed_dll_equals_native_tested": true,
+    "dll_sha256": "BD31E50A264F90AB99E6C077A935F5FF9DEC6A203A348513351F3A9698912E36",
+    "zip_sha256": "ED3A4E110FC13024EF895D1FAADDC52627BA9BC04201FA24001903AD2409785C",
+    "protected_files_unchanged": 490,
+    "previous_binary_and_manifest_backups_verified": true,
+    "game_started_by_agent": false
+  }
+}
