@@ -51,7 +51,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             // execution instead of removing that card or weakening replay validation.
             // Final verification already retries the same candidate normally;
             // a verification failure must not restart all full-budget searches.
-            progress("正在继续计算…");
+            progress("首次计算未完成，正在重新计算…");
             origin.Import(ex.Data["local_trace"] as LocalTrace);
             origin.Add(new(-1, "main", "fallback", ex.Category + ": " + ex.Message, origin.ElapsedMs, 0));
             var regular = request with { Id = request.Id + "-regular", DataOnlyCombat = false, DataOnlyRun = false,

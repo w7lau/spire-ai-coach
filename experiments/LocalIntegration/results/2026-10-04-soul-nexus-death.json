@@ -1,0 +1,104 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "version": "0.7.22",
+  "dll_sha256": "0ECCE9751AEE785D9DD250A710AB65DD799F58AED39E73D3C36561AB291F3CFE",
+  "game_version": "v0.111.0",
+  "scope": "Frozen incident combat with its captured Mod set; fixed prior computer route, not a full search benchmark.",
+  "before_fix": {
+    "failed_action": 3,
+    "exception": "NullReferenceException in SoulNexus.AfterDeath",
+    "cause": "An optional death animation dereferenced the absent NCombatRoom.Instance.",
+    "effect": "The parent restarted a full regular-mode calculation."
+  },
+  "intermediate_fix": {
+    "native_route_completed": true,
+    "accepted": false,
+    "cause": "Deferred overlay, map and timer initialization raced short-route scene cleanup."
+  },
+  "final_changes": [
+    "Guard only the optional death animation node lookup; retain event unsubscription, death hooks and rule execution.",
+    "Complete native deferred initialization before using a created NRun; model-only search adds no frame waits.",
+    "Retain complete per-request failures in private local files and label compatibility recomputation accurately."
+  ],
+  "final_controls": [
+    {
+      "minimal_bootstrap": true,
+      "DataOnlyCombat": true,
+      "DataOnlyRun": true,
+      "ElapsedMs": 21359,
+      "Timing": {
+        "RestoreMs": 1183,
+        "ActionMs": 360,
+        "DecisionMs": 87,
+        "VerificationMs": 3740,
+        "StartupMs": 14721,
+        "Actions": 3,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "first_decision_ms": 16203.2028,
+      "WorkerMemoryBytes": 800538624,
+      "Hp": 71,
+      "HpLost": 0,
+      "native_states_and_history_match": true,
+      "status": "done",
+      "rounds": 1,
+      "actions": 3,
+      "independent_verified_points": 3,
+      "rejected": 0,
+      "fallback_count": 0,
+      "starting_hp": 71
+    },
+    {
+      "minimal_bootstrap": false,
+      "DataOnlyCombat": true,
+      "DataOnlyRun": true,
+      "ElapsedMs": 23972,
+      "Timing": {
+        "RestoreMs": 1173,
+        "ActionMs": 283,
+        "DecisionMs": 71,
+        "VerificationMs": 1980,
+        "StartupMs": 19672,
+        "Actions": 3,
+        "Restores": 1,
+        "Verifications": 1
+      },
+      "first_decision_ms": 21126.5854,
+      "WorkerMemoryBytes": 1298739200,
+      "Hp": 71,
+      "HpLost": 0,
+      "native_states_and_history_match": true,
+      "status": "done",
+      "rounds": 1,
+      "actions": 3,
+      "independent_verified_points": 3,
+      "rejected": 0,
+      "fallback_count": 0,
+      "starting_hp": 71
+    }
+  ],
+  "validation": {
+    "core_checks_passed": 198,
+    "core_checks_total": 198,
+    "mod_and_native_host_build_warnings": 0,
+    "mod_and_native_host_build_errors": 0,
+    "parent_game_errors_gate_passed": true
+  },
+  "limits": [
+    "One seeded attempt per control isolates the incident; product search budgets remain unchanged.",
+    "Cold startup timings are not full-search performance or optimality evidence.",
+    "The player's reopened game and arbitrary Mod combinations have not been separately accepted."
+  ],
+  "installation": {
+    "installed_at": "2026-10-04T05:53:08.608170+00:00",
+    "version": "0.7.22",
+    "installed_dll_equals_native_tested": true,
+    "dll_sha256": "0ECCE9751AEE785D9DD250A710AB65DD799F58AED39E73D3C36561AB291F3CFE",
+    "zip_sha256": "37A5C6363C43E50BBCAB4F5430CA22ECBC058F10B7BA3F3BC779EF2448A1BEF2",
+    "protected_files_unchanged": 490,
+    "previous_dll_and_manifest_backups_verified": true,
+    "game_started_by_agent": false
+  }
+}
