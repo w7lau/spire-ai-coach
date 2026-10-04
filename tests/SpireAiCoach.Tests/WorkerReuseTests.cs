@@ -277,7 +277,8 @@ internal static class WorkerReuseTests
             {
                 var r = Request("first-win") with { SearchOrder = algorithm, ShareSearchWork = true,
                     StopOnFirstWin = true, StopOnZeroLoss = lossStop, SkipFinalVerification = lossStop, IncludePotions = true,
-                    TargetVictoryRounds = 6, TargetPotionUses = 0, RequireKnownZeroEnemyDamage = true };
+                    TargetVictoryRounds = 6, TargetPotionUses = 0, RequireKnownZeroEnemyDamage = true,
+                    CardGoals = new("play", "finish", 5) };
                 var watch = Stopwatch.StartNew();
                 var result = await f.Pool.Analyze(r, f.Installation, _ => { }, CancellationToken.None);
                 Check(result.Status == "done" && result.StoppedEarly && result.StoppedOnFirstWin &&

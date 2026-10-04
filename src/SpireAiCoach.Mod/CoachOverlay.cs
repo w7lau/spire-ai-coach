@@ -63,6 +63,14 @@ public sealed class CoachOverlay
     private SpinBox _localMaxRounds = null!;
     private SpinBox _localSearchSeconds = null!;
     private CheckBox _localPotions = null!;
+    private OptionButton _localPlayCard = null!;
+    private OptionButton _localFinisherCard = null!;
+    private CheckBox _localCardGoalThreshold = null!;
+    private SpinBox _localCardGoalLoss = null!;
+    private Label _localCardGoalNotice = null!;
+    private string? _cardGoalDeckKey;
+    private Dictionary<string, string> _cardGoalNames = new(StringComparer.Ordinal);
+    private bool _refreshingCardGoals;
     private LocalProgressPanel _localProgress = null!;
     private TextEdit _localTiming = null!;
     private TextEdit _localResultDetails = null!;
@@ -181,11 +189,12 @@ public sealed class CoachOverlay
         options.AddChild(_localStopOnZeroLoss);
         _localStopOnFirstWin = new CheckBox { Name = "LocalStopOnFirstWin", Text = "找到获胜路线即返回",
             ButtonPressed = _settings.LocalStopOnFirstWin,
-            TooltipText = "适合最终 Boss 等只需获胜的战斗。找到完整获胜路线后立即停止搜索，允许掉血或用药；不再继续优化损失。与最低损失或目标回合同时设置时，优先按此选项返回。最终复核仍由下方开关决定。" };
+            TooltipText = "适合最终 Boss 等只需获胜的战斗。找到完整获胜路线后立即停止搜索，允许掉血或用药；不再继续优化损失、补刀或使用次数。与最低损失、目标回合或可选出牌目标同时设置时，优先按此选项返回。最终复核仍由下方开关决定。" };
         _localStopOnFirstWin.Toggled += enabled =>
         {
             _settings = _settings with { LocalStopOnFirstWin = enabled };
             if (_localAnalyzing) Cancel("停止条件已改变，请重新计算。");
+            UpdateCardGoalNotice();
             try { SaveLocalSettings(); }
             catch (Exception ex) { _status.Text = "选项本次已生效，保存失败：" + ex.GetType().Name; }
         };
@@ -213,6 +222,32 @@ public sealed class CoachOverlay
             catch (Exception ex) { _status.Text = "选项本次已生效，保存失败：" + ex.GetType().Name; }
         };
         options.AddChild(_localSkipVerification);
+        var cardGoals = new VBoxContainer { Name = "LocalCardGoals", Visible = false };
+        options.AddChild(CoachTheme.Disclosure("可选出牌目标", cardGoals)); options.AddChild(cardGoals);
+        var cardFields = new GridContainer { Columns = 2 }; cardGoals.AddChild(cardFields);
+        cardFields.AddChild(new Label { Text = "尽可能多打" });
+        _localPlayCard = new OptionButton { Name = "LocalPlayCard", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            TooltipText = "从当前牌组选一张；从当前状态起统计后续打出次数，合并所有副本和升级版，包含自动和重复打出。选“不启用”关闭目标。" };
+        cardFields.AddChild(_localPlayCard);
+        cardFields.AddChild(new Label { Text = "尽量用来补刀" });
+        _localFinisherCard = new OptionButton { Name = "LocalFinisherCard", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            TooltipText = "尽量用这张牌击杀敌人，按游戏实际记录的卡牌伤害来源计数。两项都启用时，先比较补刀次数，再比较使用次数。" };
+        cardFields.AddChild(_localFinisherCard);
+        _localCardGoalThreshold = new CheckBox { Name = "LocalCardGoalThreshold", Text = "允许少量损血，优先可选目标",
+            ButtonPressed = _settings.LocalCardGoalThresholdEnabled };
+        cardGoals.AddChild(_localCardGoalThreshold);
+        cardFields = new GridContainer { Columns = 2 }; cardGoals.AddChild(cardFields);
+        cardFields.AddChild(new Label { Text = "战后净损血小于" });
+        _localCardGoalLoss = new SpinBox { Name = "LocalCardGoalLoss", MinValue = 1, MaxValue = int.MaxValue,
+            Step = 1, Value = Math.Max(1, _settings.LocalCardGoalHpLossThreshold),
+            TooltipText = "严格小于：填 5 表示净损血 0–4。包含战中和战后回血；没有符合的获胜路线时，仍按损血较少选路。" };
+        cardFields.AddChild(_localCardGoalLoss);
+        _localCardGoalNotice = Wrapped(""); cardGoals.AddChild(_localCardGoalNotice);
+        _localPlayCard.ItemSelected += _ => CardGoalsChanged();
+        _localFinisherCard.ItemSelected += _ => CardGoalsChanged();
+        _localCardGoalThreshold.Toggled += _ => CardGoalsChanged();
+        _localCardGoalLoss.ValueChanged += _ => CardGoalsChanged();
+        UpdateCardGoalNotice();
         options.AddChild(CoachTheme.Disclosure("高级设置", advanced)); options.AddChild(advanced);
         _localProgress = new LocalProgressPanel(); body.AddChild(_localProgress.View);
         var tools = new VBoxContainer { Name = "CoachDiagnostics", Visible = false };
@@ -376,6 +411,7 @@ public sealed class CoachOverlay
         try
         {
             var snapshot = _capture.Capture(_settings.RevealDrawOrder);
+            RefreshCardGoalDeck();
             var hash = snapshot?.Fingerprint();
             var changed = hash != _snapshotHash;
             if (changed)
@@ -392,6 +428,9 @@ public sealed class CoachOverlay
                 $"第 {snapshot.Round} 回合 · 生命 {snapshot.Player.Hp}/{snapshot.Player.MaxHp} · 能量 {snapshot.Player.Energy}";
             _analyze.Disabled = _executing || _request != null || snapshot?.CanAdvise != true;
             _localAnalyze.Disabled = _turnAnalyze.Disabled = _analyze.Disabled;
+            _localPlayCard.Disabled = _localFinisherCard.Disabled = _executing;
+            _localCardGoalThreshold.Disabled = _executing;
+            _localCardGoalLoss.Editable = !_executing && _localCardGoalThreshold.ButtonPressed;
             _execute.Disabled = _analyze.Disabled || _continuation == null || _continuation.Invalid ||
                 !LocalCapture.Stable() || !LocalCapture.ExecutionSettled();
             _continueOptimize.Disabled = _execute.Disabled;
@@ -476,7 +515,10 @@ public sealed class CoachOverlay
         LocalTargetVictoryRounds = (int)_localTargetVictoryRounds.Value,
         LocalMaxAttempts = (int)_localMaxAttempts.Value,
         LocalMaxRounds = (int)_localMaxRounds.Value,
-        LocalSearchSeconds = (int)_localSearchSeconds.Value
+        LocalSearchSeconds = (int)_localSearchSeconds.Value,
+        LocalPlayCardModelId = SelectedCard(_localPlayCard), LocalFinisherCardModelId = SelectedCard(_localFinisherCard),
+        LocalCardGoalThresholdEnabled = _localCardGoalThreshold.ButtonPressed,
+        LocalCardGoalHpLossThreshold = (int)_localCardGoalLoss.Value
     };
 
     private void SaveLocalSettings()
@@ -484,7 +526,8 @@ public sealed class CoachOverlay
         var next = ReadLocalSettings();
         _store.SaveLocalOptions(next.LocalWorkers, next.LocalIncludePotions, next.LocalStopOnZeroLoss,
             next.LocalTargetVictoryRounds, next.LocalMaxAttempts, next.LocalMaxRounds, next.LocalSearchSeconds,
-            next.LocalSkipFinalVerification, next.LocalStopOnFirstWin);
+            next.LocalSkipFinalVerification, next.LocalPlayCardModelId, next.LocalFinisherCardModelId,
+            next.LocalCardGoalThresholdEnabled, next.LocalCardGoalHpLossThreshold, next.LocalStopOnFirstWin);
         _settings = next;
     }
 
@@ -492,7 +535,87 @@ public sealed class CoachOverlay
         LocalCalculation.Configure(captured, order, (int)_localWorkers.Value, _localPotions.ButtonPressed,
             _localStopOnZeroLoss.ButtonPressed, _localSkipVerification.ButtonPressed,
             (int)_localTargetVictoryRounds.Value, (int)_localMaxAttempts.Value, (int)_localMaxRounds.Value,
-            (int)_localSearchSeconds.Value, _localStopOnFirstWin.ButtonPressed);
+            (int)_localSearchSeconds.Value, CurrentCardGoals(), _localStopOnFirstWin.ButtonPressed);
+
+    private static string SelectedCard(OptionButton picker) => picker.Selected > 0 && !picker.IsItemDisabled(picker.Selected)
+        ? picker.GetItemMetadata(picker.Selected).AsString() : "";
+
+    private LocalCardGoals? CurrentCardGoals()
+    {
+        var play = SelectedCard(_localPlayCard); var finisher = SelectedCard(_localFinisherCard);
+        if (play.Length == 0 && finisher.Length == 0) return null;
+        return new(play.Length == 0 ? null : play, finisher.Length == 0 ? null : finisher,
+            _localCardGoalThreshold.ButtonPressed ? (int)_localCardGoalLoss.Value : null,
+            play.Length == 0 ? null : _cardGoalNames.GetValueOrDefault(play, play),
+            finisher.Length == 0 ? null : _cardGoalNames.GetValueOrDefault(finisher, finisher));
+    }
+
+    private void RefreshCardGoalDeck()
+    {
+        var state = MegaCrit.Sts2.Core.Combat.CombatManager.Instance.DebugOnlyGetState();
+        var player = state == null ? null : MegaCrit.Sts2.Core.Context.LocalContext.GetMe(state);
+        if (player == null) return; // Preserve the selection while outside combat.
+        var cards = player.Deck.Cards.GroupBy(c => c.Id.ToString(), StringComparer.Ordinal)
+            .Select(g => (Id: g.Key, Name: string.Join(" / ", g.Select(c => c.Title).Distinct(StringComparer.Ordinal)), Count: g.Count()))
+            .OrderBy(c => c.Name, StringComparer.Ordinal).ThenBy(c => c.Id, StringComparer.Ordinal).ToArray();
+        var key = string.Join("\n", cards.Select(c => c.Id + ":" + c.Name + ":" + c.Count));
+        if (key == _cardGoalDeckKey) return;
+        _cardGoalNames = cards.ToDictionary(c => c.Id, c => c.Name, StringComparer.Ordinal);
+        _refreshingCardGoals = true;
+        try
+        {
+            void Fill(OptionButton picker, string selected)
+            {
+                picker.Clear(); picker.AddItem("不启用"); picker.SetItemMetadata(0, "");
+                foreach (var card in cards)
+                {
+                    string label = card.Name + $" ×{card.Count}";
+                    if (cards.Count(c => c.Name == card.Name) > 1) label += " · " + card.Id;
+                    picker.AddItem(label); int index = picker.ItemCount - 1;
+                    picker.SetItemMetadata(index, card.Id);
+                    if (card.Id == selected) picker.Select(index);
+                }
+                if (selected.Length > 0 && !cards.Any(c => c.Id == selected))
+                {
+                    picker.AddItem("原选择已不在牌组，本次不启用");
+                    int index = picker.ItemCount - 1; picker.SetItemDisabled(index, true); picker.Select(index);
+                }
+            }
+            Fill(_localPlayCard, _settings.LocalPlayCardModelId);
+            Fill(_localFinisherCard, _settings.LocalFinisherCardModelId);
+            _cardGoalDeckKey = key;
+        }
+        finally { _refreshingCardGoals = false; }
+        UpdateCardGoalNotice();
+    }
+
+    private void CardGoalsChanged()
+    {
+        if (_refreshingCardGoals) return;
+        if (_localAnalyzing || _continuation != null)
+        {
+            Cancel("出牌目标已变化，请重新计算。");
+            _adviceHash = null; _advice.Text = "出牌目标已变化，请重新计算。";
+        }
+        UpdateCardGoalNotice();
+        try { SaveLocalSettings(); }
+        catch (Exception ex) { _status.Text = "目标本次已生效，保存失败：" + ex.GetType().Name; }
+    }
+
+    private void UpdateCardGoalNotice()
+    {
+        if (_localStopOnFirstWin.ButtonPressed)
+        {
+            _localCardGoalLoss.Editable = false;
+            _localCardGoalNotice.Text = "找到获胜路线即返回；多打牌、补刀和损血阈值暂不参与优化。取消勾选后恢复已保存的目标。";
+            return;
+        }
+        _localCardGoalLoss.Editable = _localCardGoalThreshold.ButtonPressed && !_executing;
+        _localCardGoalNotice.Text = CurrentCardGoals() is not { Enabled: true } ? "未启用可选目标，按原生命与药水策略选路。" :
+            (_localCardGoalThreshold.ButtonPressed ? "在所填净损血范围内优先补刀及多打牌；没有符合路线时优先少损血。" :
+                "优先保住战后生命，同血量时优先补刀及多打牌。") +
+            "\n启用可选目标后不会在无伤或最低损失时立即返回，会继续搜索到原定上限。";
+    }
 
     private void ShowLocalAdvice(LocalSearchResult result)
     {
@@ -682,6 +805,7 @@ public sealed class CoachOverlay
                                 ConfiguredWorkers = request.Workers, result.WorkerLimit,
                                 request.SkipFinalVerification, request.StopOnZeroLoss, request.StopOnFirstWin, result.StoppedOnFirstWin, request.TargetVictoryRounds,
                                 request.TargetPotionUses, request.RequireKnownZeroEnemyDamage, result.VerificationSkipped, result.ElapsedMs, result.Workers,
+                                request.CardGoals,
                                 result.Evaluated, result.Victories, result.HealthBounds, result.RecoveredFailures,
                                 turn_search = result.TurnSearch is { } turns ? new { turns.Probes, turns.BoundPruned,
                                     turns.Offered, turns.DuplicateOffers, turns.Pending, turns.UnknownRecoveryChecks,

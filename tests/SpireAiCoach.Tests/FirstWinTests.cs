@@ -6,7 +6,8 @@ static class FirstWinTests
     private static void Check(bool ok, string message) { if (!ok) throw new Exception(message); }
     private static LocalSearchRequest Request() => new("first", "battle", [], "root", 1, [], false,
         IncludePotions: true, StopOnZeroLoss: false, StopOnFirstWin: true,
-        TargetVictoryRounds: 6, TargetPotionUses: 0, RequireKnownZeroEnemyDamage: true);
+        TargetVictoryRounds: 6, TargetPotionUses: 0, RequireKnownZeroEnemyDamage: true,
+        CardGoals: new("play", "finish", 5));
     private static LocalCandidate Win() => new([new(0, "potion", null, "potion", "", "root", 10, PotionSlot: 0)],
         8, 42, 0, 0, 50, true, false, false, Rounds: 10, StartingHp: 50,
         DamageSources: new(42, 0, 0, 0, true));
@@ -22,24 +23,29 @@ static class FirstWinTests
             Check(!old.StopOnFirstWin, "Legacy requests must default off");
             foreach (var order in new[] { LocalSearchOrder.MonteCarlo, LocalSearchOrder.TurnFrontier })
             {
-                var enabled = LocalCalculation.Configure(old, order, 8, true, true, true, 6, 257, 130, 125, stopOnFirstWin: true);
+                var goals = new LocalCardGoals("play", "finish", 5);
+                var enabled = LocalCalculation.Configure(old, order, 8, true, true, true, 6, 257, 130, 125,
+                    cardGoals: goals, stopOnFirstWin: true);
                 Check(enabled.StopOnFirstWin && enabled.StopOnZeroLoss && enabled.SkipFinalVerification &&
-                    enabled.TargetVictoryRounds == null && enabled.TargetPotionUses == null && !enabled.RequireKnownZeroEnemyDamage,
+                    enabled.TargetVictoryRounds == null && enabled.TargetPotionUses == null && !enabled.RequireKnownZeroEnemyDamage &&
+                    enabled.CardGoals == null,
                     "First-win mode did not override the stricter optional return goal");
                 Check(enabled.MaxNodes == 257 && enabled.MaxRounds == 130 && enabled.BudgetSeconds == 125 && enabled.Workers == 8 &&
                     enabled.Replay == old.Replay && enabled.NativeHash == old.NativeHash && enabled.IncludePotions,
                     "Stopping mode changed budgets or the frozen root");
                 Check(JsonSerializer.Deserialize<LocalSearchRequest>(JsonSerializer.Serialize(enabled))!.StopOnFirstWin,
                     "Worker transport lost the option");
-                var disabled = LocalCalculation.Configure(old, order, 8, true, true, true, 6);
+                var disabled = LocalCalculation.Configure(old, order, 8, true, true, true, 6, cardGoals: goals);
                 Check(!disabled.StopOnFirstWin && disabled.TargetVictoryRounds == 6 && disabled.TargetPotionUses == 0 &&
-                    disabled.RequireKnownZeroEnemyDamage, "Disabling first-win changed the existing target");
+                    disabled.RequireKnownZeroEnemyDamage && disabled.CardGoals == goals,
+                    "Disabling first-win changed the existing target");
             }
         });
         test("first-win accepts costly complete victories but rejects probes death and stale roots", () =>
         {
             var r = Request(); var win = Win();
-            Check(LocalSearchPolicy.CanStopAfterVictory(win, r) && !LocalSearchPolicy.HasSpecificGoal(r),
+            Check(LocalSearchPolicy.CanStopAfterVictory(win, r) && LocalSearchPolicy.CanStop(win, r) &&
+                !LocalSearchPolicy.HasSpecificGoal(r),
                 "Any win must accept damage, a potion and later rounds");
             Check(!LocalSearchPolicy.CanStopAfterVictory(win, r with { StopOnFirstWin = false }) &&
                 !LocalSearchPolicy.CanStopAfterVictory(win, r with { StopOnFirstWin = false, StopOnZeroLoss = true }),
@@ -68,6 +74,8 @@ static class FirstWinTests
             var proof = new LocalMinimumLossStatus(Certificate: new("root", 50, 42, 1), Confirmed: true);
             Check(!LocalSearchPolicy.HasMinimumProof(result with { MinimumLoss = proof }),
                 "First-win mode was advertised as a proven minimum");
+            Check(!LocalSearchPolicy.FormatAdvice(result with { CardGoals = new("play", "finish", 5) }).Contains("启用时继续搜索"),
+                "First-win advice claimed optional goal optimization was continuing");
         });
     }
 }

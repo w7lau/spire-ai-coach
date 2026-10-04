@@ -66,6 +66,7 @@ parser.add_argument('--visual-factory-test', action='store_true')
 parser.add_argument('--route-feedback-test', action='store_true')
 parser.add_argument('--route-feedback-focused-only', action='store_true')
 parser.add_argument('--selection-paging-test', action='store_true')
+parser.add_argument('--card-goals-test', action='store_true')
 args = parser.parse_args()
 if args.route_feedback_focused_only and not args.route_feedback_test:
     parser.error('--route-feedback-focused-only requires --route-feedback-test')
@@ -177,6 +178,7 @@ with worker_lock(root):
     env.pop('SPIRE_COACH_WORKER', None)
     env['SPIRE_LOCAL_INTEGRATION_QUICK'] = '1' if args.quick else '0'
     env['SPIRE_LOCAL_SELECTION_PAGING_TEST'] = '1' if args.selection_paging_test else '0'
+    env['SPIRE_LOCAL_CARD_GOALS_TEST'] = '1' if args.card_goals_test else '0'
     if args.selection_paging_test:
         env['SPIRE_LOCAL_SELECTION_MATRIX'] = '1'
     env['SPIRE_LOCAL_BENCHMARK'] = '1' if args.benchmark else '0'
@@ -238,7 +240,7 @@ with worker_lock(root):
     settings_data = json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}
     settings_data.update(volume_master=0, volume_bgm=0, volume_sfx=0, volume_ambience=0)
     settings.write_text(json.dumps(settings_data), encoding='utf-8')
-    if args.survival_test:
+    if args.survival_test or args.card_goals_test:
         # Match the product worker's private tutorial state. A fresh headless
         # profile must not open the interactive combat tutorial during settlement.
         progress = settings.parent / 'modded/profile1/saves/progress.save'
@@ -246,6 +248,10 @@ with worker_lock(root):
         progress_data = json.loads(progress.read_text(encoding='utf-8-sig')) if progress.exists() else {'schema_version': 24}
         progress_data.update(enable_ftues=False, ftue_completed=['combat_rules_ftue'])
         progress.write_text(json.dumps(progress_data), encoding='utf-8')
+        if args.card_goals_test:
+            ordinary_progress = settings.parent / 'profile1/saves/progress.save'
+            ordinary_progress.parent.mkdir(parents=True, exist_ok=True)
+            ordinary_progress.write_text(json.dumps(progress_data), encoding='utf-8')
     with (root / 'integration-stdout.log').open('wb') as output:
         process = subprocess.Popen([str(root / 'game/SlayTheSpire2.exe'), '--headless', '--audio-driver', 'Dummy', '--max-fps', '120',
                                     '--force-steam=off', '--log-file', str(root / 'integration-game.log')],
@@ -267,6 +273,8 @@ with worker_lock(root):
         # experiments may reuse the host immediately after it exits.
         args.results_dir.mkdir(parents=True, exist_ok=True)
         names = ['integration-replay-private.json', 'integration-replay-summary.json',
+                     'integration-card-goals-summary.json', 'integration-card-goals-MonteCarlo-private.json',
+                     'integration-card-goals-TurnFrontier-private.json',
                      'integration-algorithm-private.json', 'integration-algorithm-summary.json',
                      'integration-algorithm-goal-summary.json', 'integration-algorithm-goal-private-0.json', 'integration-algorithm-goal-private-1.json',
                      'integration-concurrency-summary.json', 'integration-concurrency-MonteCarlo-private.json',

@@ -49,12 +49,13 @@ public sealed class LocalTurnWork : IDisposable
         _maximum = maximum; _scope = Scope(request); _ownedWinningFocus = request.OwnedWinningFocus;
         _initialPlan = request.InitialPlan?.ToArray();
         _nativeRoot = request.NativeHash;
-        _frontier = new(1729, request.SnapshotId + ":" + request.NativeHash);
+        _frontier = new(1729, request.SnapshotId + ":" + request.NativeHash, request.CardGoals);
         _listener = Task.Run(Listen);
     }
 
     internal static string Scope(LocalSearchRequest request) => request.Id + "\n" + request.SnapshotId + "\n" +
-        request.NativeHash + "\n" + request.ModelHash + "\n" + string.Join("\n", request.LoadedMods);
+        request.NativeHash + "\n" + request.ModelHash + "\n" + string.Join("\n", request.LoadedMods) +
+        "\n" + JsonSerializer.Serialize(request.CardGoals);
 
     private async Task Listen()
     {
@@ -225,7 +226,7 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
     public LocalTurnWorkClient(LocalSearchRequest request)
     {
         _scope = LocalTurnWork.Scope(request); _owner = request.Partition;
-        _choices = new(1729 + _owner);
+        _choices = new(1729 + _owner, cardGoals: request.CardGoals);
         _pipe = new(".", request.TurnWorkPipe ?? throw new ArgumentException("Missing turn pipe"), PipeDirection.InOut);
         _pipe.Connect(10000);
         _reader = new(_pipe, new UTF8Encoding(false), false, 4096, true);

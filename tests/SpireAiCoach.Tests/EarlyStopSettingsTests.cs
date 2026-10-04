@@ -30,12 +30,17 @@ static class EarlyStopSettingsTests
                 Check(store.Load().Settings.LocalTargetVictoryRounds == 6);
                 store.SaveLocalOptions(4, null, null, 0);
                 Check(store.Load().Settings.LocalTargetVictoryRounds == 0);
+                store.SaveLocalOptions(4, null, playCardModelId: "fixture:play", finisherCardModelId: "fixture:finish",
+                    cardGoalThresholdEnabled: true, cardGoalHpLossThreshold: 5);
                 store.SaveLocalOptions(4, null, stopOnFirstWin: true);
                 Check(store.Load().Settings.LocalStopOnFirstWin && store.Load().Settings.LocalStopOnZeroLoss);
                 store.SaveLocalWorkers(3);
                 Check(store.Load().Settings.LocalStopOnFirstWin);
                 store.SaveLocalOptions(3, null, stopOnFirstWin: false);
                 Check(!store.Load().Settings.LocalStopOnFirstWin);
+                Check(store.Load().Settings.LocalPlayCardModelId == "fixture:play" &&
+                    store.Load().Settings.LocalFinisherCardModelId == "fixture:finish" &&
+                    store.Load().Settings.LocalCardGoalThresholdEnabled && store.Load().Settings.LocalCardGoalHpLossThreshold == 5);
                 Check(JsonNode.Parse(File.ReadAllText(config))!["unrelated"]!["preserve"]!.GetValue<int>() == 17);
                 Check(File.ReadAllBytes(key).SequenceEqual(new byte[] { 7, 8, 9 }));
             }
