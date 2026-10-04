@@ -11,6 +11,7 @@ using MegaCrit.Sts2.Core.Context;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Monsters;
 using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Nodes.Cards;
 using MegaCrit.Sts2.Core.Nodes;
@@ -64,6 +65,11 @@ internal static class LocalWorkerDataMode
         foreach (var factory in typeof(NDamageNumVfx).GetMethods().Where(m => m.Name == nameof(NDamageNumVfx.Create)))
             harmony.Patch(factory, prefix: new(AccessTools.Method(typeof(LocalWorkerDataMode), nameof(DamageVisual))));
         Prefix(typeof(PlayerHurtVignetteHelper), nameof(PlayerHurtVignetteHelper.Play), nameof(PresentationVoid));
+        // The native death callback removes its subscription before obtaining
+        // an optional animation node. Keep that cleanup and every death hook;
+        // only guard the missing presentation receiver in scene-free workers.
+        harmony.Patch(AccessTools.Method(typeof(SoulNexus), "AfterDeath", [typeof(Creature)]),
+            transpiler: new(AccessTools.Method(typeof(LocalWorkerDataMode), nameof(DeathCreatureVisual))));
         Prefix(typeof(CardCmd), "PreviewInternal", nameof(Preview));
         Prefix(typeof(ForgeCmd), "PreviewSovereignBlade", nameof(PresentationVoid));
         var transform = typeof(CardCmd).GetMethods().Single(m => m.Name == nameof(CardCmd.Transform) &&
@@ -119,6 +125,27 @@ internal static class LocalWorkerDataMode
     private static bool PresentationVoid() => !Active;
     private static bool DamageVisual(ref NDamageNumVfx? __result)
     { if (!Active) return true; __result = null; return false; }
+    private static NCreature? FindCreatureVisual(NCombatRoom? room, Creature creature) =>
+        Active && (room == null || !GodotObject.IsInstanceValid(room)) ? null : room!.GetCreatureNode(creature);
+    private static IEnumerable<CodeInstruction> DeathCreatureVisual(IEnumerable<CodeInstruction> instructions)
+    {
+        var lookup = AccessTools.Method(typeof(NCombatRoom), nameof(NCombatRoom.GetCreatureNode), [typeof(Creature)]);
+        int calls = 0;
+        foreach (var instruction in instructions)
+        {
+            if (instruction.Calls(lookup))
+            {
+                calls++;
+                yield return new CodeInstruction(instruction)
+                {
+                    opcode = OpCodes.Call,
+                    operand = AccessTools.Method(typeof(LocalWorkerDataMode), nameof(FindCreatureVisual))
+                };
+            }
+            else yield return instruction;
+        }
+        if (calls != 1) throw new InvalidOperationException("Native death animation lookup boundary changed");
+    }
     private static bool Preview(CardModel card, bool isAddingCardsToPile, ref TaskCompletionSource? __result)
     {
         if (!Active) return true;
