@@ -1,0 +1,148 @@
+{
+  "modVersion": "0.7.38.0",
+  "nativeModule": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
+  "passed": true,
+  "freeReturnAfterLastEnergy": true,
+  "returnedInstancePlayedTwice": true,
+  "topdeckAndHandSeparate": true,
+  "exactOfferReplay": true,
+  "generatedOfferBudget": true,
+  "generatedBundleBudget": true,
+  "nativeSelectionCommands": 2,
+  "nativeSteps": 7,
+  "selections": [
+    {
+      "offered": [
+        {
+          "ModelId": "CARD.BLUDGEON",
+          "Preference": 0,
+          "Index": 0
+        },
+        {
+          "ModelId": "CARD.WOUND",
+          "Preference": 0,
+          "Index": 1
+        },
+        {
+          "ModelId": "CARD.CLAW",
+          "Preference": 3,
+          "Index": 2
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "Preference": 0,
+          "Index": 3
+        },
+        {
+          "ModelId": "CARD.DEFEND_IRONCLAD",
+          "Preference": 0,
+          "Index": 4
+        }
+      ],
+      "remainingEnergy": 0,
+      "remainingStars": 0
+    },
+    {
+      "offered": [
+        {
+          "ModelId": "CARD.CLAW",
+          "Preference": 5,
+          "Index": 0
+        },
+        {
+          "ModelId": "CARD.WOUND",
+          "Preference": 0,
+          "Index": 1
+        },
+        {
+          "ModelId": "CARD.BLUDGEON",
+          "Preference": 0,
+          "Index": 2
+        }
+      ],
+      "remainingEnergy": 2,
+      "remainingStars": 0
+    },
+    {
+      "offered": [
+        {
+          "ModelId": "CARD.WOUND",
+          "Preference": 0,
+          "Index": 0
+        },
+        {
+          "ModelId": "CARD.BLUDGEON",
+          "Preference": 0,
+          "Index": 1
+        },
+        {
+          "ModelId": "CARD.HEADBUTT",
+          "Preference": 9,
+          "Index": 2
+        },
+        {
+          "ModelId": "CARD.CLAW",
+          "Preference": 10,
+          "Index": 3
+        }
+      ],
+      "remainingEnergy": 1,
+      "remainingStars": 0
+    }
+  ],
+  "steps": [
+    {
+      "ModelId": "CARD.DEFEND_IRONCLAD",
+      "Round": 1,
+      "choices": []
+    },
+    {
+      "ModelId": "CARD.DEFEND_IRONCLAD",
+      "Round": 1,
+      "choices": []
+    },
+    {
+      "ModelId": "CARD.HOLOGRAM",
+      "Round": 1,
+      "choices": [
+        {
+          "ModelId": "CARD.CLAW",
+          "Preference": 3
+        }
+      ]
+    },
+    {
+      "ModelId": "CARD.CLAW",
+      "Round": 1,
+      "choices": []
+    },
+    {
+      "ModelId": "CARD.HEADBUTT",
+      "Round": 2,
+      "choices": [
+        {
+          "ModelId": "CARD.CLAW",
+          "Preference": 5
+        }
+      ]
+    },
+    {
+      "ModelId": "CARD.HOLOGRAM",
+      "Round": 2,
+      "choices": [
+        {
+          "ModelId": "CARD.CLAW",
+          "Preference": 10
+        }
+      ]
+    },
+    {
+      "ModelId": "CARD.CLAW",
+      "Round": 2,
+      "choices": []
+    }
+  ],
+  "syntheticOnly": true,
+  "fullSearchBenchmark": false,
+  "modDllSha256": "8A53A6CC2997E85013FF4D654EF0448F0DC4BF756291C44624C221F905902684"
+}

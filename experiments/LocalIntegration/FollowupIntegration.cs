@@ -4,10 +4,14 @@ using System.Text.Json;
 using Godot;
 using MegaCrit.Sts2.Core.Assets;
 using MegaCrit.Sts2.Core.Combat;
+using MegaCrit.Sts2.Core.CardSelection;
 using MegaCrit.Sts2.Core.Commands;
+using MegaCrit.Sts2.Core.Context;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Multiplayer;
+using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.GameActions;
+using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Map;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Multiplayer.Serialization;
@@ -23,6 +27,12 @@ namespace SpireLocalIntegration;
 // Tiny synthetic native fight. No full search, answer seed, real save or API.
 internal static class FollowupIntegration
 {
+    private sealed class Context(Player player) : PlayerChoiceContext
+    {
+        public override ulong? OwnerId => player.NetId;
+        public override Task SignalPlayerChoiceBegun(Player chooser, PlayerChoiceOptions options) => Task.CompletedTask;
+        public override Task SignalPlayerChoiceEnded() => Task.CompletedTask;
+    }
     public static async Task Run(string root, SceneTree tree, SerializableRun fixture)
     {
         async Task Frame() => await tree.ToSignal(tree, SceneTree.SignalName.ProcessFrame);
@@ -92,6 +102,34 @@ internal static class FollowupIntegration
             var claw = pcs.Hand.Cards.Single(c => c.Id.Entry == "CLAW");
             int enemyBefore = player.Creature.CombatState!.Enemies.Sum(e => e.CurrentHp);
             await Play(claw);
+
+            // The same generic ranking serves generated offers and bundles.
+            // These native commands are not per-card effect substitutes.
+            var selectionLearner = learningType.GetProperty("Selections", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(learning)!;
+            var rank = selectionLearner.GetType().GetMethod("Rank", BindingFlags.NonPublic | BindingFlags.Instance)!;
+            var priorityProperty = typeof(LocalChoices).GetProperty("SelectionPriority", BindingFlags.NonPublic | BindingFlags.Instance)!;
+            LocalChoices Choices()
+            {
+                var session = new LocalChoices(choose: options => options.OrderByDescending(c => c.Preference).ThenBy(c => c.Index).First());
+                Func<CardModel, int, int> identity = (_, value) => value;
+                Func<string, CardModel[], CardSelectorPrefs?, int, Func<int[], int>?> priority = (kind, cards, prefs, ordinal) =>
+                    (Func<int[], int>?)rank.Invoke(selectionLearner,
+                        [hologram, player, kind, cards, prefs, ordinal, LocalRolloutStyle.Balanced, true, identity]);
+                priorityProperty.SetValue(session, priority); Set("_choices", session);
+                return session;
+            }
+            CardModel Created(string id) => run.CreateCard(ModelDb.AllCards.Single(c => c.Id.Entry == id), player);
+            var createdFree = Created("CLAW"); var createdCostly = Created("BLUDGEON");
+            var generatedSession = Choices();
+            var generated = await CardSelectCmd.FromChooseACardScreen(new Context(player), [createdCostly, createdFree], player);
+            if (!ReferenceEquals(generated, createdFree)) throw new InvalidOperationException("Generated offer must use the remaining energy budget");
+            generatedSession.Finish();
+            var bundleSession = Choices();
+            var bundles = new IReadOnlyList<CardModel>[] { [createdCostly, Created("BLUDGEON")], [createdFree, Created("DEFEND_IRONCLAD")] };
+            var bundle = await CardSelectCmd.FromChooseABundleScreen(player, bundles);
+            if (bundle.Count() != bundles[1].Count || !bundle.Zip(bundles[1]).All(pair => ReferenceEquals(pair.First, pair.Second)))
+                throw new InvalidOperationException("Generated bundle must share one resource budget");
+            bundleSession.Finish(); Set("_choices", null);
             if (!pcs.DiscardPile.Cards.Contains(claw) || player.Creature.CombatState.Enemies.Sum(e => e.CurrentHp) >= enemyBefore)
                 throw new InvalidOperationException("The returned instance must be legally playable and deal native damage");
 
@@ -133,6 +171,7 @@ internal static class FollowupIntegration
                 nativeModule = typeof(CardModel).Assembly.ManifestModule.ModuleVersionId,
                 passed = true, freeReturnAfterLastEnergy = true, returnedInstancePlayedTwice = true,
                 topdeckAndHandSeparate = true, exactOfferReplay = true,
+                generatedOfferBudget = true, generatedBundleBudget = true, nativeSelectionCommands = 2,
                 nativeSteps = steps.Count, selections = records, steps = steps.Select(s => new { s.ModelId, s.Round,
                     choices = s.Choices?.Select(c => new { c.ModelId, c.Preference }).ToArray() }).ToArray(),
                 syntheticOnly = true, fullSearchBenchmark = false });
