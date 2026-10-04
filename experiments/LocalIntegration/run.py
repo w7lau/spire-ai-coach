@@ -58,7 +58,10 @@ parser.add_argument('--algorithm-goal-test', action='store_true')
 parser.add_argument('--final-verification-test', action='store_true')
 parser.add_argument('--concurrency-test', action='store_true')
 parser.add_argument('--incident-verification', action='store_true')
+parser.add_argument('--limits-test', action='store_true')
 args = parser.parse_args()
+if args.limits_test and (not args.replay or not args.seed_result):
+    parser.error('--limits-test requires --replay and --seed-result')
 if args.incident_verification and (not args.replay or not args.seed_result):
     parser.error('--incident-verification requires --replay and --seed-result')
 if args.final_verification_test and (not args.replay or not args.seed_result):
@@ -133,6 +136,10 @@ with worker_lock(root):
         for name in ['integration-incident-summary.json', 'integration-incident-private.json',
                      'integration-incident-rejection-private.json']:
             (root / name).unlink(missing_ok=True)
+    if args.limits_test:
+        for name in ['integration-limits-summary.json', 'integration-limits-MonteCarlo-private.json',
+                     'integration-limits-TurnFrontier-private.json']:
+            (root / name).unlink(missing_ok=True)
     if args.search_cases:
         for name in ['integration-self-search-summary.json', *[f'integration-self-search-private-{i}.json' for i in range(4)]]:
             (root / name).unlink(missing_ok=True)
@@ -192,6 +199,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_FINAL_VERIFICATION_TEST'] = '1' if args.final_verification_test else '0'
     env['SPIRE_LOCAL_CONCURRENCY_TEST'] = '1' if args.concurrency_test else '0'
     env['SPIRE_LOCAL_INCIDENT_VERIFICATION'] = '1' if args.incident_verification else '0'
+    env['SPIRE_LOCAL_LIMITS_TEST'] = '1' if args.limits_test else '0'
     settings = root / 'Roaming/SlayTheSpire2/default/1/settings.save'
     settings_data = json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}
     settings_data.update(volume_master=0, volume_bgm=0, volume_sfx=0, volume_ambience=0)
@@ -224,6 +232,10 @@ with worker_lock(root):
         if args.incident_verification:
             names = ['integration-incident-summary.json', 'integration-incident-private.json',
                      'integration-incident-rejection-private.json', 'integration-success',
+                     'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.limits_test:
+            names = ['integration-limits-summary.json', 'integration-limits-MonteCarlo-private.json',
+                     'integration-limits-TurnFrontier-private.json', 'integration-success',
                      'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
         if args.search_cases:
             names = ['integration-self-search-summary.json', *[f'integration-self-search-private-{i}.json' for i in range(4)],

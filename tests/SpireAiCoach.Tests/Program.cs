@@ -889,6 +889,7 @@ SearchAlgorithmTests.Register(Test);
 EarlyStopSettingsTests.Register(Test);
 SearchWorkTests.Register(Test);
 ConcurrencyTests.Register(Test, AsyncTest);
+LocalLimitsTests.Register(Test);
 OptimizationTests.Register(Test);
 DiscrepancyTests.Register(Test);
 TurnSearchTests.Register(Test);
