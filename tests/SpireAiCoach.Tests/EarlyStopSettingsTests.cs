@@ -14,6 +14,7 @@ static class EarlyStopSettingsTests
                 void Check(bool ok) { if (!ok) throw new Exception("Early-stop setting persistence failed"); }
                 var store = new SettingsStore(directory);
                 Check(store.Load().Settings.LocalStopOnZeroLoss);
+                Check(!store.Load().Settings.LocalStopOnFirstWin);
                 var config = Path.Combine(directory, "config.json");
                 File.WriteAllText(config, """{"model":"existing","remember_key":false,"unrelated":{"preserve":17}}""");
                 var key = Path.Combine(directory, "api-key.dpapi");
@@ -29,6 +30,12 @@ static class EarlyStopSettingsTests
                 Check(store.Load().Settings.LocalTargetVictoryRounds == 6);
                 store.SaveLocalOptions(4, null, null, 0);
                 Check(store.Load().Settings.LocalTargetVictoryRounds == 0);
+                store.SaveLocalOptions(4, null, stopOnFirstWin: true);
+                Check(store.Load().Settings.LocalStopOnFirstWin && store.Load().Settings.LocalStopOnZeroLoss);
+                store.SaveLocalWorkers(3);
+                Check(store.Load().Settings.LocalStopOnFirstWin);
+                store.SaveLocalOptions(3, null, stopOnFirstWin: false);
+                Check(!store.Load().Settings.LocalStopOnFirstWin);
                 Check(JsonNode.Parse(File.ReadAllText(config))!["unrelated"]!["preserve"]!.GetValue<int>() == 17);
                 Check(File.ReadAllBytes(key).SequenceEqual(new byte[] { 7, 8, 9 }));
             }

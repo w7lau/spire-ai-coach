@@ -914,6 +914,7 @@ Test("local telemetry atomically replaces a snapshot held by an external shared 
 
 SearchAlgorithmTests.Register(Test);
 EarlyStopSettingsTests.Register(Test);
+FirstWinTests.Register(Test);
 SearchWorkTests.Register(Test);
 ConcurrencyTests.Register(Test, AsyncTest);
 LocalLimitsTests.Register(Test);

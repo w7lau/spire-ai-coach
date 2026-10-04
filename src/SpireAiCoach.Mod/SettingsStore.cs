@@ -39,7 +39,7 @@ public sealed class SettingsStore
 
     public void SaveLocalOptions(int workers, bool? includePotions, bool? stopOnZeroLoss = null,
         int? targetVictoryRounds = null, int? maxAttempts = null, int? maxRounds = null,
-        int? searchSeconds = null, bool? skipFinalVerification = null)
+        int? searchSeconds = null, bool? skipFinalVerification = null, bool? stopOnFirstWin = null)
     {
         if (workers is < 0 or > 16) throw new ArgumentOutOfRangeException(nameof(workers));
         if (targetVictoryRounds is < 0 or > LocalCalculation.MaximumRounds) throw new ArgumentOutOfRangeException(nameof(targetVictoryRounds));
@@ -50,6 +50,7 @@ public sealed class SettingsStore
         settings["local_workers"] = workers;
         if (includePotions.HasValue) settings["local_include_potions"] = includePotions.Value;
         if (stopOnZeroLoss.HasValue) settings["local_stop_on_zero_loss"] = stopOnZeroLoss.Value;
+        if (stopOnFirstWin.HasValue) settings["local_stop_on_first_win"] = stopOnFirstWin.Value;
         if (targetVictoryRounds.HasValue) settings["local_target_victory_rounds"] = targetVictoryRounds.Value;
         if (maxAttempts.HasValue) settings["local_max_attempts"] = maxAttempts.Value;
         if (maxRounds.HasValue) settings["local_max_rounds"] = maxRounds.Value;

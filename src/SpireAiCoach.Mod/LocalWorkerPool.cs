@@ -100,7 +100,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             int goalMinimumLoss = 0;
             LocalSearchResult? finishedWinner = null;
             int finishedWinnerWorker = -1;
-            using var minimumLoss = request.StopOnZeroLoss && !LocalSearchPolicy.HasSpecificGoal(request) &&
+            using var minimumLoss = request.StopOnZeroLoss && !request.StopOnFirstWin && !LocalSearchPolicy.HasSpecificGoal(request) &&
                 request.ExcludedModels is not { Length: > 0 } ? new LocalMinimumLossBroker(request, count) : null;
             var rootBranches = new int[count];
             var starting = new int[count];
@@ -177,9 +177,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             }
             if (selectedBest == null) throw new CoachException("local_verify_failed",
                 string.Join("\n", verificationResults.Select(r => r.Message).Distinct()));
-            if (goalReached.IsCancellationRequested && !(LocalSearchPolicy.MeetsGoal(selectedBest.Best, request) ||
-                minimumLoss?.Status is { Confirmed: true } proof &&
-                LocalSearchPolicy.CanStopAtMinimum(selectedBest.Best, request, proof.Certificate)))
+            if (goalReached.IsCancellationRequested && !LocalSearchPolicy.CanStopAfterVictory(selectedBest.Best, request,
+                minimumLoss?.Status is { Confirmed: true } proof ? proof.Certificate : null))
                 throw new CoachException("local_verify_failed", "达标候选未通过复核，不能按提前停止的结果返回。");
             var best = selectedBest;
             var allRuns = results.Concat(verificationResults).ToArray();
@@ -202,6 +201,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 IncludePotions = request.IncludePotions,
                 VerificationSkipped = request.SkipFinalVerification,
                 StoppedEarly = goalReached.IsCancellationRequested,
+                StoppedOnFirstWin = request.StopOnFirstWin && goalReached.IsCancellationRequested,
                 MinimumLoss = minimumLoss?.Status,
                 Id = request.Id,
                 Trials = results.SelectMany(r => r.Trials ?? []).OrderBy(t => t.FinishedMs).ToArray(),
@@ -229,7 +229,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     allRuns.Sum(r => r.Timing?.StartupMs ?? 0), allRuns.Sum(r => r.Timing?.Actions ?? 0), allRuns.Sum(r => r.Timing?.Restores ?? 0),
                     allRuns.Sum(r => r.Timing?.Verifications ?? 0)),
                 Status = goalReached.IsCancellationRequested || results.All(r => r.Status is "searched" or "done") && verificationResults.All(r => r.Status == "done") ? "done" : "partial",
-                Message = goalReached.IsCancellationRequested ? (goalMinimumLoss > 0 ?
+                Message = goalReached.IsCancellationRequested ? (request.StopOnFirstWin ?
+                    "已找到获胜路线，已停止全部后续搜索；未继续优化损失或用药。" : goalMinimumLoss > 0 ?
                     $"已达到最低净损失 {best.Best!.NetHpLoss}（含回血），同等损失下用药也已达下界，已停止后续搜索。" :
                     "已找到战后无伤获胜路线，已停止全部后续搜索。") +
                     (request.SkipFinalVerification ? "已跳过最终复核，执行时逐步核对模拟记录。" : "路线已通过复核。") :
@@ -256,12 +257,12 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 LocalSearchResult? winner; int index;
                 lock (boundPublishGate) { winner = finishedWinner; index = finishedWinnerWorker; }
                 if (winner == null || goalReached.IsCancellationRequested ||
-                    !(request.StopOnZeroLoss && LocalSearchPolicy.MeetsGoal(winner.Best, request) ||
-                      LocalSearchPolicy.CanStopAtMinimum(winner.Best, request, minimumLoss?.Status.Certificate)) ||
+                    !LocalSearchPolicy.CanStopAfterVictory(winner.Best, request, minimumLoss?.Status.Certificate) ||
                     Interlocked.CompareExchange(ref goalWorker, index, -1) != -1) return;
-                Volatile.Write(ref goalMinimumLoss, winner.Best!.NetHpLoss!.Value);
+                Volatile.Write(ref goalMinimumLoss, request.StopOnFirstWin ? 0 : winner.Best!.NetHpLoss!.Value);
                 goalReached.Cancel();
-                progress(goalMinimumLoss > 0 ? $"已达到最低净损失 {goalMinimumLoss}，正在停止其余搜索并确认路线…" :
+                progress(request.StopOnFirstWin ? "已找到获胜路线，正在停止其余搜索并确认路线…" :
+                    goalMinimumLoss > 0 ? $"已达到最低净损失 {goalMinimumLoss}，正在停止其余搜索并确认路线…" :
                     "已找到无伤获胜路线，正在停止其余搜索并复核…");
             }
 
