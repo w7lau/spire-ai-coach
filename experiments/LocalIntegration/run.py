@@ -23,6 +23,7 @@ parser.add_argument('--choices', action='store_true')
 parser.add_argument('--fallback', action='store_true')
 parser.add_argument('--mechanics', action='store_true')
 parser.add_argument('--mechanic-cases')
+parser.add_argument('--survival-test', action='store_true')
 parser.add_argument('--replay', type=Path)
 parser.add_argument('--game', type=Path)
 parser.add_argument('--mods', type=Path)
@@ -131,6 +132,9 @@ with worker_lock(root):
     for name in ['integration-success', 'integration-error.txt', 'integration-result.json',
                  'integration-algorithm-private.json', 'integration-algorithm-summary.json']:
         (root / name).unlink(missing_ok=True)
+    if args.survival_test:
+        for name in ['integration-survival-summary.json', 'integration-survival-private.json']:
+            (root / name).unlink(missing_ok=True)
     if args.algorithm_goal_test:
         for name in ['integration-algorithm-goal-summary.json', 'integration-algorithm-goal-private-0.json',
                      'integration-algorithm-goal-private-1.json']:
@@ -162,6 +166,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_CHOICES'] = '1' if args.choices else '0'
     env['SPIRE_LOCAL_FALLBACK'] = '1' if args.fallback else '0'
     env['SPIRE_LOCAL_MECHANICS'] = '1' if args.mechanics else '0'
+    env['SPIRE_LOCAL_SURVIVAL_TEST'] = '1' if args.survival_test else '0'
     if args.mechanic_cases:
         env['SPIRE_LOCAL_MECHANICS_CASES'] = args.mechanic_cases
     env['SPIRE_LOCAL_REPLAY'] = str(args.replay.resolve()) if args.replay else ''
@@ -208,6 +213,14 @@ with worker_lock(root):
     settings_data = json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}
     settings_data.update(volume_master=0, volume_bgm=0, volume_sfx=0, volume_ambience=0)
     settings.write_text(json.dumps(settings_data), encoding='utf-8')
+    if args.survival_test:
+        # Match the product worker's private tutorial state. A fresh headless
+        # profile must not open the interactive combat tutorial during settlement.
+        progress = settings.parent / 'modded/profile1/saves/progress.save'
+        progress.parent.mkdir(parents=True, exist_ok=True)
+        progress_data = json.loads(progress.read_text(encoding='utf-8-sig')) if progress.exists() else {'schema_version': 24}
+        progress_data.update(enable_ftues=False, ftue_completed=['combat_rules_ftue'])
+        progress.write_text(json.dumps(progress_data), encoding='utf-8')
     with (root / 'integration-stdout.log').open('wb') as output:
         process = subprocess.Popen([str(root / 'game/SlayTheSpire2.exe'), '--headless', '--audio-driver', 'Dummy', '--max-fps', '120',
                                     '--force-steam=off', '--log-file', str(root / 'integration-game.log')],
@@ -246,6 +259,9 @@ with worker_lock(root):
                      *[f'integration-native-overhead-private-{i}.json' for i in range(4)],
                      'integration-native-overhead-verification-private.json', 'integration-success',
                      'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.survival_test:
+            names = ['integration-survival-summary.json', 'integration-survival-private.json',
+                     'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
         if args.search_cases:
             names = ['integration-self-search-summary.json', *[f'integration-self-search-private-{i}.json' for i in range(4)],
                      'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']

@@ -51,7 +51,8 @@ public sealed record LocalCandidate(LocalAction[] Actions, int Hp, int HpLost, i
     int Gold, int MaxHp, bool Won, bool Dead, bool RewardCoverageKnown,
     int Rounds = 0, string StopReason = "", LocalContinuationPoint[]? Continuation = null,
     LocalDecision[]? Decisions = null, int? StartingHp = null, bool ContinuationFromSearch = false,
-    LocalDamageSources? DamageSources = null, LocalRolloutStyle RolloutStyle = LocalRolloutStyle.Balanced)
+    LocalDamageSources? DamageSources = null, LocalRolloutStyle RolloutStyle = LocalRolloutStyle.Balanced,
+    int? InitialEnemyHp = null, double? EndTurnHpLossHint = null)
 {
     // Gross HP costs remain useful diagnostics, but healing and victory hooks are part of the goal.
     public int? NetHpLoss => StartingHp.HasValue ? Math.Max(0, StartingHp.Value - Hp) : null;
@@ -111,14 +112,37 @@ public static class LocalSearchPolicy
         return Better(candidate, prior);
     }
 
+    // An unfinished horizon supplies a search hint, never a predicted victory or
+    // a dominance proof. Keep health needed to continue as well as kill progress.
+    // The preview covers observed attacks/hand effects, not every possible Mod hook.
+    public static double UnfinishedQuality(LocalCandidate candidate, int initialEnemyHp)
+    {
+        if (candidate.Dead) return 0;
+        var risk = Math.Max(0, candidate.EndTurnHpLossHint ?? 0);
+        var survival = Math.Clamp((candidate.Hp - risk) /
+            Math.Max(1d, candidate.StartingHp ?? candidate.MaxHp), 0, 1);
+        var progress = Math.Clamp(1d - (double)candidate.EnemyHp / Math.Max(1, initialEnemyHp), 0, 1);
+        // Progress matters while healthy. Damage dealt cannot compensate for a
+        // depleted ability to survive; a completed win still outranks all hints.
+        return survival * (.75 + .25 * progress);
+    }
+
     // Same root, completed native victory: net HP loss first, potions are a reserve resource.
     public static bool Better(LocalCandidate candidate, LocalCandidate? prior)
     {
         if (prior == null) return true;
         if (candidate.Won != prior.Won) return candidate.Won;
         if (candidate.Dead != prior.Dead) return !candidate.Dead;
-        // Unfinished horizons are not comparable to completed victories. Prefer progress within that fallback class.
-        if (!candidate.Won && candidate.EnemyHp != prior.EnemyHp) return candidate.EnemyHp < prior.EnemyHp;
+        if (!candidate.Won)
+        {
+            // Compare both hints against the same root. Legacy results without
+            // root metadata use a common denominator rather than different scales.
+            var initialEnemyHp = candidate.InitialEnemyHp ?? prior.InitialEnemyHp ??
+                Math.Max(candidate.EnemyHp, prior.EnemyHp);
+            var quality = UnfinishedQuality(candidate, initialEnemyHp);
+            var priorQuality = UnfinishedQuality(prior, initialEnemyHp);
+            if (quality != priorQuality) return quality > priorQuality;
+        }
         bool sameRoot = candidate.StartingHp.HasValue && candidate.StartingHp == prior.StartingHp;
         if (sameRoot && candidate.NetHpLoss != prior.NetHpLoss) return candidate.NetHpLoss < prior.NetHpLoss;
         if (!sameRoot && candidate.Hp != prior.Hp) return candidate.Hp > prior.Hp;

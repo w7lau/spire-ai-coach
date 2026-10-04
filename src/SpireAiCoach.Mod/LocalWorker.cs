@@ -821,6 +821,7 @@ public static class LocalWorker
                     }
                     var state = CombatManager.Instance.DebugOnlyGetState();
                     var won = _combatWon && !player.Creature.IsDead;
+                    var endTurnRisk = !IsTerminal(player) ? LocalTacticalPreview.Capture(player, []).EndTurnHpLossHint : (double?)null;
                     var candidate = new LocalCandidate(actions.ToArray(), player.Creature.CurrentHp, lost,
                         state?.Enemies.Sum(e => Math.Max(0, e.CurrentHp)) ?? 0,
                         player.Gold, player.Creature.MaxHp, won, player.Creature.IsDead,
@@ -830,7 +831,8 @@ public static class LocalWorker
                         StopReason: won ? "胜利结算完成" : player.Creature.IsDead ? "玩家死亡" :
                             string.IsNullOrEmpty(stop) ? "战斗结束但未确认胜利" : stop, Decisions: decisions.ToArray(), StartingHp: startingHp,
                         Continuation: continuationPoints?.ToArray(), ContinuationFromSearch: continuationPoints != null,
-                        DamageSources: damageSources.Snapshot(lost), RolloutStyle: _rolloutStyle);
+                        DamageSources: damageSources.Snapshot(lost), RolloutStyle: _rolloutStyle,
+                        InitialEnemyHp: initialEnemyHp, EndTurnHpLossHint: endTurnRisk);
                     if (turnTask != null && stop == "达到时间预算")
                         turns!.ReturnInterrupted(turnTask, TurnHint(player, startingHp, actions));
                     if (turnMode && IsTerminal(player) && planIndex < planned!.Length)
