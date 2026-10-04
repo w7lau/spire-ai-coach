@@ -152,6 +152,19 @@
     "Native Mod state and frozen replay fidelity remain model assumptions"
   ],
   "installation": {
-    "status": "native_validated_not_installed"
+    "status": "installed",
+    "completed_utc": "2026-10-04T18:11:08.9045103Z",
+    "implementation_commit": "e32e6ed1df93320a533df701867a56eca3edd087",
+    "game_was_closed": true,
+    "dll_sha256": "f8b62a0ac9c64dcf58f7bd5f7d80007a579e37cbf128004c5fd1c044e2ba1051",
+    "manifest_sha256": "cd226bcdd145c059440fd300427c0ddc850d065e4fa7017598983d3e817e6d45",
+    "zip_sha256": "45bfef4a0ba146858be0c6feb672fa95f92e8193a4634fa06552755716194ea5",
+    "package_matches_native_tested_dll": true,
+    "previous_version": "0.7.39",
+    "previous_mod_files_backed_up": 2,
+    "protected_file_count": 351,
+    "protected_files_unchanged": true,
+    "worker_cache_unchanged": true,
+    "game_executable_unchanged": true
   }
 }
