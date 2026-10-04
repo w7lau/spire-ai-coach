@@ -4,7 +4,8 @@ namespace SpireAiCoach.Core;
 
 // Outcome-guided tree search. Nodes represent exact action histories, not merged visible states.
 // Nothing here predicts card mechanics: only native, settled rollouts supply rewards.
-public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOrder order = LocalSearchOrder.MonteCarlo)
+public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOrder order = LocalSearchOrder.MonteCarlo,
+    LocalCardGoals? cardGoals = null)
 {
     private readonly Random _random = new(seed);
     private readonly Node _root = new();
@@ -117,7 +118,7 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOr
         }
         if (trial.Finished) throw new InvalidOperationException("Trial has already finished");
         trial.Finished = true;
-        var reward = Reward(result, initialEnemyHp);
+        var reward = Reward(result, initialEnemyHp, cardGoals);
         if (closeExactPrefix && trial.Current != null) trial.Current.Closed = true;
         // Only actions actually executed receive this outcome. Untried alternatives get no credit.
         for (int i = trial.Path.Count - 1; i >= 0; i--)
@@ -148,7 +149,7 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOr
         return actions[^1];
     }
 
-    public static double Reward(LocalCandidate result, int initialEnemyHp)
+    public static double Reward(LocalCandidate result, int initialEnemyHp, LocalCardGoals? cardGoals = null)
     {
         if (result.Dead) return 0;
         var health = Math.Clamp((double)result.Hp / Math.Max(1, result.MaxHp), 0, 1);
@@ -156,6 +157,9 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOr
             .001 * Math.Min(1, result.Actions.Length / 200d);
         // Disjoint ranges: even a low-HP victory outranks any unfinished horizon.
         var damageQuality = Math.Exp(-(result.NetHpLoss ?? Math.Max(0, result.MaxHp - result.Hp)) / 25d);
+        if (result.Won && cardGoals?.Enabled == true)
+            return cardGoals.WithinThreshold(result) ? .9 + .07 * cardGoals.Quality(result) + .005 * damageQuality :
+                .7 + .18 * damageQuality + .001 * cardGoals.Quality(result);
         return result.Won ? .8 + .18 * damageQuality + .001 * health - expense :
             .1 + .4 * LocalSearchPolicy.UnfinishedQuality(result, initialEnemyHp) - expense;
     }

@@ -14,7 +14,7 @@ public sealed class LocalSharedHealthBound(string directory, LocalSearchRequest 
         request.Id, request.SnapshotId, request.NativeHash, request.ModelHash, request.LoadedMods,
         request.MaxRounds, request.IncludePotions, request.TargetVictoryRounds, request.TargetPotionUses,
         request.RequireKnownZeroEnemyDamage, request.DataOnlyCombat, request.DataOnlyRun,
-        request.NumericalExecution, request.FastNativeWaits, request.FastStateSettling
+        request.NumericalExecution, request.FastNativeWaits, request.FastStateSettling, request.CardGoals
     }))));
     private readonly string _file = Path.Combine(directory, "health-bound-" +
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(request.Id))) + ".json");
@@ -29,7 +29,8 @@ public sealed class LocalSharedHealthBound(string directory, LocalSearchRequest 
         if (result.Id != request.Id || result.SnapshotId != request.SnapshotId ||
             result.Status is not ("searched" or "done") || result.Best is not { Actions.Length: > 0 } candidate ||
             candidate.Actions[0].BeforeHash != request.NativeHash ||
-            LocalSearchPolicy.HasSpecificGoal(request) && !LocalSearchPolicy.MeetsGoal(candidate, request)) return false;
+            request.CardGoals?.Enabled != true && LocalSearchPolicy.HasSpecificGoal(request) &&
+            !LocalSearchPolicy.MeetsGoal(candidate, request)) return false;
         var bound = LocalWinningBound.From(Root, candidate);
         if (bound == null) return false;
         lock (_gate)

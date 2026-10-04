@@ -3,7 +3,7 @@ namespace SpireAiCoach.Core;
 // A preference perturbation remains consistent throughout one native rollout.
 // Only completed native outcomes choose the next parent; it never predicts an
 // effect, removes a legal action, or transfers a state between histories.
-public sealed class LocalRolloutPolicy(int seed)
+public sealed class LocalRolloutPolicy(int seed, LocalCardGoals? cardGoals = null)
 {
     private readonly Random _random = new(seed);
     private Dictionary<string, int> _parent = new(StringComparer.Ordinal);
@@ -49,7 +49,7 @@ public sealed class LocalRolloutPolicy(int seed)
 
     public void Complete(LocalCandidate candidate)
     {
-        if (!LocalSearchPolicy.Better(candidate, _best)) return;
+        if (!LocalSearchPolicy.Better(candidate, _best, cardGoals)) return;
         _best = candidate with { Continuation = null, Decisions = null };
         _parent = new(_current, StringComparer.Ordinal);
     }

@@ -24,6 +24,7 @@ public sealed class LocalContinuation(string combatId, string[] mods, LocalSearc
         var point = matches[0]; CompletedActions = point.ActionIndex;
         var remaining = best.Actions.Skip(CompletedActions).ToArray();
         return original with { Best = best with { Actions = remaining,
+            CardGoalOutcome = best.CardGoalOutcome?.Remaining(CompletedActions),
             Continuation = best.Continuation.Skip(CompletedActions).Select(p => p with
                 { ActionIndex = p.ActionIndex - CompletedActions, HpLost = Math.Max(0, p.HpLost - point.HpLost) }).ToArray(),
             StartingHp = point.Hp ?? best.StartingHp, HpLost = Math.Max(0, best.HpLost - point.HpLost),

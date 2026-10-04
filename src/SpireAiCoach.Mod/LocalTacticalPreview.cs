@@ -83,6 +83,17 @@ internal sealed class LocalTacticalPreview(Player player, bool efficient = false
         catch { return 0; } // An opaque sibling preview must not erase known defense hints.
     }
 
+    public int CardGoalPriority(CardModel card, Creature? target, LocalCardGoals goals)
+    {
+        int hint = card.Id.ToString() == goals.PlayModelId ? 30 : 0;
+        if (target?.IsEnemy != true || PreviewDamage(card, target) < target.CurrentHp + target.Block) return hint;
+        if (card.Id.ToString() == goals.FinisherModelId) return hint + 120;
+        // Reserve a potential finishing blow only if that model is actually playable.
+        // Unknown effects remain native candidates; this is never a legality filter.
+        if (_playable.Any(c => c.Id.ToString() == goals.FinisherModelId)) hint -= 60;
+        return hint;
+    }
+
     public int Priority(CardModel card, Creature? target, LocalRolloutStyle style = LocalRolloutStyle.Balanced)
     {
         try
