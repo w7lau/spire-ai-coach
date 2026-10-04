@@ -61,6 +61,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             // a verification failure must not restart all full-budget searches.
             progress("首次计算未完成，正在重新计算…");
             origin.Import(ex.Data["local_trace"] as LocalTrace);
+            var failures = ex.Data["local_failures"] as LocalSimulationFailure[] ?? [];
             origin.Add(new(-1, "main", "fallback", ex.Category + ": " + ex.Message, origin.ElapsedMs, 0));
             var regular = request with { Id = request.Id + "-regular", DataOnlyCombat = false, DataOnlyRun = false,
                 ExperimentalNativeData = false, InitialTrace = origin.Snapshot() };
@@ -68,7 +69,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 // A compatibility pass restarts each worker's sequence; keep it above
                 // the first pass's search/refinement/verification offsets in the UI.
                 simulationProgress == null ? null : p => simulationProgress(p with { Id = request.Id, Sequence = p.Sequence + 4_000_000 }));
-            return result with { Id = request.Id, Message = "常规执行完成。" + result.Message };
+            return result with { Id = request.Id, Message = "常规执行完成。" + result.Message,
+                RecoveredFailures = failures.Concat(result.RecoveredFailures ?? []).ToArray() };
         }
     }
 
@@ -108,7 +110,11 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             int used = results.Count;
             cancellation.ThrowIfCancellationRequested();
             if (request.DataOnlyCombat && !goalReached.IsCancellationRequested && results.Any(r => r.Status is "failed" or "unsupported" or "partial"))
-                throw new CoachException("local_data_unavailable", string.Join("\n", results.Select(r => r.Message).Distinct()));
+            {
+                var failure = new CoachException("local_data_unavailable", string.Join("\n", results.Select(r => r.Message).Distinct()));
+                failure.Data["local_failures"] = results.Where(r => r.Failure != null).Select(r => r.Failure!).ToArray();
+                throw failure;
+            }
             // Pending native selectors own callbacks. Retire their processes; never reset underneath them.
             // If every lane failed before producing a route, spend only the remaining search budget on
             // one fresh lane excluding the reported actions. This is an explicitly incomplete fallback.
@@ -268,6 +274,15 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     File.Delete(Path.Combine(worker.Root, "idle.json"));
                     File.Delete(Path.Combine(worker.Root, "result.json"));
                     File.Delete(Path.Combine(worker.Root, "progress.json"));
+                    LocalProgressTransport? channel = null;
+                    if (command.MemoryProgress && command.AsyncProgressOutput)
+                    {
+                        try { channel = new LocalProgressTransport(command); }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+                        { timeline.Add(new(index, verifying ? "verify" : "search", "progress_fallback", ex.Message, timeline.ElapsedMs, 0)); }
+                    }
+                    using var telemetry = channel;
+                    command = command with { ProgressPipe = telemetry?.PipeName };
                     using (timeline.Measure(index, verifying ? "verify" : "search", "ipc", depth: 1))
                         LocalWire.Write(Path.Combine(worker.Root, "request.json"), command);
                     requestDispatched = true;
@@ -288,10 +303,15 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                                 new LocalSearchStop(command.Id, command.SnapshotId, command.NativeHash));
                             stopping = Stopwatch.StartNew();
                         }
+                        var preview = telemetry?.Latest;
                         var previewPath = Path.Combine(worker.Root, "progress.json");
                         if (File.Exists(previewPath))
                         {
-                            var preview = LocalWire.Read<LocalProgress>(previewPath);
+                            var filePreview = LocalWire.Read<LocalProgress>(previewPath);
+                            if (preview == null || filePreview.Sequence > preview.Sequence) preview = filePreview;
+                        }
+                        if (preview != null)
+                        {
                             if (preview.Id == command.Id && preview.SnapshotId == request.SnapshotId && preview.Worker == index &&
                                 preview.Workers == command.Partitions && preview.Sequence > seenSequence)
                             { seenSequence = preview.Sequence;
@@ -395,7 +415,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 {
                     worker.Stop("模拟中断：" + ex.Message, timeline, index);
                     return new(request.Id, request.SnapshotId, "failed", ex is CoachException ? ex.Message :
-                        $"本地进程准备失败（{ex.GetType().Name}）：{ex.Message}", 0, 0, 0, null);
+                        $"本地进程准备失败（{ex.GetType().Name}）：{ex.Message}", 0, 0, 0, null,
+                        Failure: LocalSimulationFailure.Capture(ex, index, verifying ? "verify" : "search"));
                 }
 
                 void RememberFailure(LocalSearchResult failed)

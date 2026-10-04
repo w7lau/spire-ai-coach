@@ -21,6 +21,10 @@ namespace SpireAiCoach.Mod;
 
 public static class LocalCapture
 {
+    [ThreadStatic] private static PacketWriter? _fingerprintWriter;
+    [ThreadStatic] private static bool _writerInUse;
+    [ThreadStatic] private static int _snapshotDepth;
+    internal static bool InFingerprintSnapshot => _snapshotDepth > 0;
     private static CombatReplay Replay() => typeof(CombatReplayWriter).GetField("_replay", BindingFlags.Instance | BindingFlags.NonPublic)
         ?.GetValue(RunManager.Instance.CombatReplayWriter) as CombatReplay ?? throw new InvalidOperationException("No combat replay");
 
@@ -69,16 +73,39 @@ public static class LocalCapture
     {
         using var measuring = LocalWorker.MeasureMethod("LocalCapture.Fingerprint");
         var state = CombatManager.Instance.DebugOnlyGetState() ?? throw new InvalidOperationException("No combat");
-        var writer = new PacketWriter();
-        NetFullCombatState.FromRun(state.RunState, null).Serialize(writer);
-        var extra = Encoding.UTF8.GetBytes($"|{state.RoundNumber}|" + string.Join(";",
-            state.Enemies.Select(e => $"{e.CombatId}:{e.Monster?.NextMove?.Id}")) + "|potions|" +
-            string.Join(";", state.Players.SelectMany(p => p.PotionSlots.Select((potion, slot) =>
-                $"{p.NetId}:{slot}:{potion?.Id}:{potion?.IsQueued}"))));
-        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        hash.AppendData(writer.Buffer.AsSpan(0, (writer.BitPosition + 7) / 8));
-        hash.AppendData(extra);
-        return Convert.ToHexString(hash.GetHashAndReset());
+        bool reuse = LocalWorker.ReuseFingerprintBuffer && !_writerInUse;
+        var writer = reuse ? _fingerprintWriter ??= new PacketWriter { WarnOnGrow = false } : new PacketWriter();
+        if (reuse)
+        {
+            _writerInUse = true;
+            // Reset alone preserves unused tail bits. Clear them so a shorter,
+            // non-byte-aligned packet hashes exactly like a fresh native writer.
+            Array.Clear(writer.Buffer); writer.Reset();
+            LocalWorker.SkipMethod("LocalCapture.ReusedPacketBuffer");
+        }
+        try
+        {
+            _snapshotDepth++;
+            try { NetFullCombatState.FromRun(state.RunState, null).Serialize(writer); }
+            finally { _snapshotDepth--; }
+            var extra = Encoding.UTF8.GetBytes($"|{state.RoundNumber}|" + string.Join(";",
+                state.Enemies.Select(e => $"{e.CombatId}:{e.Monster?.NextMove?.Id}")) + "|potions|" +
+                string.Join(";", state.Players.SelectMany(p => p.PotionSlots.Select((potion, slot) =>
+                    $"{p.NetId}:{slot}:{potion?.Id}:{potion?.IsQueued}"))));
+            using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            hash.AppendData(writer.Buffer.AsSpan(0, (writer.BitPosition + 7) / 8));
+            hash.AppendData(extra);
+            return Convert.ToHexString(hash.GetHashAndReset());
+        }
+        finally
+        {
+            if (reuse)
+            {
+                _writerInUse = false;
+                // Do not keep an unusually large Mod packet for the process lifetime.
+                if (writer.Buffer.Length > 1024 * 1024) _fingerprintWriter = null;
+            }
+        }
     }
 
     public static string[] LoadedMods() => ModManager.GetLoadedMods()

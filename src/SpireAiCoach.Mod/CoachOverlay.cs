@@ -662,11 +662,13 @@ public sealed class CoachOverlay
                         try
                         {
                             Directory.CreateDirectory(Path.GetDirectoryName(timingPath)!);
-                            LocalWire.Write(timingPath, new { version = typeof(ModEntry).Assembly.GetName().Version!.ToString(3), request.SearchOrder, request.MaxNodes, request.MaxRounds, request.BudgetSeconds,
+                            LocalTimingArchive.Write(Path.GetDirectoryName(timingPath)!, request.Id, new {
+                                request.Id, request.SnapshotId, completed_at = DateTimeOffset.UtcNow,
+                                version = typeof(ModEntry).Assembly.GetName().Version!.ToString(3), request.SearchOrder, request.MaxNodes, request.MaxRounds, request.BudgetSeconds,
                                 ConfiguredWorkers = request.Workers, result.WorkerLimit,
                                 request.SkipFinalVerification, request.StopOnZeroLoss, request.TargetVictoryRounds,
                                 request.TargetPotionUses, request.RequireKnownZeroEnemyDamage, result.VerificationSkipped, result.ElapsedMs, result.Workers,
-                                result.Evaluated, result.Victories, result.HealthBounds,
+                                result.Evaluated, result.Victories, result.HealthBounds, result.RecoveredFailures,
                                 turn_search = result.TurnSearch is { } turns ? new { turns.Probes, turns.BoundPruned,
                                     turns.Offered, turns.DuplicateOffers, turns.Pending, turns.UnknownRecoveryChecks,
                                     turns.CoveredPrefixes, turns.CompletedHistories, turns.RepeatedHistories } : null,

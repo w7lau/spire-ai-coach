@@ -60,6 +60,7 @@ public static class LocalWorker
         _timeline?.MeasureMethod(_traceWorker, _traceStage, name) ?? default;
     internal static void SkipMethod(string name) => _timeline?.SkipMethod(_traceWorker, _traceStage, name);
     private static readonly LocalDecisionFingerprint DecisionFingerprint = new();
+    internal static bool ReuseFingerprintBuffer => _activeRequest?.ReuseFingerprintBuffer != false && LocalWorkerOverhead.Active;
     private static readonly FieldInfo? PendingNotification = typeof(CombatStateTracker)
         .GetField("_combatStateChangedDeferredTask", BindingFlags.NonPublic | BindingFlags.Instance);
     private static long _frameVersion;
@@ -259,10 +260,16 @@ public static class LocalWorker
         var trials = new List<LocalSearchTrial>();
         LocalAction? pendingAction = null;
         LocalAction? blockedAction = null;
+        LocalSimulationFailure? failure = null;
         var outputTimeline = _timeline!;
+        using var progressSender = request.MemoryProgress && request.AsyncProgressOutput && request.ProgressPipe != null
+            ? new LocalProgressSender(request) : null;
         void WriteProgress((LocalProgress Progress, string Stage) update)
         {
             using var writing = outputTimeline.MeasureMethod(request.Partition, update.Stage, "LocalWorker.ProgressWrite");
+            if (progressSender?.TrySend(update.Progress,
+                operation => outputTimeline.MeasureMethod(request.Partition, update.Stage, "LocalProgress." + operation)) == true)
+                return;
             LocalWire.Write(Path.Combine(_root, "progress.json"), update.Progress,
                 operation => outputTimeline.MeasureMethod(request.Partition, update.Stage, "LocalProgress." + operation));
         }
@@ -295,14 +302,15 @@ public static class LocalWorker
             if (status != "running") LocalWire.Write(Path.Combine(_root, "runtime.json"), new
                 { status, mode = LocalWorkerDataMode.MinimalRun ? "native-model" : LocalWorkerDataMode.Active ? "no-combat-scene" : "regular-scene",
                     max_fps = Engine.MaxFps, observed_fps = Engine.GetFramesPerSecond(), numerical = LocalWorkerLogic.Counters(),
-                    overhead = LocalWorkerOverhead.Status(), verification = LocalWorkerVerification.Status(), preload_enabled = PreloadManager.Enabled });
+                    overhead = LocalWorkerOverhead.Status(), verification = LocalWorkerVerification.Status(), preload_enabled = PreloadManager.Enabled,
+                    progress_transport = new { pipe = progressSender?.Connected == true, fallback = progressSender?.Fallback } });
             LocalWire.Write(Path.Combine(_root, "result.json"),
             new LocalSearchResult(request.Id, request.SnapshotId, status, message, evaluated, rejected, timer.ElapsedMilliseconds, best,
                 Victories: victories, IncludePotions: request.IncludePotions,
                 Timing: new(restoreMs, actionMs, decisionMs, verifyMs, Actions: executed, Restores: restores, Verifications: verifyMs > 0 ? 1 : 0),
                 BlockedAction: blockedAction, MaxRounds: request.MaxRounds,
                 Trace: status == "running" ? null : _timeline!.Snapshot(), StoppedEarly: stoppedEarly, TurnSearch: TurnStats(), RootBranches: rootBranches,
-                HealthBounds: HealthStats(),
+                HealthBounds: HealthStats(), Failure: failure,
                 Trials: status == "running" ? null : trials.ToArray()));
         }
         try
@@ -959,6 +967,7 @@ public static class LocalWorker
         {
             // Any replay divergence invalidates this worker's result, including previous candidates.
             best = null;
+            failure = LocalSimulationFailure.Capture(ex, request.Partition, _traceStage);
             // Keep the complete cause before a compatibility pass restarts this instance.
             // These private per-request files are not overwritten by Ensure/request polling.
             try
@@ -968,7 +977,7 @@ public static class LocalWorker
                     captured_at = DateTimeOffset.UtcNow, request.Id, request.SnapshotId, worker = request.Partition,
                     stage = _traceStage, route = _traceRoute, step = _traceStep,
                     request.DataOnlyCombat, request.DataOnlyRun, request.NumericalExecution,
-                    exception = ex.ToString(), trace = _timeline?.Snapshot()
+                    exception = ex.ToString(), failure, trace = _timeline?.Snapshot()
                 });
             }
             catch (Exception recording) when (recording is IOException or UnauthorizedAccessException)

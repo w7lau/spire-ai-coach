@@ -5,7 +5,9 @@ using HarmonyLib;
 using MegaCrit.Sts2.Core.Assets;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Players;
+using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Multiplayer;
+using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Logging;
 using MegaCrit.Sts2.Core.Multiplayer.Game;
 using MegaCrit.Sts2.Core.Multiplayer.Replay;
@@ -59,6 +61,11 @@ internal static class LocalWorkerOverhead
         InstallLeanChecksum();
         Profile(typeof(NetFullCombatState), "FromRun");
         Profile(typeof(NetFullCombatState), "Serialize");
+        // Snapshot construction also runs numeric cost/Mod hooks. Observe that
+        // work separately; never remove it or reuse its results across states.
+        InstallBoundary(typeof(NetFullCombatState.CardState), "From", nameof(SnapshotTiming), requireVoid: false);
+        InstallBoundary(typeof(CardEnergyCost), "GetWithModifiers", nameof(SnapshotTiming), requireVoid: false);
+        InstallBoundary(typeof(Hook), "ModifyEnergyCostInCombat", nameof(SnapshotTiming), requireVoid: false);
         Profile(typeof(PlayerCombatState), "RecalculateCardValues");
         Profile(typeof(AssetCache), "GetAsset");
         Profile(typeof(NCard), "UpdateVisuals");
@@ -258,6 +265,11 @@ internal static class LocalWorkerOverhead
     }
     private static void Timing(MethodBase __originalMethod, ref LocalTimeline.MethodScope __state) =>
         __state = LocalWorker.MeasureMethod(Names[__originalMethod]);
+    private static void SnapshotTiming(MethodBase __originalMethod, ref LocalTimeline.MethodScope __state)
+    {
+        if (LocalCapture.InFingerprintSnapshot)
+            __state = LocalWorker.MeasureMethod("Snapshot." + Names[__originalMethod]);
+    }
     // Finalizer observes both success and exception and never replaces/swallows it.
     private static void FinishTiming(LocalTimeline.MethodScope __state) => __state.Dispose();
 }

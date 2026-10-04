@@ -1,0 +1,205 @@
+{
+  "samples": [
+    {
+      "optimized": false,
+      "warm": true,
+      "ElapsedMs": 2292,
+      "steps": 21,
+      "fingerprint_ms": 49.074700000000014,
+      "progress_write_ms": 73.47,
+      "progress_file_writes": 8,
+      "progress_pipe_writes": 0,
+      "reused_buffers": 0,
+      "snapshot_methods": [
+        {
+          "Worker": 0,
+          "Stage": "search",
+          "Method": "Snapshot.CardEnergyCost.GetWithModifiers",
+          "Calls": 622,
+          "Skipped": 0,
+          "TotalMs": 26.424999999999983,
+          "MaxMs": 0.2417
+        },
+        {
+          "Worker": 0,
+          "Stage": "search",
+          "Method": "Snapshot.CardState.From",
+          "Calls": 622,
+          "Skipped": 0,
+          "TotalMs": 35.80200000000001,
+          "MaxMs": 0.2511
+        },
+        {
+          "Worker": 0,
+          "Stage": "search",
+          "Method": "Snapshot.Hook.ModifyEnergyCostInCombat",
+          "Calls": 503,
+          "Skipped": 0,
+          "TotalMs": 24.629600000000003,
+          "MaxMs": 0.2356
+        }
+      ]
+    },
+    {
+      "optimized": true,
+      "warm": true,
+      "ElapsedMs": 371,
+      "steps": 21,
+      "fingerprint_ms": 50.262699999999995,
+      "progress_write_ms": 10.911200000000001,
+      "progress_file_writes": 0,
+      "progress_pipe_writes": 4,
+      "reused_buffers": 23,
+      "snapshot_methods": [
+        {
+          "Worker": 0,
+          "Stage": "search",
+          "Method": "Snapshot.CardEnergyCost.GetWithModifiers",
+          "Calls": 622,
+          "Skipped": 0,
+          "TotalMs": 32.82860000000001,
+          "MaxMs": 0.382
+        },
+        {
+          "Worker": 0,
+          "Stage": "search",
+          "Method": "Snapshot.CardState.From",
+          "Calls": 622,
+          "Skipped": 0,
+          "TotalMs": 44.04710000000001,
+          "MaxMs": 0.4445
+        },
+        {
+          "Worker": 0,
+          "Stage": "search",
+          "Method": "Snapshot.Hook.ModifyEnergyCostInCombat",
+          "Calls": 503,
+          "Skipped": 0,
+          "TotalMs": 30.29810000000001,
+          "MaxMs": 0.3741
+        }
+      ]
+    },
+    {
+      "optimized": true,
+      "warm": false,
+      "ElapsedMs": 279,
+      "steps": 21,
+      "fingerprint_ms": 78.19689999999999,
+      "progress_write_ms": 1.5534000000000001,
+      "progress_file_writes": 0,
+      "progress_pipe_writes": 4,
+      "reused_buffers": 23,
+      "snapshot_methods": [
+        {
+          "Worker": 0,
+          "Stage": "search",
+          "Method": "Snapshot.CardEnergyCost.GetWithModifiers",
+          "Calls": 622,
+          "Skipped": 0,
+          "TotalMs": 58.59520000000002,
+          "MaxMs": 13.7018
+        },
+        {
+          "Worker": 0,
+          "Stage": "search",
+          "Method": "Snapshot.CardState.From",
+          "Calls": 622,
+          "Skipped": 0,
+          "TotalMs": 70.72209999999997,
+          "MaxMs": 13.7218
+        },
+        {
+          "Worker": 0,
+          "Stage": "search",
+          "Method": "Snapshot.Hook.ModifyEnergyCostInCombat",
+          "Calls": 503,
+          "Skipped": 0,
+          "TotalMs": 56.21910000000002,
+          "MaxMs": 13.6903
+        }
+      ]
+    },
+    {
+      "optimized": false,
+      "warm": false,
+      "ElapsedMs": 314,
+      "steps": 21,
+      "fingerprint_ms": 66.2152,
+      "progress_write_ms": 36.086600000000004,
+      "progress_file_writes": 4,
+      "progress_pipe_writes": 0,
+      "reused_buffers": 0,
+      "snapshot_methods": [
+        {
+          "Worker": 0,
+          "Stage": "search",
+          "Method": "Snapshot.CardEnergyCost.GetWithModifiers",
+          "Calls": 622,
+          "Skipped": 0,
+          "TotalMs": 33.476699999999965,
+          "MaxMs": 1.1321
+        },
+        {
+          "Worker": 0,
+          "Stage": "search",
+          "Method": "Snapshot.CardState.From",
+          "Calls": 622,
+          "Skipped": 0,
+          "TotalMs": 46.44769999999999,
+          "MaxMs": 1.2905
+        },
+        {
+          "Worker": 0,
+          "Stage": "search",
+          "Method": "Snapshot.Hook.ModifyEnergyCostInCombat",
+          "Calls": 503,
+          "Skipped": 0,
+          "TotalMs": 30.92209999999997,
+          "MaxMs": 1.1241
+        }
+      ]
+    }
+  ],
+  "algorithms": [
+    {
+      "algorithm": 0,
+      "Evaluated": 1,
+      "ElapsedMs": 609,
+      "received": 3,
+      "Won": true,
+      "native_checkpoints": 21
+    },
+    {
+      "algorithm": 4,
+      "Evaluated": 1,
+      "ElapsedMs": 528,
+      "received": 3,
+      "Won": true,
+      "native_checkpoints": 21
+    }
+  ],
+  "exact_native_hashes_and_histories": true,
+  "full_native_verified_steps": 21,
+  "full_native_verification_ms": 3316,
+  "forms": {
+    "Evaluated": 16,
+    "Victories": 10,
+    "ElapsedMs": 2611,
+    "skipped_visual_factories": 3
+  },
+  "product_limits_unchanged": true,
+  "whole_search_speed_unmeasured": true,
+  "version": "0.7.32",
+  "tested_loaded_mod_count": 7,
+  "game_version": "0.111.0",
+  "dll_sha256": "b40b469319d7205a897cd2b178d2df53df2f50defbd0d9bd8df7c2e705f76b34",
+  "core_checks_passed": 245,
+  "full_search_comparison": false,
+  "native_reference": {
+    "starting_hp": 33,
+    "final_hp": 25,
+    "net_loss": 8,
+    "steps": 21
+  }
+}

@@ -21,7 +21,8 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     int? TargetVictoryRounds = null, int? TargetPotionUses = null, bool RequireKnownZeroEnemyDamage = false,
     bool EfficientTactics = true, bool LearnBuffDuration = true, bool GuideWinningRoutes = true,
     bool OwnedWinningFocus = true, string? SearchWorkPipe = null,
-    bool ReuseDecisionFingerprint = true, bool AsyncProgressOutput = true, bool MemorySearchWork = true);
+    bool ReuseDecisionFingerprint = true, bool AsyncProgressOutput = true, bool MemorySearchWork = true,
+    bool MemoryProgress = true, string? ProgressPipe = null, bool ReuseFingerprintBuffer = true);
 
 // A stop belongs to one frozen request. Goal stops exclude verification;
 // explicit caller cancellation also applies during verification or with goals off.
@@ -76,7 +77,8 @@ public sealed record LocalSearchResult(string Id, string SnapshotId, string Stat
     LocalAction? BlockedAction = null, int MaxRounds = 64, LocalTrace? Trace = null, LocalWorkStats? Work = null,
     bool StoppedEarly = false, LocalTurnSearchStats? TurnSearch = null, bool VerificationSkipped = false,
     int RootBranches = 0, int WorkerLimit = 0, LocalSearchTrial[]? Trials = null,
-    LocalHealthBoundStats? HealthBounds = null);
+    LocalHealthBoundStats? HealthBounds = null, LocalSimulationFailure? Failure = null,
+    LocalSimulationFailure[]? RecoveredFailures = null);
 
 public static class LocalSearchPolicy
 {
@@ -287,6 +289,13 @@ public static class LocalWire
     }
     public static void Write<T>(string path, T value, Func<string, IDisposable?>? measure = null)
     {
+        string json;
+        using (measure?.Invoke("Serialize")) json = JsonSerializer.Serialize(value);
+        WriteJson(path, json, measure);
+    }
+
+    public static void WriteJson(string path, string json, Func<string, IDisposable?>? measure = null)
+    {
         FileLease lease;
         using (measure?.Invoke("Lock")) lease = new FileLease(path);
         using var ownership = lease;
@@ -296,8 +305,6 @@ public static class LocalWire
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
-            string json;
-            using (measure?.Invoke("Serialize")) json = JsonSerializer.Serialize(value);
             using (measure?.Invoke("Write")) File.WriteAllText(temporary, json);
             using (measure?.Invoke("Replace"))
             {

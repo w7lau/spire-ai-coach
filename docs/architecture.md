@@ -1,5 +1,13 @@
 # 设计与合同
 
+## 0.7.32 进度管道、完整指纹缓冲与诊断保留
+
+两个算法共用 LocalProgressTransport/LocalProgressSender。父进程为每次所属实例请求先创建当前用户可访问的随机私有命名管道，再通过原 request.json 派发名称；独立 LatestWriter 发送纯 DTO，父端仅保留最新进度。消息上限 2 MiB，校验冻结请求、快照、原生根、模型/Mod、实例及分区数量，序号不得倒退。管道不可创建、连接失败或断开后使用原原子文件通道；连接和写入均有界。原结果、取消、检查点和 idle 确认通道不变，清理仍先排空输出。
+
+LocalCapture.Fingerprint 在所属后台执行中复用线程私有 PacketWriter；重置前清空缓冲区，保留新建原生 writer 的零填充与末字节尾位，递归调用使用独立 writer，超大包不长期保留。每次仍执行完整 NetFullCombatState.FromRun、序列化及附加敌方行动／药水身份，既不缓存状态也不跳过费用和 Mod 钩子。实际玩家采集和完整原生对照仍使用原路径。Snapshot.CardState.From、Snapshot.CardEnergyCost.GetWithModifiers、Snapshot.Hook.ModifyEnergyCostInCombat 仅在指纹构建范围计时；它们是包含关系，不应相加。
+
+LocalSimulationFailure 在失败结果中记录异步／反射包装之内的异常类型、方法、原始完整栈、实例和阶段；兼容执行成功后通过 RecoveredFailures 留在最终诊断，不改变失败候选失效规则。原私有失败输入与日志归档继续保留。每次完成的耗时记录仅序列化一次，同时写入 local-timing-latest.json 和独立 local-timing-时间-请求.json.gz；记录算法、预算、版本和失败原因，不含 AI 连接或密钥。
+
 ## 0.7.31 常规后台展示与失败分组收尾
 
 LocalWorkerOverhead 仍只在可执行路径和 `.coach-worker` 所有权核对通过的独立实例安装。TrimWorkerOverhead 开启时，展示、普通控制台输出和重放文件输出的跳过不再依赖 DataOnlyCombat/DataOnlyRun；常规兼容搜索也不需要渲染卡面和播放音效。卡面图片、标题、费用、附魔状态和字体适配在展示叶入口省略。NCard.UpdateVisuals 保留原生 DisplayingPile、DynamicVars.ClearPreview、UpdateDynamicVarPreview 和附魔数值预览；仅在完整预览结束后绕过说明文字格式化/排版。该 IL 边界不符时撤回本组补丁，原有方法继续执行。没有替换卡牌效果、选择、牌堆完成通知、RNG 或 Mod 规则钩子。
