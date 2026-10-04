@@ -51,6 +51,15 @@ internal static class PresentationIntegration
         var layer = tree.Root.GetNode<CanvasLayer>("SpireAiCoach");
         var panel = layer.GetNode<PanelContainer>("CoachPanel");
         var toggle = layer.GetNode<Button>("CoachToggle");
+        CheckBox CheckBox(string name) => layer.FindChild(name, true, false) as CheckBox
+            ?? throw new InvalidOperationException("Missing checkbox: " + name);
+        var skip = CheckBox("LocalSkipVerification");
+        if (!skip.ButtonPressed || ((Control)layer.FindChild("LocalAdvancedOptions", true, false)!).Visible ||
+            ((Control)layer.FindChild("CoachDiagnostics", true, false)!).Visible ||
+            ((Control)layer.FindChild("AiOptions", true, false)!).Visible ||
+            ((Control)layer.FindChild("LocalResultDetails", true, false)!).Visible ||
+            ((Control)layer.FindChild("LocalProgressDetails", true, false)!).Visible)
+            throw new InvalidOperationException("Simplified UI defaults did not apply");
         var visibility = typeof(CoachOverlay).GetMethod("ApplyPanelContext", fields)!;
         var manual = typeof(CoachOverlay).GetField("_manualPanelVisibility", fields)!;
         var visibilityChecks = new List<object>();
@@ -98,6 +107,25 @@ internal static class PresentationIntegration
         var pool = (LocalWorkerPool)typeof(CoachOverlay).GetField("_localPool", fields)!.GetValue(overlay)!;
         var count = typeof(LocalWorkerPool).GetMethod("Count", fields)!;
         var captured = new LocalSearchRequest("ui-only", "snapshot", [], "hash", 0, [], false);
+        var optionChecks = new List<object>();
+        CheckBox("LocalIncludePotions").ButtonPressed = true;
+        CheckBox("LocalStopOnZeroLoss").ButtonPressed = false;
+        foreach (bool skipFinal in new[] { false, true })
+        {
+            skip.ButtonPressed = skipFinal;
+            var preferences = store.Load().Settings;
+            if (preferences.LocalSkipFinalVerification != skipFinal || !preferences.LocalIncludePotions || preferences.LocalStopOnZeroLoss)
+                throw new InvalidOperationException("Local checkbox changes did not persist together");
+            foreach (var order in new[] { LocalSearchOrder.MonteCarlo, LocalSearchOrder.TurnFrontier })
+            {
+                var frozen = (LocalSearchRequest)configure.Invoke(overlay, [captured, order])!;
+                if (frozen.SkipFinalVerification != skipFinal || !frozen.IncludePotions || frozen.StopOnZeroLoss)
+                    throw new InvalidOperationException("Local checkbox state diverges between algorithms");
+                optionChecks.Add(new { algorithm = order.ToString(), skip_final_verification = skipFinal });
+            }
+        }
+        CheckBox("LocalIncludePotions").ButtonPressed = false;
+        CheckBox("LocalStopOnZeroLoss").ButtonPressed = true;
         foreach (var order in new[] { LocalSearchOrder.MonteCarlo, LocalSearchOrder.TurnFrontier })
         {
             var request = (LocalSearchRequest)configure.Invoke(overlay, [captured, order])!;
@@ -107,13 +135,35 @@ internal static class PresentationIntegration
                 throw new InvalidOperationException("Merged controls no longer configure both algorithms or manual concurrency");
         }
         var layouts = new List<object>();
+        var progressPanel = (LocalProgressPanel)typeof(CoachOverlay).GetField("_localProgress", fields)!.GetValue(overlay)!;
+        var visual = (Control)typeof(LocalProgressPanel).GetField("_visual", fields)!.GetValue(progressPanel)!;
+        var map = typeof(LocalProgressPanel).GetField("_map", fields)!.GetValue(progressPanel)!;
+        var pulse = (Godot.Timer)map.GetType().GetField("_pulse", fields)!.GetValue(map)!;
+        void PreviewRoutes()
+        {
+            // Presentation fixtures only: not native outcomes, benchmark evidence,
+            // game combat states, executable checkpoints or generated plans.
+            progressPanel.Begin(captured);
+            for (int worker = 0; worker < 16; worker++)
+            {
+                var preview = new LocalSimState(6, 87 - worker, 87, 48, 2, "壁垒", ["全身撞击+"], 2,
+                    [new(1, "演示敌人", 84 + worker, 180, 0, "", "攻击")]);
+                LocalSimEvent[] events = [new(1, 6, "打出「武装+」。", "升级手牌。"),
+                    new(2, 6, "打出「防御+」。", "格挡 40→48"), new(3, 6, "打出「全身撞击+」。", "敌方生命 132→84")];
+                progressPanel.Accept(new(captured.Id, captured.SnapshotId, worker, 16, 1, worker + 1,
+                    5, 64, worker == 0 ? 1 : 0, 5000, 60, "正在探索", preview, events,
+                    Best: worker == 0 ? new(1, 87, 87, 87, 6, 0) : null));
+            }
+            progressPanel.Accept(new("stale-job", captured.SnapshotId, 0, 16, 9, 100, 10, 64, 2, 9000, 60,
+                "过期数据", null, []));
+        }
         foreach (var size in new[] { new Vector2I(1280, 720), new Vector2I(1920, 1080) })
         {
             tree.Root.ContentScaleSize = size;
             tree.Root.ContentScaleMode = Window.ContentScaleModeEnum.CanvasItems;
             typeof(CoachOverlay).GetMethod("Resize", fields)!.Invoke(overlay, null);
             ((Label)typeof(CoachOverlay).GetField("_battle", fields)!.GetValue(overlay)!).Text =
-                "第 6 轮 · 出牌阶段\n生命 87/87 · 格挡 28 · 能量 3\n手牌 7 / 抽牌 12 / 弃牌 9 / 消耗 4";
+                "第 6 回合 · 生命 87/87 · 能量 3";
             ((RichTextLabel)typeof(CoachOverlay).GetField("_advice", fields)!.GetValue(overlay)!).Text =
                 "本地计算完成 · 战后生命 87/87\n第 1 回合\n1. 打出防御，获得格挡。\n2. 打出全身撞击，击败当前目标。\n第 2 回合\n3. 结束回合并等待结算。";
             for (int i = 0; i < 4; i++) await tree.ToSignal(tree, SceneTree.SignalName.ProcessFrame);
@@ -132,11 +182,45 @@ internal static class PresentationIntegration
                 await tree.ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
                 tree.Root.GetTexture().GetImage().SavePng(Path.Combine(root, $"coach-{size.X}x{size.Y}.png"));
             }
+            PreviewRoutes();
+            for (int i = 0; i < 4; i++) await tree.ToSignal(tree, SceneTree.SignalName.ProcessFrame);
+            var technical = (Control)layer.FindChild("LocalProgressDetails", true, false)!;
+            var caption = (Label)typeof(LocalProgressPanel).GetField("_caption", fields)!.GetValue(progressPanel)!;
+            if (!visual.IsVisibleInTree() || pulse.IsStopped() || technical.Visible || caption.Text.Contains("过期"))
+                throw new InvalidOperationException("Route visualization failed to show valid progress with technical records hidden");
+            rect = panel.GetGlobalRect();
+            if (Descendants(panel).OfType<Control>().Where(c => c.IsVisibleInTree()).Any(c =>
+                c.GetGlobalRect().Position.X < rect.Position.X - 1 || c.GetGlobalRect().End.X > rect.End.X + 1))
+                throw new InvalidOperationException("Route visualization exceeds panel width");
+            var routePicker = (OptionButton)layer.FindChild("LocalProgressWorker", true, false)!;
+            routePicker.Select(15); routePicker.EmitSignal(OptionButton.SignalName.ItemSelected, 15);
+            var healthLabel = (Label)typeof(LocalProgressPanel).GetField("_health", fields)!.GetValue(progressPanel)!;
+            if (!healthLabel.Text.Contains("72/87")) throw new InvalidOperationException("Route sixteen cannot be selected");
+            routePicker.Select(0); routePicker.EmitSignal(OptionButton.SignalName.ItemSelected, 0);
+            ((ScrollContainer)typeof(CoachOverlay).GetField("_contentScroll", fields)!.GetValue(overlay)!).ScrollVertical = 120;
+            if (DisplayServer.GetName() != "headless")
+            {
+                await tree.ToSignal(RenderingServer.Singleton, RenderingServer.SignalName.FramePostDraw);
+                tree.Root.GetTexture().GetImage().SavePng(Path.Combine(root, $"coach-routes-{size.X}x{size.Y}.png"));
+            }
+            visual.Hide();
+            if (!pulse.IsStopped()) throw new InvalidOperationException("Hidden visualization keeps animating");
+            visual.Show();
+            if (pulse.IsStopped()) throw new InvalidOperationException("Reopened visualization did not resume");
+            progressPanel.Finish("完成", false);
+            if (!pulse.IsStopped() || visual.Visible || !progressPanel.View.Visible)
+                throw new InvalidOperationException("Finished visualization did not stop and collapse");
+            progressPanel.Accept(new(captured.Id, captured.SnapshotId, 0, 16, 100, 200, 20, 64, 2, 9000, 60,
+                "已结束后的进度", null, []));
+            if (caption.Text != "完成") throw new InvalidOperationException("Late progress overwrote the completed view");
+            progressPanel.Finish("", true);
             var settings = (Control)typeof(CoachOverlay).GetField("_settingsPanel", fields)!.GetValue(overlay)!;
+            var aiOptions = (Control)layer.FindChild("AiOptions", true, false)!;
             var advanced = (Control)panel.FindChild("LocalAdvancedOptions", recursive: true, owned: false);
             var diagnostics = (Control)panel.FindChild("CoachDiagnostics", recursive: true, owned: false);
             foreach (var expanded in new[] { settings, advanced, diagnostics })
             {
+                if (expanded == settings) aiOptions.Show();
                 expanded.Show();
                 for (int i = 0; i < 4; i++) await tree.ToSignal(tree, SceneTree.SignalName.ProcessFrame);
                 rect = panel.GetGlobalRect();
@@ -144,11 +228,13 @@ internal static class PresentationIntegration
                     .Where(c => c.IsVisibleInTree()).Any(c => c.GetGlobalRect().Position.X < rect.Position.X - 1 || c.GetGlobalRect().End.X > rect.End.X + 1))
                     throw new InvalidOperationException("Expanded coach section exceeds the viewport");
                 expanded.Hide();
+                if (expanded == settings) aiOptions.Hide();
             }
             ((ScrollContainer)typeof(CoachOverlay).GetField("_contentScroll", fields)!.GetValue(overlay)!).ScrollVertical = 0;
             layouts.Add(new { width = size.X, height = size.Y, measured_width = rect.Size.X, measured_height = rect.Size.Y,
                 controls = controls.Length, horizontal_overflow = overflow.Length, primary_actions_fixed = true,
-                expanded_sections_checked = 3 });
+                expanded_sections_checked = 3, visualization_workers = 16, visualization_rendered = true,
+                hidden_and_finished_animation_stops = true, route_sixteen_selectable = true });
         }
         layer.QueueFree();
         LocalWire.Write(Path.Combine(root, "integration-presentation-summary.json"), new
@@ -159,6 +245,9 @@ internal static class PresentationIntegration
             , merged_budget_controls_persisted = true, both_algorithm_requests_checked = true,
             manual_worker_limit_preserved = 8, visibility_checks = visibilityChecks,
             visibility_contexts_are_ui_only = true
+            , skip_final_verification_defaults_checked = true, checkbox_options_persisted = true,
+            checkbox_algorithm_checks = optionChecks, advanced_and_diagnostics_default_hidden = true,
+            visualization_input_is_presentation_fixture_only = true, stale_and_late_progress_rejected = true
         });
     }
 
