@@ -38,15 +38,22 @@ public sealed class SettingsStore
     public void SaveLocalWorkers(int workers) => SaveLocalOptions(workers, null);
 
     public void SaveLocalOptions(int workers, bool? includePotions, bool? stopOnZeroLoss = null,
-        int? targetVictoryRounds = null)
+        int? targetVictoryRounds = null, int? maxAttempts = null, int? maxRounds = null,
+        int? searchSeconds = null)
     {
         if (workers is < 0 or > 16) throw new ArgumentOutOfRangeException(nameof(workers));
-        if (targetVictoryRounds is < 0 or > LocalCalculation.Rounds) throw new ArgumentOutOfRangeException(nameof(targetVictoryRounds));
+        if (targetVictoryRounds is < 0 or > LocalCalculation.MaximumRounds) throw new ArgumentOutOfRangeException(nameof(targetVictoryRounds));
+        if (!LocalCalculation.ValidLimits(maxAttempts ?? LocalCalculation.AttemptsPerWorker,
+            maxRounds ?? LocalCalculation.Rounds, searchSeconds ?? LocalCalculation.SearchSeconds))
+            throw new ArgumentOutOfRangeException(nameof(maxAttempts));
         var settings = File.Exists(ConfigPath) ? JsonNode.Parse(File.ReadAllText(ConfigPath))!.AsObject() : new JsonObject();
         settings["local_workers"] = workers;
         if (includePotions.HasValue) settings["local_include_potions"] = includePotions.Value;
         if (stopOnZeroLoss.HasValue) settings["local_stop_on_zero_loss"] = stopOnZeroLoss.Value;
         if (targetVictoryRounds.HasValue) settings["local_target_victory_rounds"] = targetVictoryRounds.Value;
+        if (maxAttempts.HasValue) settings["local_max_attempts"] = maxAttempts.Value;
+        if (maxRounds.HasValue) settings["local_max_rounds"] = maxRounds.Value;
+        if (searchSeconds.HasValue) settings["local_search_seconds"] = searchSeconds.Value;
         Directory.CreateDirectory(_directory);
         AtomicWrite(ConfigPath, Encoding.UTF8.GetBytes(settings.ToJsonString()));
         // Local-only preferences must not require AI credentials or rewrite the encrypted key.

@@ -62,13 +62,14 @@ internal static class LocalWorkerDataMode
             [typeof(IEnumerable<CardPileAddResult>), typeof(bool)]);
         Prefix(typeof(CardModel), "PlayPowerCardFlyVfx", nameof(PresentationTask));
         Prefix(typeof(NGame), nameof(NGame.ScreenShake), nameof(PresentationVoid));
-        // This native death callback unsubscribes its event before accessing an
-        // optional animation node. Keep the callback and all death rules intact.
-        harmony.Patch(AccessTools.DeclaredMethod(typeof(SoulNexus), "AfterDeath", [typeof(Creature)]),
-            transpiler: new(AccessTools.Method(typeof(LocalWorkerDataMode), nameof(OptionalCreaturePresentation))));
         foreach (var factory in typeof(NDamageNumVfx).GetMethods().Where(m => m.Name == nameof(NDamageNumVfx.Create)))
             harmony.Patch(factory, prefix: new(AccessTools.Method(typeof(LocalWorkerDataMode), nameof(DamageVisual))));
         Prefix(typeof(PlayerHurtVignetteHelper), nameof(PlayerHurtVignetteHelper.Play), nameof(PresentationVoid));
+        // The native death callback removes its subscription before obtaining
+        // an optional animation node. Keep that cleanup and every death hook;
+        // only guard the missing presentation receiver in scene-free workers.
+        harmony.Patch(AccessTools.Method(typeof(SoulNexus), "AfterDeath", [typeof(Creature)]),
+            transpiler: new(AccessTools.Method(typeof(LocalWorkerDataMode), nameof(DeathCreatureVisual))));
         Prefix(typeof(CardCmd), "PreviewInternal", nameof(Preview));
         Prefix(typeof(ForgeCmd), "PreviewSovereignBlade", nameof(PresentationVoid));
         var transform = typeof(CardCmd).GetMethods().Single(m => m.Name == nameof(CardCmd.Transform) &&
@@ -124,6 +125,27 @@ internal static class LocalWorkerDataMode
     private static bool PresentationVoid() => !Active;
     private static bool DamageVisual(ref NDamageNumVfx? __result)
     { if (!Active) return true; __result = null; return false; }
+    private static NCreature? FindCreatureVisual(NCombatRoom? room, Creature creature) =>
+        Active && (room == null || !GodotObject.IsInstanceValid(room)) ? null : room!.GetCreatureNode(creature);
+    private static IEnumerable<CodeInstruction> DeathCreatureVisual(IEnumerable<CodeInstruction> instructions)
+    {
+        var lookup = AccessTools.Method(typeof(NCombatRoom), nameof(NCombatRoom.GetCreatureNode), [typeof(Creature)]);
+        int calls = 0;
+        foreach (var instruction in instructions)
+        {
+            if (instruction.Calls(lookup))
+            {
+                calls++;
+                yield return new CodeInstruction(instruction)
+                {
+                    opcode = OpCodes.Call,
+                    operand = AccessTools.Method(typeof(LocalWorkerDataMode), nameof(FindCreatureVisual))
+                };
+            }
+            else yield return instruction;
+        }
+        if (calls != 1) throw new InvalidOperationException("Native death animation lookup boundary changed");
+    }
     private static bool Preview(CardModel card, bool isAddingCardsToPile, ref TaskCompletionSource? __result)
     {
         if (!Active) return true;
@@ -276,24 +298,6 @@ internal static class LocalWorkerDataMode
         if (count != 1) throw new InvalidOperationException("Native state notification boundary changed");
     }
     private static bool PresentationIsOn() => Active || TestMode.IsOn;
-    private static NCreature? CreaturePresentation(NCombatRoom? room, Creature creature) =>
-        Active ? null : room!.GetCreatureNode(creature);
-    private static IEnumerable<CodeInstruction> OptionalCreaturePresentation(IEnumerable<CodeInstruction> instructions)
-    {
-        var original = AccessTools.Method(typeof(NCombatRoom), nameof(NCombatRoom.GetCreatureNode), [typeof(Creature)]);
-        int count = 0;
-        foreach (var instruction in instructions)
-        {
-            if (instruction.Calls(original))
-            {
-                count++;
-                yield return new CodeInstruction(instruction) { opcode = OpCodes.Call,
-                    operand = AccessTools.Method(typeof(LocalWorkerDataMode), nameof(CreaturePresentation)) };
-            }
-            else yield return instruction;
-        }
-        if (count != 1) throw new InvalidOperationException("Native optional creature presentation boundary changed");
-    }
     private static bool PresentationIsOff() => !Active && TestMode.IsOff;
     private static IEnumerable<CodeInstruction> TransformPresentation(IEnumerable<CodeInstruction> instructions)
     {

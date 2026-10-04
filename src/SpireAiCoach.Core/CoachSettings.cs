@@ -12,6 +12,9 @@ public sealed record CoachSettings
     public bool LocalIncludePotions { get; init; }
     public bool LocalStopOnZeroLoss { get; init; } = true;
     public int LocalTargetVictoryRounds { get; init; }
+    public int LocalMaxAttempts { get; init; } = LocalCalculation.AttemptsPerWorker;
+    public int LocalMaxRounds { get; init; } = LocalCalculation.Rounds;
+    public int LocalSearchSeconds { get; init; } = LocalCalculation.SearchSeconds;
 
     public Uri Endpoint()
     {

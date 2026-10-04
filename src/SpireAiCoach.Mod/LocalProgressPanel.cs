@@ -70,7 +70,7 @@ public sealed class LocalProgressPanel
             _hp.MaxValue = Math.Max(1, state.MaxHp); _hp.Value = Math.Clamp(state.Hp, 0, Math.Max(1, state.MaxHp));
             _state.Text = LocalProgressBook.StateText(state);
         }
-        else { _hp.Value = 0; _state.Text = progress.Phase + "；此阶段暂无战斗画面数据。"; }
+        else { _hp.Value = 0; _state.Text = progress.Phase; }
         _events.Text = string.Join("\n\n", progress.Events.Select(e => $"第 {e.Round} 回合 · 步骤 {e.Step}：{e.Action}\n{e.Changes}"));
     }
 }

@@ -259,8 +259,8 @@ public static class LocalWorker
         try
         {
             if (request.Partitions is < 1 or > 16 || request.Partition < 0 || request.Partition >= request.Partitions ||
-                request.MaxNodes is < 1 or > 128 || request.MaxDepth is < 1 or > 64 || request.BudgetSeconds is < 1 or > 120 ||
-                request.MaxRounds is < 1 or > 128 || request.SimulationSpeed is < 1 or > 16)
+                !LocalCalculation.ValidLimits(request.MaxNodes, request.MaxRounds, request.BudgetSeconds) ||
+                request.MaxDepth is < 1 or > 64 || request.SimulationSpeed is < 1 or > 16)
                 throw new InvalidDataException("Invalid search limits");
             CheckCancellation();
             // Owned worker only. Accelerate native animation/timer waits, never model effects/RNG.
@@ -885,6 +885,20 @@ public static class LocalWorker
         {
             // Any replay divergence invalidates this worker's result, including previous candidates.
             best = null;
+            // Keep the complete cause before a compatibility pass restarts this instance.
+            // These private per-request files are not overwritten by Ensure/request polling.
+            try
+            {
+                LocalWire.Write(Path.Combine(_root, "failure-" + Guid.NewGuid().ToString("N") + ".json"), new
+                {
+                    captured_at = DateTimeOffset.UtcNow, request.Id, request.SnapshotId, worker = request.Partition,
+                    stage = _traceStage, route = _traceRoute, step = _traceStep,
+                    request.DataOnlyCombat, request.DataOnlyRun, request.NumericalExecution,
+                    exception = ex.ToString(), trace = _timeline?.Snapshot()
+                });
+            }
+            catch (Exception recording) when (recording is IOException or UnauthorizedAccessException)
+            { GD.Print("[SpireAiCoach] Failed to retain worker exception: " + recording.Message); }
             Progress("失败：" + ex.Message, force: true, status: "failed");
             session?.Dispose();
             Publish("failed", ex.Message);
@@ -1074,7 +1088,15 @@ public static class LocalWorker
             }
             using var scene = Trace("scene", LocalWorkerDataMode.Active ? "原生战斗初始化" : "场景与战斗初始化", depth: 2);
             manager.Launch();
-            if (!LocalWorkerDataMode.MinimalRun) NGame.Instance!.RootSceneContainer.SetCurrentScene(NRun.Create(run));
+            if (!LocalWorkerDataMode.MinimalRun)
+            {
+                NGame.Instance!.RootSceneContainer.SetCurrentScene(NRun.Create(run));
+                // Native map/overlay/timer initialization is deferred until the
+                // scene is attached. An instant short victory can otherwise
+                // replace that scene before its callbacks obtain their receivers.
+                // Model-only search creates no NRun and pays no frame wait here.
+                await Frame(); await Frame();
+            }
             await manager.GenerateMap();
             if (request.DebugEncounter is { } encounter)
                 await manager.EnterRoomDebug(RoomType.Monster, MapPointType.Monster,

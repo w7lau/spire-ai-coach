@@ -1,0 +1,37 @@
+{
+  "passed": true,
+  "version": "0.7.24",
+  "regular_scene_dependency_preserved": true,
+  "data_callback_preserves_unsubscribe": true,
+  "creature_hp_unchanged": true,
+  "no_combat_scene": true,
+  "no_worker_started": true,
+  "layouts": [
+    {
+      "width": 1280,
+      "height": 720,
+      "measured_width": 560,
+      "measured_height": 640,
+      "controls": 43,
+      "horizontal_overflow": 0,
+      "primary_actions_fixed": true,
+      "expanded_sections_checked": 3
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "measured_width": 560,
+      "measured_height": 1000,
+      "controls": 43,
+      "horizontal_overflow": 0,
+      "primary_actions_fixed": true,
+      "expanded_sections_checked": 3
+    }
+  ],
+  "merged_budget_controls_persisted": true,
+  "both_algorithm_requests_checked": true,
+  "manual_worker_limit_preserved": 8,
+  "mod_sha256": "5cccade974581ce9a415ea3742629ceefe78801232a038e9f11c4728d3d7052f",
+  "core_checks": "212/212",
+  "full_battle_replay": false
+}

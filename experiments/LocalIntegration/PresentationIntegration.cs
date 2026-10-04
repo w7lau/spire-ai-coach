@@ -49,6 +49,33 @@ internal static class PresentationIntegration
 
         var overlay = new CoachOverlay(tree); overlay.Mount();
         var layer = tree.Root.GetNode<CanvasLayer>("SpireAiCoach");
+        // Exercise the merged budget controls in this private userdata without
+        // launching a search or substituting a route for a real combat.
+        SpinBox Spin(string name) => layer.FindChild(name, true, false) as SpinBox
+            ?? throw new InvalidOperationException("Missing merged product control: " + name);
+        Spin("LocalWorkers").Value = 8;
+        Spin("LocalMaxAttempts").Value = 257;
+        Spin("LocalMaxRounds").Value = 130;
+        Spin("LocalSearchSeconds").Value = 125;
+        Spin("LocalTargetVictoryRounds").Value = 120;
+        ((Button)layer.FindChild("LocalSaveSettings", true, false)!).EmitSignal(Button.SignalName.Pressed);
+        var store = (SettingsStore)typeof(CoachOverlay).GetField("_store", fields)!.GetValue(overlay)!;
+        var saved = store.Load().Settings;
+        if (saved.LocalWorkers != 8 || saved.LocalMaxAttempts != 257 || saved.LocalMaxRounds != 130 ||
+            saved.LocalSearchSeconds != 125 || saved.LocalTargetVictoryRounds != 120 || Spin("LocalTargetVictoryRounds").MaxValue != 130)
+            throw new InvalidOperationException("Merged budget controls did not persist or update the horizon");
+        var configure = typeof(CoachOverlay).GetMethod("ConfigureLocalRequest", fields)!;
+        var pool = (LocalWorkerPool)typeof(CoachOverlay).GetField("_localPool", fields)!.GetValue(overlay)!;
+        var count = typeof(LocalWorkerPool).GetMethod("Count", fields)!;
+        var captured = new LocalSearchRequest("ui-only", "snapshot", [], "hash", 0, [], false);
+        foreach (var order in new[] { LocalSearchOrder.MonteCarlo, LocalSearchOrder.TurnFrontier })
+        {
+            var request = (LocalSearchRequest)configure.Invoke(overlay, [captured, order])!;
+            if (request.SearchOrder != order || request.Workers != 8 || request.MaxNodes != 257 || request.MaxRounds != 130 ||
+                request.BudgetSeconds != 125 || request.TargetVictoryRounds != 120 ||
+                (int)count.Invoke(pool, [request.Workers, request.AdaptiveWorkers])! != 8)
+                throw new InvalidOperationException("Merged controls no longer configure both algorithms or manual concurrency");
+        }
         var panel = layer.GetNode<PanelContainer>("CoachPanel"); panel.Show();
         var layouts = new List<object>();
         foreach (var size in new[] { new Vector2I(1280, 720), new Vector2I(1920, 1080) })
@@ -100,6 +127,8 @@ internal static class PresentationIntegration
             passed = true, version = typeof(CoachOverlay).Assembly.GetName().Version?.ToString(3),
             regular_scene_dependency_preserved = nativeNeedsScene, data_callback_preserves_unsubscribe = true,
             creature_hp_unchanged = true, no_combat_scene = true, no_worker_started = true, layouts
+            , merged_budget_controls_persisted = true, both_algorithm_requests_checked = true,
+            manual_worker_limit_preserved = 8
         });
     }
 

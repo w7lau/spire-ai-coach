@@ -6,14 +6,18 @@ static class ConcurrencyTests
 
     public static void Register(Action<string, Action> test, Action<string, Func<Task>> asyncTest)
     {
-        test("adaptive concurrency treats configured workers as a resource ceiling", () =>
+        test("adaptive concurrency honors manual ceilings and estimates resources only in automatic mode", () =>
         {
             const ulong gb = 1024UL * 1024 * 1024;
             Check(LocalConcurrency.Limit(32, 64 * gb, 8) == 8);
-            Check(LocalConcurrency.Limit(32, 4 * gb, 8) == 1);
-            Check(LocalConcurrency.Limit(2, 64 * gb, 8) == 2);
+            Check(LocalConcurrency.Limit(32, 4 * gb, 8) == 8);
+            Check(LocalConcurrency.Limit(2, 64 * gb, 8) == 8);
+            Check(LocalConcurrency.Limit(16, 9 * gb, 8) == 8);
+            Check(LocalConcurrency.Limit(16, 9 * gb, 0) == 4);
             Check(LocalConcurrency.Limit(32, 64 * gb, 0) == 8);
-            Check(LocalConcurrency.Limit(32, 0, 16) == 1);
+            Check(LocalConcurrency.Limit(32, 0, 16) == 16);
+            Check(LocalConcurrency.Limit(32, 0, 0) == 1);
+            Check(LocalConcurrency.Limit(32, 64 * gb, 100) == 16);
         });
         test("adaptive concurrency admits only waiting independent jobs", () =>
         {
