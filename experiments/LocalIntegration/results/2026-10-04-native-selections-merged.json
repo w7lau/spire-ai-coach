@@ -320,5 +320,16 @@
     "Native card cases are short synthetic routes, not a complete search-quality or speed comparison.",
     "No global optimality or arbitrary private-UI/unserialized-Mod-state compatibility claim.",
     "Native engine shutdown still reports texture/RID/resource leaks."
-  ]
+  ],
+  "installation": {
+    "version": "0.7.35",
+    "status": "installed",
+    "implementation_commit": "5708dd78f2a901c66bf10f454d31cf74a69fccce",
+    "same_dll_as_native_probes_and_package": true,
+    "protected_files_checked": 307,
+    "protected_hashes_unchanged": true,
+    "old_binary_and_manifest_backed_up_and_checked": true,
+    "worker_cache_cleanup": false,
+    "game_started": false
+  }
 }
