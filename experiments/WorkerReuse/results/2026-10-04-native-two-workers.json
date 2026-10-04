@@ -1,0 +1,598 @@
+{
+  "baseline": "2237d798829d61bee3c7ce733b98693dedbe67f9",
+  "implementation_commit": "5a1c85d136d4e94b908d6ae2f259d476a0cb763f",
+  "harness_parent": "8b0b73afaf3d68cc18e3af50b4facd99e9569878",
+  "kind": "real two-worker native acceptance, fixed admission, frozen replay without answer seeds",
+  "run": {
+    "passed": true,
+    "max_owned_workers": 2,
+    "admission": "fixed two-lane comparison; adaptive admissions remain in synthetic coverage",
+    "unseeded_goal": {
+      "rounds": 6,
+      "net_loss": 0,
+      "potions": 0,
+      "known_enemy_damage": 0,
+      "independent_replay": true
+    },
+    "records": [
+      {
+        "stage": "prewarm_first_only",
+        "prepare_ms": 18378,
+        "pid": 14416,
+        "live_workers": 1
+      },
+      {
+        "stage": "goal_while_real_peer_preparing",
+        "wall_ms": 5446,
+        "Status": "done",
+        "StoppedEarly": true,
+        "Workers": 2,
+        "WorkerLimit": 2,
+        "Evaluated": 1,
+        "Rejected": 0,
+        "Timing": {
+          "RestoreMs": 1135,
+          "ActionMs": 498,
+          "DecisionMs": 177,
+          "VerificationMs": 2782,
+          "StartupMs": 0,
+          "Actions": 18,
+          "Restores": 1,
+          "Verifications": 1
+        },
+        "Won": true,
+        "StartingHp": 80,
+        "Hp": 80,
+        "HpLost": 10,
+        "NetHpLoss": 0,
+        "Rounds": 5,
+        "damage_sources": {
+          "Enemy": 0,
+          "Self": 10,
+          "Unknown": 0,
+          "Unattributed": 0,
+          "AccountingMatches": true,
+          "Complete": true
+        },
+        "potion_uses": 0,
+        "verified_steps": 18,
+        "unseeded": true,
+        "goal_passed": true,
+        "peer_still_preparing": true,
+        "cleanup": null,
+        "identities": [
+          {
+            "Lane": 0,
+            "pid": 14416,
+            "started_utc": "2026-10-04T02:14:29.7834539Z",
+            "generation": "9705ba45a378423997ed55e7819e4037",
+            "private_memory_bytes": 1446412288
+          },
+          {
+            "Lane": 1,
+            "pid": 41348,
+            "started_utc": "2026-10-04T02:14:48.1829676Z",
+            "generation": "169d77b949e24bb08205fa1a1c33b85b",
+            "private_memory_bytes": 424923136
+          }
+        ]
+      },
+      {
+        "stage": "join_retained_preparation",
+        "wait_ms": 13162,
+        "unchanged_peer_identity": true,
+        "identities": [
+          {
+            "Lane": 0,
+            "pid": 14416,
+            "started_utc": "2026-10-04T02:14:29.7834539Z",
+            "generation": "9705ba45a378423997ed55e7819e4037",
+            "private_memory_bytes": 1429848064
+          },
+          {
+            "Lane": 1,
+            "pid": 41348,
+            "started_utc": "2026-10-04T02:14:48.1829676Z",
+            "generation": "169d77b949e24bb08205fa1a1c33b85b",
+            "private_memory_bytes": 1284513792
+          }
+        ]
+      },
+      {
+        "stage": "two_ready_lanes_goal_and_cleanup",
+        "wall_ms": 2801,
+        "Status": "done",
+        "StoppedEarly": true,
+        "Workers": 2,
+        "WorkerLimit": 2,
+        "Evaluated": 1,
+        "Rejected": 0,
+        "Timing": {
+          "RestoreMs": 1121,
+          "ActionMs": 62,
+          "DecisionMs": 175,
+          "VerificationMs": 914,
+          "StartupMs": 0,
+          "Actions": 18,
+          "Restores": 2,
+          "Verifications": 1
+        },
+        "Won": true,
+        "StartingHp": 80,
+        "Hp": 80,
+        "HpLost": 10,
+        "NetHpLoss": 0,
+        "Rounds": 5,
+        "damage_sources": {
+          "Enemy": 0,
+          "Self": 10,
+          "Unknown": 0,
+          "Unattributed": 0,
+          "AccountingMatches": true,
+          "Complete": true
+        },
+        "potion_uses": 0,
+        "verified_steps": 18,
+        "unseeded": true,
+        "goal_passed": true,
+        "peer_still_preparing": false,
+        "cleanup": [
+          {
+            "lane": 0,
+            "request_id": "88224ecf27744cdf98d268564f5c293c-verify-0",
+            "partition": 0,
+            "partitions": 2,
+            "cleanup_matches": true,
+            "other_lane_rejected": true,
+            "current_generation": "9705ba45a378423997ed55e7819e4037",
+            "phase": "independent_verification"
+          },
+          {
+            "lane": 1,
+            "request_id": "88224ecf27744cdf98d268564f5c293c",
+            "partition": 1,
+            "partitions": 2,
+            "cleanup_matches": true,
+            "other_lane_rejected": true,
+            "current_generation": "169d77b949e24bb08205fa1a1c33b85b",
+            "phase": "search"
+          }
+        ],
+        "identities": [
+          {
+            "Lane": 0,
+            "pid": 14416,
+            "started_utc": "2026-10-04T02:14:29.7834539Z",
+            "generation": "9705ba45a378423997ed55e7819e4037",
+            "private_memory_bytes": 1569005568
+          },
+          {
+            "Lane": 1,
+            "pid": 41348,
+            "started_utc": "2026-10-04T02:14:48.1829676Z",
+            "generation": "169d77b949e24bb08205fa1a1c33b85b",
+            "private_memory_bytes": 1280151552
+          }
+        ]
+      },
+      {
+        "stage": "two_lane_cancel_and_stale_stop_isolation",
+        "cancellation_ms": 88.6689,
+        "progress_sequences": {
+          "0": 5,
+          "1": 6
+        },
+        "cleanup": [
+          {
+            "lane": 0,
+            "request_id": "aa6bb4cf47274cb88c377e4fbc051d17",
+            "partition": 0,
+            "partitions": 2,
+            "cleanup_matches": true,
+            "other_lane_rejected": true,
+            "current_generation": "9705ba45a378423997ed55e7819e4037",
+            "phase": "search"
+          },
+          {
+            "lane": 1,
+            "request_id": "aa6bb4cf47274cb88c377e4fbc051d17",
+            "partition": 1,
+            "partitions": 2,
+            "cleanup_matches": true,
+            "other_lane_rejected": true,
+            "current_generation": "169d77b949e24bb08205fa1a1c33b85b",
+            "phase": "search"
+          }
+        ],
+        "stale_stop_injected": true,
+        "stale_stop_rejected_by_later_native_progress": true,
+        "fault_injection": null,
+        "healthy_lane_pid": 14416,
+        "peer_pid": 41348
+      },
+      {
+        "stage": "two_lane_cancel_then_research",
+        "wall_ms": 1824,
+        "Status": "done",
+        "StoppedEarly": true,
+        "Workers": 2,
+        "WorkerLimit": 2,
+        "Evaluated": 2,
+        "Rejected": 0,
+        "Timing": {
+          "RestoreMs": 74,
+          "ActionMs": 177,
+          "DecisionMs": 271,
+          "VerificationMs": 886,
+          "StartupMs": 0,
+          "Actions": 36,
+          "Restores": 2,
+          "Verifications": 1
+        },
+        "Won": true,
+        "StartingHp": 80,
+        "Hp": 80,
+        "HpLost": 10,
+        "NetHpLoss": 0,
+        "Rounds": 5,
+        "damage_sources": {
+          "Enemy": 0,
+          "Self": 10,
+          "Unknown": 0,
+          "Unattributed": 0,
+          "AccountingMatches": true,
+          "Complete": true
+        },
+        "potion_uses": 0,
+        "verified_steps": 18,
+        "unseeded": true,
+        "goal_passed": true,
+        "peer_still_preparing": false,
+        "cleanup": [
+          {
+            "lane": 0,
+            "request_id": "8a458003712a4130a49fc3b75c87d689-verify-0",
+            "partition": 0,
+            "partitions": 2,
+            "cleanup_matches": true,
+            "other_lane_rejected": true,
+            "current_generation": "9705ba45a378423997ed55e7819e4037",
+            "phase": "independent_verification"
+          },
+          {
+            "lane": 1,
+            "request_id": "8a458003712a4130a49fc3b75c87d689",
+            "partition": 1,
+            "partitions": 2,
+            "cleanup_matches": true,
+            "other_lane_rejected": true,
+            "current_generation": "169d77b949e24bb08205fa1a1c33b85b",
+            "phase": "search"
+          }
+        ],
+        "identities": [
+          {
+            "Lane": 0,
+            "pid": 14416,
+            "started_utc": "2026-10-04T02:14:29.7834539Z",
+            "generation": "9705ba45a378423997ed55e7819e4037",
+            "private_memory_bytes": 1496702976
+          },
+          {
+            "Lane": 1,
+            "pid": 41348,
+            "started_utc": "2026-10-04T02:14:48.1829676Z",
+            "generation": "169d77b949e24bb08205fa1a1c33b85b",
+            "private_memory_bytes": 1298481152
+          }
+        ]
+      },
+      {
+        "stage": "two_lane_verification_cancel",
+        "cancellation_ms": 157.3514,
+        "progress_sequences": {
+          "0": 2000002
+        },
+        "cleanup": [
+          {
+            "lane": 0,
+            "request_id": "945af4941c304c4091d00a7fd2f03a83-verify-0",
+            "partition": 0,
+            "partitions": 2,
+            "cleanup_matches": true,
+            "other_lane_rejected": true,
+            "current_generation": "9705ba45a378423997ed55e7819e4037",
+            "phase": "independent_verification"
+          },
+          {
+            "lane": 1,
+            "request_id": "945af4941c304c4091d00a7fd2f03a83",
+            "partition": 1,
+            "partitions": 2,
+            "cleanup_matches": true,
+            "other_lane_rejected": true,
+            "current_generation": "169d77b949e24bb08205fa1a1c33b85b",
+            "phase": "search"
+          }
+        ],
+        "stale_stop_injected": false,
+        "stale_stop_rejected_by_later_native_progress": false,
+        "fault_injection": null,
+        "healthy_lane_pid": 14416,
+        "peer_pid": 41348
+      },
+      {
+        "stage": "two_lane_verification_cancel_then_research",
+        "wall_ms": 1819,
+        "Status": "done",
+        "StoppedEarly": true,
+        "Workers": 2,
+        "WorkerLimit": 2,
+        "Evaluated": 2,
+        "Rejected": 0,
+        "Timing": {
+          "RestoreMs": 72,
+          "ActionMs": 125,
+          "DecisionMs": 238,
+          "VerificationMs": 903,
+          "StartupMs": 0,
+          "Actions": 36,
+          "Restores": 2,
+          "Verifications": 1
+        },
+        "Won": true,
+        "StartingHp": 80,
+        "Hp": 80,
+        "HpLost": 10,
+        "NetHpLoss": 0,
+        "Rounds": 5,
+        "damage_sources": {
+          "Enemy": 0,
+          "Self": 10,
+          "Unknown": 0,
+          "Unattributed": 0,
+          "AccountingMatches": true,
+          "Complete": true
+        },
+        "potion_uses": 0,
+        "verified_steps": 18,
+        "unseeded": true,
+        "goal_passed": true,
+        "peer_still_preparing": false,
+        "cleanup": [
+          {
+            "lane": 0,
+            "request_id": "394d495aad934d06893d41ff60fffc43-verify-0",
+            "partition": 0,
+            "partitions": 2,
+            "cleanup_matches": true,
+            "other_lane_rejected": true,
+            "current_generation": "9705ba45a378423997ed55e7819e4037",
+            "phase": "independent_verification"
+          },
+          {
+            "lane": 1,
+            "request_id": "394d495aad934d06893d41ff60fffc43",
+            "partition": 1,
+            "partitions": 2,
+            "cleanup_matches": true,
+            "other_lane_rejected": true,
+            "current_generation": "169d77b949e24bb08205fa1a1c33b85b",
+            "phase": "search"
+          }
+        ],
+        "identities": [
+          {
+            "Lane": 0,
+            "pid": 14416,
+            "started_utc": "2026-10-04T02:14:29.7834539Z",
+            "generation": "9705ba45a378423997ed55e7819e4037",
+            "private_memory_bytes": 1562075136
+          },
+          {
+            "Lane": 1,
+            "pid": 41348,
+            "started_utc": "2026-10-04T02:14:48.1829676Z",
+            "generation": "169d77b949e24bb08205fa1a1c33b85b",
+            "private_memory_bytes": 1299189760
+          }
+        ]
+      },
+      {
+        "stage": "unresponsive_peer_only_retired",
+        "cancellation_ms": 2126.3417,
+        "progress_sequences": {
+          "0": 2,
+          "1": 4
+        },
+        "cleanup": {
+          "healthy_peer_acknowledged": true,
+          "only_faulted_peer_retired": true,
+          "retired_pid": 41348,
+          "retired_child_exited": true,
+          "retired_lock_released": true
+        },
+        "stale_stop_injected": false,
+        "stale_stop_rejected_by_later_native_progress": false,
+        "fault_injection": "NtSuspendProcess on owned lane-1 handle only",
+        "healthy_lane_pid": 14416,
+        "peer_pid": null
+      },
+      {
+        "stage": "rebuild_only_faulted_peer",
+        "prepare_ms": 17728,
+        "launches_by_lane": [
+          1,
+          2
+        ],
+        "identities": [
+          {
+            "Lane": 0,
+            "pid": 14416,
+            "started_utc": "2026-10-04T02:14:29.7834539Z",
+            "generation": "9705ba45a378423997ed55e7819e4037",
+            "private_memory_bytes": 1612959744
+          },
+          {
+            "Lane": 1,
+            "pid": 38264,
+            "started_utc": "2026-10-04T02:15:17.9199372Z",
+            "generation": "575c5df30829460da05fbf9cfac6e095",
+            "private_memory_bytes": 1305288704
+          }
+        ]
+      },
+      {
+        "stage": "two_lane_research_after_fault_recovery",
+        "wall_ms": 3774,
+        "Status": "done",
+        "StoppedEarly": true,
+        "Workers": 2,
+        "WorkerLimit": 2,
+        "Evaluated": 1,
+        "Rejected": 0,
+        "Timing": {
+          "RestoreMs": 838,
+          "ActionMs": 54,
+          "DecisionMs": 167,
+          "VerificationMs": 2359,
+          "StartupMs": 0,
+          "Actions": 18,
+          "Restores": 2,
+          "Verifications": 1
+        },
+        "Won": true,
+        "StartingHp": 80,
+        "Hp": 80,
+        "HpLost": 10,
+        "NetHpLoss": 0,
+        "Rounds": 5,
+        "damage_sources": {
+          "Enemy": 0,
+          "Self": 10,
+          "Unknown": 0,
+          "Unattributed": 0,
+          "AccountingMatches": true,
+          "Complete": true
+        },
+        "potion_uses": 0,
+        "verified_steps": 18,
+        "unseeded": true,
+        "goal_passed": true,
+        "peer_still_preparing": false,
+        "cleanup": [
+          {
+            "lane": 0,
+            "request_id": "18555b1021144d2a8300f99af9b28ca7-verify-0",
+            "partition": 0,
+            "partitions": 2,
+            "cleanup_matches": true,
+            "other_lane_rejected": true,
+            "current_generation": "9705ba45a378423997ed55e7819e4037",
+            "phase": "independent_verification"
+          },
+          {
+            "lane": 1,
+            "request_id": "18555b1021144d2a8300f99af9b28ca7",
+            "partition": 1,
+            "partitions": 2,
+            "cleanup_matches": true,
+            "other_lane_rejected": true,
+            "current_generation": "575c5df30829460da05fbf9cfac6e095",
+            "phase": "search"
+          }
+        ],
+        "identities": [
+          {
+            "Lane": 0,
+            "pid": 14416,
+            "started_utc": "2026-10-04T02:14:29.7834539Z",
+            "generation": "9705ba45a378423997ed55e7819e4037",
+            "private_memory_bytes": 1560879104
+          },
+          {
+            "Lane": 1,
+            "pid": 38264,
+            "started_utc": "2026-10-04T02:15:17.9199372Z",
+            "generation": "575c5df30829460da05fbf9cfac6e095",
+            "private_memory_bytes": 1299484672
+          }
+        ]
+      },
+      {
+        "stage": "dispose",
+        "all_owned_children_exited": true,
+        "both_locks_released": true,
+        "max_live_owned_workers": 2,
+        "launches_by_lane": [
+          1,
+          2
+        ],
+        "healthy_lane_rebuilds": 0,
+        "faulted_lane_rebuilds": 1
+      }
+    ]
+  },
+  "verification": {
+    "passed": true,
+    "unchanged_source_asset_count": 245,
+    "installed_coach_sha256_before": "34f616e5a0ac53910a19025584c836620195d700ddf77f78baa934f39612e270",
+    "installed_coach_sha256_after": "34f616e5a0ac53910a19025584c836620195d700ddf77f78baa934f39612e270",
+    "private_coach_sha256": "7620c1b0aee953ae56b33533ac758185fe3ca8c3d70281da58171b9737b18919",
+    "frozen_request_sha256": "7f07f40969f62aa5f3777e8636358f1c1d65cd84bb852e49b0bafec1b76ff0c5",
+    "game_log_sha256": null,
+    "owned_log_hashes": {
+      ".spire-ai-coach-workers/37A815271D8DFD84/worker-0/game.log": "afeb71ffe4b77013c0e34f8b8f21a01682fced49a94611d1d2080364cf798761",
+      ".spire-ai-coach-workers/37A815271D8DFD84/worker-1/game.log": "2a4b3a1bb41a0eefd6dfb2770edfcb3df4d710b69158e76b2a1acf3a67071fc3",
+      "unresponsive-peer-game.log": "81067567926026b7bb621c84fafe32a082e6f66dbbb800b35029e95cd8357e46"
+    },
+    "runtime_error_filter_matches": 0,
+    "engine_errors_after_common_preload": 0,
+    "fatal_files": 0,
+    "engine_error_lines": [
+      "ERROR: Failed to read the root certificate store.",
+      "ERROR: Invalid Task ID",
+      "ERROR: Invalid Task ID",
+      "ERROR: Attempting to initialize the wrong RID",
+      "ERROR: Parameter \"mem\" is null.",
+      "ERROR: Attempting to use an uninitialized RID",
+      "ERROR: Parameter \"shader\" is null.",
+      "ERROR: Failed to read the root certificate store.",
+      "ERROR: Invalid Task ID",
+      "ERROR: Failed to read the root certificate store.",
+      "ERROR: Invalid Task ID",
+      "ERROR: Parameter \"t\" is null."
+    ],
+    "existing_process_query": false,
+    "real_save_access": false,
+    "real_installation_write": false,
+    "provider_calls": false
+  },
+  "regression": {
+    "passed": 207,
+    "total": 207,
+    "log": "2026-10-04-two-worker-regression.txt"
+  },
+  "build": {
+    "native_runner_and_mod": "0 warnings / 0 errors"
+  },
+  "review": {
+    "production_source_changed_in_this_phase": false,
+    "critical_paths": [
+      "tracked preparation and linked caller/goal wait cancellation",
+      "per-request partition/generation cleanup barrier before reuse or broker retirement",
+      "2-second unsafe-stop fallback and per-lane disposal",
+      "native stable cancellation boundaries and independent verification"
+    ],
+    "blocking_findings": []
+  },
+  "limits": [
+    "Fixed two-lane admission forces the cold-peer case; default adaptive admission policy remains covered by automated scheduler tests",
+    "Fault is controlled suspension of an owned process handle, not an arbitrary third-party callback defect",
+    "No foreground menu/UI or real save access",
+    "Only the approved fixture and six Mod set, Windows",
+    "Shared-machine CPU/memory contention not controlled; not a paired speedup benchmark",
+    "Engine startup diagnostics retained; zero generic engine errors after Common preload completion",
+    "No push, merge, installation replacement, paid API calls or shutdown"
+  ]
+}

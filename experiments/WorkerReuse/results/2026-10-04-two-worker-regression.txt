@@ -1,0 +1,214 @@
+PASS shared turn work closed broker still releases client resources
+PASS shared turn work winning improvement requires its exact owned native history
+PASS shared turn work early consumers distinguish startup from exhausted work
+PASS shared turn work publishes only alternatives beyond its owned action and selection prefix
+PASS shared turn work claims later forks once across concurrent native owners
+PASS shared turn work distinguishes a root not yet submitted from an exhausted frontier
+PASS shared turn work retains its listener with all sixteen owners connected
+PASS shared turn work rejects other frozen roots and returns interrupted owned histories
+PASS shared turn work covers a finite native-history oracle without repeating terminals
+PASS worker reuse stop and idle acknowledgements reject stale requests and generations
+PASS worker reuse file handshake rejects stale cleanup and cancellation before accepting the current request
+PASS worker reuse interrupted turn work returns to its request before connecting a fresh broker
+  worker reuse evidence: {"kind":"synthetic protocol/process acceptance; no native game","cold_prepare_ms":1088,"hot_prepare_ms":1,"pid":48956,"started_utc":"2026-10-04T02:16:58.0775358Z","generation":"76180d2faa774c4d982c3f6368ee9d0e","launches":1,"runs":[{"scenario":"repeat","Id":"13d1a12cf45b4cd28262e165797d4305","SnapshotId":"repeat","pid":48956},{"scenario":"menu-reentry","Id":"1a873487aed54d70a0c7f3b6df3e2a02","SnapshotId":"menu-reentry","pid":48956},{"scenario":"save-b","Id":"e3fd787bfbd14f39a25eb414aa3d05dc","SnapshotId":"save-b","pid":48956},{"scenario":"cancel-search","pid":48956,"cancellation_ms":107},{"scenario":"cancel-verification","pid":48956,"cancellation_ms":103}]}
+PASS worker reuse isolated processes retain PID across searches cancellation menu reentry and changed captures
+  goal/preparation reuse: peer_pid=4344, joined_pid=46404, launches=1 per lane
+PASS worker reuse isolated preparation survives goal and caller cancellation and joins readiness
+  unsafe stop: elapsed_ms=2042, retired=true; exit/config/disposal recovery verified
+PASS worker reuse isolated unsafe stop exit and configuration changes retire only owned processes
+PASS worker reuse isolated startup failure and disposal during preparation leave no launch or lock behind
+PASS worker reuse isolated terminal output without matching cleanup fails closed and rebuilds
+PASS worker reuse isolated cancelled worker with a native error is retired despite cleanup acknowledgement
+  worker isolation: isolated=False, replacement_blocked=True
+  worker isolation: isolated=True, replacement_blocked=False
+PASS worker isolation prevents inherited save locks and preserves environment and arguments
+PASS shared file identity preserves locked hardlinks and replaces equal-metadata copies
+PASS pile totals preserve duplicates and explicit counts
+PASS Windows key persistence encrypts and deletes on opt-out
+PASS valid plan maps distinct copies and targets
+PASS reassess is a legitimate entire plan
+PASS potion action supported
+PASS extra fields are projected away recursively
+PASS fenced JSON normalized
+PASS inactive fields normalized without affecting plan
+PASS missing consumed field rejected
+PASS wrong type rejected
+PASS unknown action rejected
+PASS unknown card rejected
+PASS unknown target rejected
+PASS missing attack target rejected
+PASS nonhand first card rejected
+PASS unplayable first card rejected
+PASS changed snapshot rejected
+PASS same visible state after a combat event still invalidates advice
+PASS same-named card instances affect fingerprint
+PASS empty steps rejected
+PASS overflow rejected without silent truncation
+PASS terminal action must be last
+PASS duplicate instance requires reuse condition
+PASS future known draw needs condition
+PASS prompt protocol inventory is complete
+PASS URL normalization
+PASS unsafe or credential-bearing URL rejected
+PASS HTTP request contains frozen state without token cap or secret in prompt
+PASS provider authentication body never surfaced and no retries
+PASS truncated output rejected before parsing
+PASS malformed provider response classified
+PASS explicit cancellation propagates
+PASS nonplayer phase never sends
+PASS Self recipient equivalent normalized only with verified targeting semantics
+PASS star sentinel becomes zero spend and X cost remains explicit
+PASS invalid first action keeps exact frozen input original output and reason
+PASS diagnostics redact configured key including escaped echoes without corrupting JSON
+PASS truncated response keeps partial content and HTTP auth never captures echo
+PASS diagnostic retention keeps twenty owned records and leaves unrelated files
+PASS old combat setting loads without losing connection settings
+PASS unused future output cannot enter current turn display
+PASS current turn HTTP input preserves powers relic descriptions amounts and usage
+PASS SSE displays content before completion and requests streaming once
+PASS SSE handles Chinese byte splits BOM comments multiline events CR LF and usage
+PASS SSE clean framed stop without DONE is accepted but unfinished responses are not
+PASS SSE length malformed event provider error and unsupported finish stay distinct
+PASS SSE cannot merge other choices or append content after finish
+PASS SSE transport failure retains partial raw events and assistant content
+PASS SSE cancellation during body read retains partial content
+PASS SSE overall timeout also applies after response headers
+PASS SSE response limit applies without content length or any newline
+PASS SSE completed content still goes through snapshot and action validation
+PASS stream preview and diagnostics redact secrets split across provider chunks
+PASS invalid stream UTF-8 is classified and captured
+PASS different combat states reuse byte-identical system prefix and distinct user snapshots
+PASS stream usage option is optional and reported cached tokens survive diagnostics
+PASS cache telemetry distinguishes missing zero invalid and nonzero usage
+PASS split prompt reconstructs the complete current snapshot without duplicate relics
+PASS relic context refreshes on every observed change and never carries old combat data
+PASS HTTP content has one JSON object encoding and readable diagnostics preserve text and redaction
+PASS local zero-loss switch stops complete wins without reward or potion gates
+PASS local goal stop is scoped to its frozen search and cannot interrupt verification
+PASS local ranking prioritizes combat victory over healthy unfinished horizons
+PASS local requests default to numerical execution while preserving explicit legacy override
+PASS local protocol preserves instance position and pre-state identity
+PASS local choices preserve ordered offers and do not merge same-name options
+PASS local search explores choice siblings independently before closing the parent action
+PASS combat plans preserve end turn boundaries and never invent a final end turn
+PASS frontier deduplicates exact prefixes without merging distinct card instances or rounds
+PASS automatic local concurrency reserves CPU and memory and manual selection is bounded
+PASS local concurrency persists without AI configuration and preserves existing settings and key
+PASS potion actions preserve slots targets and action kind without aliasing card prefixes
+PASS local potion preference persists independently of AI connection and encrypted secret
+PASS progress isolates job snapshot worker and monotonic ordering
+PASS progress reports measured damage block energy powers and hand changes
+PASS frequent local telemetry replacement stays readable during concurrent reads on Windows
+PASS local telemetry atomically replaces a snapshot held by an external shared reader
+PASS search resource priorities preserve lethal and payments while valuing free native block
+PASS search goal gates complete zero-loss victories by rounds and optional potion allowance
+PASS search correlated policies discover repeated delayed setup without an answer seed
+PASS search policy changes never collapse native instances or close untried histories
+PASS search tactics distinguish in-hand turn-end loss from a play payment
+PASS search choice proposals preserve unique model intent after a changed prefix
+PASS search choice proposals continue a combo when a changed offer removes an earlier intent
+PASS search refinement proposes coupled end-turn plays and changed repeated choice order
+PASS search feedback finds strength vulnerability upgrades and energy before attacks
+PASS search feedback omits empty defense but keeps needed defense and shield-breaking chains
+PASS search feedback learns only measured branches while retaining exploration
+PASS search feedback separates exact instances targets and action history
+PASS search feedback bounded memory and terminal reward ordering
+PASS search feedback never resimulates a closed exact terminal history
+PASS local early stop persists independently and preserves old settings and opaque key
+PASS search work executed prefix audit preserves native choices and instances
+PASS search work early consumers wait for atomic root publication
+PASS search work a failed root producer releases startup waiters
+PASS search work concurrent producers deduplicate exact jobs
+PASS search work concurrent consumers claim each job once
+PASS search work preserves history choice and job class identity
+PASS search work isolates requests roots and loaded mods
+PASS search work capacity and shallow deeper fairness
+PASS search work completed tasks release capacity without reopening identities
+PASS search work promoting a pending job preserves focused and broad capacity
+PASS search work focused descent survives interposed broad jobs and preserves siblings
+PASS search work new improvement generation gets attention while older plans remain reachable
+PASS search work expansion cannot starve later route improvements
+PASS search work completed request releases plans but preserves counters
+PASS search work exposes backlog and stops waiting for retired owners
+PASS search work skips queued and later exact terminal plans across job classes
+PASS search work never closes unfinished horizons or different native selections
+PASS adaptive concurrency treats configured workers as a resource ceiling
+PASS adaptive concurrency admits only waiting independent jobs
+PASS adaptive concurrency starts one worker and grows after a root is ready
+PASS adaptive concurrency never starts spare workers after a goal
+PASS adaptive concurrency preserves every admitted fixed partition even for fast workers
+PASS adaptive concurrency can grow to the ceiling without reducing search limits
+PASS shared concurrency does not start new searches after all admitted workers finish
+PASS shared concurrency does not reopen admission when a finished worker releases memory
+PASS adaptive concurrency cancellation joins every admitted worker cleanup
+PASS optimization tests unused legal resources before end turn and removes wasted actions
+PASS optimization final net HP loss includes healing and accepts recovered HP costs
+PASS optimization reserve potions only improve a route when final net loss benefits
+PASS optimization varies native selection targets without per-card adapters
+PASS optimization reorders native card instances without name type or hand-position rules
+PASS optimization selection branches cover empty single and multiple choices within native limits
+PASS optimization tactical priors depend on lethal threat and followup rather than card type
+PASS optimization rollout portfolios explore native persistent setup without changing the default
+PASS optimization previews retain marginal gains of strong attacks
+PASS optimization tactical previews never exclude unknown or low priority actions
+PASS optimization tactical rollout keeps carried block valuable and still explores unknown branches
+PASS optimization continuation reuses exact forward history and adjusts remaining damage
+PASS optimization continuation rejects other fights mods histories and repeated visible states
+PASS discrepancy finite multiway search matches an independent exhaustive oracle
+PASS discrepancy fixes setup before attack without knowing card names or effects
+PASS discrepancy preserves defense with a future payoff and healed HP costs
+PASS discrepancy enumerates native targets and nested selection siblings independently
+PASS discrepancy retains instance identity when hand positions and display text change
+PASS discrepancy interrupted rollouts stay open and trials cannot cross trees
+PASS discrepancy rejects a changed legal set without claiming exhaustive completion
+PASS discrepancy keeps potions optional and ranks postcombat net loss before their cost
+PASS discrepancy request opt-in preserves the existing default and native budgets
+PASS discrepancy parallel ownership covers later forks when first moves are scarce
+PASS discrepancy parallel ownership ignores changing previews display names and native hand positions
+MEASURE {"nativeGame":false,"elapsedMs":355,"baseline":"existing tree selection with its 3-of-4 coherent rollout schedule; no shared queue or refiner","measurements":[{"problem":"three-early-mistakes","order":"MonteCarlo","seeds":30,"limit":64,"solved":4,"medianTrialsAmongSolved":40,"maxTrialsAmongSolved":40},{"problem":"three-early-mistakes","order":"LimitedDiscrepancy","seeds":30,"limit":64,"solved":0,"medianTrialsAmongSolved":null,"maxTrialsAmongSolved":null},{"problem":"three-early-mistakes","order":"DepthDiscrepancy","seeds":30,"limit":64,"solved":30,"medianTrialsAmongSolved":8,"maxTrialsAmongSolved":8},{"problem":"three-early-mistakes","order":"DiscrepancyPortfolio","seeds":30,"limit":64,"solved":30,"medianTrialsAmongSolved":11,"maxTrialsAmongSolved":11},{"problem":"one-late-mistake","order":"MonteCarlo","seeds":30,"limit":64,"solved":0,"medianTrialsAmongSolved":null,"maxTrialsAmongSolved":null},{"problem":"one-late-mistake","order":"LimitedDiscrepancy","seeds":30,"limit":64,"solved":30,"medianTrialsAmongSolved":22,"maxTrialsAmongSolved":22},{"problem":"one-late-mistake","order":"DepthDiscrepancy","seeds":30,"limit":64,"solved":0,"medianTrialsAmongSolved":null,"maxTrialsAmongSolved":null},{"problem":"one-late-mistake","order":"DiscrepancyPortfolio","seeds":30,"limit":64,"solved":30,"medianTrialsAmongSolved":40,"maxTrialsAmongSolved":40}]}
+PASS discrepancy scheduler comparison exposes early and late heuristic mistakes
+PASS turn optimization efficiency and preparation preserve distinct native proposals
+PASS turn optimization explicit goals require known enemy damage and prefer a certified matching candidate
+PASS turn optimization interned histories retain native choices targets and parent identity
+PASS turn optimization native winning feedback promotes observed alternatives without deleting other work
+PASS turn optimization shares exploration across later rounds despite a large shallow frontier
+PASS turn optimization winning focus retains its policy and owner inside the focused lane
+PASS turn optimization owner affinity cannot replace fair round coverage
+PASS turn optimization winning feedback promotes pending native siblings without merging or closing others
+PASS turn optimization complete feedback rotates across all scheduling lanes
+PASS turn optimization focused work deepens combinations despite a large shallow frontier
+PASS turn optimization focused proposals retain native targets and completed choices
+PASS turn optimization interposed broad probes cannot steal an active compound descent
+PASS turn optimization resource savings compare surviving native hand instances
+PASS turn optimization health bounds prune only a proven inferior completed outcome
+PASS turn optimization a healthier partial turn is not a winning bound
+PASS turn optimization unsaturated healing does not establish common future recovery
+PASS turn optimization potion reserve pruning is safe even with unknown healing
+PASS turn optimization exact prefixes distinguish native instances and reject changed state
+PASS turn optimization fair frontier retains weak-looking future setup
+PASS turn optimization selection forks keep changed later offers unconstrained
+PASS turn optimization short-prefix probes do not lose long late-game continuations
+PASS turn optimization known winning bounds discard prescribed potion prefixes before replay
+PASS turn optimization prune descendants preserves sibling targets and choices
+PASS turn optimization retained turn frontier matches an independent finite-tree oracle
+PASS local algorithm buttons share native limits and preserve frozen execution controls
+PASS local algorithm completed prefix is skipped before restoring it
+PASS local algorithm probes and interrupted trials cannot close a continuation
+PASS local algorithm choice identity retains combinations skip kind targets and instances
+PASS local algorithm display changes do not repeat a completed native instance
+PASS local algorithm complete-route coverage matches a finite oracle without repeated terminals
+PASS local algorithm workers partition later choice forks without cross-worker terminal duplication
+PASS adaptive concurrency smaller root partition preserves every later legal history
+PASS timeline aligns concurrent process clocks without summing elapsed time
+PASS timeline clips prewarming to the actual time this request waited
+PASS timeline bounds diagnostics and closes an exception scope only once
+PASS timeline nests native waits without changing action state and tolerates old results
+PASS timeline preserves late verification and display when action detail capacity is exhausted
+PASS timeline partial routes never describe incomplete combat as final HP settlement
+PASS method timings retain nesting, skipped calls and latest snapshots across processes
+PASS method profiling is bounded and old trace JSON remains readable
+PASS final verification defaults on for legacy requests and preserves explicit opt-out
+PASS final verification skipped legacy advice needs its own complete search checkpoints
+PASS final verification skipped search checkpoints permit guarded execution and suffix reuse
+PASS final verification skipped execution rejects incomplete shifted or stagnant histories
+207/207 passed

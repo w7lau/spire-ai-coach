@@ -4,7 +4,8 @@ using System.Text.Json;
 using SpireAiCoach.Core;
 using SpireAiCoach.Mod;
 
-if (args.Length != 1) throw new ArgumentException("Pass one new owned native acceptance directory");
+if (args.Length == 2 && args[1] == "--two-workers") return await TwoWorkerAcceptance.Run(args[0]);
+if (args.Length != 1) throw new ArgumentException("Pass an owned native acceptance directory and optional --two-workers");
 var root = Path.GetFullPath(args[0]);
 if (!root.StartsWith(Path.GetFullPath("work") + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) ||
     !File.Exists(Path.Combine(root, ".native-worker-reuse-owner")))
