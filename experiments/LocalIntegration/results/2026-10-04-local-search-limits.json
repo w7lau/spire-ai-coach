@@ -1,5 +1,5 @@
 {
-  "version": "0.7.22",
+  "version": "0.7.23",
   "records": [
     {
       "order": 0,
@@ -38,5 +38,5 @@
     "passed": 203,
     "total": 203
   },
-  "dll_sha256": "fc8bef3ee2f780b0cb06904962eafff40bce8d7775aaf1707c6054bec3ffb4ee"
+  "dll_sha256": "317c63fd58d4cb6d92a7ccd9078b045fc6ccacae3ec3d0ec57f2241cde6d9ac2"
 }
