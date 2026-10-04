@@ -1,0 +1,59 @@
+{
+  "version": "0.7.29.0",
+  "mod_sha256": "D58A293FB599369827E15723BA13A77AE587BB37CA916F1A0D7023136E533675",
+  "fixture": "native single-turn intangible attacking enemies",
+  "previews": [
+    {
+      "mode": "defense",
+      "native_capped_damage": 1,
+      "hit_priority": 1,
+      "defense_priority": 10,
+      "upgraded_damage_before_cap": 9,
+      "ordinary_damage_before_cap": 6,
+      "distinct_instances_and_fresh_native_state": true
+    },
+    {
+      "mode": "attack",
+      "native_capped_damage": 1,
+      "hit_priority": 1,
+      "defense_priority": 10,
+      "upgraded_damage_before_cap": 9,
+      "ordinary_damage_before_cap": 6,
+      "distinct_instances_and_fresh_native_state": true
+    }
+  ],
+  "routes": [
+    {
+      "mode": "defense",
+      "StartingHp": 80,
+      "Hp": 80,
+      "HpLost": 0,
+      "InitialEnemyHp": 174,
+      "EnemyHp": 174,
+      "EndTurnHpLossHint": 8,
+      "actions": 4,
+      "score": 0.36998
+    },
+    {
+      "mode": "attack",
+      "StartingHp": 80,
+      "Hp": 70,
+      "HpLost": 10,
+      "InitialEnemyHp": 174,
+      "EnemyHp": 172,
+      "EndTurnHpLossHint": 23,
+      "actions": 4,
+      "score": 0.2769052873563218
+    }
+  ],
+  "legacy_enemy_hp_first_selects_attack": true,
+  "new_incumbent_selects_defense": true,
+  "new_feedback_selects_defense": true,
+  "full_search": false,
+  "global_optimality_proven": false,
+  "core_checks_passed": 229,
+  "core_checks_total": 229,
+  "native_runtime_errors": 0,
+  "product_budget_changed": false,
+  "new_branch_pruning": false
+}
