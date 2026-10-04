@@ -60,7 +60,8 @@ public sealed record LocalCandidate(LocalAction[] Actions, int Hp, int HpLost, i
 }
 
 // Legal alternatives observed before a real native action. Search hints only, never instructions.
-public sealed record LocalDecision(int BeforeStep, LocalAction[] Legal, LocalChoiceDecision[]? Choices = null);
+public sealed record LocalDecision(int BeforeStep, LocalAction[] Legal, LocalChoiceDecision[]? Choices = null,
+    int? HpBefore = null, int? HpAfter = null);
 public sealed record LocalChoiceDecision(int AtChoice, LocalCardChoice[] Legal);
 // Bounded per-trial metrics survive truncation of detailed native event traces.
 public sealed record LocalSearchTrial(int Worker, int Attempt, double FinishedMs, bool Won,

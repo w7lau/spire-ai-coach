@@ -27,6 +27,7 @@ public interface ILocalTurnFrontier
     int LastLane { get; }
     IReadOnlyDictionary<int, int> ClaimedByRound { get; }
     void Offer(LocalAction[] prefix, int searchRound, LocalTurnHint hint);
+    void SeedRoot(LocalAction[] continuation, int searchRound, LocalTurnHint hint);
     bool TryTake(out LocalTurnTask task);
     void FocusNext(LocalTurnTask task, IReadOnlyList<LocalAction> actions, IReadOnlyList<LocalDecision> decisions);
     void ObserveOutcome(LocalCandidate candidate);
@@ -92,6 +93,17 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         var task = new LocalTurnTask(_next++, prefix.ToArray(), searchRound, Hint: hint);
         _seen.Add(key, task.Id);
         Queue(new(task with { Hint = hint }, hint));
+    }
+
+    public void SeedRoot(LocalAction[] continuation, int searchRound, LocalTurnHint hint)
+    {
+        if (continuation.Length == 0 || continuation[0].Round != searchRound)
+            throw new InvalidDataException("Existing route does not start at the current round");
+        if (_seen.Count != 0) throw new InvalidOperationException("Initial route must precede root exploration");
+        Offer([], searchRound, hint);
+        int id = _seen[(searchRound, 0)];
+        var entry = _pending[id];
+        _pending[id] = entry with { Task = entry.Task with { FullRollout = true, Continuation = continuation.ToArray() } };
     }
 
     private int PrefixId(IReadOnlyList<LocalAction> actions, bool create)
@@ -174,9 +186,9 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
             var queue = lane == 1 ? _damage : _health;
             do { id = queue.Dequeue(); } while (!_pending.ContainsKey(id));
         }
-        task = _pending[id].Task with { FullRollout = guided,
+        task = _pending[id].Task with { FullRollout = guided || _pending[id].Task.FullRollout,
             Style = _lastStyle ?? (guided ? _guidedIncumbent?.RolloutStyle ?? LocalRolloutStyle.Balanced : _pending[id].Task.Style),
-            Continuation = _lastContinuation ?? (guided ? _winningTails.GetValueOrDefault(id) : null) };
+            Continuation = _lastContinuation ?? (guided ? _winningTails.GetValueOrDefault(id) : null) ?? _pending[id].Task.Continuation };
         _pending.Remove(id);
         _roundClaims[task.SearchRound] = _roundClaims.GetValueOrDefault(task.SearchRound) + 1;
         return true;

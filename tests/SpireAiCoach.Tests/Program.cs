@@ -917,6 +917,7 @@ ConcurrencyTests.Register(Test, AsyncTest);
 LocalLimitsTests.Register(Test);
 OptimizationTests.Register(Test);
 SurvivalSearchTests.Register(Test);
+RouteReuseTests.Register(Test);
 DiscrepancyTests.Register(Test);
 ExhaustedSearchTests.Register(Test);
 TurnSearchTests.Register(Test);

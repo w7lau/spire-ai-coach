@@ -441,10 +441,19 @@ public static class LocalWorker
                     initialEnemyHp, p.Creature.Block, line.Count(a => a.PotionSlot.HasValue), recovery.Estimate(p).MaximumFurtherHpGain);
             if (turns != null)
             {
-                if (request.InitialPlan is { Length: > 0 }) throw new InvalidDataException("Turn frontier requires an unseeded frozen root");
                 var rootPlayer = LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!;
                 if (sharedTurns == null || request.Partition == 0)
-                    turns.Offer([], CombatManager.Instance.DebugOnlyGetState()!.RoundNumber, TurnHint(rootPlayer, rootPlayer.Creature.CurrentHp, []));
+                {
+                    int round = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
+                    var hint = TurnHint(rootPlayer, rootPlayer.Creature.CurrentHp, []);
+                    if (request.InitialPlan is { Length: > 0 } seed)
+                    {
+                        if (seed[0].BeforeHash != request.NativeHash)
+                            throw new InvalidDataException("Existing route does not match the frozen native root");
+                        turns.SeedRoot(seed, round, hint);
+                    }
+                    else turns.Offer([], round, hint);
+                }
             }
             while (evaluated < request.MaxNodes && budget.Elapsed.TotalSeconds < request.BudgetSeconds &&
                 (turns != null ? sharedTurns != null || turns.Count > 0 && !coverage!.Exhausted : work != null || !noPotionSearch.Exhausted || request.IncludePotions && !potionSearch.Exhausted || refiner.Count > 0))
@@ -771,7 +780,8 @@ public static class LocalWorker
                         }
                         _nativeLearning?.After(learned, player);
                         if (next.EndTurn) _nativeLearning?.SettleBuffs(player);
-                        decisions[^1] = decisions[^1] with { Choices = choiceDecisions.ToArray() };
+                        decisions[^1] = decisions[^1] with { Choices = choiceDecisions.ToArray(),
+                            HpBefore = previousHp, HpAfter = player.Creature.CurrentHp };
                         if (turns != null && actions.Count >= planned!.Length)
                         {
                             using var offering = MeasureMethod("LocalTurnFrontier.OfferAlternatives");

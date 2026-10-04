@@ -30,6 +30,8 @@ public sealed class LocalTurnWork : IDisposable
     private readonly string _scope;
     private readonly int _maximum;
     private readonly bool _ownedWinningFocus;
+    private readonly LocalAction[]? _initialPlan;
+    private readonly string _nativeRoot;
     private int _taken;
     private int _rollouts;
     private bool _rootReady;
@@ -45,6 +47,8 @@ public sealed class LocalTurnWork : IDisposable
     {
         if (maximum is < 1 or > 16) throw new ArgumentOutOfRangeException(nameof(maximum));
         _maximum = maximum; _scope = Scope(request); _ownedWinningFocus = request.OwnedWinningFocus;
+        _initialPlan = request.InitialPlan?.ToArray();
+        _nativeRoot = request.NativeHash;
         _frontier = new(1729, request.SnapshotId + ":" + request.NativeHash);
         _listener = Task.Run(Listen);
     }
@@ -109,6 +113,16 @@ public sealed class LocalTurnWork : IDisposable
 
     private Reply Apply(Command command)
     {
+        if (command.Operation == "seed")
+        {
+            if (command.Owner != 0 || _rootReady || command.Offers is { Length: > 0 } || command.Task?.Prefix.Length != 0 ||
+                _initialPlan is not { Length: > 0 } || _initialPlan[0].BeforeHash != _nativeRoot || command.Actions == null ||
+                command.Actions.Length != _initialPlan.Length || !LocalSearchWork.MatchesPrefix(command.Actions, _initialPlan))
+                throw new InvalidDataException("Initial route does not match the frozen producer request");
+            _frontier.SeedRoot(_initialPlan, command.Task.SearchRound,
+                command.Hint ?? throw new InvalidDataException("Missing initial native root hint"));
+            _rootReady = true; return Snapshot();
+        }
         foreach (var offer in command.Offers ?? []) _frontier.Offer(offer.Prefix, offer.SearchRound, offer.Hint);
         if (command.Offers is { Length: > 0 }) _rootReady = true;
         switch (command.Operation)
@@ -236,6 +250,9 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
         _offers.Add(new(prefix.ToArray(), searchRound, hint));
         if (_offers.Count >= 32 || Environment.TickCount64 - _lastFlush >= 100) Exchange("offer");
     }
+
+    public void SeedRoot(LocalAction[] continuation, int searchRound, LocalTurnHint hint) =>
+        Exchange("seed", new LocalTurnTask(-1, [], searchRound), actions: continuation.ToArray(), hint: hint);
 
     public bool TryTake(out LocalTurnTask task)
     {
