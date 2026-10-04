@@ -96,7 +96,9 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             bool shared = request.ShareSearchWork && count > 1 &&
                 request.SearchOrder is LocalSearchOrder.MonteCarlo or LocalSearchOrder.TurnFrontier;
             using var turnWork = shared && request.SearchOrder == LocalSearchOrder.TurnFrontier ? new LocalTurnWork(request, count) : null;
-            request = request with { TurnWorkPipe = turnWork?.PipeName };
+            using var searchWork = shared && request.SearchOrder == LocalSearchOrder.MonteCarlo && request.MemorySearchWork
+                ? new LocalSearchWorkBroker(request, count) : null;
+            request = request with { TurnWorkPipe = turnWork?.PipeName, SearchWorkPipe = searchWork?.PipeName };
             LocalSearchWork? schedulingWork = null;
             int launched = 0;
             progress("准备计算…");
@@ -116,7 +118,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             {
                 progress("部分动作无法完成，正在计算其他路线…");
                 var fallback = request with { Partition = 0, Partitions = 1, BudgetSeconds = remainingSeconds, DeferVerification = true,
-                    TurnWorkPipe = null,
+                    TurnWorkPipe = null, SearchWorkPipe = null,
                     ExcludedModels = (request.ExcludedModels ?? []).Concat(blocked.Select(a => a.ModelId)).Distinct().ToArray() };
                 results.Add(await Task.Run(() => Run(_workers[0], 0, fallback), cancellation));
             }
@@ -138,7 +140,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 var proposed = valid.Aggregate((a, b) => LocalSearchPolicy.BetterForGoal(b.Best!, a.Best, request) ? b : a);
                 int index = Math.Clamp(results.IndexOf(proposed), 0, used - 1);
                 var verify = request with { Id = request.Id + "-verify-" + verificationResults.Count,
-                    Partition = index, Partitions = count, DeferVerification = false, VerifyCandidate = proposed.Best, TurnWorkPipe = null };
+                    Partition = index, Partitions = count, DeferVerification = false, VerifyCandidate = proposed.Best,
+                    TurnWorkPipe = null, SearchWorkPipe = null };
                 progress("正在复核最终路线…");
                 var check = await Task.Run(() => Run(_workers[index], index, verify), cancellation);
                 verificationResults.Add(check);
@@ -156,9 +159,9 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             if (request.ShareSearchWork && request.SearchOrder == LocalSearchOrder.MonteCarlo && count > 1)
             {
                 using var scheduling = timeline.Measure(-1, "main", "schedule", "释放已结束的分支提案", depth: 1);
-                var work = new LocalSearchWork(Path.GetDirectoryName(_workers[goalWorker >= 0 ? goalWorker : 0].Root)!, request);
-                workStats = work.Stats();
-                try { work.ReleasePlans(); }
+                using var work = searchWork == null ? new LocalSearchWork(Path.GetDirectoryName(_workers[goalWorker >= 0 ? goalWorker : 0].Root)!, request) : null;
+                workStats = searchWork?.Stats ?? work!.Stats();
+                try { work?.ReleasePlans(); }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 { /* Completed native result remains valid if private diagnostic cleanup is busy. */ }
             }
@@ -222,6 +225,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 int roots = Volatile.Read(ref rootBranches[0]);
                 int pending = 0;
                 if (turnWork != null) pending = turnWork.Pending;
+                else if (searchWork != null) pending = searchWork.Stats.Pending;
                 else if (shared && roots > 0 && _workers[0].Root.Length > 0)
                 {
                     schedulingWork ??= new LocalSearchWork(Path.GetDirectoryName(_workers[0].Root)!, request);

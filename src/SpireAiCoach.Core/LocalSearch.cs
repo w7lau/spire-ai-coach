@@ -20,7 +20,8 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     bool LeanSearchChecksums = true, string? TurnWorkPipe = null, bool ProbeChecksumListener = false,
     int? TargetVictoryRounds = null, int? TargetPotionUses = null, bool RequireKnownZeroEnemyDamage = false,
     bool EfficientTactics = true, bool LearnBuffDuration = true, bool GuideWinningRoutes = true,
-    bool OwnedWinningFocus = true);
+    bool OwnedWinningFocus = true, string? SearchWorkPipe = null,
+    bool ReuseDecisionFingerprint = true, bool AsyncProgressOutput = true, bool MemorySearchWork = true);
 
 // A stop belongs to one frozen request. Goal stops exclude verification;
 // explicit caller cancellation also applies during verification or with goals off.
@@ -231,18 +232,25 @@ public static class LocalWire
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         return JsonSerializer.Deserialize<T>(stream) ?? throw new InvalidDataException("Local worker returned empty data");
     }
-    public static void Write<T>(string path, T value)
+    public static void Write<T>(string path, T value, Func<string, IDisposable?>? measure = null)
     {
-        using var lease = new FileLease(path);
+        FileLease lease;
+        using (measure?.Invoke("Lock")) lease = new FileLease(path);
+        using var ownership = lease;
         // Never reuse a just-retired staging path. On Windows it can still be held by
         // an external reader/scanner after replacement. ReplaceFile preserves an
         // already-published document atomically instead of deleting its directory entry.
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
-            File.WriteAllText(temporary, JsonSerializer.Serialize(value));
-            if (File.Exists(path)) File.Replace(temporary, path, null);
-            else File.Move(temporary, path);
+            string json;
+            using (measure?.Invoke("Serialize")) json = JsonSerializer.Serialize(value);
+            using (measure?.Invoke("Write")) File.WriteAllText(temporary, json);
+            using (measure?.Invoke("Replace"))
+            {
+                if (File.Exists(path)) File.Replace(temporary, path, null);
+                else File.Move(temporary, path);
+            }
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }

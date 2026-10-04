@@ -59,7 +59,17 @@ public static class LocalWorker
     internal static LocalTimeline.MethodScope MeasureMethod(string name) =>
         _timeline?.MeasureMethod(_traceWorker, _traceStage, name) ?? default;
     internal static void SkipMethod(string name) => _timeline?.SkipMethod(_traceWorker, _traceStage, name);
-    private static Task Frame() => _tree.ToSignal(_tree, SceneTree.SignalName.ProcessFrame).AsTask();
+    private static readonly LocalDecisionFingerprint DecisionFingerprint = new();
+    private static readonly FieldInfo? PendingNotification = typeof(CombatStateTracker)
+        .GetField("_combatStateChangedDeferredTask", BindingFlags.NonPublic | BindingFlags.Instance);
+    private static long _frameVersion;
+    private static Task Frame()
+    {
+        _frameVersion++;
+        return _tree.ToSignal(_tree, SceneTree.SignalName.ProcessFrame).AsTask();
+    }
+    private static bool DecisionSettled() => PendingNotification != null && LocalCapture.Stable() &&
+        (PendingNotification.GetValue(CombatManager.Instance.StateTracker) is not Task pending || pending.IsCompletedSuccessfully);
 
     public static bool TryStart()
     {
@@ -130,6 +140,7 @@ public static class LocalWorker
     private static async Task<bool> Search(LocalSearchRequest request)
     {
         _activeRequest = request;
+        DecisionFingerprint.Clear();
         LocalWorkerLogic.ResetCounters();
         LocalWorkerVerification.Reset();
         _timeline = new(request.TimelineOrigin);
@@ -233,6 +244,7 @@ public static class LocalWorker
         int executed = 0, restores = 0;
         async Task RestoreMeasured()
         {
+            DecisionFingerprint.Clear();
             CheckCancellation();
             LocalWorkerOverhead.LeanSearchChecksums = false;
             _nativeLearning?.ResetDecision();
@@ -247,6 +259,14 @@ public static class LocalWorker
         var trials = new List<LocalSearchTrial>();
         LocalAction? pendingAction = null;
         LocalAction? blockedAction = null;
+        var outputTimeline = _timeline!;
+        void WriteProgress((LocalProgress Progress, string Stage) update)
+        {
+            using var writing = outputTimeline.MeasureMethod(request.Partition, update.Stage, "LocalWorker.ProgressWrite");
+            LocalWire.Write(Path.Combine(_root, "progress.json"), update.Progress,
+                operation => outputTimeline.MeasureMethod(request.Partition, update.Stage, "LocalProgress." + operation));
+        }
+        var progressWriter = request.AsyncProgressOutput ? new LocalLatestWriter<(LocalProgress, string)>(WriteProgress) : null;
         void Progress(string phase, LocalSimState? state = null, bool force = false, string status = "running")
         {
             if ((!force || LocalWorkerOverhead.Active && status == "running") && timer.ElapsedMilliseconds - lastProgress < 100)
@@ -254,12 +274,15 @@ public static class LocalWorker
             using var publishing = Trace("publish", "过程进度");
             using var measuring = MeasureMethod("LocalWorker.Progress");
             lastProgress = timer.ElapsedMilliseconds;
-            LocalWire.Write(Path.Combine(_root, "progress.json"), new LocalProgress(request.Id, request.SnapshotId,
+            var update = new LocalProgress(request.Id, request.SnapshotId,
                 request.Partition, request.Partitions, ++sequence, route, evaluated, request.MaxNodes, victories,
-                budget.ElapsedMilliseconds, request.BudgetSeconds, phase, state, events.ToArray(), status, probes, boundPruned, rootBranches));
+                budget.ElapsedMilliseconds, request.BudgetSeconds, phase, state, events.ToArray(), status, probes, boundPruned, rootBranches);
+            if (progressWriter != null) progressWriter.Publish((update, _traceStage));
+            else WriteProgress((update, _traceStage));
         }
         void Publish(string status, string message)
         {
+            if (status != "running") progressWriter?.FlushAsync().GetAwaiter().GetResult();
             // The parent polls every 250 ms. Rewriting the unchanged, potentially large
             // candidate after every fast route does not provide any newer recommendation.
             if (status == "running" && (LocalWorkerOverhead.Active || ReferenceEquals(best, lastPublishedBest)) && timer.ElapsedMilliseconds - lastResult < 250)
@@ -953,8 +976,12 @@ public static class LocalWorker
         }
         finally
         {
-            try { sharedTurns?.Dispose(); work?.Retire(request.Partition); }
-            finally { NonInteractiveMode.AutoSlayerCheck = originalNativeMode; LocalWorkerOverhead.Enabled = false; LocalWorkerOverhead.LeanSearchChecksums = false; LocalWorkerLogic.Enabled = false; LocalWorkerDataMode.Reset(); LocalWorkerVisuals.Reset(); _fastNativeWaits = _fastStateSettling = false; LocalWorkerResources.Retain = LocalWorkerResources.FastCollection = false; Engine.TimeScale = originalScale; Engine.MaxFps = originalFps; _timeline = null; _activeRequest = null; _nativeLearning = null; _targetLabels = null; _choices = null; _excludedModels.Clear(); _includePotions = false; }
+            try { if (progressWriter != null) await progressWriter.DisposeAsync(); }
+            finally
+            {
+                try { sharedTurns?.Dispose(); try { work?.Retire(request.Partition); } finally { work?.Dispose(); } }
+                finally { DecisionFingerprint.Clear(); NonInteractiveMode.AutoSlayerCheck = originalNativeMode; LocalWorkerOverhead.Enabled = false; LocalWorkerOverhead.LeanSearchChecksums = false; LocalWorkerLogic.Enabled = false; LocalWorkerDataMode.Reset(); LocalWorkerVisuals.Reset(); _fastNativeWaits = _fastStateSettling = false; LocalWorkerResources.Retain = LocalWorkerResources.FastCollection = false; Engine.TimeScale = originalScale; Engine.MaxFps = originalFps; _timeline = null; _activeRequest = null; _nativeLearning = null; _targetLabels = null; _choices = null; _excludedModels.Clear(); _includePotions = false; }
+            }
         }
     }
 
@@ -1210,7 +1237,8 @@ public static class LocalWorker
     {
         var state = CombatManager.Instance.DebugOnlyGetState()!;
         var player = LocalContext.GetMe(state)!;
-        var hash = LocalCapture.Fingerprint();
+        DecisionFingerprint.Clear();
+        const string hash = "";
         var result = new List<LocalAction>();
         var hand = player.PlayerCombatState!.Hand.Cards;
         // CanPlay walks the hook chain. Query once per card and reuse within this settled
@@ -1253,7 +1281,12 @@ public static class LocalWorker
             }
         }
         result.Add(new(-1, "", null, "", "", hash, state.RoundNumber, EndTurn: true, Preference: tactics.EndTurnPriority));
-        return result.ToArray();
+        // Native legality/preview hooks have finished before capturing the decision.
+        var fingerprint = LocalCapture.Fingerprint();
+        if (_activeRequest?.ReuseDecisionFingerprint == true && _traceStage == "search" &&
+            LocalWorkerLogic.Enabled && LocalWorkerLogic.Available && LocalWorkerDataMode.MinimalRun && DecisionSettled())
+            DecisionFingerprint.Remember(state, fingerprint, LocalWorkerLogic.Revision, _frameVersion);
+        return result.Select(a => a with { BeforeHash = fingerprint }).ToArray();
     }
 
     private static async Task<LocalAction> Play(LocalAction action, Func<LocalCardChoice[], LocalCardChoice>? choose = null)
@@ -1277,8 +1310,15 @@ public static class LocalWorker
 
     private static async Task PlayNative(LocalAction action)
     {
-        if (LocalCapture.Fingerprint() != action.BeforeHash) throw new InvalidOperationException("搜索分支状态复现不一致。");
         var state = CombatManager.Instance.DebugOnlyGetState()!;
+        bool reused = _activeRequest?.ReuseDecisionFingerprint == true && _traceStage == "search" && LocalWorkerLogic.Active &&
+            DecisionFingerprint.Consume(state, action.BeforeHash, LocalWorkerLogic.Revision, _frameVersion, DecisionSettled());
+        if (reused) SkipMethod("LocalCapture.ReusedDecisionFingerprint");
+        else
+        {
+            DecisionFingerprint.Clear();
+            if (LocalCapture.Fingerprint() != action.BeforeHash) throw new InvalidOperationException("搜索分支状态复现不一致。");
+        }
         var player = LocalContext.GetMe(state)!;
         if (action.EndTurn) { await EndTurn(player); return; }
         var target = action.TargetId == null ? null : state.Creatures.Single(c => c.CombatId == action.TargetId);

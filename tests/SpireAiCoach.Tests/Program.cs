@@ -14,6 +14,7 @@ var tests = new List<(string, Func<Task>)>();
 void Test(string name, Action test) => tests.Add((name, () => { test(); return Task.CompletedTask; }));
 void AsyncTest(string name, Func<Task> test) => tests.Add((name, test));
 TurnWorkTests.Register(Test, AsyncTest);
+NativeOverheadTests.Register(Test, AsyncTest);
 WorkerReuseTests.Register(Test, AsyncTest);
 AsyncTest("worker isolation prevents inherited save locks and preserves environment and arguments", WorkerIsolationTests.Run);
 AsyncTest("shared file identity preserves locked hardlinks and replaces equal-metadata copies", WorkerSharingTests.Run);
