@@ -1,0 +1,171 @@
+{
+  "version": "0.7.29",
+  "dll_sha256": "a32ad48ee5a524e41ff7075c6124ec5c57e5b235758746f3f542c1fb8f3bd1e5",
+  "core_checks": "229/229",
+  "build_warnings": 0,
+  "build_errors": 0,
+  "original_runtime": {
+    "workers": 8,
+    "search_seconds": 60,
+    "first_best_net_hp_loss": 4,
+    "result_display_ms": 21.64,
+    "later_regular_rebuild_range_ms": [
+      36769,
+      41241
+    ],
+    "fallback_at_ms": 19646,
+    "attempts_per_worker": 64,
+    "first_best_ms": 47601,
+    "elapsed_ms": 154920,
+    "max_rounds": 20,
+    "verification_ms": 0,
+    "numeric_failure": "NullReferenceException: NVoidFormVfx.Create",
+    "first_regular_rebuild_ms": 21195,
+    "regular_search_range_ms": [
+      64000,
+      67000
+    ]
+  },
+  "presentation": {
+    "factory_types": 98,
+    "form_factory_checks": [
+      {
+        "factory": "NDemonFormVfx",
+        "regular_requires_scene": true,
+        "numerical_returns_null": true
+      },
+      {
+        "factory": "NEchoFormVfx",
+        "regular_requires_scene": true,
+        "numerical_returns_null": true
+      },
+      {
+        "factory": "NReaperFormVfx",
+        "regular_requires_scene": true,
+        "numerical_returns_null": true
+      },
+      {
+        "factory": "NSerpentFormVfx",
+        "regular_requires_scene": true,
+        "numerical_returns_null": true
+      },
+      {
+        "factory": "NVoidFormVfx",
+        "regular_requires_scene": true,
+        "numerical_returns_null": true
+      }
+    ],
+    "both_algorithms_checked": true,
+    "persistent_options_checked": true,
+    "global_test_mode_unchanged": true,
+    "layouts": [
+      {
+        "width": 1280,
+        "height": 720,
+        "measured_width": 560,
+        "measured_height": 640,
+        "controls": 30,
+        "horizontal_overflow": 0,
+        "primary_actions_fixed": true,
+        "expanded_sections_checked": 3,
+        "visualization_workers": 16,
+        "visualization_rendered": true,
+        "hidden_and_finished_animation_stops": true,
+        "route_sixteen_selectable": true
+      },
+      {
+        "width": 1920,
+        "height": 1080,
+        "measured_width": 560,
+        "measured_height": 1000,
+        "controls": 30,
+        "horizontal_overflow": 0,
+        "primary_actions_fixed": true,
+        "expanded_sections_checked": 3,
+        "visualization_workers": 16,
+        "visualization_rendered": true,
+        "hidden_and_finished_animation_stops": true,
+        "route_sixteen_selectable": true
+      }
+    ]
+  },
+  "frozen_incident_replay": {
+    "independent_optimal_search_tested": false,
+    "fixed_route": true,
+    "rounds": 4,
+    "original_settings_preserved": true,
+    "steps": 18,
+    "samples": [
+      {
+        "starting_hp": 36,
+        "hp": 32,
+        "native_step_fingerprints_match": true,
+        "actions_and_selections_match": true,
+        "damage_sources": {
+          "Enemy": 4,
+          "Self": 0,
+          "Unknown": 0,
+          "Unattributed": 0,
+          "AccountingMatches": true,
+          "Complete": true
+        },
+        "net_hp_loss": 4,
+        "reused_worker": false,
+        "complete_execution_points": true,
+        "elapsed_ms": 22152,
+        "timing": {
+          "RestoreMs": 1460,
+          "ActionMs": 697,
+          "DecisionMs": 168,
+          "VerificationMs": 0,
+          "StartupMs": 19007,
+          "Actions": 18,
+          "Restores": 1,
+          "Verifications": 0
+        },
+        "regular_fallbacks": 0,
+        "search_preference_scores_excluded": true,
+        "pass": 0,
+        "void_form_factory_skipped": true
+      },
+      {
+        "starting_hp": 36,
+        "hp": 32,
+        "native_step_fingerprints_match": true,
+        "actions_and_selections_match": true,
+        "damage_sources": {
+          "Enemy": 4,
+          "Self": 0,
+          "Unknown": 0,
+          "Unattributed": 0,
+          "AccountingMatches": true,
+          "Complete": true
+        },
+        "net_hp_loss": 4,
+        "reused_worker": true,
+        "complete_execution_points": true,
+        "elapsed_ms": 526,
+        "timing": {
+          "RestoreMs": 132,
+          "ActionMs": 70,
+          "DecisionMs": 69,
+          "VerificationMs": 0,
+          "StartupMs": 0,
+          "Actions": 18,
+          "Restores": 1,
+          "Verifications": 0
+        },
+        "regular_fallbacks": 0,
+        "search_preference_scores_excluded": true,
+        "pass": 1,
+        "void_form_factory_skipped": true
+      }
+    ],
+    "production_budgets_unchanged": true
+  },
+  "limits": [
+    "No exhaustive search or all-Mod guarantee",
+    "Other visual factories checked at their early native null-return boundary, not every argument combination",
+    "Cold preparation remains necessary; fixed-route timing is not complete-search timing"
+  ]
+}

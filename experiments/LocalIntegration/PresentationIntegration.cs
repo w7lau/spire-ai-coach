@@ -5,6 +5,8 @@ using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Monsters;
 using MegaCrit.Sts2.Core.Nodes.Rooms;
+using MegaCrit.Sts2.Core.Nodes.Vfx.Forms;
+using MegaCrit.Sts2.Core.TestSupport;
 using SpireAiCoach.Core;
 using SpireAiCoach.Mod;
 
@@ -46,6 +48,28 @@ internal static class PresentationIntegration
                 throw new InvalidOperationException("Native callback altered game data or failed to unsubscribe its own event");
         }
         finally { active.SetValue(null, false); creature.Died -= sentinel; }
+
+        if (TestMode.IsOn) throw new InvalidOperationException("Visual smoke must keep native TestMode off");
+        var visualChecks = new List<object>();
+        var visualFactories = (string[])mode.GetProperty("VisualFactories")!.GetValue(null)!;
+        foreach (var type in typeof(NFormVfx).Assembly.GetTypes().Where(t => t != typeof(NFormVfx) && typeof(NFormVfx).IsAssignableFrom(t)))
+        {
+            var create = type.GetMethod("Create", BindingFlags.Static | BindingFlags.Public | BindingFlags.DeclaredOnly);
+            if (create == null) continue;
+            if (!visualFactories.Contains(type.Name + ".Create")) throw new InvalidOperationException("Form factory was not discovered: " + type.Name);
+            bool sceneRequired = false;
+            try { create.Invoke(null, [creature]); }
+            catch (TargetInvocationException ex) when (ex.InnerException is NullReferenceException) { sceneRequired = true; }
+            if (!sceneRequired) throw new InvalidOperationException("Regular form visual behavior changed: " + type.Name);
+            try
+            {
+                active.SetValue(null, true);
+                if (create.Invoke(null, [creature]) != null || TestMode.IsOn || creature.CurrentHp != hp)
+                    throw new InvalidOperationException("Scene-free form factory changed native rules: " + type.Name);
+            }
+            finally { active.SetValue(null, false); }
+            visualChecks.Add(new { factory = type.Name, regular_requires_scene = sceneRequired, numerical_returns_null = true });
+        }
 
         var overlay = new CoachOverlay(tree); overlay.Mount();
         var layer = tree.Root.GetNode<CanvasLayer>("SpireAiCoach");
@@ -247,7 +271,9 @@ internal static class PresentationIntegration
             visibility_contexts_are_ui_only = true
             , skip_final_verification_defaults_checked = true, checkbox_options_persisted = true,
             checkbox_algorithm_checks = optionChecks, advanced_and_diagnostics_default_hidden = true,
-            visualization_input_is_presentation_fixture_only = true, stale_and_late_progress_rejected = true
+            visualization_input_is_presentation_fixture_only = true, stale_and_late_progress_rejected = true,
+            visual_factories = visualFactories,
+            form_visual_checks = visualChecks, global_test_mode_unchanged = !TestMode.IsOn
         });
     }
 

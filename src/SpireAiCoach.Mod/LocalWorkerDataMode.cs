@@ -19,10 +19,12 @@ using MegaCrit.Sts2.Core.Nodes.Rooms;
 using MegaCrit.Sts2.Core.Nodes.Screens.CardSelection;
 using MegaCrit.Sts2.Core.Nodes.Screens.Overlays;
 using MegaCrit.Sts2.Core.Nodes.Vfx;
+using MegaCrit.Sts2.Core.Nodes.Vfx.Forms;
 using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Runs;
 using MegaCrit.Sts2.Core.Saves;
 using MegaCrit.Sts2.Core.TestSupport;
+using SpireAiCoach.Core;
 
 namespace SpireAiCoach.Mod;
 
@@ -33,6 +35,7 @@ internal static class LocalWorkerDataMode
     public static bool Active { get; set; }
     public static bool Available { get; private set; }
     public static bool MinimalRun { get; set; }
+    public static string[] VisualFactories { get; private set; } = [];
     private static NOverlayStack? _emptyOverlays;
     private static readonly Dictionary<Node, Func<IEnumerable<CardModel>>> Selections = new(ReferenceEqualityComparer.Instance);
     public static void Install(Harmony _)
@@ -41,7 +44,7 @@ internal static class LocalWorkerDataMode
         try { InstallBoundaries(harmony); Available = true; }
         catch (Exception ex)
         {
-            harmony.UnpatchAll(harmony.Id); Available = false;
+            harmony.UnpatchAll(harmony.Id); Available = false; VisualFactories = [];
             GD.Print("[SpireAiCoach] Native presentation boundaries unavailable; using regular execution: " + ex.Message);
         }
     }
@@ -65,6 +68,7 @@ internal static class LocalWorkerDataMode
         foreach (var factory in typeof(NDamageNumVfx).GetMethods().Where(m => m.Name == nameof(NDamageNumVfx.Create)))
             harmony.Patch(factory, prefix: new(AccessTools.Method(typeof(LocalWorkerDataMode), nameof(DamageVisual))));
         Prefix(typeof(PlayerHurtVignetteHelper), nameof(PlayerHurtVignetteHelper.Play), nameof(PresentationVoid));
+        InstallVisualFactories(harmony);
         // The native death callback removes its subscription before obtaining
         // an optional animation node. Keep that cleanup and every death hook;
         // only guard the missing presentation receiver in scene-free workers.
@@ -98,6 +102,58 @@ internal static class LocalWorkerDataMode
             var machine = AccessTools.Method(typeof(CardSelectCmd), name).GetCustomAttribute<AsyncStateMachineAttribute>()!.StateMachineType;
             harmony.Patch(AccessTools.Method(machine, "MoveNext"),
                 transpiler: new(AccessTools.Method(typeof(LocalWorkerDataMode), nameof(HandPresentation))));
+        }
+    }
+    private static void InstallVisualFactories(Harmony harmony)
+    {
+        // Use the native factory's existing early, side-effect-free null return.
+        // Do not turn on global TestMode: that flag also changes game rules.
+        var factories = typeof(NFormVfx).Assembly.GetTypes()
+            .Where(t => typeof(Node).IsAssignableFrom(t) &&
+                (t.Namespace == typeof(NDamageNumVfx).Namespace ||
+                 t.Namespace?.StartsWith(typeof(NDamageNumVfx).Namespace + ".", StringComparison.Ordinal) == true))
+            .SelectMany(t => t.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly))
+            .Where(m => m.Name == "Create" && !m.IsGenericMethod && typeof(Node).IsAssignableFrom(m.ReturnType)).ToArray();
+        var guarded = factories.Where(HasEarlyVisualExit).ToArray();
+        if (factories.Any(m => typeof(NFormVfx).IsAssignableFrom(m.ReturnType) && !guarded.Contains(m)))
+            throw new InvalidOperationException("Native form visual factory boundary changed");
+        foreach (var factory in guarded)
+            harmony.Patch(factory, transpiler: new(AccessTools.Method(typeof(LocalWorkerDataMode), nameof(VisualFactoryExit))));
+        VisualFactories = guarded.Select(m => m.DeclaringType!.Name + "." + m.Name).Distinct().Order(StringComparer.Ordinal).ToArray();
+    }
+    private static bool HasEarlyVisualExit(MethodInfo factory)
+    {
+        var code = LocalMethodBody.Read(factory)?.Where(i => i.Code != OpCodes.Nop).ToArray();
+        return code is { Length: >= 5 } && code[0].Code == OpCodes.Call &&
+            Equals(code[0].Operand, AccessTools.PropertyGetter(typeof(TestMode), nameof(TestMode.IsOn))) &&
+            (code[1].Code == OpCodes.Brfalse || code[1].Code == OpCodes.Brfalse_S) &&
+            code[2].Code == OpCodes.Ldnull && code[3].Code == OpCodes.Ret &&
+            code[1].Operand is int target && target == code[4].Offset;
+    }
+    private static bool SuppressVisualFactory(string name)
+    {
+        if (!Active) return TestMode.IsOn;
+        LocalWorker.SkipMethod(name);
+        return true;
+    }
+    private static IEnumerable<CodeInstruction> VisualFactoryExit(IEnumerable<CodeInstruction> instructions, MethodBase __originalMethod)
+    {
+        var code = instructions.ToList();
+        var first = code.Where(i => i.opcode != OpCodes.Nop).Take(4).ToArray();
+        if (first.Length != 4 || !first[0].Calls(AccessTools.PropertyGetter(typeof(TestMode), nameof(TestMode.IsOn))) ||
+            (first[1].opcode != OpCodes.Brfalse && first[1].opcode != OpCodes.Brfalse_S) ||
+            first[2].opcode != OpCodes.Ldnull || first[3].opcode != OpCodes.Ret)
+            throw new InvalidOperationException("Native visual factory early exit changed");
+        foreach (var instruction in code)
+        {
+            if (ReferenceEquals(instruction, first[0]))
+            {
+                var name = new CodeInstruction(OpCodes.Ldstr, __originalMethod.DeclaringType!.Name + "." + __originalMethod.Name);
+                name.labels.AddRange(instruction.labels); name.blocks.AddRange(instruction.blocks);
+                yield return name;
+                yield return new CodeInstruction(OpCodes.Call, AccessTools.Method(typeof(LocalWorkerDataMode), nameof(SuppressVisualFactory)));
+            }
+            else yield return instruction;
         }
     }
     public static void FreeSelections()
