@@ -13,7 +13,9 @@ static class LocalLimitsTests
         {
             var settings = JsonSerializer.Deserialize<CoachSettings>("{\"local_workers\":8}", Wire.Json)!;
             Check(settings.LocalWorkers == 8 && settings.LocalMaxAttempts == 64 &&
-                settings.LocalMaxRounds == 64 && settings.LocalSearchSeconds == 60);
+                settings.LocalMaxRounds == 64 && settings.LocalSearchSeconds == 60 && settings.LocalSkipFinalVerification);
+            var optedIn = JsonSerializer.Deserialize<CoachSettings>("{\"local_skip_final_verification\":false}", Wire.Json)!;
+            Check(!optedIn.LocalSkipFinalVerification && !new CoachSettings { LocalSkipFinalVerification = false }.LocalSkipFinalVerification);
         });
         test("local search limits freeze configurable budgets in both algorithms and on the wire", () =>
         {
@@ -41,7 +43,7 @@ static class LocalLimitsTests
                 var key = Path.Combine(directory, "api-key.dpapi");
                 File.WriteAllBytes(key, [1, 2, 3, 4]);
                 var store = new SettingsStore(directory);
-                store.SaveLocalOptions(8, true, false, 120, 257, 130, 125);
+                store.SaveLocalOptions(8, true, false, 120, 257, 130, 125, skipFinalVerification: false);
                 var before = JsonNode.Parse(File.ReadAllText(config))!;
                 store.SaveLocalWorkers(16);
                 var after = JsonNode.Parse(File.ReadAllText(config))!;
@@ -51,7 +53,11 @@ static class LocalLimitsTests
                 var loaded = store.Load().Settings;
                 Check(loaded.LocalWorkers == 16 && loaded.LocalMaxAttempts == 257 && loaded.LocalMaxRounds == 130 &&
                     loaded.LocalSearchSeconds == 125 && loaded.LocalTargetVictoryRounds == 120 &&
-                    loaded.LocalIncludePotions && !loaded.LocalStopOnZeroLoss && loaded.Model == "");
+                    loaded.LocalIncludePotions && !loaded.LocalStopOnZeroLoss && !loaded.LocalSkipFinalVerification && loaded.Model == "");
+                store.SaveLocalOptions(16, null, skipFinalVerification: true);
+                Check(store.Load().Settings.LocalSkipFinalVerification && File.ReadAllBytes(key).SequenceEqual(new byte[] { 1, 2, 3, 4 }));
+                store.Save(store.Load().Settings with { Model = "fixture", LocalSkipFinalVerification = false }, "");
+                Check(!store.Load().Settings.LocalSkipFinalVerification && store.Load().Settings.LocalMaxAttempts == 257);
             }
             finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
         });

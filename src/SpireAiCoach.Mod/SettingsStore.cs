@@ -39,7 +39,7 @@ public sealed class SettingsStore
 
     public void SaveLocalOptions(int workers, bool? includePotions, bool? stopOnZeroLoss = null,
         int? targetVictoryRounds = null, int? maxAttempts = null, int? maxRounds = null,
-        int? searchSeconds = null)
+        int? searchSeconds = null, bool? skipFinalVerification = null)
     {
         if (workers is < 0 or > 16) throw new ArgumentOutOfRangeException(nameof(workers));
         if (targetVictoryRounds is < 0 or > LocalCalculation.MaximumRounds) throw new ArgumentOutOfRangeException(nameof(targetVictoryRounds));
@@ -54,6 +54,7 @@ public sealed class SettingsStore
         if (maxAttempts.HasValue) settings["local_max_attempts"] = maxAttempts.Value;
         if (maxRounds.HasValue) settings["local_max_rounds"] = maxRounds.Value;
         if (searchSeconds.HasValue) settings["local_search_seconds"] = searchSeconds.Value;
+        if (skipFinalVerification.HasValue) settings["local_skip_final_verification"] = skipFinalVerification.Value;
         Directory.CreateDirectory(_directory);
         AtomicWrite(ConfigPath, Encoding.UTF8.GetBytes(settings.ToJsonString()));
         // Local-only preferences must not require AI credentials or rewrite the encrypted key.

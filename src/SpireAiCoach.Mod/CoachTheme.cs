@@ -35,6 +35,9 @@ internal static class CoachTheme
         theme.SetStylebox("hover", "Button", Box("314b61", "7593aa"));
         theme.SetStylebox("pressed", "Button", Box("1d4c52", "62b4b2"));
         theme.SetStylebox("disabled", "Button", Box("202a38", "354252"));
+        foreach (var state in new[] { "normal", "hover", "pressed", "hover_pressed", "disabled" })
+            theme.SetStylebox(state, "CheckBox", new StyleBoxEmpty
+            { ContentMarginLeft = 4, ContentMarginRight = 4, ContentMarginTop = 2, ContentMarginBottom = 2 });
         theme.SetStylebox("focus", "Button", new StyleBoxFlat
         {
             DrawCenter = false, BorderColor = Gold, BorderWidthLeft = 2, BorderWidthRight = 2,

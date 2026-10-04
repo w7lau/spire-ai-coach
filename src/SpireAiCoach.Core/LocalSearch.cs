@@ -179,10 +179,39 @@ public static class LocalSearchPolicy
         return string.Join("\n", lines);
     }
 
-    public static string Describe(LocalAction action) => (action.EndTurn ? "结束回合，结算敌方行动。" :
+    // The default advice contains decisions and outcomes. Full diagnostics keep
+    // search accounting and native identities in Format above.
+    public static string FormatAdvice(LocalSearchResult result)
+    {
+        if (result.Best is not { } best) return result.Message;
+        var lines = new List<string>
+        {
+            best.Won ? $"预计获胜 · {best.Rounds} 回合" : "战斗尚未打完，以下是部分路线。",
+            $"{(best.Won ? "预计战后生命" : "当前模拟生命")} {best.Hp}/{best.MaxHp}" +
+                (best.NetHpLoss is { } loss ? $" · 净损失 {loss}（含回血）" : "")
+        };
+        if (best.Dead) lines.Add("注意：这条路线会死亡，不能保证存活。");
+        if (!best.Won) lines.Add("尚未找到能打赢的路线，请继续优化或重新计算。");
+        if (result.Status == "partial") lines.Add("部分搜索未完成，显示当前取得的路线。");
+        if (!HasExecutionPoints(result)) lines.Add("这条路线暂不能自动执行，可手动参考。");
+        var potions = best.Actions.Count(a => a.PotionSlot.HasValue);
+        if (potions > 0) lines.Add($"这条路线会使用 {potions} 瓶药水。");
+        int round = -1;
+        for (int i = 0; i < best.Actions.Length; i++)
+        {
+            var action = best.Actions[i];
+            if (action.Round != round) { round = action.Round; lines.Add($"—— 第 {round} 回合 ——"); }
+            lines.Add($"{i + 1}. " + Describe(action, includeNativeTarget: false));
+        }
+        return string.Join("\n", lines);
+    }
+
+    public static string Describe(LocalAction action) => Describe(action, includeNativeTarget: true);
+
+    public static string Describe(LocalAction action, bool includeNativeTarget) => (action.EndTurn ? "结束回合，结算敌方行动。" :
         (action.PotionSlot is { } slot ? $"使用药水「{action.CardName}」（药水槽 {slot + 1}）" :
             $"打出「{action.CardName}」（当时手牌第 {action.HandIndex + 1} 张）") +
-        (action.TargetId is null ? "。" : $" → {action.TargetName}［目标 {action.TargetId}］。")) +
+        (action.TargetId is null ? "。" : $" → {action.TargetName}" + (includeNativeTarget ? $"［目标 {action.TargetId}］。" : "。"))) +
         string.Concat((action.Choices ?? []).Select(c => c.Kind != "offer" ?
             (c.Indices is { Length: 0 } ? " 不选择卡牌。" : $" 选牌时选择「{c.Name}」。") :
             c.Index < 0 ? " 选牌时跳过。" : $" 选择第 {c.Index + 1} 张「{c.Name}」。"));
