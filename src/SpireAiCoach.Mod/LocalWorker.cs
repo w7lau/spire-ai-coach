@@ -276,7 +276,9 @@ public static class LocalWorker
             lastProgress = timer.ElapsedMilliseconds;
             var update = new LocalProgress(request.Id, request.SnapshotId,
                 request.Partition, request.Partitions, ++sequence, route, evaluated, request.MaxNodes, victories,
-                budget.ElapsedMilliseconds, request.BudgetSeconds, phase, state, events.ToArray(), status, probes, boundPruned, rootBranches);
+                budget.ElapsedMilliseconds, request.BudgetSeconds, phase, state, events.ToArray(), status, probes, boundPruned, rootBranches,
+                best is { Won: true, Dead: false } winner ? new(bestRoute, winner.Hp, winner.MaxHp,
+                    winner.StartingHp, winner.Rounds, winner.Actions.Count(a => a.PotionSlot.HasValue)) : null);
             if (progressWriter != null) progressWriter.Publish((update, _traceStage));
             else WriteProgress((update, _traceStage));
         }

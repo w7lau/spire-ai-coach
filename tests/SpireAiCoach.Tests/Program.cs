@@ -850,6 +850,26 @@ Test("progress reports measured damage block energy powers and hand changes", ()
     Check(change.Contains("易伤 2") && change.Contains("手牌"));
     Check(LocalProgressBook.StateText(after).Contains("生命 77/80"));
 });
+Test("progress victory summaries retain net healing and missing summaries across protocol versions", () =>
+{
+    var progress = new LocalProgress("job", "snapshot", 0, 4, 3, 2, 1, 64, 1, 2000, 60, "搜索", null, [],
+        Best: new(1, 87, 87, 87, 6, 0));
+    var copy = JsonSerializer.Deserialize<LocalProgress>(JsonSerializer.Serialize(progress))!;
+    Check(copy.Best is { NetHpLoss: 0, Rounds: 6, Potions: 0 });
+    Check(JsonSerializer.Deserialize<LocalProgress>(JsonSerializer.Serialize(progress with { Best = null }))!.Best == null);
+    Check((copy.Best! with { Hp = 80 }).NetHpLoss == 7 && (copy.Best with { StartingHp = null }).NetHpLoss == null);
+});
+Test("compact local advice preserves incomplete death and execution warnings while full details remain available", () =>
+{
+    var action = new LocalAction(1, "STRIKE", 123, "打击", "左侧敌人", "hash", Round: 1);
+    var candidate = new LocalCandidate([action], 0, 87, 30, 0, 87, false, true, false, Rounds: 1, StartingHp: 87);
+    var result = new LocalSearchResult("id", "snapshot", "partial", "详细停止原因", 9, 0, 5000, candidate,
+        VerificationSkipped: true);
+    var advice = LocalSearchPolicy.FormatAdvice(result);
+    Check(advice.Contains("尚未打完") && advice.Contains("会死亡") && advice.Contains("暂不能自动执行") && advice.Contains("部分搜索未完成"));
+    Check(advice.Contains("左侧敌人") && advice.Contains("当时手牌第 2 张") && !advice.Contains("目标 123") && !advice.Contains("评估"));
+    Check(LocalSearchPolicy.Format(result).Contains("目标 123") && LocalSearchPolicy.Format(result).Contains("详细停止原因"));
+});
 AsyncTest("frequent local telemetry replacement stays readable during concurrent reads on Windows", async () =>
 {
     var directory = Path.Combine(Path.GetTempPath(), "spire-wire-test-" + Guid.NewGuid().ToString("N"));
