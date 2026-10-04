@@ -1,0 +1,80 @@
+{
+  "version": "0.7.37",
+  "validation_date": "2026-10-05",
+  "kind": "Deterministic finite-history oracle and isolated synthetic process protocol; not a native-game benchmark",
+  "core_checks_passed": 267,
+  "finite_oracle_trees": 40,
+  "leaves_per_tree": 9,
+  "runs": [
+    {
+      "algorithm": "MonteCarlo",
+      "scenario": "minimum-goal",
+      "net_hp_loss": 12,
+      "workers": 2,
+      "elapsed_ms": 2936,
+      "confirmed": true,
+      "final_verifications": 1,
+      "synthetic_peer_wait_ms": 10000,
+      "native_game": false
+    },
+    {
+      "algorithm": "MonteCarlo",
+      "scenario": "minimum-late-proof",
+      "net_hp_loss": 12,
+      "workers": 2,
+      "elapsed_ms": 2130,
+      "confirmed": true,
+      "final_verifications": 1,
+      "synthetic_peer_wait_ms": 10000,
+      "native_game": false
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "scenario": "minimum-goal",
+      "net_hp_loss": 12,
+      "workers": 2,
+      "elapsed_ms": 1625,
+      "confirmed": true,
+      "final_verifications": 1,
+      "synthetic_peer_wait_ms": 10000,
+      "native_game": false
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "scenario": "minimum-late-proof",
+      "net_hp_loss": 12,
+      "workers": 2,
+      "elapsed_ms": 2138,
+      "confirmed": true,
+      "final_verifications": 1,
+      "synthetic_peer_wait_ms": 10000,
+      "native_game": false
+    }
+  ],
+  "game_adapter_build": {
+    "warnings": 0,
+    "errors": 0,
+    "dll_sha256": "68c88fd3be52cd1e631bd928e6f30f1679aa767a2b16d1a5e2fb76104aa8a68a"
+  },
+  "configuration_budgets_unchanged": true,
+  "per_card_effect_rules_added": false,
+  "installed": true,
+  "installation": {
+    "installed_at": "2026-10-05T01:12:52.8976336+08:00",
+    "game_was_closed": true,
+    "dll_sha256": "68c88fd3be52cd1e631bd928e6f30f1679aa767a2b16d1a5e2fb76104aa8a68a",
+    "package_sha256": "7cbd8dc2685ae2912e1551154a96002a031eba5a1150a03b5b0f54217ae7a46c",
+    "package_matches_compiled_dll": true,
+    "previous_mod_files_backed_up": 2,
+    "protected_file_count": 244,
+    "protected_files_unchanged": true,
+    "worker_cache_unchanged": true
+  },
+  "native_combat_tested": false,
+  "limitations": [
+    "Unknown global Mod healing cannot establish a positive HP floor",
+    "Incomplete native selection pages remain unresolved",
+    "All contributing workers must pass cleanup and error gates",
+    "Actual trigger rate and overhead need game logs"
+  ]
+}
