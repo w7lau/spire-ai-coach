@@ -20,11 +20,9 @@ public sealed class LocalProgressPanel
 
     public LocalProgressPanel()
     {
-        var toggle = new Button { Text = "展开 / 收起计算过程" };
-        toggle.Pressed += () => _details.Visible = !_details.Visible;
-        View.AddChild(toggle); View.AddChild(_details);
-        _details.AddChild(_caption); _details.AddChild(_overview);
-        _details.AddChild(Wrap("选择搜索分组查看正在尝试的路线"));
+        View.AddChild(_caption); View.AddChild(CoachTheme.Disclosure("查看正在模拟的路线", _details)); View.AddChild(_details);
+        _details.AddChild(_overview);
+        _details.AddChild(Wrap("选择计算实例"));
         _details.AddChild(_worker);
         _worker.ItemSelected += _ => Render();
         _details.AddChild(_budgetText); _details.AddChild(_budget);
@@ -41,9 +39,8 @@ public sealed class LocalProgressPanel
     };
     public void Begin(LocalSearchRequest request)
     {
-        Finish("后台试走中；分支可能失败或被放弃，请等待最终方案。", true);
+        Finish("正在准备计算…", true);
         _book = new(request.Id, request.SnapshotId);
-        _details.Show();
     }
     public void Accept(LocalProgress progress)
     {
@@ -62,10 +59,12 @@ public sealed class LocalProgressPanel
     private void Render()
     {
         if (_book == null) return;
+        _caption.Text = $"已参与 {_book.Latest.Count} 路 · 已评估 {_book.Latest.Values.Sum(p => p.Evaluated)} 条路线";
         _overview.Text = string.Join("\n", _book.Latest.Values.Select(LocalProgressBook.Overview));
         if (!_book.Latest.TryGetValue(Math.Max(0, _worker.Selected), out var progress)) return;
         _budget.Value = LocalProgressBook.BudgetUsed(progress);
-        _budgetText.Text = $"搜索用时 {progress.ElapsedMs / 1000.0:F1}/{progress.BudgetSeconds} 秒（含复核可能超时；此条不是穷举完成率）";
+        _budgetText.Text = $"{progress.Phase} · {progress.ElapsedMs / 1000.0:F1} / {progress.BudgetSeconds} 秒";
+        _budget.TooltipText = "已使用的搜索时间预算，不是穷举完成率；准备和复核另计。";
         if (progress.State is { } state)
         {
             _hp.MaxValue = Math.Max(1, state.MaxHp); _hp.Value = Math.Clamp(state.Hp, 0, Math.Max(1, state.MaxHp));

@@ -7,12 +7,21 @@ using SpireAiCoach.Core;
 
 namespace SpireAiCoach.Mod;
 
+public sealed record LocalPoolResources(int Ready, int Preparing, int Starts, string LastChange);
+
 public sealed class LocalWorkerPool(string directory) : IDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly Worker[] _workers = Enumerable.Range(0, 16).Select(_ => new Worker()).ToArray();
     private bool _disposed;
     private LocalTrace? _lastPreparation;
+
+    public LocalPoolResources Resources()
+    {
+        var states = _workers.Select(w => w.ResourceState()).ToArray();
+        return new(states.Count(w => w.Ready), states.Count(w => w.Preparing), states.Sum(w => w.Starts),
+            states.OrderByDescending(w => w.Changed).First().Detail);
+    }
 
     private int Count(int configured, bool adaptive = true)
     {
@@ -76,7 +85,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             int count = Count(request.Workers, request.AdaptiveWorkers);
-            foreach (var idle in _workers.Skip(count)) idle.Stop();
+            foreach (var idle in _workers.Skip(count)) idle.Stop("并发上限或可用内存减少", timeline, Array.IndexOf(_workers, idle));
             using var goalReached = new CancellationTokenSource();
             int goalWorker = -1;
             var rootBranches = new int[count];
@@ -304,18 +313,14 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                                     { worker.Process.Refresh(); result = result with { WorkerMemoryBytes = worker.Process.PrivateMemorySize64 }; }
                                     if (worker.GameErrors())
                                     {
-                                        if (command.DataOnlyCombat)
-                                        {
-                                            LocalWire.Write(Path.Combine(worker.Root, "last-data-failure.json"), result);
-                                            File.Copy(Path.Combine(worker.Root, "game.log"), Path.Combine(worker.Root, "last-data-failure.log"), true);
-                                        }
-                                        worker.Stop();
+                                        RememberFailure(result);
+                                        worker.Stop("模拟报告运行错误", timeline, index);
                                         return result with { Status = "failed", Best = null, Message = "后台游戏报告运行错误，未采用该进程的结果。" };
                                     }
                                     if (result.Status is not ("done" or "searched"))
                                     {
-                                        if (command.DataOnlyCombat) LocalWire.Write(Path.Combine(worker.Root, "last-data-failure.json"), result);
-                                        worker.Stop();
+                                        RememberFailure(result);
+                                        worker.Stop("上次模拟未完成：" + result.Message, timeline, index);
                                     }
                                     if (!verifying && result.Status is "searched" or "done" &&
                                         request.StopOnZeroLoss && LocalSearchPolicy.MeetsGoal(result.Best, request) &&
@@ -332,7 +337,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                         // Normally the native action settles and acknowledges within one poll.
                         // A stuck callback must not hold the goal route until the search budget.
                         if (stopping?.Elapsed.TotalSeconds >= 2)
-                        { worker.Stop(); return Stopped(); }
+                        { worker.Stop("停止搜索后未能确认安全清理", timeline, index); return Stopped(); }
                         if (worker.Process?.HasExited != false)
                             throw new CoachException("local_exit", "本次计算意外中断，请重试。");
                         await Task.Delay(250, cancellation);
@@ -345,9 +350,19 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 { if (requestDispatched) await worker.CancelRequest(command, timeline, index); throw; }
                 catch (Exception ex)
                 {
-                    worker.Stop();
+                    worker.Stop("模拟中断：" + ex.Message, timeline, index);
                     return new(request.Id, request.SnapshotId, "failed", ex is CoachException ? ex.Message :
                         $"本地进程准备失败（{ex.GetType().Name}）：{ex.Message}", 0, 0, 0, null);
+                }
+
+                void RememberFailure(LocalSearchResult failed)
+                {
+                    if (!command.DataOnlyCombat) return;
+                    LocalWire.Write(Path.Combine(worker.Root, "last-data-failure.json"), failed);
+                    // Keep the failing frozen input, not a later request overwriting request.json.
+                    LocalWire.Write(Path.Combine(worker.Root, "last-data-failure-request.json"), command);
+                    var log = Path.Combine(worker.Root, "game.log");
+                    if (File.Exists(log)) File.Copy(log, Path.Combine(worker.Root, "last-data-failure.log"), true);
                 }
             }
         }
@@ -401,6 +416,20 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
         private FileStream? _lock;
         private string? _configuration;
         private long _logPosition;
+        private int _starts;
+        private long _changed;
+        private string _detail = "尚未准备";
+        private string _retirement = "实例已退出";
+
+        internal (bool Ready, bool Preparing, int Starts, long Changed, string Detail) ResourceState()
+        {
+            lock (_lifecycle)
+            {
+                bool alive = Process?.HasExited == false && _generation != null;
+                return (alive && _preparation?.IsCompletedSuccessfully == true,
+                    _generation != null && _preparation is { IsCompleted: false }, _starts, _changed, _detail);
+            }
+        }
 
         public async Task Ensure(string directory, int index, LocalInstallation installation, CancellationToken token, LocalTimeline? timeline = null)
         {
@@ -418,7 +447,12 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     (!_preparation.IsCompletedSuccessfully || Process?.HasExited == false);
                 if (!reuse)
                 {
-                    StopLocked();
+                    var reason = _configuration != null && _configuration != configuration ? "配置或运行模式改变" : _retirement;
+                    StopLocked(reason);
+                    _detail = _starts == 0 ? "首次准备" : "重新准备：" + reason;
+                    _changed = LocalTimeline.Timestamp;
+                    if (timeline != null) timeline.Add(new(index, "prepare", _starts == 0 ? "cold_start" : "rebuild",
+                        _detail, timeline.ElapsedMs, 0));
                     var previous = _preparation;
                     var generation = new CancellationTokenSource();
                     var preparationToken = generation.Token;
@@ -434,7 +468,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                         try { await Prepare(directory, index, installation, configuration, identity, preparationToken, timeline); }
                         catch
                         {
-                            lock (_lifecycle) if (ReferenceEquals(_generation, generation)) StopLocked();
+                            lock (_lifecycle) if (ReferenceEquals(_generation, generation)) StopLocked("准备失败");
                             throw;
                         }
                     });
@@ -504,6 +538,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 // Dispose/Stop can race file preparation, but never a new launch.
                 token.ThrowIfCancellationRequested();
                 using (timeline?.Measure(index, "prepare", "launch", depth: 1)) Process = IsolatedProcess.Start(start);
+                _starts++; _changed = LocalTimeline.Timestamp;
             }
             var timer = Stopwatch.StartNew();
             using var engine = timeline?.Measure(index, "prepare", "engine", depth: 1);
@@ -536,7 +571,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 if (await WaitIdle(command, timeline, index) && !GameErrors() && !File.Exists(Path.Combine(Root, "fatal.txt"))) return;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or JsonException) { }
-            Stop();
+            Stop("取消后未能确认安全清理", timeline, index);
         }
 
         public bool GameErrors()
@@ -586,9 +621,14 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 CopyTree(child, Path.Combine(target, Path.GetFileName(child)), token);
             }
         }
-        public void Stop()
+        public void Stop(string reason = "释放计算资源", LocalTimeline? timeline = null, int index = 0)
         {
-            lock (_lifecycle) StopLocked();
+            lock (_lifecycle)
+            {
+                if (_generation != null && timeline != null)
+                    timeline.Add(new(index, "prepare", "retire", reason, timeline.ElapsedMs, 0));
+                StopLocked(reason);
+            }
         }
 
         public void Dispose()
@@ -603,8 +643,10 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             if (pending != null) try { await pending; } catch (Exception) { }
         }
 
-        private void StopLocked()
+        private void StopLocked(string reason = "释放计算资源")
         {
+            if (_generation != null || Process != null)
+            { _retirement = reason; _detail = reason; _changed = LocalTimeline.Timestamp; }
             _generation?.Cancel(); _generation?.Dispose(); _generation = null;
             Generation = "";
             try

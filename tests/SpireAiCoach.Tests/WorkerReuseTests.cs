@@ -130,6 +130,7 @@ internal static class WorkerReuseTests
             var cold = Stopwatch.StartNew(); await f.Pool.Prepare(f.Installation, 2, CancellationToken.None); cold.Stop();
             Check(lanes.Count(w => w.Process != null) == 1, "Prewarming created extra lanes");
             var pid = lanes[0].Process!.Id; var started = lanes[0].Process!.StartTime.ToUniversalTime();
+            Check(f.Pool.Resources() is { Ready: 1, Preparing: 0, Starts: 1 }, "Ready resource display lost the actual worker state");
             var hot = Stopwatch.StartNew(); await f.Pool.Prepare(f.Installation, 2, CancellationToken.None); hot.Stop();
             var runs = new List<object>();
             foreach (var scenario in new[] { "repeat", "menu-reentry", "save-b" })
@@ -153,6 +154,7 @@ internal static class WorkerReuseTests
                 runs.Add(new { scenario = verify ? "cancel-verification" : "cancel-search", pid, cancellation_ms = watch.ElapsedMilliseconds });
                 var result = await f.Pool.Analyze(Request() with { Workers = 1 }, f.Installation, _ => { }, CancellationToken.None);
                 Check(result.Status == "done" && lanes[0].Process!.Id == pid, "Cancelled-then-restarted search did not reuse");
+                Check(f.Pool.Resources().Starts == 1, "Healthy cancellation counted as a new launch");
             }
             var evidence = new { kind = "synthetic protocol/process acceptance; no native game", cold_prepare_ms = cold.ElapsedMilliseconds,
                 hot_prepare_ms = hot.ElapsedMilliseconds, pid, started_utc = started, generation = lanes[0].Generation,
@@ -242,8 +244,11 @@ internal static class WorkerReuseTests
             try { await f.Pool.Analyze(Request("bad-idle") with { Workers = 1 }, f.Installation, _ => { }, CancellationToken.None); throw new Exception("Unclean terminal accepted"); }
             catch (CoachException ex) when (ex.Category == "local_failed") { }
             Check(lane.Process == null, "Unclean worker retained");
+            Check(f.Pool.Resources() is { Ready: 0, Preparing: 0, Starts: 1 }, "Failed cleanup remained ready in the resource display");
             var result = await f.Pool.Analyze(Request() with { Workers = 1 }, f.Installation, _ => { }, CancellationToken.None);
             Check(result.Status == "done", "Unclean worker did not recover");
+            Check(f.Pool.Resources().Starts == 2 && result.Trace!.Spans.Any(s => s.Phase == "rebuild" && s.Detail.Contains("cleanup")),
+                "Rebuilding a failed instance lost its reason or launch count");
         });
         asyncTest("worker reuse isolated cancelled worker with a native error is retired despite cleanup acknowledgement", async () =>
         {

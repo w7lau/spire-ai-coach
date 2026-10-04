@@ -11,6 +11,7 @@ using MegaCrit.Sts2.Core.Context;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Monsters;
 using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Nodes.Cards;
 using MegaCrit.Sts2.Core.Nodes;
@@ -61,6 +62,10 @@ internal static class LocalWorkerDataMode
             [typeof(IEnumerable<CardPileAddResult>), typeof(bool)]);
         Prefix(typeof(CardModel), "PlayPowerCardFlyVfx", nameof(PresentationTask));
         Prefix(typeof(NGame), nameof(NGame.ScreenShake), nameof(PresentationVoid));
+        // This native death callback unsubscribes its event before accessing an
+        // optional animation node. Keep the callback and all death rules intact.
+        harmony.Patch(AccessTools.DeclaredMethod(typeof(SoulNexus), "AfterDeath", [typeof(Creature)]),
+            transpiler: new(AccessTools.Method(typeof(LocalWorkerDataMode), nameof(OptionalCreaturePresentation))));
         foreach (var factory in typeof(NDamageNumVfx).GetMethods().Where(m => m.Name == nameof(NDamageNumVfx.Create)))
             harmony.Patch(factory, prefix: new(AccessTools.Method(typeof(LocalWorkerDataMode), nameof(DamageVisual))));
         Prefix(typeof(PlayerHurtVignetteHelper), nameof(PlayerHurtVignetteHelper.Play), nameof(PresentationVoid));
@@ -271,6 +276,24 @@ internal static class LocalWorkerDataMode
         if (count != 1) throw new InvalidOperationException("Native state notification boundary changed");
     }
     private static bool PresentationIsOn() => Active || TestMode.IsOn;
+    private static NCreature? CreaturePresentation(NCombatRoom? room, Creature creature) =>
+        Active ? null : room!.GetCreatureNode(creature);
+    private static IEnumerable<CodeInstruction> OptionalCreaturePresentation(IEnumerable<CodeInstruction> instructions)
+    {
+        var original = AccessTools.Method(typeof(NCombatRoom), nameof(NCombatRoom.GetCreatureNode), [typeof(Creature)]);
+        int count = 0;
+        foreach (var instruction in instructions)
+        {
+            if (instruction.Calls(original))
+            {
+                count++;
+                yield return new CodeInstruction(instruction) { opcode = OpCodes.Call,
+                    operand = AccessTools.Method(typeof(LocalWorkerDataMode), nameof(CreaturePresentation)) };
+            }
+            else yield return instruction;
+        }
+        if (count != 1) throw new InvalidOperationException("Native optional creature presentation boundary changed");
+    }
     private static bool PresentationIsOff() => !Active && TestMode.IsOff;
     private static IEnumerable<CodeInstruction> TransformPresentation(IEnumerable<CodeInstruction> instructions)
     {
