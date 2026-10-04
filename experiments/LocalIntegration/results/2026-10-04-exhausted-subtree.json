@@ -1,0 +1,184 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "version": "0.7.23",
+  "dll_sha256": "812EAA6F0E4E9BFF33C3ABFDFF2D85966A4B1BE9968A23ADDFD94FFEAF87155A",
+  "game_version": "v0.111.0",
+  "before": [
+    {
+      "mode": "regular_retry",
+      "worker": 0,
+      "status": "failed",
+      "message": "This exact subtree has already been exhausted",
+      "evaluated": 12,
+      "elapsed_ms": 12738,
+      "candidate_retained": false
+    },
+    {
+      "mode": "regular_retry",
+      "worker": 1,
+      "status": "failed",
+      "message": "This exact subtree has already been exhausted",
+      "evaluated": 24,
+      "elapsed_ms": 19653,
+      "candidate_retained": false
+    },
+    {
+      "mode": "regular_retry",
+      "worker": 2,
+      "status": "failed",
+      "message": "This exact subtree has already been exhausted",
+      "evaluated": 20,
+      "elapsed_ms": 18324,
+      "candidate_retained": false
+    },
+    {
+      "mode": "regular_retry",
+      "worker": 3,
+      "status": "failed",
+      "message": "This exact subtree has already been exhausted",
+      "evaluated": 33,
+      "elapsed_ms": 24641,
+      "candidate_retained": false
+    },
+    {
+      "mode": "numeric",
+      "worker": 0,
+      "status": "failed",
+      "message": "This exact subtree has already been exhausted",
+      "evaluated": 57,
+      "elapsed_ms": 6351,
+      "candidate_retained": false
+    },
+    {
+      "mode": "numeric",
+      "worker": 1,
+      "status": "failed",
+      "message": "This exact subtree has already been exhausted",
+      "evaluated": 12,
+      "elapsed_ms": 2195,
+      "candidate_retained": false
+    },
+    {
+      "mode": "numeric",
+      "worker": 2,
+      "status": "failed",
+      "message": "This exact subtree has already been exhausted",
+      "evaluated": 43,
+      "elapsed_ms": 6849,
+      "candidate_retained": false
+    },
+    {
+      "mode": "numeric",
+      "worker": 3,
+      "status": "failed",
+      "message": "This exact subtree has already been exhausted",
+      "evaluated": 20,
+      "elapsed_ms": 3337,
+      "candidate_retained": false
+    }
+  ],
+  "change": "Exhaustion is a normal scheduling result. Finish covered jobs and pending legal native choices without publishing a new outcome or clearing prior candidates.",
+  "final_native": {
+    "Status": "done",
+    "Evaluated": 256,
+    "Rejected": 0,
+    "Victories": 0,
+    "ElapsedMs": 68388,
+    "Timing": {
+      "RestoreMs": 12995,
+      "ActionMs": 8235,
+      "DecisionMs": 5196,
+      "VerificationMs": 2581,
+      "StartupMs": 102579,
+      "Actions": 2353,
+      "Restores": 259,
+      "Verifications": 1
+    },
+    "Workers": 4,
+    "MaxRounds": 64,
+    "BudgetSeconds": 60,
+    "MaxNodes": 64,
+    "IncludePotions": true,
+    "FastCardPresentation": true,
+    "FastNativeWaits": true,
+    "FastStateSettling": true,
+    "FastAssetCollection": false,
+    "ShareSearchWork": true,
+    "SearchOrder": 0,
+    "Work": {
+      "Submitted": 862,
+      "Claimed": 259,
+      "Completed": 259,
+      "DuplicateOffers": 5437,
+      "Pending": 598,
+      "Active": 0,
+      "CoveredJobs": 18,
+      "RootReady": true
+    },
+    "TurnSearch": null,
+    "Won": false,
+    "StartingHp": 6,
+    "Hp": 0,
+    "NetHpLoss": 6,
+    "HpLost": 6,
+    "Rounds": 4,
+    "EnemyHp": 16,
+    "StopReason": "玩家死亡",
+    "used_potion": true,
+    "choices": 1,
+    "verified_steps": 20
+  },
+  "completed_trials_by_worker": {
+    "0": 64,
+    "1": 64,
+    "2": 64,
+    "3": 64
+  },
+  "covered_proposals": [
+    {
+      "worker": 0,
+      "route": 13,
+      "step": 17,
+      "detail": "该操作前缀已全部评估"
+    },
+    {
+      "worker": 0,
+      "route": 22,
+      "step": 17,
+      "detail": "该操作前缀已全部评估"
+    },
+    {
+      "worker": 0,
+      "route": 63,
+      "step": 17,
+      "detail": "该操作前缀已全部评估"
+    }
+  ],
+  "fallback_count": 0,
+  "native_states_and_full_history_verified": true,
+  "parent_game_errors_gate_passed": true,
+  "validation": {
+    "core_passed": 202,
+    "core_total": 202,
+    "adapter_build_warnings": 0,
+    "adapter_build_errors": 0
+  },
+  "limits": [
+    "The frozen incident starts at 6 HP. No winning route was found within this unchanged budget; the retained result is correctly marked as player death.",
+    "The native test keeps 64 trials, 60 seconds and 64 rounds per worker and adds one independent final verification.",
+    "StartupMs and other worker totals are cumulative, not elapsed request time. Cold preparation is included in ElapsedMs.",
+    "Closed selection proposals have core regression coverage; the three observed native covered proposals were action prefixes.",
+    "No arbitrary Mod compatibility, global optimum or reopened player-window acceptance is claimed."
+  ],
+  "installation": {
+    "installed_at": "2026-10-04T06:21:23.501887+00:00",
+    "version": "0.7.23",
+    "installed_dll_equals_native_tested": true,
+    "dll_sha256": "812EAA6F0E4E9BFF33C3ABFDFF2D85966A4B1BE9968A23ADDFD94FFEAF87155A",
+    "zip_sha256": "01A6ABED49B233E83A30C7EA6C473CFB586230F9FD30BFD329C1AE44E7706CA4",
+    "protected_files_unchanged": 490,
+    "previous_binary_and_manifest_backups_verified": true,
+    "game_started_by_agent": false
+  }
+}

@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace SpireAiCoach.Core;
 
 // Outcome-guided tree search. Nodes represent exact action histories, not merged visible states.
@@ -30,11 +32,12 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOr
 
     public sealed class Trial
     {
+        internal readonly Node Root;
         internal Node? Current;
         internal readonly List<Node> Path;
         internal bool Finished;
         internal LocalDiscrepancyTree.Trial? Discrepancy;
-        internal Trial(Node root) { Current = root; Path = [root]; }
+        internal Trial(Node root) { Root = root; Current = root; Path = [root]; }
     }
 
     public Trial Begin() => new(_root) { Discrepancy = _discrepancy?.Begin() };
@@ -42,10 +45,22 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOr
     public LocalAction Select(Trial trial, IReadOnlyList<LocalAction> legal, LocalAction? preferred = null, bool greedy = false,
         Func<LocalAction, int>? priority = null)
     {
-        if (_discrepancy != null) return _discrepancy.Select(trial.Discrepancy ??
-            throw new InvalidOperationException("Trial belongs to a different search"), legal, preferred);
+        if (TrySelect(trial, legal, out var action, preferred, greedy, priority)) return action;
+        throw new InvalidOperationException("This exact subtree has already been exhausted");
+    }
+
+    // Exhaustion is a scheduling result, not a failed native simulation. A forced
+    // proposal can revisit a closed subtree while other exact histories stay open.
+    public bool TrySelect(Trial trial, IReadOnlyList<LocalAction> legal, [NotNullWhen(true)] out LocalAction? selected,
+        LocalAction? preferred = null, bool greedy = false, Func<LocalAction, int>? priority = null)
+    {
+        selected = null;
+        if (trial.Root != _root) throw new InvalidOperationException("Trial belongs to a different search");
+        if (_discrepancy != null) return _discrepancy.TrySelect(trial.Discrepancy ??
+            throw new InvalidOperationException("Trial belongs to a different search"), legal, out selected, preferred);
         if (trial.Finished) throw new InvalidOperationException("Trial has already finished");
         if (legal.Count == 0) throw new InvalidOperationException("No legal action");
+        if (preferred != null && !legal.Contains(preferred)) throw new InvalidOperationException("Preferred action is not legal");
         var parent = trial.Current;
         LocalAction action;
         Node? child = null;
@@ -54,8 +69,13 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOr
         {
             parent.LegalKeys = legal.Select(Key).Distinct(StringComparer.Ordinal).ToArray();
             var remaining = legal.Where(a => !parent.Children.TryGetValue(Key(a), out var n) || !n.Closed).ToArray();
-            if (preferred != null && !legal.Contains(preferred)) throw new InvalidOperationException("Preferred action is not legal");
-            if (remaining.Length == 0 && preferred == null) throw new InvalidOperationException("This exact subtree has already been exhausted");
+            if (remaining.Length == 0 || preferred != null && parent.Children.TryGetValue(Key(preferred), out var prior) && prior.Closed)
+            {
+                trial.Finished = true;
+                // Do not add a rollout reward, visit or fabricated outcome for a
+                // proposal that has no untried continuation at this exact prefix.
+                return false;
+            }
             var unseen = remaining.Where(a => !parent.Children.TryGetValue(Key(a), out var n) || n.Visits == 0).ToArray();
             if (preferred != null) action = preferred;
             else if (unseen.Length > 0) action = greedy ? unseen.OrderByDescending(a => priority?.Invoke(a) ?? a.Preference).ThenBy(a => a.EndTurn).First() : Explore(unseen, priority);
@@ -81,11 +101,13 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOr
         }
         trial.Current = child;
         if (child != null) trial.Path.Add(child);
-        return action;
+        selected = action;
+        return true;
     }
 
     public void Complete(Trial trial, LocalCandidate result, int initialEnemyHp, bool closeExactPrefix = false)
     {
+        if (trial.Root != _root) throw new InvalidOperationException("Trial belongs to a different search");
         if (_discrepancy != null)
         {
             _discrepancy.Complete(trial.Discrepancy ?? throw new InvalidOperationException("Trial belongs to a different search"), result, closeExactPrefix);
