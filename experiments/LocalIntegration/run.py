@@ -63,7 +63,13 @@ parser.add_argument('--limits-test', action='store_true')
 parser.add_argument('--native-overhead-test', action='store_true')
 parser.add_argument('--scene-overhead-test', action='store_true')
 parser.add_argument('--visual-factory-test', action='store_true')
+parser.add_argument('--route-feedback-test', action='store_true')
+parser.add_argument('--route-feedback-focused-only', action='store_true')
 args = parser.parse_args()
+if args.route_feedback_focused_only and not args.route_feedback_test:
+    parser.error('--route-feedback-focused-only requires --route-feedback-test')
+if args.route_feedback_test and (not args.replay or not args.seed_result or args.recorded_replay):
+    parser.error('--route-feedback-test requires frozen --replay and previous native --seed-result')
 if args.scene_overhead_test and (not args.replay or not args.seed_result):
     parser.error('--scene-overhead-test requires a frozen --replay and --seed-result')
 if args.native_overhead_test and (not args.replay or not args.seed_result):
@@ -141,6 +147,11 @@ with worker_lock(root):
     if args.survival_test:
         for name in ['integration-survival-summary.json', 'integration-survival-private.json']:
             (root / name).unlink(missing_ok=True)
+    if args.route_feedback_test:
+        for name in ['integration-route-feedback-summary.json',
+                     *[f'integration-route-feedback-private-{order}-{mode}.json'
+                       for order in ('MonteCarlo', 'TurnFrontier') for mode in ('baseline', 'reuse')]]:
+            (root / name).unlink(missing_ok=True)
     if args.algorithm_goal_test:
         for name in ['integration-algorithm-goal-summary.json', 'integration-algorithm-goal-private-0.json',
                      'integration-algorithm-goal-private-1.json']:
@@ -217,6 +228,8 @@ with worker_lock(root):
     env['SPIRE_LOCAL_NATIVE_OVERHEAD_TEST'] = '1' if args.native_overhead_test else '0'
     env['SPIRE_LOCAL_SCENE_OVERHEAD_TEST'] = '1' if args.scene_overhead_test else '0'
     env['SPIRE_LOCAL_VISUAL_FACTORY_TEST'] = '1' if args.visual_factory_test else '0'
+    env['SPIRE_LOCAL_ROUTE_FEEDBACK_TEST'] = '1' if args.route_feedback_test else '0'
+    env['SPIRE_LOCAL_ROUTE_FEEDBACK_FOCUSED_ONLY'] = '1' if args.route_feedback_focused_only else '0'
     settings = root / 'Roaming/SlayTheSpire2/default/1/settings.save'
     settings_data = json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}
     settings_data.update(volume_master=0, volume_bgm=0, volume_sfx=0, volume_ambience=0)
@@ -236,7 +249,8 @@ with worker_lock(root):
         try:
             # Each comparison retains the full product search budget. Several
             # resident-pool samples need a larger outer harness timeout.
-            process.wait(timeout=max(300, 90 + 75 * len(args.search_cases.split(','))) if args.search_cases else 300)
+            process.wait(timeout=390 if args.route_feedback_test else
+                         max(300, 90 + 75 * len(args.search_cases.split(','))) if args.search_cases else 300)
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait(timeout=10)
@@ -280,6 +294,11 @@ with worker_lock(root):
             names = ['integration-visual-factory-summary.json', 'integration-visual-factory-private-0.json',
                      'integration-visual-factory-private-1.json', 'integration-success',
                      'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.route_feedback_test:
+            names = ['integration-route-feedback-summary.json',
+                     *[f'integration-route-feedback-private-{order}-{mode}.json'
+                       for order in ('MonteCarlo', 'TurnFrontier') for mode in ('baseline', 'reuse')],
+                     'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
         if args.search_cases:
             names = ['integration-self-search-summary.json', *[f'integration-self-search-private-{i}.json' for i in range(4)],
                      'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']

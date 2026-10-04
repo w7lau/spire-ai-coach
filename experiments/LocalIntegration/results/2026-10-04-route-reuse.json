@@ -1,0 +1,381 @@
+{
+  "version": "0.7.33",
+  "game_version": "0.111.0",
+  "starting_hp": 32,
+  "original_old_player_run": "Overwritten before investigation; same 32-HP combat confirmed by user.",
+  "original_latest_new_player_run": {
+    "elapsed_ms": 58871,
+    "evaluated": 512,
+    "victories": 36,
+    "final_hp": 9,
+    "net_loss": 23,
+    "rounds": 10,
+    "potions": 1,
+    "round_losses": {
+      "3": 4,
+      "7": 18,
+      "8": 1
+    }
+  },
+  "frozen_limits": {
+    "workers": 8,
+    "attempts_per_worker": 64,
+    "seconds_per_worker": 60,
+    "max_rounds": 20,
+    "include_potions": true,
+    "stop_on_zero_loss": true,
+    "skip_final_verification": true
+  },
+  "reference_unseeded_retests": [
+    {
+      "label": "MonteCarlo-baseline",
+      "MaxNodes": 64,
+      "MaxRounds": 20,
+      "BudgetSeconds": 60,
+      "IncludePotions": true,
+      "StopOnZeroLoss": true,
+      "SkipFinalVerification": true,
+      "unseeded": true,
+      "requested_workers": 8,
+      "Status": "done",
+      "Workers": 8,
+      "Evaluated": 512,
+      "Victories": 1,
+      "Rejected": 0,
+      "ElapsedMs": 107871,
+      "StartingHp": 32,
+      "Hp": 1,
+      "HpLost": 31,
+      "NetHpLoss": 31,
+      "Won": true,
+      "Rounds": 11,
+      "potions": 1,
+      "round_losses": {
+        "1": 0,
+        "2": 0,
+        "3": 12,
+        "4": 3,
+        "5": 0,
+        "6": 0,
+        "7": 6,
+        "8": 1,
+        "9": 0,
+        "10": 9,
+        "11": 0
+      },
+      "Timing": {
+        "RestoreMs": 70723,
+        "ActionMs": 111835,
+        "DecisionMs": 132686,
+        "VerificationMs": 0,
+        "StartupMs": 312425,
+        "Actions": 11323,
+        "Restores": 512,
+        "Verifications": 0
+      },
+      "first_win_ms": 107600.6607,
+      "repeated_histories": null,
+      "measured_decisions": 37
+    },
+    {
+      "label": "TurnFrontier-baseline",
+      "MaxNodes": 64,
+      "MaxRounds": 20,
+      "BudgetSeconds": 60,
+      "IncludePotions": true,
+      "StopOnZeroLoss": true,
+      "SkipFinalVerification": true,
+      "unseeded": true,
+      "requested_workers": 8,
+      "Status": "done",
+      "Workers": 8,
+      "Evaluated": 464,
+      "Victories": 14,
+      "Rejected": 0,
+      "ElapsedMs": 62598,
+      "StartingHp": 32,
+      "Hp": 12,
+      "HpLost": 20,
+      "NetHpLoss": 20,
+      "Won": true,
+      "Rounds": 11,
+      "potions": 1,
+      "round_losses": {
+        "1": 0,
+        "2": 0,
+        "3": 20,
+        "4": 0,
+        "5": 0,
+        "6": 0,
+        "7": 0,
+        "8": 0,
+        "9": 0,
+        "10": 0,
+        "11": 0
+      },
+      "Timing": {
+        "RestoreMs": 51894,
+        "ActionMs": 133680,
+        "DecisionMs": 181350,
+        "VerificationMs": 0,
+        "StartupMs": 1,
+        "Actions": 17323,
+        "Restores": 802,
+        "Verifications": 0
+      },
+      "first_win_ms": 40567.074,
+      "repeated_histories": 0,
+      "measured_decisions": 51
+    }
+  ],
+  "route_reuse_native_validation": {
+    "scope": "existing native route reuse with captured workers/budgets/potions; one sample per case, not unseeded search optimality or stable speedup proof",
+    "mod_sha256": "3DD62C1800081FAFC13981DECAC6A1581CC42F94F60CD2ADAA2E48100DE8142D",
+    "samples": [
+      {
+        "label": "MonteCarlo-reuse",
+        "MaxNodes": 64,
+        "MaxRounds": 20,
+        "BudgetSeconds": 60,
+        "IncludePotions": true,
+        "StopOnZeroLoss": true,
+        "SkipFinalVerification": true,
+        "seeded": true,
+        "initial_plan_steps": 36,
+        "known_hp": 9,
+        "known_net_loss": 23,
+        "requested_workers": 8,
+        "Status": "done",
+        "Workers": 8,
+        "Evaluated": 512,
+        "Victories": 50,
+        "Rejected": 0,
+        "ElapsedMs": 63608,
+        "StartingHp": 32,
+        "Hp": 11,
+        "HpLost": 21,
+        "NetHpLoss": 21,
+        "Won": true,
+        "Rounds": 9,
+        "potions": 0,
+        "round_losses": {
+          "1": 0,
+          "2": 0,
+          "3": 4,
+          "4": 0,
+          "5": 0,
+          "6": 7,
+          "7": 10,
+          "8": 0,
+          "9": 0
+        },
+        "Timing": {
+          "RestoreMs": 35711,
+          "ActionMs": 55073,
+          "DecisionMs": 50468,
+          "VerificationMs": 0,
+          "StartupMs": 243146,
+          "Actions": 12162,
+          "Restores": 527,
+          "Verifications": 0
+        },
+        "first_win_ms": 2664.777,
+        "repeated_histories": null,
+        "measured_decisions": 31
+      },
+      {
+        "label": "TurnFrontier-reuse",
+        "MaxNodes": 64,
+        "MaxRounds": 20,
+        "BudgetSeconds": 60,
+        "IncludePotions": true,
+        "StopOnZeroLoss": true,
+        "SkipFinalVerification": true,
+        "seeded": true,
+        "initial_plan_steps": 36,
+        "known_hp": 9,
+        "known_net_loss": 23,
+        "requested_workers": 8,
+        "Status": "done",
+        "Workers": 8,
+        "Evaluated": 512,
+        "Victories": 68,
+        "Rejected": 0,
+        "ElapsedMs": 41333,
+        "StartingHp": 32,
+        "Hp": 18,
+        "HpLost": 14,
+        "NetHpLoss": 14,
+        "Won": true,
+        "Rounds": 10,
+        "potions": 1,
+        "round_losses": {
+          "1": 0,
+          "2": 0,
+          "3": 4,
+          "4": 0,
+          "5": 0,
+          "6": 0,
+          "7": 10,
+          "8": 0,
+          "9": 0,
+          "10": 0
+        },
+        "Timing": {
+          "RestoreMs": 35629,
+          "ActionMs": 89644,
+          "DecisionMs": 95672,
+          "VerificationMs": 0,
+          "StartupMs": 0,
+          "Actions": 19468,
+          "Restores": 806,
+          "Verifications": 0
+        },
+        "first_win_ms": 394.6517,
+        "repeated_histories": 0,
+        "measured_decisions": 34
+      }
+    ]
+  },
+  "rejected_prototypes": [
+    {
+      "mechanism": "failure feedback and round-loss focus",
+      "shipped": false,
+      "mod_sha256": "7F21882F4353F6EDEAAF81C665D001A94C594383CF29A15C0CE806961929845D",
+      "observations": [
+        {
+          "label": "MonteCarlo-baseline",
+          "Evaluated": 512,
+          "Victories": 18,
+          "Hp": 1,
+          "NetHpLoss": 31,
+          "Won": true,
+          "ElapsedMs": 73540
+        },
+        {
+          "label": "MonteCarlo-focused",
+          "Evaluated": 512,
+          "Victories": 0,
+          "Hp": 0,
+          "NetHpLoss": 32,
+          "Won": false,
+          "ElapsedMs": 31161
+        },
+        {
+          "label": "TurnFrontier-baseline",
+          "Evaluated": 512,
+          "Victories": 25,
+          "Hp": 12,
+          "NetHpLoss": 20,
+          "Won": true,
+          "ElapsedMs": 49091
+        },
+        {
+          "label": "TurnFrontier-focused",
+          "Evaluated": 512,
+          "Victories": 14,
+          "Hp": 2,
+          "NetHpLoss": 30,
+          "Won": true,
+          "ElapsedMs": 46879
+        }
+      ],
+      "interpretation": "No demonstrated native quality improvement; single concurrent samples are nondeterministic."
+    },
+    {
+      "mechanism": "winning round-loss focus",
+      "shipped": false,
+      "mod_sha256": "6CD3632A925C577DE7B829516C5C0AD3FF0EA2CBD318B5FBE73DB536BB04472C",
+      "observations": [
+        {
+          "label": "MonteCarlo-baseline",
+          "Evaluated": 512,
+          "Victories": 1,
+          "Hp": 1,
+          "NetHpLoss": 31,
+          "Won": true,
+          "ElapsedMs": 107871
+        },
+        {
+          "label": "MonteCarlo-focused",
+          "Evaluated": 512,
+          "Victories": 24,
+          "Hp": 1,
+          "NetHpLoss": 31,
+          "Won": true,
+          "ElapsedMs": 61165
+        },
+        {
+          "label": "TurnFrontier-baseline",
+          "Evaluated": 464,
+          "Victories": 14,
+          "Hp": 12,
+          "NetHpLoss": 20,
+          "Won": true,
+          "ElapsedMs": 62598
+        },
+        {
+          "label": "TurnFrontier-focused",
+          "Evaluated": 376,
+          "Victories": 28,
+          "Hp": 1,
+          "NetHpLoss": 31,
+          "Won": true,
+          "ElapsedMs": 62627
+        }
+      ],
+      "interpretation": "No demonstrated native quality improvement; single concurrent samples are nondeterministic."
+    },
+    {
+      "mechanism": "replace stale soft EndTurn",
+      "shipped": false,
+      "mod_sha256": "A5DDFC399EC75B521725082F75CF232FAB245D84A8F875315A3E52E1E28115F6",
+      "observations": [
+        {
+          "label": "MonteCarlo-focused",
+          "Evaluated": 512,
+          "Victories": 0,
+          "Hp": 0,
+          "NetHpLoss": 32,
+          "Won": false,
+          "ElapsedMs": 97724
+        },
+        {
+          "label": "TurnFrontier-focused",
+          "Evaluated": 428,
+          "Victories": 38,
+          "Hp": 4,
+          "NetHpLoss": 28,
+          "Won": true,
+          "ElapsedMs": 62303
+        }
+      ],
+      "interpretation": "No demonstrated native quality improvement; single concurrent samples are nondeterministic."
+    }
+  ],
+  "checks": {
+    "core_passed": 251,
+    "core_total": 251,
+    "mod_build_warnings": 0,
+    "mod_build_errors": 0,
+    "integration_build_warnings": 0,
+    "integration_build_errors": 0,
+    "earlier_core_cleanup_race": "One preexisting WorkerReuse fixture cleanup failed; targeted retry and final full run passed."
+  },
+  "limitations": [
+    "Final comparison intentionally uses a known native 36-action victory, re-executed rather than copying its score.",
+    "Unseeded retests are not recovered old player-run results and do not establish repeatable superiority.",
+    "First-win metrics use worker trace clocks; parent preparation and JIT differ between cold and warm cases.",
+    "No stable overall speedup, no zero-loss discovery, no global optimality or arbitrary-Mod compatibility proved.",
+    "Native request, result, history, saved state, game assets and local paths are excluded from this summary."
+  ],
+  "installation": {
+    "version": "0.7.33",
+    "dll_sha256": "3dd62c1800081fafc13981decac6a1581cc42f94f60cd2adaa2e48100de8142d",
+    "zip_sha256": "7f765d340c039ff5cc933c635cdcf320f8aa3e0faa1931826595a0a3ec5327f6",
+    "previous_version": "0.7.32",
+    "backup_verified": true,
+    "selected_profile_files_unchanged": 13,
+    "formal_game_not_started": true
+  }
+}

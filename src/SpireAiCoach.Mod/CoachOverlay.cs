@@ -602,7 +602,7 @@ public sealed class CoachOverlay
             request = ConfigureLocalRequest(LocalCapture.Capture(_snapshotHash!, continueOptimization), order);
             // Reuse only the suffix matching this combat, mods, native state and complete history.
             // It is an exploration seed; the worker re-executes and verifies it, never copies its score.
-            if (order == LocalSearchOrder.MonteCarlo && _continuation != null && request.History != null)
+            if (_continuation != null && request.History != null)
             {
                 var seed = _continuation.Advance(_snapshot!.CombatId, request.LoadedMods, request.NativeHash, request.History);
                 if (seed?.IncludePotions == request.IncludePotions) request = request with { InitialPlan = seed.Best?.Actions };
@@ -663,7 +663,7 @@ public sealed class CoachOverlay
                         {
                             Directory.CreateDirectory(Path.GetDirectoryName(timingPath)!);
                             LocalTimingArchive.Write(Path.GetDirectoryName(timingPath)!, request.Id, new {
-                                request.Id, request.SnapshotId, completed_at = DateTimeOffset.UtcNow,
+                                request.Id, request.SnapshotId, request.NativeHash, completed_at = DateTimeOffset.UtcNow,
                                 version = typeof(ModEntry).Assembly.GetName().Version!.ToString(3), request.SearchOrder, request.MaxNodes, request.MaxRounds, request.BudgetSeconds,
                                 ConfiguredWorkers = request.Workers, result.WorkerLimit,
                                 request.SkipFinalVerification, request.StopOnZeroLoss, request.TargetVictoryRounds,
@@ -672,6 +672,8 @@ public sealed class CoachOverlay
                                 turn_search = result.TurnSearch is { } turns ? new { turns.Probes, turns.BoundPruned,
                                     turns.Offered, turns.DuplicateOffers, turns.Pending, turns.UnknownRecoveryChecks,
                                     turns.CoveredPrefixes, turns.CompletedHistories, turns.RepeatedHistories } : null,
+                                result.Status, result.Best,
+                                round_losses = result.Best is { } candidate ? LocalRouteFeedback.RoundLosses(candidate) : null,
                                 result.Timing, result.Trace });
                         }
                         catch (Exception ex) { GD.Print("[SpireAiCoach] Timing save failed: " + ex.GetType().Name); }

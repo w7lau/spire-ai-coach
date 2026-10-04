@@ -62,6 +62,11 @@ public static class ReplayIntegration
                 System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT")!);
             return;
         }
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_ROUTE_FEEDBACK_TEST") == "1")
+        {
+            await RouteFeedbackIntegration.Run(root, pool, request with { MaxRounds = original.MaxRounds }, installation);
+            return;
+        }
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SCENE_OVERHEAD_TEST") == "1")
         {
             await SceneOverheadIntegration.Run(root, pool, request, installation,

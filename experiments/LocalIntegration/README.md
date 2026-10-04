@@ -18,6 +18,7 @@ python experiments/LocalIntegration/run.py --workspace C:\path\owned-native-work
 - `--execution` / `--optimization` / `--features`：执行保护、路线续用、药水与进度。
 - `--fallback`：保留旧命令名称；原先的普通武装失败夹具现在断言手牌选择正常参与、无排除，不再期待不支持武装。
 - `--replay <private-request.json> --game <installed-game> --mods <matching-frozen-mods>`：冻结故障记录，只替换本项目 DLL/版本及旧轮数上限，保留请求的并发、药水和搜索预算。原始记录、完整结果及日志仅留本机，提交验证摘要前必须去除真实记录、身份和本机路径。
+- `--route-feedback-test --seed-result <previous-private-result.json>`：从同一冻结根、相同完整历史的既有获胜结果提取动作，比较旧 Monte Carlo／新回合搜索的已有路线复用，并记录每回合生命变化。保留捕获的并发、次数、时间、回合和药水选项；这项明确带已知路线，不作为无提示最优解发现。可加 `--route-feedback-focused-only` 仅验证复用组。每组完整结果留本机，摘要注明准备状态、单次样本和种子；死亡、未完成及预算内最佳候选不能冒充无伤或全局最优。
 - `--data-combat-benchmark --data-run --seed-result <private-result.json>`：常规执行与省去冒险/战斗场景的固定路线交错对照，逐步比较原生状态、历史和完整结算；两种模式的最终复核都使用常规场景。需要上面的冻结请求参数。单条路线限制只用于速度配对，不改变产品预算。加 `--death-route` 使用连续结束回合的种子，比较原生死亡、失败结算与失败后的实例复用。
 - `--execution-search-benchmark --seed-result <private-result.json>`：预热两种执行路径后，保留冻结请求的时间与路线数量预算，测量常规／无场景完整搜索。固定路线只用于预热，正式搜索不注入种子；要求所有进程完成、无拒绝、只复核最终路线一次，禁止用常规回退的结果冒充无场景通过。
 
