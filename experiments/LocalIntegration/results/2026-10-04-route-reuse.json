@@ -368,5 +368,14 @@
     "First-win metrics use worker trace clocks; parent preparation and JIT differ between cold and warm cases.",
     "No stable overall speedup, no zero-loss discovery, no global optimality or arbitrary-Mod compatibility proved.",
     "Native request, result, history, saved state, game assets and local paths are excluded from this summary."
-  ]
+  ],
+  "installation": {
+    "version": "0.7.33",
+    "dll_sha256": "3dd62c1800081fafc13981decac6a1581cc42f94f60cd2adaa2e48100de8142d",
+    "zip_sha256": "7f765d340c039ff5cc933c635cdcf320f8aa3e0faa1931826595a0a3ec5327f6",
+    "previous_version": "0.7.32",
+    "backup_verified": true,
+    "selected_profile_files_unchanged": 13,
+    "formal_game_not_started": true
+  }
 }
