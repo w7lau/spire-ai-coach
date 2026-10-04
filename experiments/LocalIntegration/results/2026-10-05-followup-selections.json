@@ -1,5 +1,5 @@
 {
-  "modVersion": "0.7.39.0",
+  "modVersion": "0.7.40.0",
   "nativeModule": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
   "passed": true,
   "freeReturnAfterLastEnergy": true,
@@ -144,5 +144,5 @@
   ],
   "syntheticOnly": true,
   "fullSearchBenchmark": false,
-  "modDllSha256": "F0E70AFE2AB875AF0755D39CF2698A275F1AD14C55FC2F138DC33971A9F6BF6D"
+  "modDllSha256": "3E44F4DBB6F3D91876ED304C2DC2E3E79D2022B27F02BC3FF671D6054FFF89F0"
 }

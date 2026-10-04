@@ -45,7 +45,7 @@ public sealed record LocalSearchEvidence(string Conclusion, string StopReason,
         string conclusion = best is { Won: true, Dead: false } ?
             IndependentVerification ? "verified-win" : "native-win" : ExactRootCovered ? "covered-no-win" : "unknown";
         var reasons = new List<string>();
-        if (GoalStopped) reasons.Add("已按无伤目标停止搜索");
+        if (GoalStopped) reasons.Add("已达到配置的提前返回条件");
         if (AttemptLimitReached) reasons.Add("达到每路试走次数上限");
         if (TimeLimitReached || TimeLimitHits > 0) reasons.Add("达到搜索时间预算");
         if (RoundLimitHits > 0) reasons.Add($"{RoundLimitHits} 条路线达到回合上限");

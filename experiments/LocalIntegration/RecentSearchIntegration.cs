@@ -14,7 +14,7 @@ internal static class RecentSearchIntegration
             throw new InvalidOperationException("Recent-search regression requires an unseeded frozen request");
         request = request with { MaxRounds = original.MaxRounds, InitialPlan = null, VerifyCandidate = null,
             RecordedReplayProbe = null, Partition = 0, Partitions = 1, TimelineOrigin = 0, InitialTrace = null,
-            TurnWorkPipe = null, SearchWorkPipe = null, ProgressPipe = null };
+            TurnWorkPipe = null, SearchWorkPipe = null, ProgressPipe = null, MinimumLossPipe = null };
         var result = await Task.Run(() => pool.Analyze(request, installation, _ => { }, CancellationToken.None));
         LocalWire.Write(Path.Combine(root, "integration-recent-search-private.json"), result);
         var failures = result.RecoveredFailures?.Length ?? 0;
@@ -31,7 +31,7 @@ internal static class RecentSearchIntegration
                 result.TurnSearch.Offered, result.TurnSearch.DuplicateOffers, result.TurnSearch.Pending,
                 result.TurnSearch.CoveredPrefixes, result.TurnSearch.CompletedHistories, result.TurnSearch.RepeatedHistories,
                 result.TurnSearch.ClaimedByRound, result.TurnSearch.RolloutStyles },
-            result.Work, result.HealthBounds, result.Evidence,
+            result.Work, result.HealthBounds, result.MinimumLoss, result.CardGoals, result.Evidence,
             recoveredFailures = failures, result.Failure,
             foundVictory = result.Best?.Won == true,
             best = result.Best == null ? null : new { result.Best.Won, result.Best.Dead,

@@ -16,9 +16,10 @@ void AsyncTest(string name, Func<Task> test) => tests.Add((name, test));
 TurnWorkTests.Register(Test, AsyncTest);
 MinimumLossTests.Register(Test, AsyncTest);
 SelectionSpaceTests.Register(Test);
-FollowupTests.Register(Test);
 SearchEvidenceTests.Register(Test);
+
 CardGoalTests.Register(Test);
+FollowupTests.Register(Test);
 NativeOverheadTests.Register(Test, AsyncTest);
 ProgressTransportTests.Register(Test, AsyncTest);
 WorkerReuseTests.Register(Test, AsyncTest);
