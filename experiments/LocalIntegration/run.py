@@ -67,6 +67,7 @@ parser.add_argument('--route-feedback-test', action='store_true')
 parser.add_argument('--route-feedback-focused-only', action='store_true')
 parser.add_argument('--recent-search-test', action='store_true', help='Frozen unseeded incident; preserve its trial/time/turn limits and report incomplete search honestly')
 parser.add_argument('--selection-paging-test', action='store_true')
+parser.add_argument('--followup-test', action='store_true', help='Short synthetic native return-to-hand/topdeck ordering probe; no full search')
 args = parser.parse_args()
 if args.recent_search_test and (not args.replay or args.seed_result or args.recorded_replay):
     parser.error('--recent-search-test requires an unseeded --replay')
@@ -182,6 +183,7 @@ with worker_lock(root):
     env.pop('SPIRE_NATIVE_PROBE_ROOT', None)
     env.pop('SPIRE_COACH_WORKER', None)
     env['SPIRE_LOCAL_INTEGRATION_QUICK'] = '1' if args.quick else '0'
+    env['SPIRE_LOCAL_FOLLOWUP_TEST'] = '1' if args.followup_test else '0'
     env['SPIRE_LOCAL_SELECTION_PAGING_TEST'] = '1' if args.selection_paging_test else '0'
     if args.selection_paging_test:
         env['SPIRE_LOCAL_SELECTION_MATRIX'] = '1'

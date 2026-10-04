@@ -83,6 +83,25 @@ internal sealed class LocalTacticalPreview(Player player, bool efficient = false
         catch { return 0; } // An opaque sibling preview must not erase known defense hints.
     }
 
+    internal LocalFollowupCard Followup(CardModel card, LocalRolloutStyle style, Func<CardModel, int, int> learned)
+    {
+        try
+        {
+            // CanPlay() includes pile/action-queue restrictions, so asking it
+            // during an in-flight selection would reject every returned card.
+            // Native legality is checked after the real move, before any play.
+            if (card.Keywords.Contains(CardKeyword.Unplayable)) return default;
+            int cost = card.EnergyCost.GetAmountToSpend();
+            if (cost < 0) return default;
+            var targets = player.Creature.CombatState!.Creatures.Where(c => c.IsAlive && card.IsValidTarget(c));
+            int value = card.IsValidTarget(null) ? Priority(card, null, style) :
+                targets.Select(c => Priority(card, c, style)).DefaultIfEmpty(0).Max();
+            return new(learned(card, value), cost,
+                Math.Max(0, card.HasStarCostX ? player.PlayerCombatState!.Stars : card.GetStarCostWithModifiers()));
+        }
+        catch { return default; }
+    }
+
     public int Priority(CardModel card, Creature? target, LocalRolloutStyle style = LocalRolloutStyle.Balanced)
     {
         try

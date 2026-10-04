@@ -26,6 +26,10 @@ public sealed class LocalChoices
     private readonly List<LocalCardChoice> _completed = [];
     private readonly HashSet<object> _handled = new(ReferenceEqualityComparer.Instance);
     private readonly LocalSelectionCursor _cursor;
+    internal sealed record Selection(string Kind, CardSelectorPrefs? Prefs, int Ordinal, CardModel[] Offered,
+        CardModel[] Selected, PileType[] Origins);
+    internal Func<string, CardModel[], CardSelectorPrefs?, int, Func<int[], int>?>? SelectionPriority { get; init; }
+    internal List<Selection> Selections { get; } = [];
     public LocalCardChoice[] Completed => _completed.ToArray();
     public LocalChoices(LocalCardChoice[]? expected = null, Func<LocalCardChoice[], LocalCardChoice>? choose = null,
         LocalSelectionCursor? cursor = null)
@@ -102,13 +106,17 @@ public sealed class LocalChoices
             return score;
         }
         var priorities = cards.Select(Priority).ToArray();
+        // Evaluate a selected set against ONE remaining resource budget. Simply
+        // summing individual values overvalues several cards we cannot all play.
+        var followup = SelectionPriority?.Invoke(kind, cards, prefs, _completed.Count);
+        var seeds = priorities.Select((score, i) => score + (followup?.Invoke([i]) ?? 0)).ToArray();
         bool complete = space.Count <= 128;
         var ranks = _cursor.Page(hash, space).ToHashSet();
         // Explore native glow/status hints early without deleting any alternative.
         // Stable ranks depend only on the offer, never on changing preference scores.
         foreach (var size in sizes ?? Enumerable.Range(minimum, maximum - minimum + 1).ToArray())
         {
-            var indices = Enumerable.Range(0, cards.Length).OrderByDescending(i => priorities[i]).ThenBy(i => i).Take(size).ToArray();
+            var indices = Enumerable.Range(0, cards.Length).OrderByDescending(i => seeds[i]).ThenBy(i => i).Take(size).ToArray();
             ranks.Add(space.Rank(indices)); ranks.Add(space.Rank(indices.Reverse().ToArray()));
         }
         var expected = _expected.ElementAtOrDefault(_completed.Count);
@@ -120,10 +128,16 @@ public sealed class LocalChoices
             return new LocalCardChoice(hash, rank <= int.MaxValue ? (int)rank : -2,
                 string.Join(";", indexes.Select(n => cards[n].Id)),
                 string.Join("、", indexes.Select(n => $"{n + 1}. {cards[n].Title}")), indexes, kind,
-                Preference: indexes.Sum(n => priorities[n]), CompleteOffer: complete);
+                Preference: indexes.Sum(n => priorities[n]) + (followup?.Invoke(indexes) ?? 0), CompleteOffer: complete);
         }
         var options = ranks.Order().Select(Make).ToArray();
-        return Select(options, identity);
+        var selected = Select(options, identity);
+        if (SelectionPriority != null)
+        {
+            var picked = selected.Indices!.Select(i => cards[i]).ToArray();
+            Selections.Add(new(kind, prefs, _completed.Count - 1, cards, picked, picked.Select(c => c.Pile?.Type ?? PileType.None).ToArray()));
+        }
+        return selected;
     }
 
     // Used only by owned workers replacing presentation. Native CardSelectCmd still reserves
@@ -136,11 +150,25 @@ public sealed class LocalChoices
 
     internal IEnumerable<CardModel> OfferWithoutPresentation(IReadOnlyList<CardModel> cards, bool canSkip)
     {
-        var hash = OfferHash("offer", cards, canSkip ? 0 : 1, 1);
-        var options = cards.Select((c, i) => new LocalCardChoice(hash, i, c.Id.ToString(), c.Title)).ToList();
-        if (canSkip) options.Add(new(hash, -1, "", "跳过"));
-        var selected = Select(options.ToArray(), new object());
+        var selected = SelectOffer(cards, canSkip, new object());
         return selected.Index < 0 ? [] : [cards[selected.Index]];
+    }
+
+    private LocalCardChoice SelectOffer(IReadOnlyList<CardModel> cards, bool canSkip, object identity)
+    {
+        var hash = OfferHash("offer", cards, canSkip ? 0 : 1, 1);
+        var followup = SelectionPriority?.Invoke("offer", cards.ToArray(), null, _completed.Count);
+        var options = cards.Select((c, i) => new LocalCardChoice(hash, i, c.Id.ToString(), c.Title,
+            Preference: followup?.Invoke([i]) ?? 0)).ToList();
+        if (canSkip) options.Add(new(hash, -1, "", "跳过"));
+        var selected = Select(options.ToArray(), identity);
+        if (SelectionPriority != null)
+        {
+            CardModel[] picked = selected.Index < 0 ? [] : [cards[selected.Index]];
+            Selections.Add(new("offer", null, _completed.Count - 1, cards.ToArray(), picked,
+                picked.Select(c => c.Pile?.Type ?? PileType.None).ToArray()));
+        }
+        return selected;
     }
 
     private LocalCardChoice SelectBundle(IReadOnlyList<IReadOnlyList<CardModel>> bundles, object identity)
@@ -148,8 +176,23 @@ public sealed class LocalChoices
         // Include bundle boundaries, not only the flattened cards: [A,B]/[C]
         // and [A]/[B,C] are different native offers with different effects.
         var hash = OfferHash("bundle:" + string.Join(",", bundles.Select(b => b.Count)), bundles.SelectMany(b => b).ToArray(), 1, 1);
-        return Select(bundles.Select((b, i) => new LocalCardChoice(hash, i,
-            string.Join(";", b.Select(c => c.Id)), string.Join("、", b.Select(c => c.Title)), Kind: "bundle")).ToArray(), identity);
+        var cards = bundles.SelectMany(b => b).ToArray();
+        var followup = SelectionPriority?.Invoke("bundle", cards, null, _completed.Count);
+        int offset = 0;
+        var options = bundles.Select((b, i) =>
+        {
+            var indices = Enumerable.Range(offset, b.Count).ToArray(); offset += b.Count;
+            return new LocalCardChoice(hash, i, string.Join(";", b.Select(c => c.Id)),
+                string.Join("、", b.Select(c => c.Title)), Kind: "bundle", Preference: followup?.Invoke(indices) ?? 0);
+        }).ToArray();
+        var selected = Select(options, identity);
+        if (SelectionPriority != null)
+        {
+            var picked = bundles[selected.Index].ToArray();
+            Selections.Add(new("bundle", null, _completed.Count - 1, cards, picked,
+                picked.Select(c => c.Pile?.Type ?? PileType.None).ToArray()));
+        }
+        return selected;
     }
     internal IEnumerable<IReadOnlyList<CardModel>> BundleWithoutPresentation(IReadOnlyList<IReadOnlyList<CardModel>> bundles) =>
         [bundles[SelectBundle(bundles, new object()).Index]];
@@ -174,10 +217,7 @@ public sealed class LocalChoices
             if (Godot.Time.GetTicksMsec() - Field<ulong>(screen, "_openedTicks") <= 350) return;
             var cards = Field<IReadOnlyList<CardModel>>(screen, "_cards");
             var canSkip = Field<bool>(screen, "_canSkip");
-            var hash = OfferHash("offer", cards, canSkip ? 0 : 1, 1);
-            var options = cards.Select((c, i) => new LocalCardChoice(hash, i, c.Id.ToString(), c.Title)).ToList();
-            if (canSkip) options.Add(new(hash, -1, "", "跳过"));
-            var selected = Select(options.ToArray(), screen);
+            var selected = SelectOffer(cards, canSkip, screen);
             token.ThrowIfCancellationRequested();
             if (selected.Index < 0) screen.Call("OnSkipButtonReleased", default(Variant));
             else
