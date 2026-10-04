@@ -176,8 +176,8 @@ public sealed class CoachOverlay
             catch (Exception ex) { _status.Text = "选项本次已生效，保存失败：" + ex.GetType().Name; }
         };
         options.AddChild(_localPotions);
-        _localStopOnZeroLoss = new CheckBox { Name = "LocalStopOnZeroLoss", Text = "战后无伤即返回", ButtonPressed = _settings.LocalStopOnZeroLoss,
-            TooltipText = "找到获胜且战后生命不低于计算起点的路线，就停止全部搜索。关闭后继续寻找更佳路线；最终复核由下方开关决定。" };
+        _localStopOnZeroLoss = new CheckBox { Name = "LocalStopOnZeroLoss", Text = "达到最低损失即返回", ButtonPressed = _settings.LocalStopOnZeroLoss,
+            TooltipText = "战后无伤，或路线达到已证明的最低净损失且无需多喝药水，就停止搜索。回复上限未知或操作尚未覆盖时，不按正数下界停止。关闭后继续优化；最终复核由下方开关决定。" };
         _localStopOnZeroLoss.Toggled += enabled =>
         {
             _settings = _settings with { LocalStopOnZeroLoss = enabled };
@@ -594,7 +594,7 @@ public sealed class CoachOverlay
         _localCardGoalNotice.Text = CurrentCardGoals() is not { Enabled: true } ? "未启用可选目标，按原生命与药水策略选路。" :
             (_localCardGoalThreshold.ButtonPressed ? "在所填净损血范围内优先补刀及多打牌；没有符合路线时优先少损血。" :
                 "优先保住战后生命，同血量时优先补刀及多打牌。") +
-            "\n启用可选目标后不会无伤立即返回，会继续搜索到原定上限。";
+            "\n启用可选目标后不会在无伤或最低损失时立即返回，会继续搜索到原定上限。";
     }
 
     private void ShowLocalAdvice(LocalSearchResult result)
@@ -790,17 +790,18 @@ public sealed class CoachOverlay
                                 turn_search = result.TurnSearch is { } turns ? new { turns.Probes, turns.BoundPruned,
                                     turns.Offered, turns.DuplicateOffers, turns.Pending, turns.UnknownRecoveryChecks,
                                     turns.CoveredPrefixes, turns.CompletedHistories, turns.RepeatedHistories } : null,
-                                result.Status, result.Best,
+                                result.Status, result.Best, result.MinimumLoss,
                                 round_losses = result.Best is { } candidate ? LocalRouteFeedback.RoundLosses(candidate) : null,
                                 result.Timing, result.Trace });
                         }
                         catch (Exception ex) { GD.Print("[SpireAiCoach] Timing save failed: " + ex.GetType().Name); }
                     });
                     _adviceHash = request.SnapshotId;
+                    string optimality = LocalSearchPolicy.HasMinimumProof(result) ? "已达到最低净损失。" : "候选路线尚未证明最优。";
                     _freshness.Text = result.VerificationSkipped ? LocalSearchPolicy.HasExecutionPoints(result) ?
-                        "可执行方案，偏离时自动停止。候选路线尚未证明最优。" :
+                        "可执行方案，偏离时自动停止。" + optimality :
                         "暂不能自动执行，可手动参考。" :
-                        "路线已复核，偏离时自动停止。候选路线尚未证明最优。";
+                        "路线已复核，偏离时自动停止。" + optimality;
                     _status.Text = $"计算完成 · {result.ElapsedMs / 1000d:F1} 秒";
                     if (LocalSearchPolicy.HasExecutionPoints(result))
                     {

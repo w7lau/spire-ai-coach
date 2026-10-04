@@ -180,6 +180,23 @@ public static class LocalWorker
         int knownRecoveryChecks = 0, sharedIncumbentUpdates = 0;
         string unknownRecoveryReason = "";
         var recovery = new LocalRecoveryEstimator(request);
+        bool trackMinimum = request.StopOnZeroLoss && request.VerifyCandidate == null &&
+            !LocalSearchPolicy.HasSpecificGoal(request) && request.ExcludedModels is not { Length: > 0 };
+        var minimumProof = trackMinimum && request.MinimumLossPipe == null ? new LocalMinimumLossProof(request) : null;
+        LocalMinimumLossClient? minimumClient = null;
+        LocalMinimumLossStatus? minimumStatus = null;
+        void ObserveMinimum(LocalLossProofTrial trial)
+        {
+            if (!trackMinimum || minimumStatus?.InvalidReason.Length > 0) return;
+            using var measuring = MeasureMethod("LocalMinimumLoss.ObserveTrial");
+            try
+            {
+                if (minimumClient != null) minimumStatus = minimumClient.Observe(trial);
+                else { minimumProof!.Observe(trial); minimumStatus = minimumProof.Status; }
+            }
+            catch (Exception ex) when (ex is IOException or InvalidDataException or ObjectDisposedException or OperationCanceledException)
+            { minimumStatus = new(InvalidReason: "Loss proof transport unavailable: " + ex.GetType().Name); }
+        }
         var sharedBounds = new LocalSharedHealthBound(Path.GetDirectoryName(_root)!, request);
         LocalWinningBound? lastSharedBound = null;
         LocalWinningBound? WinningBound()
@@ -313,7 +330,7 @@ public static class LocalWorker
                 BlockedAction: blockedAction, MaxRounds: request.MaxRounds,
                 Trace: status == "running" ? null : _timeline!.Snapshot(), StoppedEarly: stoppedEarly, TurnSearch: TurnStats(), RootBranches: rootBranches,
                 HealthBounds: HealthStats(), Failure: failure,
-                Trials: status == "running" ? null : trials.ToArray(), CardGoals: request.CardGoals));
+                Trials: status == "running" ? null : trials.ToArray(), CardGoals: request.CardGoals, MinimumLoss: minimumStatus));
         }
         try
         {
@@ -323,6 +340,12 @@ public static class LocalWorker
                 request.MaxDepth is < 1 or > 64 || request.SimulationSpeed is < 1 or > 16)
                 throw new InvalidDataException("Invalid search limits");
             CheckCancellation();
+            if (trackMinimum && request.MinimumLossPipe != null)
+            {
+                try { minimumClient = new(request); }
+                catch (Exception ex) when (ex is IOException or TimeoutException)
+                { trackMinimum = false; minimumStatus = new(InvalidReason: "Loss proof connection unavailable: " + ex.GetType().Name); }
+            }
             // Owned worker only. Accelerate native animation/timer waits, never model effects/RNG.
             if (request.SimulationSpeed > 1) { Engine.TimeScale = request.SimulationSpeed; Engine.MaxFps = 240; }
             LocalWorkerVisuals.Active = request.SimulationSpeed > 1;
@@ -579,6 +602,7 @@ public static class LocalWorker
                     search = _includePotions ? potionSearch : noPotionSearch;
                 }
                 var actions = new List<LocalAction>();
+                var proofSteps = trackMinimum ? new List<LocalLossProofStep>() : null;
                 var continuationPoints = request.SkipFinalVerification && request.History != null ? new List<LocalContinuationPoint>() : null;
                 var decisions = new List<LocalDecision>();
                 var partition = systematic && sharedTurns == null ? new LocalBranchPartition(request.Partition, partitions) : null;
@@ -626,6 +650,8 @@ public static class LocalWorker
                         decisionStarted = Stopwatch.GetTimestamp();
                         using var deciding = Trace("decision");
                         var legal = EnumerateActions();
+                        var proofLegal = proofSteps == null ? null : legal;
+                        bool proofComplete = _includePotions == request.IncludePotions;
                         if (partition != null) legal = partition.Assign(legal);
                         if (coverage != null)
                         {
@@ -713,6 +739,7 @@ public static class LocalWorker
                         else { covered = true; stop = "该操作前缀已全部评估"; break; }
                         coverage?.Follow(coveredTrial!, next);
                         var choiceDecisions = new List<LocalChoiceDecision>();
+                        var proofChoices = proofSteps == null ? null : new List<LocalChoiceDecision>();
                         decisions.Add(new(actions.Count, legal));
                         decisionMs += (long)Stopwatch.GetElapsedTime(decisionStarted).TotalMilliseconds;
                         deciding?.Dispose();
@@ -747,6 +774,7 @@ public static class LocalWorker
                                 // subtree was already covered, finish each pending choice
                                 // legally, then discard this redundant trial after settling.
                                 if (covered) return options[0];
+                                proofChoices?.Add(new(proofChoices.Count, options));
                                 // A choice is a child of the actual action prefix, so siblings get independent outcomes.
                                 var expected = exactAction && preferred != null ? plannedAction?.Choices?.ElementAtOrDefault(choiceIndex++) : null;
                                 var match = !exactAction ?
@@ -804,12 +832,19 @@ public static class LocalWorker
                         while (events.Count > 12) events.Dequeue();
                         Progress("试走路线", after);
                         plays = next.EndTurn ? 0 : plays + 1;
+                        // Only changed health, potion expense or a settled turn can
+                        // raise this floor. Reuse the existing pruning checkpoint.
+                        LocalHealthEnvelope? stepEnvelope = proofSteps != null && !IsTerminal(player) &&
+                            (next.EndTurn || next.PotionSlot.HasValue || player.Creature.CurrentHp != previousHp ||
+                             CombatManager.Instance.DebugOnlyGetState()!.RoundNumber > round)
+                            ? Envelope(player, startingHp, actions) : null;
+                        proofSteps?.Add(new(next, proofLegal!, proofChoices!.ToArray(), stepEnvelope, proofComplete));
                         if (!IsTerminal(player) &&
                             (next.PotionSlot.HasValue || player.Creature.CurrentHp < previousHp ||
                              CombatManager.Instance.DebugOnlyGetState()!.RoundNumber > round))
                         {
                             winningBound = WinningBound();
-                            if (winningBound != null && LocalHealthBound.CannotImprove(Envelope(player, startingHp, actions), winningBound, request.CardGoals))
+                            if (winningBound != null && LocalHealthBound.CannotImprove(stepEnvelope ?? Envelope(player, startingHp, actions), winningBound, request.CardGoals))
                             {
                                 cut = true; boundPruned += 1 + (turns?.DiscardDescendants(actions) ?? 0);
                                 stop = "分支已无法优于现有获胜路线"; break;
@@ -864,6 +899,7 @@ public static class LocalWorker
                         turns!.ReturnInterrupted(turnTask, TurnHint(player, startingHp, actions));
                     if (turnMode && IsTerminal(player) && planIndex < planned!.Length)
                         throw new InvalidOperationException("Exact native search prefix terminated early");
+                    if (proofSteps != null) ObserveMinimum(new(startingHp, proofSteps.ToArray(), candidate.Hp, candidate.Won, candidate.Dead));
                     bool completeAttempt = !turnProbed && !cut && !covered && (fullRollout || IsTerminal(player));
                     if (turnMode && completeAttempt)
                         turnOutcomes.Add(new(request.Partition, route, _timeline!.ElapsedMs, won, candidate.Hp, lost,
@@ -895,7 +931,8 @@ public static class LocalWorker
                                 candidate with { Continuation = null }));
                     }
                     if (completeAttempt && stop != "达到时间预算") activePolicy?.Complete(candidate);
-                    if (LocalSearchPolicy.CanStop(best, request)) { stoppedEarly = true; break; }
+                    if (LocalSearchPolicy.CanStop(best, request) ||
+                        LocalSearchPolicy.CanStopAtMinimum(best, request, minimumStatus?.Certificate)) { stoppedEarly = true; break; }
                     if (work != null)
                     {
                         using var scheduling = Trace("schedule");
@@ -967,7 +1004,8 @@ public static class LocalWorker
             await Cleanup();
             session?.Dispose();
             Publish(best == null ? stoppedEarly || sharedExhausted ? "searched" : "unsupported" : request.DeferVerification ? "searched" : "done",
-                stoppedEarly ? "已达到无伤通关停止条件，停止后续搜索。" : best == null ? "没有找到可完整结算的路线。" :
+                stoppedEarly ? best?.NetHpLoss is > 0 ? $"已达到最低净损失 {best.NetHpLoss}，停止后续搜索。" :
+                    "已达到无伤通关停止条件，停止后续搜索。" : best == null ? "没有找到可完整结算的路线。" :
                 turns != null ? $"已完成当前预算；评估 {evaluated} 条整场路线，另探查 {probes} 个回合组合，剪枝 {boundPruned} 次；尚未证明全局最优。" :
                 $"已完成当前预算，操作树 {noPotionSearch.Nodes + (request.IncludePotions ? potionSearch.Nodes : 0)} 个节点，比较了 {refinements} 条补牌、删牌、换牌和选牌路线。");
             return true;
@@ -1010,7 +1048,7 @@ public static class LocalWorker
             try { if (progressWriter != null) await progressWriter.DisposeAsync(); }
             finally
             {
-                try { sharedTurns?.Dispose(); try { work?.Retire(request.Partition); } finally { work?.Dispose(); } }
+                try { minimumClient?.Dispose(); sharedTurns?.Dispose(); try { work?.Retire(request.Partition); } finally { work?.Dispose(); } }
                 finally { DecisionFingerprint.Clear(); NonInteractiveMode.AutoSlayerCheck = originalNativeMode; LocalWorkerOverhead.Enabled = false; LocalWorkerOverhead.LeanSearchChecksums = false; LocalWorkerLogic.Enabled = false; LocalWorkerDataMode.Reset(); LocalWorkerVisuals.Reset(); _fastNativeWaits = _fastStateSettling = false; LocalWorkerResources.Retain = LocalWorkerResources.FastCollection = false; Engine.TimeScale = originalScale; Engine.MaxFps = originalFps; _timeline = null; _activeRequest = null; _nativeLearning = null; _targetLabels = null; _choices = null; _selectionCursor = null; _excludedModels.Clear(); _includePotions = false; }
             }
         }

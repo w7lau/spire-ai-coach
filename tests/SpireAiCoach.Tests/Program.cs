@@ -14,6 +14,7 @@ var tests = new List<(string, Func<Task>)>();
 void Test(string name, Action test) => tests.Add((name, () => { test(); return Task.CompletedTask; }));
 void AsyncTest(string name, Func<Task> test) => tests.Add((name, test));
 TurnWorkTests.Register(Test, AsyncTest);
+MinimumLossTests.Register(Test, AsyncTest);
 SelectionSpaceTests.Register(Test);
 CardGoalTests.Register(Test);
 NativeOverheadTests.Register(Test, AsyncTest);

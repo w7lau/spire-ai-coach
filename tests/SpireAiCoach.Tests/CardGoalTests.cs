@@ -55,6 +55,22 @@ static class CardGoalTests
             Check(new LocalSearchStop("request", "snapshot", "root", true).Matches(request), "Explicit cancellation ignored");
             Check(LocalSearchPolicy.CanStop(Win(50, 0, 0), request with { CardGoals = null }), "Ordinary no-loss stop changed");
         });
+        test("card goals keep searching after a certified minimum health loss", () =>
+        {
+            var ordinary = new LocalSearchRequest("request", "snapshot", [], "root", 1, [], false);
+            var selected = ordinary with { CardGoals = Goals(20) };
+            var candidate = Win(38, 3, 1) with { Actions = [new(0, "mod:finish", null, "", "", "root", 1)] };
+            LocalMinimumLossCertificate Certificate(LocalSearchRequest r) => new(LocalMinimumLossProof.Scope(r), 50, 12, 0);
+            Check(LocalSearchPolicy.CanStopAtMinimum(candidate, ordinary, Certificate(ordinary)), "Ordinary certified stop regressed");
+            Check(!LocalSearchPolicy.CanStopAtMinimum(candidate, selected, Certificate(selected)), "Health proof ended optional-goal search");
+            Check(LocalMinimumLossProof.Scope(ordinary) != LocalMinimumLossProof.Scope(selected), "Goal identity leaked across proof scopes");
+            var proven = new LocalSearchResult("request", "snapshot", "done", "", 1, 0, 1, candidate,
+                MinimumLoss: new(Certificate: Certificate(ordinary), Confirmed: true));
+            Check(LocalSearchPolicy.HasMinimumProof(proven), "Ordinary proof display regressed");
+            Check(!LocalSearchPolicy.HasMinimumProof(proven with { CardGoals = selected.CardGoals }), "Card-goal route claimed proved optimality");
+            var disabled = ordinary with { CardGoals = new(null, null) };
+            Check(LocalSearchPolicy.CanStopAtMinimum(candidate, disabled, Certificate(disabled)), "Disabled selections prevented certified stopping");
+        });
         test("card goals preserve affordable goal branches in both health bound modes", () =>
         {
             var best = new LocalWinningBound("root", 50, 0, 0);

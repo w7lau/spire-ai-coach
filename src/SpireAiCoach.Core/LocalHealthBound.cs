@@ -15,6 +15,13 @@ public sealed record LocalWinningBound(string Root, int StartingHp, int NetHpLos
 
 public static class LocalHealthBound
 {
+    public static long MinimumNetHpLoss(LocalHealthEnvelope branch)
+    {
+        if (branch.PotionsUsed < 0 || branch.MaximumFurtherHpGain < 0)
+            throw new ArgumentOutOfRangeException(nameof(branch));
+        long deficit = (long)branch.StartingHp - branch.Hp;
+        return branch.MaximumFurtherHpGain is { } gain && deficit > gain ? deficit - gain : 0;
+    }
     public static LocalWinningBound? Better(LocalWinningBound? current, LocalWinningBound? proposed)
     {
         if (proposed == null) return current;
@@ -32,8 +39,7 @@ public static class LocalHealthBound
             return false;
         // Unknown recovery can restore all HP. Do not cap by today's MaxHp: a
         // generated card, relic or Mod can increase it during the continuation.
-        long deficit = (long)branch.StartingHp - branch.Hp;
-        long lowerLoss = branch.MaximumFurtherHpGain is { } gain && deficit > gain ? deficit - gain : 0;
+        long lowerLoss = MinimumNetHpLoss(branch);
         if (cardGoals?.Enabled == true)
         {
             // No upper bound exists for plays/finishing blows, especially for Mods.
