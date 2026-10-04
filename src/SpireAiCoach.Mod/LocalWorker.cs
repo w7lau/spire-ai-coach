@@ -1380,7 +1380,13 @@ public static class LocalWorker
             if (action.CombatCardIndex is { } id) hints[id] = Math.Max(hints.GetValueOrDefault(id, int.MinValue), action.Preference);
         _nativeLearning?.ObserveHints(player, hints);
         for (int i = 0; i < result.Count; i++)
-            result[i] = result[i] with { Preference = _nativeLearning?.Priority(hand[result[i].HandIndex], result[i].Preference) ?? result[i].Preference };
+        {
+            var card = hand[result[i].HandIndex];
+            int priority = _nativeLearning?.Priority(card, result[i].Preference) ?? result[i].Preference;
+            if (_nativeLearning != null) priority += _nativeLearning.Selections.SourcePriority(card, player, tactics,
+                _rolloutStyle, _nativeLearning.Priority);
+            result[i] = result[i] with { Preference = priority };
+        }
         if (_rolloutStyle == LocalRolloutStyle.Preparation) _nativeLearning?.OrderDependencies(player, result);
         if (_activeRequest?.CardGoals is { Enabled: true } goals)
             for (int i = 0; i < result.Count; i++)
@@ -1422,13 +1428,24 @@ public static class LocalWorker
         // Search enumerates the next page of large native offers. Supply the
         // planned choices as well, so exact replay can directly materialize its
         // legal selection even when that rank is outside the current page.
-        var session = new LocalChoices(selectionIntent ?? action.Choices, choose, _selectionCursor);
+        var player = LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!;
+        var source = !action.EndTurn && !action.PotionSlot.HasValue && action.HandIndex >= 0
+            ? player.PlayerCombatState!.Hand.Cards[action.HandIndex] : null;
+        // Search-only ordering. Guarded live execution/replay has no chooser
+        // and must resolve exactly the recorded native offer/rank instead.
+        var learner = choose != null ? _nativeLearning : null;
+        var session = new LocalChoices(selectionIntent ?? action.Choices, choose, _selectionCursor)
+        {
+            SelectionPriority = source == null || learner == null ? null : (kind, cards, prefs, ordinal) =>
+                learner.Selections.Rank(source, player, kind, cards, prefs, ordinal, _rolloutStyle, _efficientTactics, learner.Priority)
+        };
         _choices = session;
         try
         {
             await LocalWorkerLogic.Run(() => PlayNative(action), () => _choices?.Tick(), Frame);
             session.Finish();
             CheckCancellation();
+            if (source != null) learner?.Selections.Observe(source, session.Selections);
             return action with { Choices = session.Completed };
         }
         catch (LocalChoiceException ex)

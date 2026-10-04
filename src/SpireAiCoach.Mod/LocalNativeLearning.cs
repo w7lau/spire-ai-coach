@@ -12,6 +12,7 @@ namespace SpireAiCoach.Mod;
 // This is not an effect mirror: native hooks still execute every proposed line.
 internal sealed class LocalNativeLearning(bool trackCosts = false, bool trackDurations = false)
 {
+    internal LocalSelectionLearning Selections { get; } = new();
     internal sealed record Observation(string Card, int Round, decimal Energy, int PaidEnergy, int Hand,
         int Upgrades, int Statuses, int Buffs, int BuffAmount, int Hp, uint Played,
         IReadOnlyDictionary<uint, int>? HandCosts, bool HasHandEndEffect, IReadOnlyDictionary<uint, int> Hints,
