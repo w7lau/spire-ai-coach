@@ -64,4 +64,30 @@ public static class LocalConcurrency
         finally { await Task.WhenAll(runs); }
         return runs.Select(r => r.Result).ToArray();
     }
+
+    // A compatibility pass becomes unusable as soon as one lane rejects it.
+    // Notify admitted peers immediately, including peers still preparing, then
+    // join their cleanup before the caller changes execution mode or ownership.
+    public static async Task<T[]> Run<T>(int maximum, bool adaptive, bool shared,
+        Func<int, CancellationToken, Task<T>> launch, Func<int, LocalWorkerDemand> demand,
+        Func<bool> stopped, Func<T, bool> failed, CancellationToken cancellation, int pollMs = 250)
+    {
+        using var failure = new CancellationTokenSource();
+        async Task<T> Observe(int index)
+        {
+            try
+            {
+                var result = await launch(index, failure.Token);
+                if (failed(result)) failure.Cancel();
+                return result;
+            }
+            catch
+            {
+                failure.Cancel();
+                throw;
+            }
+        }
+        return await Run(maximum, adaptive, shared, Observe, demand,
+            () => failure.IsCancellationRequested || stopped(), cancellation, pollMs);
+    }
 }

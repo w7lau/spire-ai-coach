@@ -45,6 +45,7 @@ public static class LocalWorker
     private static LocalRolloutStyle _rolloutStyle;
     private static bool _efficientTactics;
     private static LocalChoices? _choices;
+    private static LocalSelectionCursor? _selectionCursor;
     private static Func<bool> _nativeModeBeforeRequest = () => false;
     internal static LocalChoices CurrentChoices => _choices ?? throw new LocalChoiceException("未处于原生选牌操作中。");
     private static HashSet<string> _excludedModels = [];
@@ -59,7 +60,18 @@ public static class LocalWorker
     internal static LocalTimeline.MethodScope MeasureMethod(string name) =>
         _timeline?.MeasureMethod(_traceWorker, _traceStage, name) ?? default;
     internal static void SkipMethod(string name) => _timeline?.SkipMethod(_traceWorker, _traceStage, name);
-    private static Task Frame() => _tree.ToSignal(_tree, SceneTree.SignalName.ProcessFrame).AsTask();
+    private static readonly LocalDecisionFingerprint DecisionFingerprint = new();
+    internal static bool ReuseFingerprintBuffer => _activeRequest?.ReuseFingerprintBuffer != false && LocalWorkerOverhead.Active;
+    private static readonly FieldInfo? PendingNotification = typeof(CombatStateTracker)
+        .GetField("_combatStateChangedDeferredTask", BindingFlags.NonPublic | BindingFlags.Instance);
+    private static long _frameVersion;
+    private static Task Frame()
+    {
+        _frameVersion++;
+        return _tree.ToSignal(_tree, SceneTree.SignalName.ProcessFrame).AsTask();
+    }
+    private static bool DecisionSettled() => PendingNotification != null && LocalCapture.Stable() &&
+        (PendingNotification.GetValue(CombatManager.Instance.StateTracker) is not Task pending || pending.IsCompletedSuccessfully);
 
     public static bool TryStart()
     {
@@ -130,6 +142,8 @@ public static class LocalWorker
     private static async Task<bool> Search(LocalSearchRequest request)
     {
         _activeRequest = request;
+        _selectionCursor = new();
+        DecisionFingerprint.Clear();
         LocalWorkerLogic.ResetCounters();
         LocalWorkerVerification.Reset();
         _timeline = new(request.TimelineOrigin);
@@ -233,6 +247,7 @@ public static class LocalWorker
         int executed = 0, restores = 0;
         async Task RestoreMeasured()
         {
+            DecisionFingerprint.Clear();
             CheckCancellation();
             LocalWorkerOverhead.LeanSearchChecksums = false;
             _nativeLearning?.ResetDecision();
@@ -247,6 +262,20 @@ public static class LocalWorker
         var trials = new List<LocalSearchTrial>();
         LocalAction? pendingAction = null;
         LocalAction? blockedAction = null;
+        LocalSimulationFailure? failure = null;
+        var outputTimeline = _timeline!;
+        using var progressSender = request.MemoryProgress && request.AsyncProgressOutput && request.ProgressPipe != null
+            ? new LocalProgressSender(request) : null;
+        void WriteProgress((LocalProgress Progress, string Stage) update)
+        {
+            using var writing = outputTimeline.MeasureMethod(request.Partition, update.Stage, "LocalWorker.ProgressWrite");
+            if (progressSender?.TrySend(update.Progress,
+                operation => outputTimeline.MeasureMethod(request.Partition, update.Stage, "LocalProgress." + operation)) == true)
+                return;
+            LocalWire.Write(Path.Combine(_root, "progress.json"), update.Progress,
+                operation => outputTimeline.MeasureMethod(request.Partition, update.Stage, "LocalProgress." + operation));
+        }
+        var progressWriter = request.AsyncProgressOutput ? new LocalLatestWriter<(LocalProgress, string)>(WriteProgress) : null;
         void Progress(string phase, LocalSimState? state = null, bool force = false, string status = "running")
         {
             if ((!force || LocalWorkerOverhead.Active && status == "running") && timer.ElapsedMilliseconds - lastProgress < 100)
@@ -254,14 +283,17 @@ public static class LocalWorker
             using var publishing = Trace("publish", "过程进度");
             using var measuring = MeasureMethod("LocalWorker.Progress");
             lastProgress = timer.ElapsedMilliseconds;
-            LocalWire.Write(Path.Combine(_root, "progress.json"), new LocalProgress(request.Id, request.SnapshotId,
+            var update = new LocalProgress(request.Id, request.SnapshotId,
                 request.Partition, request.Partitions, ++sequence, route, evaluated, request.MaxNodes, victories,
                 budget.ElapsedMilliseconds, request.BudgetSeconds, phase, state, events.ToArray(), status, probes, boundPruned, rootBranches,
                 best is { Won: true, Dead: false } winner ? new(bestRoute, winner.Hp, winner.MaxHp,
-                    winner.StartingHp, winner.Rounds, winner.Actions.Count(a => a.PotionSlot.HasValue)) : null));
+                    winner.StartingHp, winner.Rounds, winner.Actions.Count(a => a.PotionSlot.HasValue)) : null);
+            if (progressWriter != null) progressWriter.Publish((update, _traceStage));
+            else WriteProgress((update, _traceStage));
         }
         void Publish(string status, string message)
         {
+            if (status != "running") progressWriter?.FlushAsync().GetAwaiter().GetResult();
             // The parent polls every 250 ms. Rewriting the unchanged, potentially large
             // candidate after every fast route does not provide any newer recommendation.
             if (status == "running" && (LocalWorkerOverhead.Active || ReferenceEquals(best, lastPublishedBest)) && timer.ElapsedMilliseconds - lastResult < 250)
@@ -272,14 +304,15 @@ public static class LocalWorker
             if (status != "running") LocalWire.Write(Path.Combine(_root, "runtime.json"), new
                 { status, mode = LocalWorkerDataMode.MinimalRun ? "native-model" : LocalWorkerDataMode.Active ? "no-combat-scene" : "regular-scene",
                     max_fps = Engine.MaxFps, observed_fps = Engine.GetFramesPerSecond(), numerical = LocalWorkerLogic.Counters(),
-                    overhead = LocalWorkerOverhead.Status(), verification = LocalWorkerVerification.Status(), preload_enabled = PreloadManager.Enabled });
+                    overhead = LocalWorkerOverhead.Status(), verification = LocalWorkerVerification.Status(), preload_enabled = PreloadManager.Enabled,
+                    progress_transport = new { pipe = progressSender?.Connected == true, fallback = progressSender?.Fallback } });
             LocalWire.Write(Path.Combine(_root, "result.json"),
             new LocalSearchResult(request.Id, request.SnapshotId, status, message, evaluated, rejected, timer.ElapsedMilliseconds, best,
                 Victories: victories, IncludePotions: request.IncludePotions,
                 Timing: new(restoreMs, actionMs, decisionMs, verifyMs, Actions: executed, Restores: restores, Verifications: verifyMs > 0 ? 1 : 0),
                 BlockedAction: blockedAction, MaxRounds: request.MaxRounds,
                 Trace: status == "running" ? null : _timeline!.Snapshot(), StoppedEarly: stoppedEarly, TurnSearch: TurnStats(), RootBranches: rootBranches,
-                HealthBounds: HealthStats(),
+                HealthBounds: HealthStats(), Failure: failure,
                 Trials: status == "running" ? null : trials.ToArray()));
         }
         try
@@ -713,20 +746,24 @@ public static class LocalWorker
                                     (c.Indices ?? []).SequenceEqual(expected.Indices ?? []));
                                 var choices = options.Select(c => LocalRouteCoverage.ChoiceAction(c, round)).ToArray();
                                 if (partition != null) choices = partition.Assign(choices);
-                                if (coverage != null) choices = coverage.Open(coveredTrial!, choices);
-                                if (choices.Length == 0) throw new InvalidOperationException("Completed native selection subtree was selected again");
-                                var ownedOptions = options.Where(c => choices.Any(a => a.HandIndex == c.Index)).ToArray();
+                                bool completeOffer = options.All(c => c.CompleteOffer);
+                                if (coverage != null) choices = coverage.Open(coveredTrial!, choices, completeOffer);
+                                if (choices.Length == 0) { covered = true; stop = "本组选牌已评估，继续探索其他组合"; return options[0]; }
+                                bool SameOption(LocalCardChoice c, LocalAction a) =>
+                                    LocalRouteCoverage.ChoiceAction(c, round) with { Preference = 0 } == a with { Preference = 0 };
+                                var ownedOptions = options.Where(c => choices.Any(a => SameOption(c, a))).ToArray();
                                 choiceDecisions.Add(new(choiceDecisions.Count, ownedOptions));
-                                var fixedChoice = match == null ? null : choices.SingleOrDefault(c => c.HandIndex == match.Index);
+                                var fixedChoice = match == null ? null : choices.SingleOrDefault(c => SameOption(match, c));
                                 if (exactAction && expected != null && fixedChoice == null)
                                     throw new InvalidOperationException("Exact native selection prefix diverged");
                                 LocalAction selected;
                                 if (turns != null) selected = fixedChoice ?? ChooseTurn(choices, coherent);
                                 else if (search.TrySelect(trial, choices, out var selectedChoice, fixedChoice,
-                                    greedy: coherent, priority: activePolicy == null ? null : activePolicy.Priority)) selected = selectedChoice;
-                                else { covered = true; stop = "该选牌前缀已全部评估"; return ownedOptions[0]; }
+                                    greedy: coherent, priority: activePolicy == null ? null : activePolicy.Priority,
+                                    completeLegal: completeOffer)) selected = selectedChoice;
+                                else { covered = true; stop = completeOffer ? "该选牌前缀已全部评估" : "本组选牌已评估，继续探索其他组合"; return ownedOptions[0]; }
                                 coverage?.Follow(coveredTrial!, selected);
-                                return options.Single(c => c.Index == selected.HandIndex);
+                                return options.Single(c => SameOption(c, selected));
                             });
                         }
                         finally { actionMs += (long)Stopwatch.GetElapsedTime(actionStarted).TotalMilliseconds; executed++; }
@@ -936,6 +973,7 @@ public static class LocalWorker
         {
             // Any replay divergence invalidates this worker's result, including previous candidates.
             best = null;
+            failure = LocalSimulationFailure.Capture(ex, request.Partition, _traceStage);
             // Keep the complete cause before a compatibility pass restarts this instance.
             // These private per-request files are not overwritten by Ensure/request polling.
             try
@@ -945,7 +983,7 @@ public static class LocalWorker
                     captured_at = DateTimeOffset.UtcNow, request.Id, request.SnapshotId, worker = request.Partition,
                     stage = _traceStage, route = _traceRoute, step = _traceStep,
                     request.DataOnlyCombat, request.DataOnlyRun, request.NumericalExecution,
-                    exception = ex.ToString(), trace = _timeline?.Snapshot()
+                    exception = ex.ToString(), failure, trace = _timeline?.Snapshot()
                 });
             }
             catch (Exception recording) when (recording is IOException or UnauthorizedAccessException)
@@ -957,8 +995,12 @@ public static class LocalWorker
         }
         finally
         {
-            try { sharedTurns?.Dispose(); work?.Retire(request.Partition); }
-            finally { NonInteractiveMode.AutoSlayerCheck = originalNativeMode; LocalWorkerOverhead.Enabled = false; LocalWorkerOverhead.LeanSearchChecksums = false; LocalWorkerLogic.Enabled = false; LocalWorkerDataMode.Reset(); LocalWorkerVisuals.Reset(); _fastNativeWaits = _fastStateSettling = false; LocalWorkerResources.Retain = LocalWorkerResources.FastCollection = false; Engine.TimeScale = originalScale; Engine.MaxFps = originalFps; _timeline = null; _activeRequest = null; _nativeLearning = null; _targetLabels = null; _choices = null; _excludedModels.Clear(); _includePotions = false; }
+            try { if (progressWriter != null) await progressWriter.DisposeAsync(); }
+            finally
+            {
+                try { sharedTurns?.Dispose(); try { work?.Retire(request.Partition); } finally { work?.Dispose(); } }
+                finally { DecisionFingerprint.Clear(); NonInteractiveMode.AutoSlayerCheck = originalNativeMode; LocalWorkerOverhead.Enabled = false; LocalWorkerOverhead.LeanSearchChecksums = false; LocalWorkerLogic.Enabled = false; LocalWorkerDataMode.Reset(); LocalWorkerVisuals.Reset(); _fastNativeWaits = _fastStateSettling = false; LocalWorkerResources.Retain = LocalWorkerResources.FastCollection = false; Engine.TimeScale = originalScale; Engine.MaxFps = originalFps; _timeline = null; _activeRequest = null; _nativeLearning = null; _targetLabels = null; _choices = null; _selectionCursor = null; _excludedModels.Clear(); _includePotions = false; }
+            }
         }
     }
 
@@ -1214,7 +1256,8 @@ public static class LocalWorker
     {
         var state = CombatManager.Instance.DebugOnlyGetState()!;
         var player = LocalContext.GetMe(state)!;
-        var hash = LocalCapture.Fingerprint();
+        DecisionFingerprint.Clear();
+        const string hash = "";
         var result = new List<LocalAction>();
         var hand = player.PlayerCombatState!.Hand.Cards;
         // CanPlay walks the hook chain. Query once per card and reuse within this settled
@@ -1257,7 +1300,12 @@ public static class LocalWorker
             }
         }
         result.Add(new(-1, "", null, "", "", hash, state.RoundNumber, EndTurn: true, Preference: tactics.EndTurnPriority));
-        return result.ToArray();
+        // Native legality/preview hooks have finished before capturing the decision.
+        var fingerprint = LocalCapture.Fingerprint();
+        if (_activeRequest?.ReuseDecisionFingerprint == true && _traceStage == "search" &&
+            LocalWorkerLogic.Enabled && LocalWorkerLogic.Available && LocalWorkerDataMode.MinimalRun && DecisionSettled())
+            DecisionFingerprint.Remember(state, fingerprint, LocalWorkerLogic.Revision, _frameVersion);
+        return result.Select(a => a with { BeforeHash = fingerprint }).ToArray();
     }
 
     private static async Task<LocalAction> Play(LocalAction action, Func<LocalCardChoice[], LocalCardChoice>? choose = null)
@@ -1265,7 +1313,7 @@ public static class LocalWorker
         CheckCancellation();
         using var playing = Trace(action.EndTurn ? "end_turn" : action.PotionSlot.HasValue ? "potion" : "card",
             action.EndTurn ? $"第 {action.Round} 回合" : action.CardName);
-        var session = new LocalChoices(action.Choices, choose);
+        var session = new LocalChoices(action.Choices, choose, _selectionCursor);
         _choices = session;
         try
         {
@@ -1281,8 +1329,15 @@ public static class LocalWorker
 
     private static async Task PlayNative(LocalAction action)
     {
-        if (LocalCapture.Fingerprint() != action.BeforeHash) throw new InvalidOperationException("搜索分支状态复现不一致。");
         var state = CombatManager.Instance.DebugOnlyGetState()!;
+        bool reused = _activeRequest?.ReuseDecisionFingerprint == true && _traceStage == "search" && LocalWorkerLogic.Active &&
+            DecisionFingerprint.Consume(state, action.BeforeHash, LocalWorkerLogic.Revision, _frameVersion, DecisionSettled());
+        if (reused) SkipMethod("LocalCapture.ReusedDecisionFingerprint");
+        else
+        {
+            DecisionFingerprint.Clear();
+            if (LocalCapture.Fingerprint() != action.BeforeHash) throw new InvalidOperationException("搜索分支状态复现不一致。");
+        }
         var player = LocalContext.GetMe(state)!;
         if (action.EndTurn) { await EndTurn(player); return; }
         var target = action.TargetId == null ? null : state.Creatures.Single(c => c.CombatId == action.TargetId);

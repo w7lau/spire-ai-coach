@@ -28,6 +28,7 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOr
         public double Total, Best;
         public bool Closed;
         public string[]? LegalKeys;
+        public bool CompleteLegal;
     }
 
     public sealed class Trial
@@ -52,12 +53,12 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOr
     // Exhaustion is a scheduling result, not a failed native simulation. A forced
     // proposal can revisit a closed subtree while other exact histories stay open.
     public bool TrySelect(Trial trial, IReadOnlyList<LocalAction> legal, [NotNullWhen(true)] out LocalAction? selected,
-        LocalAction? preferred = null, bool greedy = false, Func<LocalAction, int>? priority = null)
+        LocalAction? preferred = null, bool greedy = false, Func<LocalAction, int>? priority = null, bool completeLegal = true)
     {
         selected = null;
         if (trial.Root != _root) throw new InvalidOperationException("Trial belongs to a different search");
         if (_discrepancy != null) return _discrepancy.TrySelect(trial.Discrepancy ??
-            throw new InvalidOperationException("Trial belongs to a different search"), legal, out selected, preferred);
+            throw new InvalidOperationException("Trial belongs to a different search"), legal, out selected, preferred, completeLegal);
         if (trial.Finished) throw new InvalidOperationException("Trial has already finished");
         if (legal.Count == 0) throw new InvalidOperationException("No legal action");
         if (preferred != null && !legal.Contains(preferred)) throw new InvalidOperationException("Preferred action is not legal");
@@ -67,7 +68,8 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOr
         if (parent == null) action = preferred ?? Explore(legal, priority);
         else
         {
-            parent.LegalKeys = legal.Select(Key).Distinct(StringComparer.Ordinal).ToArray();
+            parent.LegalKeys = (parent.LegalKeys ?? []).Concat(legal.Select(Key)).Distinct(StringComparer.Ordinal).ToArray();
+            parent.CompleteLegal |= completeLegal;
             var remaining = legal.Where(a => !parent.Children.TryGetValue(Key(a), out var n) || !n.Closed).ToArray();
             if (remaining.Length == 0 || preferred != null && parent.Children.TryGetValue(Key(preferred), out var prior) && prior.Closed)
             {
@@ -122,7 +124,7 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOr
         {
             var node = trial.Path[i];
             node.Visits++; node.Total += reward; node.Best = Math.Max(node.Best, reward);
-            if (node.LegalKeys is { Length: > 0 } keys && keys.All(k => node.Children.TryGetValue(k, out var n) && n.Closed))
+            if (node.CompleteLegal && node.LegalKeys is { Length: > 0 } keys && keys.All(k => node.Children.TryGetValue(k, out var n) && n.Closed))
                 node.Closed = true;
         }
     }

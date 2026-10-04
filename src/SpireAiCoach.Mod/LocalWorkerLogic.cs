@@ -27,6 +27,8 @@ internal static class LocalWorkerLogic
     public static long Notifications { get; private set; }
     public static long DirectActions { get; private set; }
     public static long RealFrames { get; private set; }
+    private static long _revision;
+    public static long Revision => Interlocked.Read(ref _revision);
 
     public static void Install()
     {
@@ -172,6 +174,7 @@ internal static class LocalWorkerLogic
     private static bool DirectPath() => Active || NonInteractiveMode.IsActive;
     private static Task ExecuteAction(GameAction action)
     {
+        Interlocked.Increment(ref _revision);
         if (Active)
         {
             var callbacks = ExecutorCallbacks.GetValue(RunManager.Instance.ActionExecutor, e => new(e));
@@ -215,6 +218,7 @@ internal static class LocalWorkerLogic
 
     private static bool DeferNotification(CombatStateTracker __instance, ref Task __result)
     {
+        Interlocked.Increment(ref _revision);
         if (!Active || _dispatchingNotification) return true;
         var completion = new TaskCompletionSource();
         _current!.Post(_ => DispatchNotification(__instance, completion), null);

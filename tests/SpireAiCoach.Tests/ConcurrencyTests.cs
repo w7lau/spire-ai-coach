@@ -132,5 +132,53 @@ static class ConcurrencyTests
             catch (OperationCanceledException) { }
             Check(launched == 2 && cleaned == 2);
         });
+        asyncTest("a rejected compatibility pass cancels preparing peers and joins cleanup", async () =>
+        {
+            var first = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var canceled = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var cleanup = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            int launches = 0, cleaned = 0;
+            async Task<string> Launch(int index, CancellationToken failure)
+            {
+                Interlocked.Increment(ref launches);
+                try
+                {
+                    if (index == 0) return await first.Task;
+                    first.TrySetResult("original native error");
+                    try { await Task.Delay(Timeout.Infinite, failure); throw new Exception("Peer preparation continued"); }
+                    catch (OperationCanceledException) when (failure.IsCancellationRequested)
+                    { canceled.TrySetResult(); await cleanup.Task; return "peer stopped"; }
+                }
+                finally { Interlocked.Increment(ref cleaned); }
+            }
+            var running = LocalConcurrency.Run(8, true, true, Launch,
+                n => new(100, n - 1, 8, 2), () => false, r => r == "original native error", CancellationToken.None, 1);
+            try
+            {
+                await canceled.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                Check(!running.IsCompleted && launches == 2 && cleaned == 1);
+            }
+            finally { cleanup.TrySetResult(); }
+            var results = await running.WaitAsync(TimeSpan.FromSeconds(5));
+            Check(results.SequenceEqual(["original native error", "peer stopped"]) && launches == cleaned);
+        });
+        asyncTest("compatibility cancellation preserves caller cancellation instead of a successful fallback", async () =>
+        {
+            using var caller = new CancellationTokenSource();
+            int cleaned = 0;
+            async Task<int> Launch(int index, CancellationToken failure)
+            {
+                using var linked = CancellationTokenSource.CreateLinkedTokenSource(caller.Token, failure);
+                try { caller.Cancel(); await Task.Delay(Timeout.Infinite, linked.Token); return index; }
+                finally { Interlocked.Increment(ref cleaned); }
+            }
+            try
+            {
+                await LocalConcurrency.Run(8, true, true, Launch, _ => new(100, 0, 8, 8),
+                    () => false, _ => false, caller.Token, 1);
+                throw new Exception("Caller cancellation was returned as a result");
+            }
+            catch (OperationCanceledException) { Check(cleaned == 1); }
+        });
     }
 }

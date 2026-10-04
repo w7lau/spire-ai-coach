@@ -20,7 +20,9 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     bool LeanSearchChecksums = true, string? TurnWorkPipe = null, bool ProbeChecksumListener = false,
     int? TargetVictoryRounds = null, int? TargetPotionUses = null, bool RequireKnownZeroEnemyDamage = false,
     bool EfficientTactics = true, bool LearnBuffDuration = true, bool GuideWinningRoutes = true,
-    bool OwnedWinningFocus = true);
+    bool OwnedWinningFocus = true, string? SearchWorkPipe = null,
+    bool ReuseDecisionFingerprint = true, bool AsyncProgressOutput = true, bool MemorySearchWork = true,
+    bool MemoryProgress = true, string? ProgressPipe = null, bool ReuseFingerprintBuffer = true);
 
 // A stop belongs to one frozen request. Goal stops exclude verification;
 // explicit caller cancellation also applies during verification or with goals off.
@@ -38,7 +40,7 @@ public sealed record LocalAction(int HandIndex, string ModelId, uint? TargetId,
 
 // Index is relative to this exact ordered native offer, never to a display-name lookup.
 public sealed record LocalCardChoice(string OfferHash, int Index, string ModelId, string Name,
-    int[]? Indices = null, string Kind = "offer", int Preference = 0);
+    int[]? Indices = null, string Kind = "offer", int Preference = 0, bool CompleteOffer = true);
 
 // Unknown/native-unrecorded HP changes must never establish an enemy-damage-free claim.
 public sealed record LocalDamageSources(int Enemy, int Self, int Unknown, int Unattributed, bool AccountingMatches)
@@ -75,7 +77,8 @@ public sealed record LocalSearchResult(string Id, string SnapshotId, string Stat
     LocalAction? BlockedAction = null, int MaxRounds = 64, LocalTrace? Trace = null, LocalWorkStats? Work = null,
     bool StoppedEarly = false, LocalTurnSearchStats? TurnSearch = null, bool VerificationSkipped = false,
     int RootBranches = 0, int WorkerLimit = 0, LocalSearchTrial[]? Trials = null,
-    LocalHealthBoundStats? HealthBounds = null);
+    LocalHealthBoundStats? HealthBounds = null, LocalSimulationFailure? Failure = null,
+    LocalSimulationFailure[]? RecoveredFailures = null);
 
 public static class LocalSearchPolicy
 {
@@ -284,18 +287,30 @@ public static class LocalWire
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
         return JsonSerializer.Deserialize<T>(stream) ?? throw new InvalidDataException("Local worker returned empty data");
     }
-    public static void Write<T>(string path, T value)
+    public static void Write<T>(string path, T value, Func<string, IDisposable?>? measure = null)
     {
-        using var lease = new FileLease(path);
+        string json;
+        using (measure?.Invoke("Serialize")) json = JsonSerializer.Serialize(value);
+        WriteJson(path, json, measure);
+    }
+
+    public static void WriteJson(string path, string json, Func<string, IDisposable?>? measure = null)
+    {
+        FileLease lease;
+        using (measure?.Invoke("Lock")) lease = new FileLease(path);
+        using var ownership = lease;
         // Never reuse a just-retired staging path. On Windows it can still be held by
         // an external reader/scanner after replacement. ReplaceFile preserves an
         // already-published document atomically instead of deleting its directory entry.
         var temporary = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
-            File.WriteAllText(temporary, JsonSerializer.Serialize(value));
-            if (File.Exists(path)) File.Replace(temporary, path, null);
-            else File.Move(temporary, path);
+            using (measure?.Invoke("Write")) File.WriteAllText(temporary, json);
+            using (measure?.Invoke("Replace"))
+            {
+                if (File.Exists(path)) File.Replace(temporary, path, null);
+                else File.Move(temporary, path);
+            }
         }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }
     }

@@ -1,0 +1,99 @@
+{
+  "samples": [
+    {
+      "fast": false,
+      "warm": true,
+      "ElapsedMs": 3623,
+      "steps": 26,
+      "reused": 0,
+      "copies": 55,
+      "fingerprint_ms": 104.25840000000001,
+      "progress_enqueue_ms": 118.1155,
+      "progress_write_ms": 117.16350000000001,
+      "Hp": 20,
+      "HpLost": 18,
+      "NetHpLoss": 18,
+      "Won": true,
+      "Rounds": 7
+    },
+    {
+      "fast": true,
+      "warm": true,
+      "ElapsedMs": 502,
+      "steps": 26,
+      "reused": 26,
+      "copies": 29,
+      "fingerprint_ms": 44.4221,
+      "progress_enqueue_ms": 2.3224,
+      "progress_write_ms": 40.097699999999996,
+      "Hp": 20,
+      "HpLost": 18,
+      "NetHpLoss": 18,
+      "Won": true,
+      "Rounds": 7
+    },
+    {
+      "fast": true,
+      "warm": false,
+      "ElapsedMs": 303,
+      "steps": 26,
+      "reused": 26,
+      "copies": 29,
+      "fingerprint_ms": 44.77339999999998,
+      "progress_enqueue_ms": 0.039900000000000005,
+      "progress_write_ms": 54.6735,
+      "Hp": 20,
+      "HpLost": 18,
+      "NetHpLoss": 18,
+      "Won": true,
+      "Rounds": 7
+    },
+    {
+      "fast": false,
+      "warm": false,
+      "ElapsedMs": 361,
+      "steps": 26,
+      "reused": 0,
+      "copies": 55,
+      "fingerprint_ms": 87.4978,
+      "progress_enqueue_ms": 38.1353,
+      "progress_write_ms": 38.120200000000004,
+      "Hp": 20,
+      "HpLost": 18,
+      "NetHpLoss": 18,
+      "Won": true,
+      "Rounds": 7
+    }
+  ],
+  "equivalent_native_history_and_settlement": true,
+  "independent_verified_steps": 26,
+  "Hp": 20,
+  "verification_ms": 4859,
+  "shared_transport": {
+    "Workers": 2,
+    "Evaluated": 2,
+    "Rejected": 0,
+    "Work": {
+      "Submitted": 133,
+      "Claimed": 2,
+      "Completed": 2,
+      "DuplicateOffers": 26,
+      "Pending": 131,
+      "Active": 0,
+      "CoveredJobs": 0,
+      "RootReady": true
+    },
+    "participants": [
+      0,
+      1
+    ],
+    "native_checkpoints": 26
+  },
+  "product_limits_unchanged": true,
+  "whole_search_speed_unmeasured": true,
+  "release": "0.7.30",
+  "game": "v0.111.0",
+  "core_checks_passed": 236,
+  "dll_sha256": "8fab04889eb26c3f4da4af95f959f9d25b4f1ff8dad912a3e202759d8d2e6420",
+  "scope": "fixed native route and two-lane transport acceptance; not full search throughput"
+}

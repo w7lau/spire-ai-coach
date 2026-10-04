@@ -1,5 +1,37 @@
 # 设计与合同
 
+## 0.7.32 进度管道、完整指纹缓冲与诊断保留
+
+两个算法共用 LocalProgressTransport/LocalProgressSender。父进程为每次所属实例请求先创建当前用户可访问的随机私有命名管道，再通过原 request.json 派发名称；独立 LatestWriter 发送纯 DTO，父端仅保留最新进度。消息上限 2 MiB，校验冻结请求、快照、原生根、模型/Mod、实例及分区数量，序号不得倒退。管道不可创建、连接失败或断开后使用原原子文件通道；连接和写入均有界。原结果、取消、检查点和 idle 确认通道不变，清理仍先排空输出。
+
+LocalCapture.Fingerprint 在所属后台执行中复用线程私有 PacketWriter；重置前清空缓冲区，保留新建原生 writer 的零填充与末字节尾位，递归调用使用独立 writer，超大包不长期保留。每次仍执行完整 NetFullCombatState.FromRun、序列化及附加敌方行动／药水身份，既不缓存状态也不跳过费用和 Mod 钩子。实际玩家采集和完整原生对照仍使用原路径。Snapshot.CardState.From、Snapshot.CardEnergyCost.GetWithModifiers、Snapshot.Hook.ModifyEnergyCostInCombat 仅在指纹构建范围计时；它们是包含关系，不应相加。
+
+LocalSimulationFailure 在失败结果中记录异步／反射包装之内的异常类型、方法、原始完整栈、实例和阶段；兼容执行成功后通过 RecoveredFailures 留在最终诊断，不改变失败候选失效规则。原私有失败输入与日志归档继续保留。每次完成的耗时记录仅序列化一次，同时写入 local-timing-latest.json 和独立 local-timing-时间-请求.json.gz；记录算法、预算、版本和失败原因，不含 AI 连接或密钥。
+
+## 0.7.31 常规后台展示与失败分组收尾
+
+LocalWorkerOverhead 仍只在可执行路径和 `.coach-worker` 所有权核对通过的独立实例安装。TrimWorkerOverhead 开启时，展示、普通控制台输出和重放文件输出的跳过不再依赖 DataOnlyCombat/DataOnlyRun；常规兼容搜索也不需要渲染卡面和播放音效。卡面图片、标题、费用、附魔状态和字体适配在展示叶入口省略。NCard.UpdateVisuals 保留原生 DisplayingPile、DynamicVars.ClearPreview、UpdateDynamicVarPreview 和附魔数值预览；仅在完整预览结束后绕过说明文字格式化/排版。该 IL 边界不符时撤回本组补丁，原有方法继续执行。没有替换卡牌效果、选择、牌堆完成通知、RNG 或 Mod 规则钩子。
+
+形态特效工厂按原生 `Nodes.Vfx.Forms` 家族及方法结构统一识别：静态 Create、返回 Godot Node、无异常收尾块、开头严格为 `if (TestMode.IsOn) return null`。只扩展这个局部展示条件，不修改全局 TestMode。v0.111.0 已检查该家族原生调用点使用可为空的 power Vfx，实际虚空形态路径通过隔离原生试走；不把这种省略应用到负责牌堆完成回调的飞牌工厂，也不跳过未知 Mod 工厂。
+
+LeanSearchChecksums 同样可在常规搜索生效，但仍要求单人、没有第三方 Harmony owner 和外部 ChecksumGenerated 监听。发现外部监听时照常生成完整原生状态并通知；当前决策指纹和逐步执行/复核检查保持原行为。LocalWorkerVerification.Running 与 Active 分开表示“正在复核”和“启用了快速展示”；显式关闭快速复核时，这个 scope 内恢复原生展示和 checksum 路径。数值预览、动作历史、选择身份和最终结算始终执行原生代码。
+
+LocalConcurrency 的兼容分组重载向每个已准入路提供独立的失败取消信号，首个 failed/unsupported/partial 结果使同组数值 pass 立即关闭准入并通知其他路。准备中的所属实例退役并 DrainPreparation，执行中的路先发送绑定原请求的取消信号并完成清理。所有已准入路收尾后才切换常规方式，避免继续等待已经注定废弃的启动/搜索。用户取消仍以取消返回，无伤目标仍用原来的成功停止信号；搜索预算、轮数和尝试上限没有缩短。时间轴增加 stop_failed_pass，实际停止/清理耗时可与准备和搜索分开查看。
+
+## 0.7.30 后台快照及任务传输开销
+
+两个算法共用一次性 LocalDecisionFingerprint：原生合法性、预览和提示读取结束后，采集完整指纹；仅在同一后台数值实例、同一线程、同一战斗对象、相同状态通知/原生动作代次且没有帧推进、没有待结算通知时，为紧接着的动作复用这次采集。令牌消费一次即失效，恢复、请求结束和不符合条件的执行均清空；未知/普通场景及独立复核仍重新采集。实际玩家执行的逐步完整指纹、Mod/操作历史校验不变。
+
+Progress 仍按原 100ms 间隔产生纯 DTO，通过容量为一的 LocalLatestWriter 合并积压，在独立线程执行序列化、文件锁、写入和原子替换。原生模型或 Godot 对象不进入输出队列。终态结果前等待此前进度写完，退出前排空所有输出，之后才允许 idle 确认和下一请求。输出异常传回计算调用，不伪造成功。新增 ProgressWrite 和 LocalProgress.Lock/Serialize/Write/Replace 累计计时；后台写入与原生执行可能重叠，不应再次相加成等待时间。
+
+旧算法默认通过 LocalSearchWorkBroker 在父进程保留原 LocalSearchWork 队列，私有命名管道只传已观察操作前缀、领取身份与终局历史摘要。原浅/深、集中深入、容量、去重与终局关闭规则不变；根就绪与任务发布保持原子，完成任务必须属于当前领取者。请求、原生根、模型/Mod 和连接所有者不匹配即拒绝；断线及退出退休相应所有者。新算法仍使用已有 LocalTurnWork。验证及单路兼容路径不接入共享 broker。内部 ReuseDecisionFingerprint/AsyncProgressOutput/MemorySearchWork 开关供冻结输入对照，搜索预算、回合和次数上限不变。
+
+## 0.7.29 通用生存与进展评价
+
+LocalCandidate 的可选 InitialEnemyHp 与 EndTurnHpLossHint 只传递同一冻结起点的敌方总生命及当前已知攻击／手牌回合结束效果提示。LocalWorker 在稳定的未结束状态采集提示；未知效果不补造确定预测。LocalSearchPolicy.UnfinishedQuality 同时衡量保有生命、预览风险与击杀进展，Better 与 MonteCarlo 的未完成试走反馈共用它。完整获胜仍优先于全部未完成路线，获胜候选的净生命、药水、额外收益及目标比较保持原样；提示不成为生命界限或状态等价证明。
+
+LocalTacticalPreview 的后续攻击读取原生 UpdateDynamicVarPreview 的目标修正值，不再仅取 BaseValue。缓存按真实卡牌与目标对象身份区分，只活到本次动作枚举结束；重复卡、升级卡及不同目标不会共用预览，原生操作之后重新捕获。兄弟卡的未知预览只回到中性提示，不抹去已知防御收益。全部合法选择、原生效果与 Mod 钩子、准确历史和已配置的最终复核选项仍保留，64 次／60 秒／64 回合的默认预算没有缩短。
+
 ## 0.7.29 后台原生特效工厂的空返回入口
 
 LocalWorkerDataMode 仅在所属隔离进程安装特效工厂补丁。候选必须是游戏原生 Vfx 命名空间中的 Node 工厂，且 IL 的第一段严格为 TestMode.IsOn 判断、真分支直接返回 null、假分支进入剩余原生代码。在该判断处增加当前后台数值模式条件，保持全局 TestMode 关闭；不替换 Power/Card 的回调或任何按名字猜测的 Visual 方法，因为这些方法也可能维护规则计数。不同参数重载各自检查和补丁，未满足结构的普通特效不自动跳过；形态工厂结构变化时取消该组补丁并保留常规执行兜底。
@@ -15,11 +47,6 @@ CoachSettings.LocalSkipFinalVerification 默认为 true；旧配置缺字段时�
 LocalSearchPolicy.FormatAdvice 只整理可操作的路线与结果，保留未获胜、死亡、部分搜索和不能自动执行的提示。原 Format 保存全部搜索与伤害来源统计供折叠诊断查看；隐藏原生目标编号不改变 LocalAction.TargetId 或执行器身份匹配。明确设置的目标回合未达成仍显示提示。AI 设置、资源状态、预算和技术记录默认折叠。
 
 LocalProgress 增加可缺省的小型获胜摘要，来自后台已完成候选的生命、起点、回合和用药数量，不增加模拟、游戏钩子或消息通道。LocalRouteMap 仅消费已经通过请求/快照/分组/序列检查的遥测；缓存最多 64 个路线片段，每片段最多现有 12 步，图上至多显示一个获胜候选和七条当前路线。其余路线可选择查看。没有观测事件时不生成出牌节点，未获胜的中途生命不会当成战后生命。流光只说明探索仍在运行，不表示执行速度或搜索覆盖率。最多 10 Hz 重绘；隐藏或计算结束停止 Timer，技术文本只在展开时整理。完成后忽略迟到进度，取消或新请求清空旧片段。
-## 0.7.28 通用生存与进展评价
-
-LocalCandidate 的可选 InitialEnemyHp 与 EndTurnHpLossHint 只传递同一冻结起点的敌方总生命及当前已知攻击／手牌回合结束效果提示。LocalWorker 在稳定的未结束状态采集提示；未知效果不补造确定预测。LocalSearchPolicy.UnfinishedQuality 同时衡量保有生命、预览风险与击杀进展，Better 与 MonteCarlo 的未完成试走反馈共用它。完整获胜仍优先于全部未完成路线，获胜候选的净生命、药水、额外收益及目标比较保持原样；提示不成为生命界限或状态等价证明。
-
-LocalTacticalPreview 的后续攻击读取原生 UpdateDynamicVarPreview 的目标修正值，不再仅取 BaseValue。缓存按真实卡牌与目标对象身份区分，只活到本次动作枚举结束；重复卡、升级卡及不同目标不会共用预览，原生操作之后重新捕获。兄弟卡的未知预览只回到中性提示，不抹去已知防御收益。全部合法选择、原生效果与 Mod 钩子、准确历史和默认最终复核仍保留，64 次／60 秒／64 回合的默认预算没有缩短。
 
 ## 0.7.27 面板随战斗和执行状态显示
 

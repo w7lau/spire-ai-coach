@@ -22,6 +22,8 @@ internal static class PresentationIntegration
         if (NCombatRoom.Instance != null) throw new InvalidOperationException("Presentation smoke requires no combat scene");
         var mode = typeof(LocalWorkerPool).Assembly.GetType("SpireAiCoach.Mod.LocalWorkerDataMode", throwOnError: true)!;
         mode.GetMethod("Install")!.Invoke(null, [null]);
+        // Presentation factories have one owner after merging the native worker paths.
+        typeof(LocalWorkerPool).Assembly.GetType("SpireAiCoach.Mod.LocalWorkerOverhead", true)!.GetMethod("Install")!.Invoke(null, null);
         if ((bool)mode.GetProperty("Available")!.GetValue(null)! != true)
             throw new InvalidOperationException("Native presentation patch installation failed");
         var active = mode.GetProperty("Active")!;

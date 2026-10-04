@@ -11,18 +11,24 @@ public sealed record LocalWorkStats(int Submitted, int Claimed, int Completed, i
 
 // A bounded shared frontier of exact action-history jobs. It stores proposals, never a
 // substitute combat state or a transferable score. Every claimed job runs natively.
-public sealed class LocalSearchWork
+public sealed class LocalSearchWork : IDisposable
 {
     private readonly string _directory;
     private readonly int _capacityPerKind;
-    public LocalSearchWork(string parent, LocalSearchRequest request, int capacity = 512)
+    private readonly object _memoryGate = new();
+    private Index? _memory;
+    private readonly Dictionary<string, LocalWorkTask> _plans = new(StringComparer.Ordinal);
+    private readonly LocalSearchWorkClient? _remote;
+    public LocalSearchWork(string parent, LocalSearchRequest request, int capacity = 512, bool inMemory = false)
     {
         var scope = Hash(request.Id + "\n" + request.SnapshotId + "\n" + request.NativeHash + "\n" +
             request.ModelHash + "\n" + string.Join("\n", request.LoadedMods));
         _directory = Path.Combine(parent, "search-work", scope);
         if (capacity < 1) throw new ArgumentOutOfRangeException(nameof(capacity));
         _capacityPerKind = capacity;
-        Directory.CreateDirectory(_directory);
+        if (request.SearchWorkPipe != null) _remote = new(request);
+        else if (inMemory) _memory = new();
+        else Directory.CreateDirectory(_directory);
     }
 
     private sealed class Entry
@@ -72,6 +78,7 @@ public sealed class LocalSearchWork
         if (kind is not ("expand" or "improve")) throw new ArgumentException("Unknown search job kind", nameof(kind));
         var batch = plans.ToArray();
         if (batch.Length == 0 && !initializeRoot) return;
+        if (_remote != null) { _remote.Offer(kind, batch, initializeRoot, parent); return; }
         using var gate = Lock();
         var index = Read();
         var known = index.Entries.ToDictionary(e => e.Key, StringComparer.Ordinal);
@@ -105,7 +112,9 @@ public sealed class LocalSearchWork
             if (parent == null ? count >= _capacityPerKind : focusedCount >= _capacityPerKind) break;
             // Every queue access holds the same gate. Immutable jobs are fully written
             // before publishing the index, without acquiring an extra IPC mutex per job.
-            File.WriteAllText(Path.Combine(_directory, key + ".json"), JsonSerializer.Serialize(new LocalWorkTask(key, kind, plan)));
+            var task = new LocalWorkTask(key, kind, plan);
+            if (_memory != null) _plans.Add(key, task);
+            else File.WriteAllText(Path.Combine(_directory, key + ".json"), JsonSerializer.Serialize(task));
             var entry = new Entry { Key = key, Kind = kind, Depth = plan.Length, Order = index.Entries.Count,
                 HistoryKey = history, Parent = parent, Generation = generation };
             index.Entries.Add(entry); known.Add(key, entry);
@@ -119,6 +128,7 @@ public sealed class LocalSearchWork
 
     public LocalWorkTask? Take(string kind, int owner, bool deeper = false, bool focused = false)
     {
+        if (_remote != null) return _remote.Take(kind, owner, deeper, focused);
         using var gate = Lock();
         var index = Read();
         var candidates = index.Entries.Where(e => e.Kind == kind && !e.Owner.HasValue && !e.Covered);
@@ -135,7 +145,7 @@ public sealed class LocalSearchWork
         entry ??= deeper ? candidates.OrderByDescending(e => e.Depth).ThenBy(e => e.Order).FirstOrDefault()
             : candidates.OrderBy(e => e.Depth).ThenBy(e => e.Order).FirstOrDefault();
         if (entry == null) return null;
-        var task = Read<LocalWorkTask>(Path.Combine(_directory, entry.Key + ".json"));
+        var task = _memory != null ? _plans[entry.Key] : Read<LocalWorkTask>(Path.Combine(_directory, entry.Key + ".json"));
         if (task.Key != entry.Key || task.Kind != kind || Key(kind, task.Plan) != entry.Key)
             throw new InvalidDataException("Shared search job identity changed");
         entry.Owner = owner;
@@ -146,6 +156,7 @@ public sealed class LocalSearchWork
 
     public void Complete(LocalWorkTask task)
     {
+        if (_remote != null) { _remote.Complete(task); return; }
         using var gate = Lock();
         var index = Read();
         var entry = index.Entries.Single(e => e.Key == task.Key);
@@ -156,6 +167,7 @@ public sealed class LocalSearchWork
 
     public LocalWorkStats Stats()
     {
+        if (_remote != null) return _remote.Stats();
         using var gate = Lock();
         var index = Read();
         return new(index.Entries.Count, index.Entries.Count(e => e.Owner.HasValue),
@@ -170,7 +182,13 @@ public sealed class LocalSearchWork
     public void RecordTerminal(LocalCandidate candidate)
     {
         if ((!candidate.Won && !candidate.Dead) || candidate.Actions.Length == 0) return;
+        if (_remote != null) { _remote.RecordTerminal(candidate); return; }
         var history = Key("expand", candidate.Actions);
+        RecordTerminalDigest(history);
+    }
+    internal void RecordTerminalDigest(string history)
+    {
+        if (history.Length != 64 || !history.All(Uri.IsHexDigit)) throw new InvalidDataException("Invalid terminal history digest");
         using var gate = Lock();
         var index = Read();
         if (!index.TerminalHistories.Add(history)) return;
@@ -183,6 +201,7 @@ public sealed class LocalSearchWork
     // peers wait for new proposals from a worker that has already returned.
     public void Retire(int owner)
     {
+        if (_remote != null) { _remote.Retire(owner); return; }
         using var gate = Lock();
         var index = Read();
         if (index.RetiredOwners.Add(owner)) Save(index);
@@ -192,7 +211,9 @@ public sealed class LocalSearchWork
     // Retain the small index for diagnostics; do not retain unused action plans forever.
     public void ReleasePlans()
     {
+        if (_remote != null) throw new InvalidOperationException("Only the parent releases shared plans");
         using var gate = Lock();
+        if (_memory != null) { _plans.Clear(); return; }
         foreach (var entry in Read().Entries)
         {
             if (entry.Key.Length != 64 || !entry.Key.All(Uri.IsHexDigit))
@@ -201,17 +222,19 @@ public sealed class LocalSearchWork
         }
     }
 
-    private FileStream Lock()
+    private IDisposable Lock()
     {
+        if (_memory != null) { Monitor.Enter(_memoryGate); return new MemoryLease(_memoryGate); }
         var started = Stopwatch.StartNew();
         while (true)
         {
-            try { return new(Path.Combine(_directory, ".gate"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None); }
+            try { return new FileStream(Path.Combine(_directory, ".gate"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None); }
             catch (IOException) when (started.Elapsed.TotalSeconds < 2) { Thread.Sleep(2); }
         }
     }
-    private Index Read() => File.Exists(Path.Combine(_directory, "index.json"))
-        ? Read<Index>(Path.Combine(_directory, "index.json")) : new();
+    private sealed class MemoryLease(object gate) : IDisposable { public void Dispose() => Monitor.Exit(gate); }
+    private Index Read() => _memory ?? (File.Exists(Path.Combine(_directory, "index.json"))
+        ? Read<Index>(Path.Combine(_directory, "index.json")) : new());
     private static T Read<T>(string path)
     {
         using var stream = File.OpenRead(path);
@@ -219,9 +242,11 @@ public sealed class LocalSearchWork
     }
     private void Save(Index index)
     {
+        if (_memory != null) return;
         var path = Path.Combine(_directory, "index.json");
         File.WriteAllText(path + ".tmp", JsonSerializer.Serialize(index));
         File.Move(path + ".tmp", path, true);
     }
     private static string Hash(string value) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value)));
+    public void Dispose() => _remote?.Dispose();
 }
