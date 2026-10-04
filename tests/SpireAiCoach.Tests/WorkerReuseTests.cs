@@ -250,6 +250,35 @@ internal static class WorkerReuseTests
             Check(f.Pool.Resources().Starts == 2 && result.Trace!.Spans.Any(s => s.Phase == "rebuild" && s.Detail.Contains("cleanup")),
                 "Rebuilding a failed instance lost its reason or launch count");
         });
+        asyncTest("both algorithms stop at a shared positive minimum and verify only the final winner", async () =>
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            await using var f = new Fixture();
+            foreach (var algorithm in new[] { LocalSearchOrder.MonteCarlo, LocalSearchOrder.TurnFrontier })
+            foreach (var scenario in new[] { "minimum-goal", "minimum-late-proof" })
+            {
+                var r = Request(scenario) with { SearchOrder = algorithm, StopOnZeroLoss = true };
+                var watch = Stopwatch.StartNew();
+                var result = await f.Pool.Analyze(r, f.Installation, _ => { }, CancellationToken.None);
+                Check(result.Status == "done" && result.StoppedEarly && result.Best?.NetHpLoss == 12 &&
+                    result.MinimumLoss is { Confirmed: true, Certificate.MinimumNetHpLoss: 12 }, "Positive minimum was not confirmed");
+                Check(result.Timing?.Verifications == 1 && result.Trace!.Spans.Any(s => s.Phase == "stop_search") &&
+                    watch.Elapsed < TimeSpan.FromSeconds(8), "Peer waited for its full budget or repeated winner verification");
+                Check(LocalSearchPolicy.FormatAdvice(result).Contains("已证明最低净损失为 12"), "Advice hid the confirmed optimum");
+                Console.WriteLine($"  minimum-loss protocol evidence: algorithm={algorithm}; scenario={scenario}; loss=12; peers=2; elapsed_ms={watch.ElapsedMilliseconds}; confirmed={result.MinimumLoss!.Confirmed}; verifications={result.Timing!.Verifications}; peer_budget_ms=10000; native_game=false");
+            }
+        });
+        asyncTest("positive minimum does not survive a contributing worker runtime error", async () =>
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            await using var f = new Fixture();
+            try
+            {
+                await f.Pool.Analyze(Request("minimum-errors") with { StopOnZeroLoss = true }, f.Installation, _ => { }, CancellationToken.None);
+                throw new Exception("An invalid contributor certified global minimum");
+            }
+            catch (CoachException ex) when (ex.Category == "local_data_unavailable") { }
+        });
         asyncTest("worker reuse isolated cancelled worker with a native error is retired despite cleanup acknowledgement", async () =>
         {
             if (!OperatingSystem.IsWindows()) return;
@@ -264,9 +293,14 @@ internal static class WorkerReuseTests
         });
     }
 
-    private static LocalCandidate Candidate(LocalSearchRequest request) => new(
-        [new(0, "synthetic", null, "fake", "", request.NativeHash)], 50, 0, 0, 0, 50, true, false, false,
-        StartingHp: 50, Continuation: [new(0, request.NativeHash, new(0, "synthetic"), 0, 50)]);
+    private static LocalCandidate Candidate(LocalSearchRequest request)
+    {
+        var candidate = request.VerifyCandidate ?? new(
+            [new(0, "synthetic", null, "fake", "", request.NativeHash)], 50, 0, 0, 0, 50, true, false, false, StartingHp: 50);
+        if (request.VerifyCandidate == null && request.DebugEncounter is "minimum-goal" or "minimum-errors" or "minimum-late-proof")
+            candidate = candidate with { Hp = 38, HpLost = 12, Actions = [MinimumLossTests.FirstTurn(request, request.Partition).Steps[0].Action] };
+        return candidate with { Continuation = [new(0, request.NativeHash, new(0, "synthetic"), 0, 50)] };
+    }
 
     public static async Task<int> Child()
     {
@@ -292,10 +326,21 @@ internal static class WorkerReuseTests
                     File.WriteAllText(Path.Combine(root, request.VerifyCandidate == null ? "search-received" : "verify-received"), request.Id);
                     if (request.DebugEncounter == "exit") return 71;
                     using var client = request.TurnWorkPipe == null ? null : new LocalTurnWorkClient(request);
+                    using var loss = request.MinimumLossPipe == null ? null : new LocalMinimumLossClient(request);
+                    bool minimum = request.DebugEncounter is "minimum-goal" or "minimum-errors" or "minimum-late-proof" && request.VerifyCandidate == null;
+                    if (minimum)
+                    {
+                        // The first winner finishes before this peer establishes
+                        // the final missing bound; it need not be found again.
+                        bool late = request.DebugEncounter == "minimum-late-proof" && request.Partition == 1;
+                        if (late) await Task.Delay(1300);
+                        loss!.Observe(MinimumLossTests.FirstTurn(request, request.Partition, finish: !late));
+                    }
                     LocalTurnTask? task = null;
                     if (client != null) { client.Offer([], 1, new(50, 50, 100, 100)); if (client.TryTake(out var claimed)) task = claimed; }
                     int delay = request.DebugEncounter is "slow" or "ignore-stop" or "cancel-errors" || request.DebugEncounter == "slow-verify" && request.VerifyCandidate != null ||
                         request.DebugEncounter == "peer-slow" && request.Partition == 1 && request.VerifyCandidate == null ? 10000 : 60;
+                    if (minimum) delay = request.Partition == 0 ? 600 : 10000;
                     var timer = Stopwatch.StartNew(); bool cancelled = false, goal = false;
                     while (timer.ElapsedMilliseconds < delay)
                     {
@@ -311,9 +356,12 @@ internal static class WorkerReuseTests
                     if (task != null) { if (cancelled || goal) client!.ReturnInterrupted(task, new(50, 50, 100, 100)); else client!.Finish(task); }
                     var result = new LocalSearchResult(request.Id, request.SnapshotId,
                         cancelled ? "cancelled" : request.VerifyCandidate == null ? "searched" : "done", "synthetic", 1, 0, timer.ElapsedMilliseconds,
-                        cancelled || goal ? null : Candidate(request), RootBranches: 2, Timing: new(Verifications: request.VerifyCandidate == null ? 0 : 1));
+                        cancelled || goal ? null : Candidate(request), RootBranches: 2, Timing: new(Verifications: request.VerifyCandidate == null ? 0 : 1),
+                        MinimumLoss: minimum ? loss!.Observe(null) : null);
                     LocalWire.Write(Path.Combine(root, "result.json"), result);
                     if (cancelled && request.DebugEncounter == "cancel-errors") File.AppendAllText(Path.Combine(root, "game.log"), "[ERROR] synthetic native error\n");
+                    if (minimum && request.Partition == 1 && request.DebugEncounter == "minimum-errors")
+                        File.AppendAllText(Path.Combine(root, "game.log"), "[ERROR] synthetic invalid proof contributor\n");
                     // Deliberately publish before teardown, like the native worker.
                     await Task.Delay(80); client?.Dispose();
                     LocalWire.Write(Path.Combine(root, "idle.json"), new LocalWorkerIdle(request.Id, request.SnapshotId, request.NativeHash, request.Partition,
