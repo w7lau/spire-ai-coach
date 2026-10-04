@@ -64,6 +64,12 @@ public static class Entry
                 File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
                 return;
             }
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_CARD_GOALS_TEST") == "1")
+            {
+                await CardGoalIntegration.Run(root, tree, pool, save);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SELECTION_MATRIX") == "1")
             {
                 await SelectionMatrixIntegration.Run(root, tree, save);

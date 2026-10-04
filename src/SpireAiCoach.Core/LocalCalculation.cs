@@ -27,9 +27,10 @@ public static class LocalCalculation
     public static LocalSearchRequest Configure(LocalSearchRequest captured, LocalSearchOrder order,
         int workers, bool includePotions, bool stopOnZeroLoss, bool skipFinalVerification = false,
         int targetVictoryRounds = 0, int maxAttempts = AttemptsPerWorker, int maxRounds = Rounds,
-        int searchSeconds = SearchSeconds)
+        int searchSeconds = SearchSeconds, LocalCardGoals? cardGoals = null)
     {
         _ = Name(order);
+        cardGoals?.Validate();
         if (!ValidLimits(maxAttempts, maxRounds, searchSeconds))
             throw new ArgumentOutOfRangeException(nameof(maxAttempts), "本地搜索上限超出允许范围。");
         return captured with
@@ -38,6 +39,7 @@ public static class LocalCalculation
             MaxNodes = maxAttempts, BudgetSeconds = searchSeconds, MaxRounds = maxRounds,
             StopOnZeroLoss = stopOnZeroLoss,
             SkipFinalVerification = skipFinalVerification,
+            CardGoals = cardGoals?.Enabled == true ? cardGoals : null,
             // Optional return target; never reduces the search horizon or budget.
             TargetVictoryRounds = targetVictoryRounds > 0 ? Math.Clamp(targetVictoryRounds, 1, maxRounds) : null,
             TargetPotionUses = targetVictoryRounds > 0 ? 0 : null,

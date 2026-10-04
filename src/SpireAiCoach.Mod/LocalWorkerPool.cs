@@ -178,7 +178,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             }
             if (selectedBest == null) throw new CoachException("local_verify_failed",
                 string.Join("\n", verificationResults.Select(r => r.Message).Distinct()));
-            if (goalReached.IsCancellationRequested && !(LocalSearchPolicy.MeetsGoal(selectedBest.Best, request) ||
+            if (goalReached.IsCancellationRequested && !(LocalSearchPolicy.CanStop(selectedBest.Best, request) ||
                 minimumLoss?.Status is { Confirmed: true } proof &&
                 LocalSearchPolicy.CanStopAtMinimum(selectedBest.Best, request, proof.Certificate)))
                 throw new CoachException("local_verify_failed", "达标候选未通过复核，不能按提前停止的结果返回。");
@@ -240,7 +240,9 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     (results.Any(r => r.Status is not ("searched" or "done")) || verificationResults.Any(r => r.Status != "done") ?
                         request.SkipFinalVerification ? "部分搜索未完成，显示已取得的模拟路线。" : "部分搜索未完成，显示已复核的可用路线。" : "") +
                     (results.Count > used ? "本次补充搜索未纳入：" + string.Join("、", blocked.Select(a => a.CardName)) + "。" : "") +
-                    "按战后净生命损失选路，同等净损失优先保留药水；预算内候选，未证明全局最优。" };
+                    (request.CardGoals?.Enabled == true ?
+                        "按可选出牌目标选路；预算内候选，未证明目标最优。" :
+                        "按战后净生命损失选路，同等净损失优先保留药水；预算内候选，未证明全局最优。") };
 
             Task<LocalSearchResult> Launch(int index, CancellationToken passFailure)
             {
@@ -259,7 +261,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 LocalSearchResult? winner; int index;
                 lock (boundPublishGate) { winner = finishedWinner; index = finishedWinnerWorker; }
                 if (winner == null || goalReached.IsCancellationRequested ||
-                    !(request.StopOnZeroLoss && LocalSearchPolicy.MeetsGoal(winner.Best, request) ||
+                    !(LocalSearchPolicy.CanStop(winner.Best, request) ||
                       LocalSearchPolicy.CanStopAtMinimum(winner.Best, request, minimumLoss?.Status.Certificate)) ||
                     Interlocked.CompareExchange(ref goalWorker, index, -1) != -1) return;
                 Volatile.Write(ref goalMinimumLoss, winner.Best!.NetHpLoss!.Value);
@@ -627,8 +629,13 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             var settings = Path.Combine(roaming, "SlayTheSpire2", "default", "1");
             Directory.CreateDirectory(settings); Directory.CreateDirectory(local);
             File.WriteAllText(Path.Combine(settings, "settings.save"), "{\"volume_master\":0,\"volume_bgm\":0,\"volume_sfx\":0,\"volume_ambience\":0,\"skip_intro_logo\":true,\"mod_settings\":{\"mods_enabled\":true,\"mod_list\":[]}}");
-            var saves = Path.Combine(settings, "modded", "profile1", "saves"); Directory.CreateDirectory(saves);
-            File.WriteAllText(Path.Combine(saves, "progress.save"), "{\"schema_version\":24,\"enable_ftues\":false,\"ftue_completed\":[\"combat_rules_ftue\"]}");
+            // Read-only mods need not mark a run as gameplay-modded. The native
+            // save manager selects the corresponding profile at runtime.
+            foreach (var profile in new[] { Path.Combine(settings, "modded", "profile1"), Path.Combine(settings, "profile1") })
+            {
+                var saves = Path.Combine(profile, "saves"); Directory.CreateDirectory(saves);
+                File.WriteAllText(Path.Combine(saves, "progress.save"), "{\"schema_version\":24,\"enable_ftues\":false,\"ftue_completed\":[\"combat_rules_ftue\"]}");
+            }
             foreach (var name in new[] { "ready", "fatal.txt", "result.json", "request.json", "progress.json", "audio.json", "idle.json", "stop-search.json" }) File.Delete(Path.Combine(Root, name));
             var start = new ProcessStartInfo(Path.Combine(game, "SlayTheSpire2.exe"))
             { WorkingDirectory = game, UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden };

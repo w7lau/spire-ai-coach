@@ -16,6 +16,10 @@ public sealed record CoachSettings
     public int LocalMaxAttempts { get; init; } = LocalCalculation.AttemptsPerWorker;
     public int LocalMaxRounds { get; init; } = LocalCalculation.Rounds;
     public int LocalSearchSeconds { get; init; } = LocalCalculation.SearchSeconds;
+    public string LocalPlayCardModelId { get; init; } = "";
+    public string LocalFinisherCardModelId { get; init; } = "";
+    public bool LocalCardGoalThresholdEnabled { get; init; }
+    public int LocalCardGoalHpLossThreshold { get; init; } = 5;
 
     public Uri Endpoint()
     {

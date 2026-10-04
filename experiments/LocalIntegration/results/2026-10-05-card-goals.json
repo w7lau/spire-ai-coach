@@ -1,0 +1,46 @@
+{
+  "version": "0.7.38",
+  "scope": "Owned synthetic native cases; not performance or arbitrary-Mod coverage proof",
+  "records": [
+    {
+      "kind": "repeat-and-feed",
+      "Plays": 2,
+      "Kills": 1,
+      "nativeRepeatedPlayObserved": true
+    },
+    {
+      "kind": "other-finisher",
+      "Plays": 3,
+      "Kills": 0,
+      "nativeRepeatedPlayObserved": true
+    },
+    {
+      "kind": "MonteCarlo",
+      "Status": "done",
+      "Evaluated": 6,
+      "Victories": 4,
+      "StoppedEarly": false,
+      "Won": true,
+      "Hp": 7,
+      "NetHpLoss": 73,
+      "Plays": 31,
+      "Kills": 0,
+      "verified": 1,
+      "hostUnchanged": true
+    },
+    {
+      "kind": "TurnFrontier",
+      "Status": "done",
+      "Evaluated": 6,
+      "Victories": 4,
+      "StoppedEarly": false,
+      "Won": true,
+      "Hp": 7,
+      "NetHpLoss": 73,
+      "Plays": 31,
+      "Kills": 0,
+      "verified": 1,
+      "hostUnchanged": true
+    }
+  ]
+}
