@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace SpireAiCoach.Core;
 
 public enum LocalSearchOrder { MonteCarlo, LimitedDiscrepancy, DepthDiscrepancy, DiscrepancyPortfolio, TurnFrontier }
@@ -38,9 +40,11 @@ internal sealed class LocalDiscrepancyTree(LocalSearchOrder order)
         public int Visits;
         public bool Closed;
 
-        internal static LocalAction Select(Node parent, LocalDiscrepancyTree tree, Trial trial,
-            IReadOnlyList<LocalAction> legal, LocalAction? preferred)
+        internal static bool TrySelect(Node parent, LocalDiscrepancyTree tree, Trial trial,
+            IReadOnlyList<LocalAction> legal, [NotNullWhen(true)] out LocalAction? result, LocalAction? preferred)
         {
+            result = null;
+            if (preferred != null && !legal.Contains(preferred)) throw new InvalidOperationException("Preferred action is not legal");
             var keyed = legal.Select(a => (Action: a, Key: Identity.Of(a))).ToArray();
             if (keyed.Select(x => x.Key).Distinct().Count() != legal.Count)
                 throw new InvalidOperationException("Native legal action identities are not unique");
@@ -69,12 +73,12 @@ internal sealed class LocalDiscrepancyTree(LocalSearchOrder order)
                 { selected = edge; action = item.Action; selectedBound = bound; }
             }
             if (selected == null)
-                throw new InvalidOperationException(preferred == null ? "This exact subtree has already been exhausted" :
-                    "Preferred action is not legal or its exact subtree has already been exhausted");
+            { trial.Finished = true; return false; }
             if (selected.Child == null) { selected.Child = new(parent.Depth + 1); tree.Nodes++; }
             trial.Current = selected.Child;
             trial.Path.Add(selected.Child);
-            return action!;
+            result = action!;
+            return true;
         }
 
         private static bool BetterTie(Edge a, Edge b)
@@ -128,11 +132,11 @@ internal sealed class LocalDiscrepancyTree(LocalSearchOrder order)
     public Trial Begin() => new(_root, order == LocalSearchOrder.DiscrepancyPortfolio ?
         CompletedTrials % 2 == 0 ? LocalSearchOrder.DepthDiscrepancy : LocalSearchOrder.LimitedDiscrepancy : order);
 
-    public LocalAction Select(Trial trial, IReadOnlyList<LocalAction> legal, LocalAction? preferred)
+    public bool TrySelect(Trial trial, IReadOnlyList<LocalAction> legal, [NotNullWhen(true)] out LocalAction? result, LocalAction? preferred)
     {
         Check(trial);
         if (legal.Count == 0) throw new InvalidOperationException("No legal action");
-        return Node.Select(trial.Current, this, trial, legal, preferred);
+        return Node.TrySelect(trial.Current, this, trial, legal, out result, preferred);
     }
 
     public void Complete(Trial trial, LocalCandidate result, bool closeExactPrefix)

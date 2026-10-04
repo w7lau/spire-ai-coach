@@ -891,6 +891,7 @@ SearchWorkTests.Register(Test);
 ConcurrencyTests.Register(Test, AsyncTest);
 OptimizationTests.Register(Test);
 DiscrepancyTests.Register(Test);
+ExhaustedSearchTests.Register(Test);
 TurnSearchTests.Register(Test);
 RouteCoverageTests.Register(Test);
 TimelineTests.Register(Test);

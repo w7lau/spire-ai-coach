@@ -446,7 +446,8 @@ public static class LocalWorker
                         // Do not turn an empty shared queue into independent root
                         // rollouts. Peers can publish new branches after their jobs.
                         var workState = work.Stats();
-                        if (workState.RootReady && workState.Active == 0 && workState.Pending == 0) break;
+                        if (workState.RootReady && workState.Active == 0 && workState.Pending == 0)
+                        { sharedExhausted = true; break; }
                         refining?.Dispose();
                         Progress("等待可探索分支");
                         await Task.Delay(50);
@@ -620,8 +621,11 @@ public static class LocalWorker
                         bool coherent = request.StrategicRollouts && (turnMode || evaluated % 4 != 3);
                         var continuations = turnMode && attempts % 3 != 0 ? legal.Where(a => a.PotionSlot == null).ToArray() : legal;
                         if (continuations.Length == 0) continuations = legal;
-                        var next = turns != null ? preferred ?? ChooseTurn(continuations, coherent) :
-                            search.Select(trial, legal, preferred, greedy: coherent, priority: activePolicy == null ? null : activePolicy.Priority);
+                        LocalAction next;
+                        if (turns != null) next = preferred ?? ChooseTurn(continuations, coherent);
+                        else if (search.TrySelect(trial, legal, out var selectedAction, preferred,
+                            greedy: coherent, priority: activePolicy == null ? null : activePolicy.Priority)) next = selectedAction;
+                        else { covered = true; stop = "该操作前缀已全部评估"; break; }
                         coverage?.Follow(coveredTrial!, next);
                         var choiceDecisions = new List<LocalChoiceDecision>();
                         decisions.Add(new(actions.Count, legal));
@@ -653,6 +657,10 @@ public static class LocalWorker
                             int choiceIndex = 0;
                             next = await Play(next, options =>
                             {
+                                // The native action may ask for several choices. If its
+                                // subtree was already covered, finish each pending choice
+                                // legally, then discard this redundant trial after settling.
+                                if (covered) return options[0];
                                 // A choice is a child of the actual action prefix, so siblings get independent outcomes.
                                 var expected = exactAction && preferred != null ? plannedAction?.Choices?.ElementAtOrDefault(choiceIndex++) : null;
                                 var match = !exactAction ?
@@ -670,14 +678,18 @@ public static class LocalWorker
                                 var fixedChoice = match == null ? null : choices.SingleOrDefault(c => c.HandIndex == match.Index);
                                 if (exactAction && expected != null && fixedChoice == null)
                                     throw new InvalidOperationException("Exact native selection prefix diverged");
-                                var selected = turns != null ? fixedChoice ?? ChooseTurn(choices, coherent) :
-                                    search.Select(trial, choices, fixedChoice, greedy: coherent, priority: activePolicy == null ? null : activePolicy.Priority);
+                                LocalAction selected;
+                                if (turns != null) selected = fixedChoice ?? ChooseTurn(choices, coherent);
+                                else if (search.TrySelect(trial, choices, out var selectedChoice, fixedChoice,
+                                    greedy: coherent, priority: activePolicy == null ? null : activePolicy.Priority)) selected = selectedChoice;
+                                else { covered = true; stop = "该选牌前缀已全部评估"; return ownedOptions[0]; }
                                 coverage?.Follow(coveredTrial!, selected);
                                 return options.Single(c => c.Index == selected.HandIndex);
                             });
                         }
                         finally { actionMs += (long)Stopwatch.GetElapsedTime(actionStarted).TotalMilliseconds; executed++; }
                         actions.Add(next);
+                        if (covered) break;
                         if (exactAction && plannedAction != null)
                         {
                             int expectedChoices = plannedAction.Choices?.Length ?? 0, actualChoices = next.Choices?.Length ?? 0;
@@ -723,7 +735,15 @@ public static class LocalWorker
                     // A peer reached the goal. Discard this unfinished trial; only a
                     // previously completed candidate may survive to final verification.
                     if (stoppedEarly) break;
-                    if (covered) { coveredTasks++; continue; }
+                    if (covered)
+                    {
+                        coveredTasks++;
+                        await StableOrTerminal(player);
+                        using (Trace("covered-prefix", stop)) { }
+                        if (sharedTask != null) work!.Complete(sharedTask);
+                        Progress("该分支已完成，继续其他分支", Observe(player));
+                        continue;
+                    }
                     await StableOrTerminal(player);
                     coverage?.Complete(coveredTrial!, IsTerminal(player));
                     if (coverage != null && IsTerminal(player))
