@@ -16,6 +16,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
 
     private int Count(int configured, bool adaptive = true)
     {
+        if (configured > 0) return LocalConcurrency.Limit(0, 0, configured);
         var memory = new MemoryStatus();
         if (!GlobalMemoryStatusEx(memory)) throw new IOException("Cannot determine available memory for local workers");
         ulong reusable = (ulong)_workers.Sum(w => w.MemoryBytes);
@@ -244,7 +245,9 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     var timer = Stopwatch.StartNew();
                     long seenSequence = 0;
                     Stopwatch? stopping = null;
-                    while (timer.Elapsed.TotalSeconds < 180)
+                    int timeoutSeconds = LocalCalculation.WorkerTimeoutSeconds(command.BudgetSeconds,
+                        command.VerifyCandidate?.Actions.Length ?? 0);
+                    while (timer.Elapsed.TotalSeconds < timeoutSeconds)
                     {
                         cancellation.ThrowIfCancellationRequested();
                         if (!verifying && goalReached.IsCancellationRequested && stopping == null)

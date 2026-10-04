@@ -1,0 +1,42 @@
+{
+  "version": "0.7.22",
+  "records": [
+    {
+      "order": 0,
+      "configured_workers": 8,
+      "worker_limit": 8,
+      "MaxNodes": 257,
+      "MaxRounds": 130,
+      "BudgetSeconds": 125,
+      "TargetVictoryRounds": 120,
+      "Status": "done",
+      "verified_steps": 60,
+      "Hp": 87,
+      "Won": true,
+      "ui_persisted": true,
+      "actual_native_workers": 1,
+      "eight_process_throughput_measured": false
+    },
+    {
+      "order": 4,
+      "configured_workers": 8,
+      "worker_limit": 8,
+      "MaxNodes": 257,
+      "MaxRounds": 130,
+      "BudgetSeconds": 125,
+      "TargetVictoryRounds": 120,
+      "Status": "done",
+      "verified_steps": 60,
+      "Hp": 87,
+      "Won": true,
+      "ui_persisted": true,
+      "actual_native_workers": 1,
+      "eight_process_throughput_measured": false
+    }
+  ],
+  "core_tests": {
+    "passed": 203,
+    "total": 203
+  },
+  "dll_sha256": "fc8bef3ee2f780b0cb06904962eafff40bce8d7775aaf1707c6054bec3ffb4ee"
+}

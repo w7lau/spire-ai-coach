@@ -9,6 +9,9 @@ public static class LocalConcurrency
     public static int Limit(int processors, ulong availableMemory, int configured)
     {
         int requested = LocalSearchPolicy.WorkerCount(processors, availableMemory, configured);
+        // A positive value is the player's explicit ceiling. Only automatic
+        // selection uses the historical CPU/RAM estimate; admission remains lazy.
+        if (configured > 0) return requested;
         int memory = (int)Math.Clamp(((double)availableMemory / (1024 * 1024 * 1024) - 3) / 1.5, 1, 16);
         return Math.Min(requested, Math.Min(Math.Max(1, processors), memory));
     }
