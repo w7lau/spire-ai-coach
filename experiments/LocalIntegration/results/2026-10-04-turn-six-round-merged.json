@@ -2,9 +2,9 @@
   "schema_version": 1,
   "release": "0.7.21",
   "game_version": "v0.111.0",
-  "native_dll_sha256": "E0C9F2DAE74066ABDE42FFF385F084EBF9DA8C53E182D2FE483CE11BE58DA077",
-  "core_checks_passed": 197,
-  "core_checks_total": 197,
+  "native_dll_sha256": "34F616E5A0AC53910A19025584C836620195D700DDF77F78BAA934F39612E270",
+  "core_checks_passed": 198,
+  "core_checks_total": 198,
   "mod_build_warnings": 0,
   "mod_build_errors": 0,
   "manual_seed": false,
@@ -31,13 +31,13 @@
       "Evaluated": 6,
       "Victories": 6,
       "Rejected": 0,
-      "ElapsedMs": 30747,
+      "ElapsedMs": 30992,
       "Timing": {
-        "RestoreMs": 1565,
-        "ActionMs": 2101,
-        "DecisionMs": 1809,
-        "VerificationMs": 3548,
-        "StartupMs": 19195,
+        "RestoreMs": 1557,
+        "ActionMs": 2137,
+        "DecisionMs": 1755,
+        "VerificationMs": 3567,
+        "StartupMs": 19687,
         "Actions": 367,
         "Restores": 6,
         "Verifications": 1
@@ -57,20 +57,20 @@
       },
       "used_potions": 0,
       "verified_steps": 45,
-      "first_goal_from_request_ms": 26545.1306,
-      "first_goal_from_search_ms": 7057.467499999999,
+      "first_goal_from_request_ms": 26980.6085,
+      "first_goal_from_search_ms": 7022.9234,
       "hp_before_final_action": 87,
       "gross_loss_before_final_action": 11,
       "completed_histories": 6,
       "repeated_histories": 0,
       "remaining_prefixes": 1579,
-      "post_goal_total_ms": 4201.8694,
+      "post_goal_total_ms": 4011.3915000000015,
       "outcome_intervals": [
         {
           "attempt": 1,
           "rounds": 12,
-          "completed_ms": 22257.2406,
-          "interval_since_previous_outcome_ms": 2769.5774999999994,
+          "completed_ms": 22706.9347,
+          "interval_since_previous_outcome_ms": 2749.249600000003,
           "enemy_damage": 0,
           "self_damage": 17,
           "known_damage_sources": true
@@ -78,8 +78,8 @@
         {
           "attempt": 2,
           "rounds": 12,
-          "completed_ms": 23259.6799,
-          "interval_since_previous_outcome_ms": 1002.4392999999982,
+          "completed_ms": 23713.2864,
+          "interval_since_previous_outcome_ms": 1006.3516999999993,
           "enemy_damage": 0,
           "self_damage": 17,
           "known_damage_sources": true
@@ -87,8 +87,8 @@
         {
           "attempt": 3,
           "rounds": 12,
-          "completed_ms": 24090.1588,
-          "interval_since_previous_outcome_ms": 830.4789000000019,
+          "completed_ms": 24463.4497,
+          "interval_since_previous_outcome_ms": 750.1633000000002,
           "enemy_damage": 0,
           "self_damage": 17,
           "known_damage_sources": true
@@ -96,8 +96,8 @@
         {
           "attempt": 4,
           "rounds": 6,
-          "completed_ms": 24789.1205,
-          "interval_since_previous_outcome_ms": 698.9616999999998,
+          "completed_ms": 25122.5989,
+          "interval_since_previous_outcome_ms": 659.1491999999998,
           "enemy_damage": 0,
           "self_damage": 11,
           "known_damage_sources": false
@@ -105,8 +105,8 @@
         {
           "attempt": 5,
           "rounds": 13,
-          "completed_ms": 25903.863,
-          "interval_since_previous_outcome_ms": 1114.7425000000003,
+          "completed_ms": 26217.3912,
+          "interval_since_previous_outcome_ms": 1094.7922999999973,
           "enemy_damage": 0,
           "self_damage": 18,
           "known_damage_sources": true
@@ -114,8 +114,8 @@
         {
           "attempt": 6,
           "rounds": 6,
-          "completed_ms": 26545.1306,
-          "interval_since_previous_outcome_ms": 641.2675999999992,
+          "completed_ms": 26980.6085,
+          "interval_since_previous_outcome_ms": 763.2173000000003,
           "enemy_damage": 0,
           "self_damage": 11,
           "known_damage_sources": true
@@ -131,12 +131,12 @@
       "Evaluated": 6,
       "Victories": 6,
       "Rejected": 0,
-      "ElapsedMs": 7167,
+      "ElapsedMs": 7172,
       "Timing": {
-        "RestoreMs": 257,
-        "ActionMs": 1533,
-        "DecisionMs": 1618,
-        "VerificationMs": 1752,
+        "RestoreMs": 238,
+        "ActionMs": 1565,
+        "DecisionMs": 1676,
+        "VerificationMs": 1782,
         "StartupMs": 0,
         "Actions": 367,
         "Restores": 6,
@@ -157,20 +157,20 @@
       },
       "used_potions": 0,
       "verified_steps": 45,
-      "first_goal_from_request_ms": 4835.2793,
-      "first_goal_from_search_ms": 4740.8077,
+      "first_goal_from_request_ms": 4886.7664,
+      "first_goal_from_search_ms": 4825.897400000001,
       "hp_before_final_action": 87,
       "gross_loss_before_final_action": 11,
       "completed_histories": 6,
       "repeated_histories": 0,
       "remaining_prefixes": 1579,
-      "post_goal_total_ms": 2331.7207,
+      "post_goal_total_ms": 2285.2335999999996,
       "outcome_intervals": [
         {
           "attempt": 1,
           "rounds": 12,
-          "completed_ms": 877.6032,
-          "interval_since_previous_outcome_ms": 783.1316,
+          "completed_ms": 886.9193,
+          "interval_since_previous_outcome_ms": 826.0503,
           "enemy_damage": 0,
           "self_damage": 17,
           "known_damage_sources": true
@@ -178,8 +178,8 @@
         {
           "attempt": 2,
           "rounds": 12,
-          "completed_ms": 1743.5792,
-          "interval_since_previous_outcome_ms": 865.9759999999999,
+          "completed_ms": 1735.0492,
+          "interval_since_previous_outcome_ms": 848.1298999999999,
           "enemy_damage": 0,
           "self_damage": 17,
           "known_damage_sources": true
@@ -187,8 +187,8 @@
         {
           "attempt": 3,
           "rounds": 12,
-          "completed_ms": 2470.0864,
-          "interval_since_previous_outcome_ms": 726.5072000000002,
+          "completed_ms": 2490.8651,
+          "interval_since_previous_outcome_ms": 755.8159,
           "enemy_damage": 0,
           "self_damage": 17,
           "known_damage_sources": true
@@ -196,8 +196,8 @@
         {
           "attempt": 4,
           "rounds": 6,
-          "completed_ms": 3107.6314,
-          "interval_since_previous_outcome_ms": 637.5450000000001,
+          "completed_ms": 3130.8209,
+          "interval_since_previous_outcome_ms": 639.9558000000002,
           "enemy_damage": 0,
           "self_damage": 11,
           "known_damage_sources": false
@@ -205,8 +205,8 @@
         {
           "attempt": 5,
           "rounds": 13,
-          "completed_ms": 4191.5623,
-          "interval_since_previous_outcome_ms": 1083.9308999999994,
+          "completed_ms": 4242.3437,
+          "interval_since_previous_outcome_ms": 1111.5228000000002,
           "enemy_damage": 0,
           "self_damage": 18,
           "known_damage_sources": true
@@ -214,8 +214,8 @@
         {
           "attempt": 6,
           "rounds": 6,
-          "completed_ms": 4835.2793,
-          "interval_since_previous_outcome_ms": 643.7170000000006,
+          "completed_ms": 4886.7664,
+          "interval_since_previous_outcome_ms": 644.4227000000001,
           "enemy_damage": 0,
           "self_damage": 11,
           "known_damage_sources": true
@@ -260,12 +260,235 @@
       "goal_met": false
     }
   ],
+  "earlier_merged_binary": {
+    "native_dll_sha256": "E0C9F2DAE74066ABDE42FFF385F084EBF9DA8C53E182D2FE483CE11BE58DA077",
+    "samples": [
+      {
+        "sample": "cold",
+        "version": "0.7.21.0",
+        "Workers": 4,
+        "WorkerLimit": 4,
+        "workers_with_completed_trials": 1,
+        "Evaluated": 6,
+        "Victories": 6,
+        "Rejected": 0,
+        "ElapsedMs": 30747,
+        "Timing": {
+          "RestoreMs": 1565,
+          "ActionMs": 2101,
+          "DecisionMs": 1809,
+          "VerificationMs": 3548,
+          "StartupMs": 19195,
+          "Actions": 367,
+          "Restores": 6,
+          "Verifications": 1
+        },
+        "Rounds": 6,
+        "StartingHp": 87,
+        "Hp": 87,
+        "HpLost": 11,
+        "NetHpLoss": 0,
+        "DamageSources": {
+          "Enemy": 0,
+          "Self": 11,
+          "Unknown": 0,
+          "Unattributed": 0,
+          "AccountingMatches": true,
+          "Complete": true
+        },
+        "used_potions": 0,
+        "verified_steps": 45,
+        "first_goal_from_request_ms": 26545.1306,
+        "first_goal_from_search_ms": 7057.467499999999,
+        "hp_before_final_action": 87,
+        "gross_loss_before_final_action": 11,
+        "completed_histories": 6,
+        "repeated_histories": 0,
+        "remaining_prefixes": 1579,
+        "post_goal_total_ms": 4201.8694,
+        "outcome_intervals": [
+          {
+            "attempt": 1,
+            "rounds": 12,
+            "completed_ms": 22257.2406,
+            "interval_since_previous_outcome_ms": 2769.5774999999994,
+            "enemy_damage": 0,
+            "self_damage": 17,
+            "known_damage_sources": true
+          },
+          {
+            "attempt": 2,
+            "rounds": 12,
+            "completed_ms": 23259.6799,
+            "interval_since_previous_outcome_ms": 1002.4392999999982,
+            "enemy_damage": 0,
+            "self_damage": 17,
+            "known_damage_sources": true
+          },
+          {
+            "attempt": 3,
+            "rounds": 12,
+            "completed_ms": 24090.1588,
+            "interval_since_previous_outcome_ms": 830.4789000000019,
+            "enemy_damage": 0,
+            "self_damage": 17,
+            "known_damage_sources": true
+          },
+          {
+            "attempt": 4,
+            "rounds": 6,
+            "completed_ms": 24789.1205,
+            "interval_since_previous_outcome_ms": 698.9616999999998,
+            "enemy_damage": 0,
+            "self_damage": 11,
+            "known_damage_sources": false
+          },
+          {
+            "attempt": 5,
+            "rounds": 13,
+            "completed_ms": 25903.863,
+            "interval_since_previous_outcome_ms": 1114.7425000000003,
+            "enemy_damage": 0,
+            "self_damage": 18,
+            "known_damage_sources": true
+          },
+          {
+            "attempt": 6,
+            "rounds": 6,
+            "completed_ms": 26545.1306,
+            "interval_since_previous_outcome_ms": 641.2675999999992,
+            "enemy_damage": 0,
+            "self_damage": 11,
+            "known_damage_sources": true
+          }
+        ]
+      },
+      {
+        "sample": "reused",
+        "version": "0.7.21.0",
+        "Workers": 4,
+        "WorkerLimit": 4,
+        "workers_with_completed_trials": 1,
+        "Evaluated": 6,
+        "Victories": 6,
+        "Rejected": 0,
+        "ElapsedMs": 7167,
+        "Timing": {
+          "RestoreMs": 257,
+          "ActionMs": 1533,
+          "DecisionMs": 1618,
+          "VerificationMs": 1752,
+          "StartupMs": 0,
+          "Actions": 367,
+          "Restores": 6,
+          "Verifications": 1
+        },
+        "Rounds": 6,
+        "StartingHp": 87,
+        "Hp": 87,
+        "HpLost": 11,
+        "NetHpLoss": 0,
+        "DamageSources": {
+          "Enemy": 0,
+          "Self": 11,
+          "Unknown": 0,
+          "Unattributed": 0,
+          "AccountingMatches": true,
+          "Complete": true
+        },
+        "used_potions": 0,
+        "verified_steps": 45,
+        "first_goal_from_request_ms": 4835.2793,
+        "first_goal_from_search_ms": 4740.8077,
+        "hp_before_final_action": 87,
+        "gross_loss_before_final_action": 11,
+        "completed_histories": 6,
+        "repeated_histories": 0,
+        "remaining_prefixes": 1579,
+        "post_goal_total_ms": 2331.7207,
+        "outcome_intervals": [
+          {
+            "attempt": 1,
+            "rounds": 12,
+            "completed_ms": 877.6032,
+            "interval_since_previous_outcome_ms": 783.1316,
+            "enemy_damage": 0,
+            "self_damage": 17,
+            "known_damage_sources": true
+          },
+          {
+            "attempt": 2,
+            "rounds": 12,
+            "completed_ms": 1743.5792,
+            "interval_since_previous_outcome_ms": 865.9759999999999,
+            "enemy_damage": 0,
+            "self_damage": 17,
+            "known_damage_sources": true
+          },
+          {
+            "attempt": 3,
+            "rounds": 12,
+            "completed_ms": 2470.0864,
+            "interval_since_previous_outcome_ms": 726.5072000000002,
+            "enemy_damage": 0,
+            "self_damage": 17,
+            "known_damage_sources": true
+          },
+          {
+            "attempt": 4,
+            "rounds": 6,
+            "completed_ms": 3107.6314,
+            "interval_since_previous_outcome_ms": 637.5450000000001,
+            "enemy_damage": 0,
+            "self_damage": 11,
+            "known_damage_sources": false
+          },
+          {
+            "attempt": 5,
+            "rounds": 13,
+            "completed_ms": 4191.5623,
+            "interval_since_previous_outcome_ms": 1083.9308999999994,
+            "enemy_damage": 0,
+            "self_damage": 18,
+            "known_damage_sources": true
+          },
+          {
+            "attempt": 6,
+            "rounds": 6,
+            "completed_ms": 4835.2793,
+            "interval_since_previous_outcome_ms": 643.7170000000006,
+            "enemy_damage": 0,
+            "self_damage": 11,
+            "known_damage_sources": true
+          }
+        ]
+      }
+    ],
+    "installation_receipt": {
+      "utc": "2026-10-04T00:32:36.0027855Z",
+      "version": "0.7.21",
+      "previous_version": "0.7.19",
+      "dll_sha256": "E0C9F2DAE74066ABDE42FFF385F084EBF9DA8C53E182D2FE483CE11BE58DA077",
+      "zip_sha256": "27C79A87937407D54FDA9E9C885CB772AC1DB20493A5C5207B12C5E2D814633B",
+      "protected_files": 489,
+      "protected_files_unchanged": true,
+      "backups_verified": true,
+      "game_started": false,
+      "native_search_build_matches_final_release": true
+    }
+  },
+  "broker_shutdown_check": {
+    "reproduced_before_fix": true,
+    "closed_broker_cleanup_passed": true,
+    "repeated_client_dispose_passed": true,
+    "failure_details_printed": true
+  },
   "installation_receipt": {
-    "utc": "2026-10-04T00:32:36.0027855Z",
+    "utc": "2026-10-04T00:56:41.2440679Z",
     "version": "0.7.21",
-    "previous_version": "0.7.19",
-    "dll_sha256": "E0C9F2DAE74066ABDE42FFF385F084EBF9DA8C53E182D2FE483CE11BE58DA077",
-    "zip_sha256": "27C79A87937407D54FDA9E9C885CB772AC1DB20493A5C5207B12C5E2D814633B",
+    "previous_version": "0.7.21",
+    "dll_sha256": "34F616E5A0AC53910A19025584C836620195D700DDF77F78BAA934F39612E270",
+    "zip_sha256": "0A8F0B6B1731F92BF121D01799D4E5E2176EC9967B2970D98C6E5324FAA79708",
     "protected_files": 489,
     "protected_files_unchanged": true,
     "backups_verified": true,

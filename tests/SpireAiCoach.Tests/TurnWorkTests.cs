@@ -11,6 +11,17 @@ static class TurnWorkTests
 
     public static void Register(Action<string, Action> test, Action<string, Func<Task>> asyncTest)
     {
+        test("shared turn work closed broker still releases client resources", () =>
+        {
+            var captured = Request(); var broker = new LocalTurnWork(captured, 2);
+            var client = new LocalTurnWorkClient(captured with { TurnWorkPipe = broker.PipeName });
+            client.Offer([Move(0)], 1, Hint()); Check(client.TryTake(out var task), "Missing owned task");
+            client.Finish(task);
+            broker.Dispose();
+            client.Dispose();
+            client.Dispose();
+        });
+
         test("shared turn work winning improvement requires its exact owned native history", () =>
         {
             var captured = Request(); using var broker = new LocalTurnWork(captured, 2);

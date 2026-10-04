@@ -197,6 +197,7 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
     private readonly List<LocalTurnOffer> _offers = [];
     private LocalTurnWork.Reply _last = new(null, 0, 0, 0, 0);
     private LocalTurnTask? _owned;
+    private int _disposed;
     private readonly Dictionary<int, int> _roundClaims = new();
     private long _lastFlush = Environment.TickCount64;
     public int Count => _last.Pending + _offers.Count;
@@ -271,8 +272,21 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
 
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         try { Exchange("retire"); }
         catch (Exception ex) when (ex is IOException or ObjectDisposedException or InvalidOperationException) { }
-        finally { _reader.Dispose(); _writer.Dispose(); _pipe.Dispose(); }
+        finally
+        {
+            try { _reader.Dispose(); }
+            finally
+            {
+                // An unsuccessful retirement can leave buffered text in the
+                // writer. Disposing it retries that write to the closed broker;
+                // cleanup must still release the pipe without masking a result.
+                try { _writer.Dispose(); }
+                catch (Exception ex) when (ex is IOException or ObjectDisposedException) { }
+                finally { _pipe.Dispose(); }
+            }
+        }
     }
 }
