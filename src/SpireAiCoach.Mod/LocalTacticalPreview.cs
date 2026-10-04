@@ -2,9 +2,11 @@ using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Players;
+using MegaCrit.Sts2.Core.Localization.DynamicVars;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.MonsterMoves.Intents;
+using System.Runtime.CompilerServices;
 using SpireAiCoach.Core;
 
 namespace SpireAiCoach.Mod;
@@ -12,6 +14,14 @@ namespace SpireAiCoach.Mod;
 internal sealed class LocalTacticalPreview(Player player, bool efficient = false)
 {
     private readonly Dictionary<Creature, double> _threats = new();
+    private readonly Dictionary<(CardModel, Creature?), DynamicVarSet> _previews = new(new PreviewKeyComparer());
+    private sealed class PreviewKeyComparer : IEqualityComparer<(CardModel, Creature?)>
+    {
+        public bool Equals((CardModel, Creature?) a, (CardModel, Creature?) b) =>
+            ReferenceEquals(a.Item1, b.Item1) && ReferenceEquals(a.Item2, b.Item2);
+        public int GetHashCode((CardModel, Creature?) key) => HashCode.Combine(
+            RuntimeHelpers.GetHashCode(key.Item1), key.Item2 == null ? 0 : RuntimeHelpers.GetHashCode(key.Item2));
+    }
     private double _incoming;
     private double _handEndHpLoss;
     private bool _retainsBlock;
@@ -34,6 +44,7 @@ internal sealed class LocalTacticalPreview(Player player, bool efficient = false
         catch { /* Unknown retention keeps the neutral prior; native execution remains authoritative. */ }
         foreach (var enemy in CombatManager.Instance.DebugOnlyGetState()!.Enemies)
         {
+            if (!enemy.IsAlive) continue;
             try
             {
                 var damage = enemy.Monster?.NextMove?.Intents.OfType<AttackIntent>()
@@ -49,20 +60,44 @@ internal sealed class LocalTacticalPreview(Player player, bool efficient = false
         CurrentBlock: player.Creature.Block, Hp: player.Creature.CurrentHp, EndTurn: true, Known: true,
         HandEndHpLoss: _handEndHpLoss));
 
+    public double EndTurnHpLossHint => Math.Max(0, _incoming - player.Creature.Block) + _handEndHpLoss;
+
+    private DynamicVarSet Preview(CardModel card, Creature? target)
+    {
+        if (_previews.TryGetValue((card, target), out var vars)) return vars;
+        vars = card.DynamicVars.Clone(card);
+        card.UpdateDynamicVarPreview(CardPreviewMode.Normal, target, vars);
+        _previews.Add((card, target), vars);
+        return vars;
+    }
+
+    private double PreviewDamage(CardModel card, Creature? target)
+    {
+        try
+        {
+            if (!card.DynamicVars.Keys.Any(k => k is "Damage" or "CalculatedDamage")) return 0;
+            var vars = Preview(card, target);
+            double Value(string key) => vars.TryGetValue(key, out var v) ? Math.Max(0, (double)v.PreviewValue) : 0;
+            return Math.Max(Value("Damage"), Value("CalculatedDamage")) * Math.Max(1, Value("Repeat"));
+        }
+        catch { return 0; } // An opaque sibling preview must not erase known defense hints.
+    }
+
     public int Priority(CardModel card, Creature? target, LocalRolloutStyle style = LocalRolloutStyle.Balanced)
     {
         try
         {
-            var vars = card.DynamicVars.Clone(card);
-            card.UpdateDynamicVarPreview(CardPreviewMode.Normal, target, vars);
+            var vars = Preview(card, target);
             double Value(string key) => vars.TryGetValue(key, out var v) ? Math.Max(0, (double)v.PreviewValue) : 0;
             bool enemy = target != null && _threats.ContainsKey(target);
             var others = _playable.Where(c => c != card).ToArray();
-            double baseDamage(CardModel c) => c.DynamicVars.TryGetValue("Damage", out var d) ? Math.Max(0, (double)d.BaseValue) : 0;
-            int attacks = others.Count(c => baseDamage(c) > 0);
+            // Follow-up damage must use the same target's native modifiers too.
+            // Raw card values overstate shield breaking under damage caps/reduction.
+            // This decision-local cache never crosses a native action or state change.
+            var attacks = others.Select(c => (Card: c, Damage: PreviewDamage(c, target))).Where(a => a.Damage > 0).ToArray();
             var energyAfter = Math.Max(0, player.PlayerCombatState!.Energy - card.EnergyCost.GetAmountToSpend());
-            int affordable = Math.Min(attacks, energyAfter + others.Count(c => baseDamage(c) > 0 && c.EnergyCost.GetAmountToSpend() == 0));
-            var followup = others.Select(baseDamage).OrderDescending().Take(affordable).Sum();
+            int affordable = Math.Min(attacks.Length, energyAfter + attacks.Count(a => a.Card.EnergyCost.GetAmountToSpend() == 0));
+            var followup = attacks.Select(a => a.Damage).OrderDescending().Take(affordable).Sum();
             var repeat = Math.Max(1, Value("Repeat"));
             // HpLoss alone does not identify a payment made by OnPlay. The native
             // in-hand trigger flag places this preview in the turn-end risk instead.
