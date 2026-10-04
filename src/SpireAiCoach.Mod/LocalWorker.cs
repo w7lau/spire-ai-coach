@@ -739,7 +739,12 @@ public static class LocalWorker
                         try
                         {
                             int choiceIndex = 0;
-                            next = await Play(next, options =>
+                            // Legal-action enumeration has no selection history. Carry the
+                            // planned choices into the session so a paged native offer can
+                            // include the exact prefix even after its cursor has advanced.
+                            // The chooser below still validates the current native offer.
+                            var selectionPlan = preferred == null ? null : plannedAction?.Choices;
+                            next = await Play(next with { Choices = selectionPlan }, options =>
                             {
                                 // The native action may ask for several choices. If its
                                 // subtree was already covered, finish each pending choice

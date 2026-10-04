@@ -158,6 +158,44 @@ internal static class SelectionMatrixIntegration
                     choiceCount = expected!.Length, synchronizationCount = baselineBytes!.Length,
                     begun = signals[0].Item1, ended = signals[0].Item2, ordinaryAndDataMatch = true });
             }
+            // A queued action may replay an earlier page after many sibling trials.
+            // Pin that exact selection without resetting the cursor or hiding alternatives.
+            var direct = typeof(LocalChoices).GetMethod("SelectWithoutPresentation", BindingFlags.NonPublic | BindingFlags.Instance)!;
+            var many = new CardSelectorPrefs(CardSelectorPrefs.DiscardSelectionPrompt, 0, 5) { RequireManualConfirmation = true };
+            var cards = hand.Take(5).ToArray();
+            var beforeHash = LocalCapture.Fingerprint(); var beforeHistory = LocalCapture.History();
+            void SelectDirect(LocalChoices session, CardSelectorPrefs preference) =>
+                direct.Invoke(session, ["hand", cards, preference, false]);
+            var cursor = new LocalSelectionCursor();
+            var first = new LocalChoices(choose: options => options.Single(c => c.Index == 111), cursor: cursor);
+            SelectDirect(first, many);
+            var intent = first.Completed.Single();
+            var repeated = new LocalChoices([intent], options => options.Single(c => c.Index == intent.Index &&
+                c.OfferHash == intent.OfferHash && c.Kind == intent.Kind && c.ModelId == intent.ModelId &&
+                (c.Indices ?? []).SequenceEqual(intent.Indices ?? [])), cursor);
+            SelectDirect(repeated, many);
+            if (!repeated.Completed.Single().Indices!.SequenceEqual(intent.Indices!))
+                throw new InvalidOperationException("Paged planned selection changed");
+            var controlCursor = new LocalSelectionCursor();
+            SelectDirect(new LocalChoices(choose: options => options[0], cursor: controlCursor), many);
+            bool ordinaryPageAdvanced = false;
+            SelectDirect(new LocalChoices(choose: options =>
+            {
+                ordinaryPageAdvanced = options.All(c => c.Index != intent.Index);
+                return options[0];
+            }, cursor: controlCursor), many);
+            if (!ordinaryPageAdvanced) throw new InvalidOperationException("Choice cursor did not advance to a different page");
+            bool changedOfferIgnored = false;
+            SelectDirect(new LocalChoices([intent], options =>
+            {
+                changedOfferIgnored = options.All(c => c.OfferHash != intent.OfferHash && c.Indices?.Length == 1);
+                return options[0];
+            }, cursor), one);
+            if (!changedOfferIgnored || LocalCapture.Fingerprint() != beforeHash || LocalCapture.History() != beforeHistory)
+                throw new InvalidOperationException("Selection pinning changed native state or accepted a stale offer");
+            records.Add(new { Name = "paged-selection-prefix", selectionSpace = 326, pageSize = 128,
+                intendedRank = intent.Index, plannedPrefixRetained = true, ordinaryPageAdvanced, changedOfferIgnored,
+                nativeStateAndHistoryUnchanged = true });
             LocalWire.Write(Path.Combine(root, "integration-selection-matrix.json"), new {
                 version = typeof(LocalWorker).Assembly.GetName().Version!.ToString(3),
                 nativeModule = typeof(CardModel).Assembly.ManifestModule.ModuleVersionId,

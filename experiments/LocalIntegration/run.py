@@ -65,7 +65,10 @@ parser.add_argument('--scene-overhead-test', action='store_true')
 parser.add_argument('--visual-factory-test', action='store_true')
 parser.add_argument('--route-feedback-test', action='store_true')
 parser.add_argument('--route-feedback-focused-only', action='store_true')
+parser.add_argument('--recent-search-test', action='store_true', help='Frozen unseeded incident; preserve its trial/time/turn limits and report incomplete search honestly')
 args = parser.parse_args()
+if args.recent_search_test and (not args.replay or args.seed_result or args.recorded_replay):
+    parser.error('--recent-search-test requires an unseeded --replay')
 if args.route_feedback_focused_only and not args.route_feedback_test:
     parser.error('--route-feedback-focused-only requires --route-feedback-test')
 if args.route_feedback_test and (not args.replay or not args.seed_result or args.recorded_replay):
@@ -144,6 +147,9 @@ with worker_lock(root):
     for name in ['integration-success', 'integration-error.txt', 'integration-result.json',
                  'integration-algorithm-private.json', 'integration-algorithm-summary.json']:
         (root / name).unlink(missing_ok=True)
+    if args.recent_search_test:
+        for name in ['integration-recent-search-summary.json', 'integration-recent-search-private.json']:
+            (root / name).unlink(missing_ok=True)
     if args.survival_test:
         for name in ['integration-survival-summary.json', 'integration-survival-private.json']:
             (root / name).unlink(missing_ok=True)
@@ -230,6 +236,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_VISUAL_FACTORY_TEST'] = '1' if args.visual_factory_test else '0'
     env['SPIRE_LOCAL_ROUTE_FEEDBACK_TEST'] = '1' if args.route_feedback_test else '0'
     env['SPIRE_LOCAL_ROUTE_FEEDBACK_FOCUSED_ONLY'] = '1' if args.route_feedback_focused_only else '0'
+    env['SPIRE_LOCAL_RECENT_SEARCH_TEST'] = '1' if args.recent_search_test else '0'
     settings = root / 'Roaming/SlayTheSpire2/default/1/settings.save'
     settings_data = json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}
     settings_data.update(volume_master=0, volume_bgm=0, volume_sfx=0, volume_ambience=0)
@@ -298,6 +305,9 @@ with worker_lock(root):
             names = ['integration-route-feedback-summary.json',
                      *[f'integration-route-feedback-private-{order}-{mode}.json'
                        for order in ('MonteCarlo', 'TurnFrontier') for mode in ('baseline', 'reuse')],
+                     'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.recent_search_test:
+            names = ['integration-recent-search-summary.json', 'integration-recent-search-private.json',
                      'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
         if args.search_cases:
             names = ['integration-self-search-summary.json', *[f'integration-self-search-private-{i}.json' for i in range(4)],
