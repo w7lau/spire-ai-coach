@@ -152,6 +152,8 @@ with worker_lock(root):
     if args.recent_search_test:
         for name in ['integration-recent-search-summary.json', 'integration-recent-search-private.json']:
             (root / name).unlink(missing_ok=True)
+    if args.followup_test:
+        (root / 'integration-followup-summary.json').unlink(missing_ok=True)
     if args.survival_test:
         for name in ['integration-survival-summary.json', 'integration-survival-private.json']:
             (root / name).unlink(missing_ok=True)
@@ -321,6 +323,9 @@ with worker_lock(root):
         if args.lean_checksum_test:
             names = ['integration-lean-checksum-summary.json', 'integration-lean-checksum-private-0.json', 'integration-lean-checksum-private-1.json',
                      'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.followup_test:
+            names = ['integration-followup-summary.json', 'integration-success', 'integration-error.txt',
+                     'integration-stdout.log', 'integration-game.log']
         for name in names:
             if (root / name).is_file():
                 shutil.copy2(root / name, args.results_dir / name)
