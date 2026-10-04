@@ -387,7 +387,7 @@ public sealed class CoachOverlay
             var resources = _localPool.Resources();
             _resources.Text = $"计算资源 · {resources.Ready} 路可复用" +
                 (resources.Preparing > 0 ? $" · {resources.Preparing} 路准备中" : "");
-            _resources.TooltipText = resources.LastChange + "\n按需增加实例；健康实例保留，失败或无法安全清理的实例重新准备。";
+            _resources.TooltipText = resources.LastChange + "\n手动并发提前准备所选数量，自动模式按需增加；可用实例会复用。";
             var preparationScope = snapshot?.CombatId ??
                 (MegaCrit.Sts2.Core.Runs.RunManager.Instance.IsInProgress ? "active-run" : null);
             if (preparationScope != null && _preparedCombat != preparationScope && _request == null && !_executing &&

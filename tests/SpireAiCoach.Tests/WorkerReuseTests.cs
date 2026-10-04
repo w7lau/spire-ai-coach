@@ -128,9 +128,9 @@ internal static class WorkerReuseTests
             if (!OperatingSystem.IsWindows()) return;
             await using var f = new Fixture(); var lanes = Workers(f.Pool); var timeline = new LocalTimeline();
             var cold = Stopwatch.StartNew(); await f.Pool.Prepare(f.Installation, 2, CancellationToken.None); cold.Stop();
-            Check(lanes.Count(w => w.Process != null) == 1, "Prewarming created extra lanes");
+            Check(lanes.Count(w => w.Process != null) == 2, "Manual prewarming did not prepare both chosen lanes");
             var pid = lanes[0].Process!.Id; var started = lanes[0].Process!.StartTime.ToUniversalTime();
-            Check(f.Pool.Resources() is { Ready: 1, Preparing: 0, Starts: 1 }, "Ready resource display lost the actual worker state");
+            Check(f.Pool.Resources() is { Ready: 2, Preparing: 0, Starts: 2 }, "Ready resource display lost the actual worker state");
             var hot = Stopwatch.StartNew(); await f.Pool.Prepare(f.Installation, 2, CancellationToken.None); hot.Stop();
             var runs = new List<object>();
             foreach (var scenario in new[] { "repeat", "menu-reentry", "save-b" })
@@ -154,7 +154,7 @@ internal static class WorkerReuseTests
                 runs.Add(new { scenario = verify ? "cancel-verification" : "cancel-search", pid, cancellation_ms = watch.ElapsedMilliseconds });
                 var result = await f.Pool.Analyze(Request() with { Workers = 1 }, f.Installation, _ => { }, CancellationToken.None);
                 Check(result.Status == "done" && lanes[0].Process!.Id == pid, "Cancelled-then-restarted search did not reuse");
-                Check(f.Pool.Resources().Starts == 1, "Healthy cancellation counted as a new launch");
+                Check(f.Pool.Resources().Starts == 2, "Healthy cancellation counted as a new launch");
             }
             var evidence = new { kind = "synthetic protocol/process acceptance; no native game", cold_prepare_ms = cold.ElapsedMilliseconds,
                 hot_prepare_ms = hot.ElapsedMilliseconds, pid, started_utc = started, generation = lanes[0].Generation,
@@ -167,7 +167,7 @@ internal static class WorkerReuseTests
         {
             if (!OperatingSystem.IsWindows()) return;
             await using var f = new Fixture(); var lanes = Workers(f.Pool);
-            await f.Pool.Prepare(f.Installation, 2, CancellationToken.None);
+            await f.Pool.Prepare(f.Installation, 0, CancellationToken.None);
             var result = await f.Pool.Analyze(Request("goal") with { StopOnZeroLoss = true }, f.Installation, _ => { }, CancellationToken.None);
             Check(result.StoppedEarly && result.Timing?.Verifications == 1, "Goal route was not verified");
             Check(lanes[1].Process != null, "Cold peer was terminated by the goal");

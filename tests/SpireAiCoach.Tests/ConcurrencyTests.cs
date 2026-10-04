@@ -6,6 +6,36 @@ static class ConcurrencyTests
 
     public static void Register(Action<string, Action> test, Action<string, Func<Task>> asyncTest)
     {
+        test("manual concurrency prepares its chosen count and automatic mode remains lazy", () =>
+        {
+            Check(LocalConcurrency.PrewarmCount(0) == 1 && LocalConcurrency.PrewarmCount(8) == 8 &&
+                LocalConcurrency.PrewarmCount(100) == 16);
+            Check(!LocalConcurrency.AdaptiveAdmission(8, true) && LocalConcurrency.AdaptiveAdmission(0, true) &&
+                !LocalConcurrency.AdaptiveAdmission(0, false));
+        });
+        asyncTest("manual concurrency starts every lane before the first root becomes ready", async () =>
+        {
+            var lanes = Enumerable.Range(0, 8).Select(_ => new TaskCompletionSource<int>()).ToArray();
+            var launched = new List<int>();
+            var request = LocalCalculation.Configure(new("id", "snap", [], "native", 1, [], true),
+                LocalSearchOrder.TurnFrontier, 8, true, false);
+            var running = LocalConcurrency.Run(8, LocalConcurrency.AdaptiveAdmission(request.Workers, request.AdaptiveWorkers), true,
+                i => { launched.Add(i); return lanes[i].Task; },
+                _ => throw new Exception("Manual admission waited for root work"), () => false, CancellationToken.None);
+            Check(launched.SequenceEqual(Enumerable.Range(0, 8)) && !running.IsCompleted);
+            for (int i = 0; i < 8; i++) lanes[i].SetResult(i);
+            Check((await running).SequenceEqual(Enumerable.Range(0, 8)) && request.MaxNodes == 64 &&
+                request.MaxRounds == 64 && request.BudgetSeconds == 60);
+        });
+        asyncTest("manual concurrency stops admission after an immediate goal", async () =>
+        {
+            bool stopped = false;
+            int launched = 0;
+            var result = await LocalConcurrency.Run(8, false, true,
+                i => { launched++; stopped = true; return Task.FromResult(i); },
+                _ => throw new Exception("Manual admission consulted pending work"), () => stopped, CancellationToken.None);
+            Check(launched == 1 && result.SequenceEqual([0]));
+        });
         test("adaptive concurrency honors manual ceilings and estimates resources only in automatic mode", () =>
         {
             const ulong gb = 1024UL * 1024 * 1024;
