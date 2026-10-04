@@ -96,7 +96,7 @@ public sealed class LocalTimeline
         lock (_gate)
         {
             span = span with { Detail = span.Detail.Length <= 160 ? span.Detail : span.Detail[..160] };
-            if (_overviewCapacity > 0 && (span.Depth == 0 || span.Phase is "result_transfer" or "receive" or "stop_search"))
+            if (_overviewCapacity > 0 && (span.Depth == 0 || span.Phase is "result_transfer" or "receive" or "stop_search" or "await_idle" or "cancel_request"))
             {
                 if (_overview.Count == _overviewCapacity) { _overview.Dequeue(); _dropped++; }
                 _overview.Enqueue(span);
@@ -168,6 +168,7 @@ public sealed class LocalTimeline
         "executor" => "等待原生执行完成", "asset_gc" => "资源准备后的内存回收",
         "logic_frame" => "等待事件",
         "stop_search" => "停止其余搜索",
+        "await_ready" => "等待已启动实例就绪", "await_idle" => "等待实例安全清理", "cancel_request" => "取消并清理本次计算",
         "observe" => "读取过程预览", "publish" => "写入进度与候选", "ipc" => "传递计算请求",
         "receive" => "接收候选与检查运行日志", "dispatch" => "等待计算进程接收请求",
         "result_transfer" => "结果传递与轮询等待", "display_wait" => "等待界面显示",

@@ -1,0 +1,75 @@
+{
+  "baseline": "2237d798829d61bee3c7ce733b98693dedbe67f9",
+  "branch": "codex/worker-reuse-optimization",
+  "test_command": "dotnet run --project tests/SpireAiCoach.Tests -c Release",
+  "windows_checks": {
+    "passed": 207,
+    "total": 207,
+    "new_reuse_checks": 9
+  },
+  "builds": {
+    "mod": "passed, 0 warnings / 0 errors",
+    "integration": "passed, 0 warnings / 0 errors"
+  },
+  "measured_synthetic_process": {
+    "kind": "synthetic protocol/process acceptance; no native game",
+    "cold_prepare_ms": 1093,
+    "hot_prepare_ms": 1,
+    "pid": 31580,
+    "started_utc": "2026-10-04T01:34:10.7717415Z",
+    "generation": "789f9c69519443d39679bcaed78adc9c",
+    "launches": 1,
+    "runs": [
+      {
+        "scenario": "repeat",
+        "Id": "9a62898bfd594b9b962abcc722ad6144",
+        "SnapshotId": "repeat",
+        "pid": 31580
+      },
+      {
+        "scenario": "menu-reentry",
+        "Id": "5395f363cafa416ab6cf7b6967ea477a",
+        "SnapshotId": "menu-reentry",
+        "pid": 31580
+      },
+      {
+        "scenario": "save-b",
+        "Id": "45b8f12fb53b48b191c23a4f531dc604",
+        "SnapshotId": "save-b",
+        "pid": 31580
+      },
+      {
+        "scenario": "cancel-search",
+        "pid": 31580,
+        "cancellation_ms": 107
+      },
+      {
+        "scenario": "cancel-verification",
+        "pid": 31580,
+        "cancellation_ms": 104
+      }
+    ]
+  },
+  "other_measured_cases": [
+    "goal/preparation reuse: peer_pid=18368, joined_pid=33612, launches=1 per lane",
+    "unsafe stop: elapsed_ms=2037, retired=true; exit/config/disposal recovery verified"
+  ],
+  "isolation": {
+    "existing_processes_enumerated": false,
+    "existing_processes_changed": false,
+    "native_game_started": false,
+    "real_saves_accessed": false,
+    "installed_mod_changed": false,
+    "provider_calls": false,
+    "all_fixture_owned_processes_joined_and_locks_released": true
+  },
+  "limits": [
+    "No actual native game or game-worker reuse measurement",
+    "Menu/reentry/save cases use distinct synthetic frozen requests, not actual UI or real saves",
+    "Synthetic cold preparation includes a deliberate 650ms delay; no game speedup claim",
+    "Current patch has not rerun six-round native victory acceptance",
+    "Linux tests not executed locally",
+    "Unexpected owner exit not remeasured; unchanged PID/start-time owner guard retained",
+    "Independent native storage/IPC is possible but shared-machine CPU/memory contention remains unresolved"
+  ]
+}

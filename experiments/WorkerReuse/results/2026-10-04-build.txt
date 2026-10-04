@@ -1,0 +1,8 @@
+  SpireAiCoach.Mod -> C:\Users\16845\Documents\Codex\2026-10-04\task\work\worker-reuse\src\SpireAiCoach.Mod\bin\Release\net9.0\SpireAiCoach.dll
+  LocalIntegration -> C:\Users\16845\Documents\Codex\2026-10-04\task\work\worker-reuse\experiments\LocalIntegration\bin\Release\net9.0\SpireLocalIntegration.dll
+
+宸叉垚鍔熺敓鎴愩€?
+    0 涓鍛?
+    0 涓敊璇?
+
+宸茬敤鏃堕棿 00:00:01.98

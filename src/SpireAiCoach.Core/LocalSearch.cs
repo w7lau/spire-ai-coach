@@ -22,10 +22,12 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     bool EfficientTactics = true, bool LearnBuffDuration = true, bool GuideWinningRoutes = true,
     bool OwnedWinningFocus = true);
 
-// A stop belongs to one frozen request, never to another battle or final verification.
-public sealed record LocalSearchStop(string Id, string SnapshotId, string NativeHash)
+// A stop belongs to one frozen request. Goal stops exclude verification;
+// explicit caller cancellation also applies during verification or with goals off.
+public sealed record LocalSearchStop(string Id, string SnapshotId, string NativeHash, bool Cancel = false)
 {
-    public bool Matches(LocalSearchRequest request) => request.StopOnZeroLoss && request.VerifyCandidate == null &&
+    public bool Matches(LocalSearchRequest request) =>
+        (Cancel || request.StopOnZeroLoss && request.VerifyCandidate == null) &&
         Id == request.Id && SnapshotId == request.SnapshotId && NativeHash == request.NativeHash;
 }
 
