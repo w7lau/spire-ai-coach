@@ -19,12 +19,16 @@ static class EarlyStopSettingsTests
                 var key = Path.Combine(directory, "api-key.dpapi");
                 File.WriteAllBytes(key, [7, 8, 9]);
                 Check(store.Load().Settings.LocalStopOnZeroLoss);
-                store.SaveLocalOptions(3, true, false);
+                store.SaveLocalOptions(3, true, false, 6);
                 Check(!store.Load().Settings.LocalStopOnZeroLoss);
+                Check(store.Load().Settings.LocalTargetVictoryRounds == 6);
                 store.SaveLocalWorkers(4);
                 Check(!store.Load().Settings.LocalStopOnZeroLoss && store.Load().Settings.LocalIncludePotions);
                 store.SaveLocalOptions(4, null, true);
                 Check(store.Load().Settings.LocalStopOnZeroLoss && store.Load().Settings.Model == "existing");
+                Check(store.Load().Settings.LocalTargetVictoryRounds == 6);
+                store.SaveLocalOptions(4, null, null, 0);
+                Check(store.Load().Settings.LocalTargetVictoryRounds == 0);
                 Check(JsonNode.Parse(File.ReadAllText(config))!["unrelated"]!["preserve"]!.GetValue<int>() == 17);
                 Check(File.ReadAllBytes(key).SequenceEqual(new byte[] { 7, 8, 9 }));
             }

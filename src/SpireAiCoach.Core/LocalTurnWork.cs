@@ -14,7 +14,7 @@ public sealed class LocalTurnWork : IDisposable
         LocalTurnOffer[]? Offers = null, LocalTurnTask? Task = null,
         LocalAction[]? Actions = null, LocalDecision[]? Decisions = null,
         LocalTurnHint? Hint = null, LocalWinningBound? Bound = null, string? TerminalDigest = null,
-        LocalCandidate? WinningCandidate = null);
+        LocalCandidate? Outcome = null, LocalCandidate? WinningCandidate = null);
     internal sealed record Reply(LocalTurnTask? Task, int Pending, int Active,
         int Offered, int Duplicates, int Affected = 0, string? Error = null, bool RootReady = false);
 
@@ -31,6 +31,7 @@ public sealed class LocalTurnWork : IDisposable
     private readonly int _maximum;
     private readonly bool _ownedWinningFocus;
     private int _taken;
+    private int _rollouts;
     private bool _rootReady;
     public string PipeName { get; } = "SpireAiCoach-turn-" + Guid.NewGuid().ToString("N");
     public int Pending { get { lock (_gate) return _frontier.Count; } }
@@ -38,6 +39,7 @@ public sealed class LocalTurnWork : IDisposable
     public int DuplicateOffers { get { lock (_gate) return _frontier.DuplicateOffers; } }
     public int CompletedHistories { get { lock (_gate) return _terminals.Count + _repeated; } }
     public int RepeatedHistories { get { lock (_gate) return _repeated; } }
+    public IReadOnlyDictionary<int, int> ClaimedByRound { get { lock (_gate) return _frontier.ClaimedByRound; } }
 
     public LocalTurnWork(LocalSearchRequest request, int maximum)
     {
@@ -115,12 +117,23 @@ public sealed class LocalTurnWork : IDisposable
             case "take":
                 if (_active.ContainsKey(command.Owner)) throw new InvalidOperationException("Worker already owns a turn task");
                 if (!_frontier.TryTake(out var task, command.Owner)) return Snapshot();
-                task = task with { FullRollout = LocalTurnSearch.IsFullRollout(_taken++) || task.FullRollout,
+                bool guidedRollout = task.FullRollout;
+                task = task with { FullRollout = LocalTurnSearch.IsFullRollout(_taken++) || task.FullRollout || task.Prefix.Length == 1,
                     Lane = _frontier.LastLane, Focused = _frontier.LastFocused };
+                if (task.FullRollout && !guidedRollout) task = task with { Style = task.Prefix.Length <= 1 ?
+                    LocalRolloutStyle.Preparation : (LocalRolloutStyle)(_rollouts++ % 4) };
                 _active.Add(command.Owner, task); return Snapshot(task);
             case "focus":
                 var focused = RequireOwner(command);
                 _frontier.FocusNext(focused, command.Actions ?? [], command.Decisions ?? [], focused.Focused);
+                return Snapshot();
+            case "outcome":
+                var outcomeOwner = RequireOwner(command);
+                var outcome = command.Outcome ?? throw new InvalidDataException("Missing native outcome");
+                if (!LocalSearchWork.MatchesPrefix(outcome.Actions, outcomeOwner.Prefix))
+                    throw new InvalidDataException("Outcome does not belong to its owned native prefix");
+                _frontier.ObserveOutcome(outcome);
+                _frontier.PromoteWinning(outcome, _ownedWinningFocus ? command.Owner : null);
                 return Snapshot();
             case "improve":
                 var incumbentOwner = RequireOwner(command);
@@ -184,6 +197,8 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
     private readonly List<LocalTurnOffer> _offers = [];
     private LocalTurnWork.Reply _last = new(null, 0, 0, 0, 0);
     private LocalTurnTask? _owned;
+    private int _disposed;
+    private readonly Dictionary<int, int> _roundClaims = new();
     private long _lastFlush = Environment.TickCount64;
     public int Count => _last.Pending + _offers.Count;
     public int Active => _last.Active;
@@ -191,6 +206,7 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
     public int Offered => _last.Offered;
     public int DuplicateOffers => _last.Duplicates;
     public int LastLane { get; private set; }
+    public IReadOnlyDictionary<int, int> ClaimedByRound => new Dictionary<int, int>(_roundClaims);
 
     public LocalTurnWorkClient(LocalSearchRequest request)
     {
@@ -205,9 +221,9 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
     private LocalTurnWork.Reply Exchange(string operation, LocalTurnTask? task = null,
         LocalAction[]? actions = null, LocalDecision[]? decisions = null,
         LocalTurnHint? hint = null, LocalWinningBound? bound = null, string? terminalDigest = null,
-        LocalCandidate? winningCandidate = null)
+        LocalCandidate? outcome = null, LocalCandidate? winningCandidate = null)
     {
-        var command = new LocalTurnWork.Command(_scope, _owner, operation, _offers.ToArray(), task, actions, decisions, hint, bound, terminalDigest, winningCandidate);
+        var command = new LocalTurnWork.Command(_scope, _owner, operation, _offers.ToArray(), task, actions, decisions, hint, bound, terminalDigest, outcome, winningCandidate);
         _writer.WriteLine(JsonSerializer.Serialize(command));
         var reply = JsonSerializer.Deserialize<LocalTurnWork.Reply>(_reader.ReadLine() ?? throw new IOException("Turn task broker closed"))
             ?? throw new InvalidDataException("Empty turn task reply");
@@ -225,12 +241,15 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
     {
         var reply = Exchange("take"); task = reply.Task!;
         if (task == null) return false;
-        _owned = task; LastLane = task.Lane; return true;
+        _owned = task; LastLane = task.Lane;
+        _roundClaims[task.SearchRound] = _roundClaims.GetValueOrDefault(task.SearchRound) + 1;
+        return true;
     }
 
     public void FocusNext(LocalTurnTask task, IReadOnlyList<LocalAction> actions, IReadOnlyList<LocalDecision> decisions) =>
         Exchange("focus", task, actions.Take(task.Prefix.Length + 1).ToArray(),
             decisions.Where(d => d.BeforeStep == task.Prefix.Length).ToArray());
+    public void ObserveOutcome(LocalCandidate candidate) => Exchange("outcome", _owned, outcome: candidate);
     public void PromoteWinning(LocalCandidate candidate)
     {
         if (!candidate.Won || candidate.Dead || _owned == null) return;
@@ -253,8 +272,21 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
 
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         try { Exchange("retire"); }
         catch (Exception ex) when (ex is IOException or ObjectDisposedException or InvalidOperationException) { }
-        finally { _reader.Dispose(); _writer.Dispose(); _pipe.Dispose(); }
+        finally
+        {
+            try { _reader.Dispose(); }
+            finally
+            {
+                // An unsuccessful retirement can leave buffered text in the
+                // writer. Disposing it retries that write to the closed broker;
+                // cleanup must still release the pipe without masking a result.
+                try { _writer.Dispose(); }
+                catch (Exception ex) when (ex is IOException or ObjectDisposedException) { }
+                finally { _pipe.Dispose(); }
+            }
+        }
     }
 }

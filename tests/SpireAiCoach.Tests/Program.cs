@@ -903,7 +903,7 @@ int failures = 0;
 foreach (var (name, test) in selected)
 {
     try { await test(); Console.WriteLine($"PASS {name}"); }
-    catch (Exception ex) { failures++; Console.Error.WriteLine($"FAIL {name}: {ex.Message}"); }
+    catch (Exception ex) { failures++; Console.Error.WriteLine($"FAIL {name}: {ex}"); }
 }
 Console.WriteLine($"{selected.Length - failures}/{selected.Length} passed");
 return failures == 0 ? 0 : 1;

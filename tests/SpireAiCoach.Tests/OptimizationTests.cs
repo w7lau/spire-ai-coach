@@ -88,6 +88,35 @@ static class OptimizationTests
             Check(LocalTactics.Priority(new(Block: 8, Incoming: 10, Hp: 5, Known: true)) > LocalTactics.Priority(hit), "Survival block first");
             Check(LocalTactics.Priority(new(Known: false)) == 0, "Unknown remains neutral");
         });
+        test("optimization rollout portfolios explore native persistent setup without changing the default", () =>
+        {
+            var hit = new LocalTacticalFeatures(Damage: 6, EnemyHp: 100, Known: true);
+            var unknownPower = new LocalTacticalFeatures(PersistentSetup: true);
+            Check(LocalTactics.Priority(hit) == 12 && LocalTactics.Priority(unknownPower) == 0,
+                "The existing balanced preview changed");
+            Check(LocalTactics.Priority(unknownPower, LocalRolloutStyle.Preparation) >
+                LocalTactics.Priority(hit, LocalRolloutStyle.Preparation), "Persistent setup was never tested early");
+            Check(LocalTactics.Priority(hit, LocalRolloutStyle.Attack) > LocalTactics.Priority(hit),
+                "The attack portfolio does not explore a different ordering");
+            var spareFreeBlock = new LocalTacticalFeatures(Block: 8, Incoming: 0, Known: true, EnergyCost: 0);
+            Check(LocalTactics.Priority(spareFreeBlock) < 0 &&
+                LocalTactics.Priority(spareFreeBlock, LocalRolloutStyle.Preparation) > 0,
+                "A separate native rollout must test opaque triggers from an otherwise unused free play");
+            Check(LocalTactics.Priority(spareFreeBlock with { EnergyCost = 1 }, LocalRolloutStyle.Preparation) < 0,
+                "The free-play portfolio must not silently assume every paid block is worthwhile");
+            Check(LocalTactics.Priority(new(EndTurn: true, Known: true, Hp: 5, Incoming: 10),
+                LocalRolloutStyle.Preparation) == -40, "A setup prior must not overwrite lethal end-turn risk");
+        });
+
+        test("optimization previews retain marginal gains of strong attacks", () =>
+        {
+            var hit = new LocalTacticalFeatures(Damage: 80, EnemyHp: 500, Known: true);
+            Check(LocalTactics.Priority(hit with { Damage = 90 }) > LocalTactics.Priority(hit),
+                "A score ceiling hid additional block, strength or upgrade damage");
+            Check(LocalTactics.Priority(hit with { EnemyBlock = 20 }) < LocalTactics.Priority(hit),
+                "Blocked damage must retain its native marginal cost");
+        });
+
         test("optimization tactical previews never exclude unknown or low priority actions", () =>
         {
             var tree = new LocalSearchTree(1);

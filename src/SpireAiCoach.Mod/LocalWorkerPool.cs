@@ -119,12 +119,12 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             LocalSearchResult? selectedBest = null;
             if (request.SkipFinalVerification)
             {
-                var proposed = valid.Aggregate((a, b) => LocalSearchPolicy.Better(b.Best!, a.Best) ? b : a);
+                var proposed = valid.Aggregate((a, b) => LocalSearchPolicy.BetterForGoal(b.Best!, a.Best, request) ? b : a);
                 selectedBest = proposed with { VerificationSkipped = true };
             }
             while (selectedBest == null && valid.Length > 0)
             {
-                var proposed = valid.Aggregate((a, b) => LocalSearchPolicy.Better(b.Best!, a.Best) ? b : a);
+                var proposed = valid.Aggregate((a, b) => LocalSearchPolicy.BetterForGoal(b.Best!, a.Best, request) ? b : a);
                 int index = Math.Clamp(results.IndexOf(proposed), 0, used - 1);
                 var verify = request with { Id = request.Id + "-verify-" + verificationResults.Count,
                     Partition = index, Partitions = count, DeferVerification = false, VerifyCandidate = proposed.Best, TurnWorkPipe = null };
@@ -137,8 +137,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             }
             if (selectedBest == null) throw new CoachException("local_verify_failed",
                 string.Join("\n", verificationResults.Select(r => r.Message).Distinct()));
-            if (goalReached.IsCancellationRequested && !LocalSearchPolicy.CanStop(selectedBest.Best, request.StopOnZeroLoss,
-                request.TargetVictoryRounds, request.TargetPotionUses))
+            if (goalReached.IsCancellationRequested && !LocalSearchPolicy.MeetsGoal(selectedBest.Best, request))
                 throw new CoachException("local_verify_failed", "无伤候选未通过复核，不能按提前停止的结果返回。");
             var best = selectedBest;
             var allRuns = results.Concat(verificationResults).ToArray();
@@ -171,7 +170,12 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     turnWork?.Pending ?? results.Sum(r => r.TurnSearch?.Pending ?? 0), results.Sum(r => r.TurnSearch?.UnknownRecoveryChecks ?? 0),
                     results.Sum(r => r.TurnSearch?.CoveredPrefixes ?? 0),
                     turnWork?.CompletedHistories ?? results.Sum(r => r.TurnSearch?.CompletedHistories ?? 0),
-                    turnWork?.RepeatedHistories ?? results.Sum(r => r.TurnSearch?.RepeatedHistories ?? 0)),
+                    turnWork?.RepeatedHistories ?? results.Sum(r => r.TurnSearch?.RepeatedHistories ?? 0),
+                    turnWork?.ClaimedByRound ?? results.SelectMany(r => r.TurnSearch?.ClaimedByRound ?? new Dictionary<int, int>())
+                        .GroupBy(p => p.Key).ToDictionary(g => g.Key, g => g.Sum(p => p.Value)),
+                    results.SelectMany(r => r.TurnSearch?.RolloutStyles ?? new Dictionary<string, int>())
+                        .GroupBy(p => p.Key).ToDictionary(g => g.Key, g => g.Sum(p => p.Value)),
+                    results.SelectMany(r => r.TurnSearch?.Outcomes ?? []).OrderBy(o => o.CompletedMs).ToArray()),
                 Timing = new(allRuns.Sum(r => r.Timing?.RestoreMs ?? 0), allRuns.Sum(r => r.Timing?.ActionMs ?? 0),
                     allRuns.Sum(r => r.Timing?.DecisionMs ?? 0), allRuns.Sum(r => r.Timing?.VerificationMs ?? 0),
                     allRuns.Sum(r => r.Timing?.StartupMs ?? 0), allRuns.Sum(r => r.Timing?.Actions ?? 0), allRuns.Sum(r => r.Timing?.Restores ?? 0),
@@ -303,8 +307,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                                         worker.Stop();
                                     }
                                     if (!verifying && result.Status is "searched" or "done" &&
-                                        LocalSearchPolicy.CanStop(result.Best, request.StopOnZeroLoss,
-                                            request.TargetVictoryRounds, request.TargetPotionUses) &&
+                                        request.StopOnZeroLoss && LocalSearchPolicy.MeetsGoal(result.Best, request) &&
                                         Interlocked.CompareExchange(ref goalWorker, index, -1) == -1)
                                     {
                                         goalReached.Cancel();

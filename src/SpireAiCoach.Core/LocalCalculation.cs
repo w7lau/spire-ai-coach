@@ -15,7 +15,8 @@ public static class LocalCalculation
     };
 
     public static LocalSearchRequest Configure(LocalSearchRequest captured, LocalSearchOrder order,
-        int workers, bool includePotions, bool stopOnZeroLoss, bool skipFinalVerification = false)
+        int workers, bool includePotions, bool stopOnZeroLoss, bool skipFinalVerification = false,
+        int targetVictoryRounds = 0)
     {
         _ = Name(order);
         return captured with
@@ -24,6 +25,10 @@ public static class LocalCalculation
             MaxNodes = AttemptsPerWorker, BudgetSeconds = SearchSeconds, MaxRounds = Rounds,
             StopOnZeroLoss = stopOnZeroLoss,
             SkipFinalVerification = skipFinalVerification,
+            // Optional return target; never reduces the search horizon or budget.
+            TargetVictoryRounds = targetVictoryRounds > 0 ? Math.Clamp(targetVictoryRounds, 1, Rounds) : null,
+            TargetPotionUses = targetVictoryRounds > 0 ? 0 : null,
+            RequireKnownZeroEnemyDamage = targetVictoryRounds > 0,
             ShareSearchWork = captured.ShareSearchWork,
             // Turn-frontier continuations are generated from the current native state.
             InitialPlan = order == LocalSearchOrder.TurnFrontier ? null : captured.InitialPlan

@@ -5,10 +5,16 @@ namespace SpireAiCoach.Core;
 public sealed record LocalTurnHint(int Hp, int StartingHp, int EnemyHp, int InitialEnemyHp,
     int Block = 0, int PotionsUsed = 0);
 public sealed record LocalTurnTask(int Id, LocalAction[] Prefix, int SearchRound,
-    bool FullRollout = false, int Lane = 0, bool Focused = false, LocalTurnHint? Hint = null);
+    bool FullRollout = false, int Lane = 0, bool Focused = false, LocalTurnHint? Hint = null,
+    LocalRolloutStyle Style = LocalRolloutStyle.Balanced, LocalAction[]? Continuation = null);
+public sealed record LocalTurnOutcome(int Worker, int Attempt, double CompletedMs, bool Won,
+    int Hp, int GrossLoss, int Rounds, int Potions, LocalRolloutStyle Style, LocalDamageSources? DamageSources);
 public sealed record LocalTurnSearchStats(int Probes = 0, int BoundPruned = 0, int Offered = 0,
     int DuplicateOffers = 0, int Pending = 0, int UnknownRecoveryChecks = 0, int CoveredPrefixes = 0,
-    int CompletedHistories = 0, int RepeatedHistories = 0);
+    int CompletedHistories = 0, int RepeatedHistories = 0,
+    IReadOnlyDictionary<int, int>? ClaimedByRound = null,
+    IReadOnlyDictionary<string, int>? RolloutStyles = null,
+    LocalTurnOutcome[]? Outcomes = null);
 
 // Exact native histories only. A turn probe executes through enemy settlement,
 // records the resulting next turn, then returns to the scheduler. Scores order
@@ -19,9 +25,11 @@ public interface ILocalTurnFrontier
     int Offered { get; }
     int DuplicateOffers { get; }
     int LastLane { get; }
+    IReadOnlyDictionary<int, int> ClaimedByRound { get; }
     void Offer(LocalAction[] prefix, int searchRound, LocalTurnHint hint);
     bool TryTake(out LocalTurnTask task);
     void FocusNext(LocalTurnTask task, IReadOnlyList<LocalAction> actions, IReadOnlyList<LocalDecision> decisions);
+    void ObserveOutcome(LocalCandidate candidate);
     void PromoteWinning(LocalCandidate candidate);
     void ReturnInterrupted(LocalTurnTask task, LocalTurnHint hint);
     int DiscardDescendants(IReadOnlyList<LocalAction> prefix);
@@ -36,13 +44,24 @@ public sealed record LocalTurnOffer(LocalAction[] Prefix, int SearchRound, Local
 public sealed class LocalTurnSearch : ILocalTurnFrontier
 {
     private readonly Dictionary<int, Entry> _pending = new();
-    private readonly Dictionary<string, int> _seen = new(StringComparer.Ordinal);
+    private readonly Dictionary<(int Round, int Prefix), int> _seen = new();
+    private readonly List<Dictionary<StepKey, int>> _prefixes = [new()];
+    private readonly record struct StepKey(string Before, int Round, bool End, int? Potion, uint? Target,
+        string Model, uint? Card, int? Hand, string Choices);
     private readonly PriorityQueue<int, (double, int)> _health = new();
     private readonly PriorityQueue<int, (double, int)> _damage = new();
     private readonly Queue<int> _fair = new();
     private readonly Stack<int[]> _focus = new();
     private readonly Stack<int[]> _descent = new();
+    private readonly Queue<(int Id, LocalAction[] Tail)> _winner = new();
+    private LocalAction[]? _lastContinuation;
+    private LocalRolloutStyle? _lastStyle;
+    private LocalCandidate? _winningOutcome;
+    private readonly SortedDictionary<int, RoundQueue> _rounds = new();
+    private readonly Dictionary<int, int> _roundClaims = new();
+    private int _damageRound, _fairRound;
     private readonly Stack<int[]> _winning = new();
+    private readonly Dictionary<int, LocalAction[]> _winningTails = new();
     private readonly Random _random;
     private readonly string? _root;
     private int _next, _taken, _descentTakes, _guidedTakes;
@@ -55,18 +74,48 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
     public int FocusedTakes { get; private set; }
     public int LastLane { get; private set; }
     public bool LastFocused { get; private set; }
+    public IReadOnlyDictionary<int, int> ClaimedByRound => new Dictionary<int, int>(_roundClaims);
     private sealed record Entry(LocalTurnTask Task, LocalTurnHint Hint);
+    private sealed class RoundQueue
+    {
+        public readonly PriorityQueue<int, (double, int)> Damage = new();
+        public readonly Queue<int> Fair = new();
+    }
 
     public LocalTurnSearch(int seed, string? root = null) { _random = new(seed); _root = root; }
 
     public void Offer(LocalAction[] prefix, int searchRound, LocalTurnHint hint)
     {
         if (searchRound < 1) throw new ArgumentOutOfRangeException(nameof(searchRound));
-        var key = searchRound + ":" + HistoryKey(prefix);
+        var key = (searchRound, PrefixId(prefix, true));
         if (_seen.ContainsKey(key)) { DuplicateOffers++; return; }
         var task = new LocalTurnTask(_next++, prefix.ToArray(), searchRound, Hint: hint);
         _seen.Add(key, task.Id);
         Queue(new(task with { Hint = hint }, hint));
+    }
+
+    private int PrefixId(IReadOnlyList<LocalAction> actions, bool create)
+    {
+        // Intern exact action identities under their exact parents. This shares
+        // immutable history structure, never native states, RNG or Mod objects.
+        // Typed fields avoid serializing and storing the whole prefix per fork.
+        int parent = 0;
+        foreach (var action in actions)
+        {
+            string choices = action.Choices is not { Length: > 0 } ? "" : JsonSerializer.Serialize(
+                action.Choices.Select(c => new { c.OfferHash, c.Kind, c.Index, c.ModelId, Indices = c.Indices ?? [] }));
+            var step = new StepKey(action.BeforeHash, action.Round, action.EndTurn, action.PotionSlot,
+                action.TargetId, action.ModelId, action.CombatCardIndex,
+                action.CombatCardIndex.HasValue ? null : action.HandIndex, choices);
+            var children = _prefixes[parent];
+            if (!children.TryGetValue(step, out int next))
+            {
+                if (!create) return -1;
+                next = _prefixes.Count; children.Add(step, next); _prefixes.Add(new());
+            }
+            parent = next;
+        }
+        return parent;
     }
 
     private void Queue(Entry entry)
@@ -81,8 +130,13 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         // FIFO work retains long prefixes; this only orders the other lanes.
         double replayCost = Math.Sqrt(1 + entry.Task.Prefix.Length);
         _health.Enqueue(entry.Task.Id, (-(hp * 2 + progress + carry - cost) / replayCost, entry.Task.Id));
-        _damage.Enqueue(entry.Task.Id, (-(progress * 2 + hp + carry - cost) / replayCost, entry.Task.Id));
+        var damageScore = (-(progress * 2 + hp + carry - cost) / replayCost, entry.Task.Id);
+        _damage.Enqueue(entry.Task.Id, damageScore);
         _fair.Enqueue(entry.Task.Id);
+        if (!_rounds.TryGetValue(entry.Task.SearchRound, out var round))
+            _rounds.Add(entry.Task.SearchRound, round = new());
+        round.Damage.Enqueue(entry.Task.Id, damageScore);
+        round.Fair.Enqueue(entry.Task.Id);
     }
 
     public bool TryTake(out LocalTurnTask task) => TryTake(out task, null);
@@ -98,12 +152,19 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         int lane = _taken++ % 4;
         LastLane = lane;
         LastFocused = false;
+        _lastContinuation = null;
+        _lastStyle = null;
         int id;
         bool guided = false;
         bool winningAllowed = _winningOwner == null || owner == _winningOwner;
-        bool ownerTurn = _winningOwner.HasValue && owner == _winningOwner && _ownerGuidedTakes++ % 2 == 0;
+        // Native learning affinity must not replace health, round and FIFO
+        // coverage. Alternate it only inside the dedicated focused lane.
+        bool ownerTurn = lane == 2 && _winningOwner.HasValue && owner == _winningOwner && _ownerGuidedTakes++ % 2 == 1;
         if (ownerTurn && TryStack(_winning, out id)) { guided = true; FocusedTakes++; LastFocused = true; }
         else if (lane == 2 && TryGuidedFocus(out id, out guided, winningAllowed)) { FocusedTakes++; LastFocused = true; }
+        else if (lane == 1 && winningAllowed && TryWinner(out id)) { guided = true; }
+        else if (lane == 1 && TryRound(ref _damageRound, true, out id)) { }
+        else if (lane == 3 && TryRound(ref _fairRound, false, out id)) { }
         else if (lane == 3)
         {
             do { id = _fair.Dequeue(); } while (!_pending.ContainsKey(id));
@@ -113,9 +174,63 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
             var queue = lane == 1 ? _damage : _health;
             do { id = queue.Dequeue(); } while (!_pending.ContainsKey(id));
         }
-        task = _pending[id].Task with { FullRollout = guided };
+        task = _pending[id].Task with { FullRollout = guided,
+            Style = _lastStyle ?? (guided ? _guidedIncumbent?.RolloutStyle ?? LocalRolloutStyle.Balanced : _pending[id].Task.Style),
+            Continuation = _lastContinuation ?? (guided ? _winningTails.GetValueOrDefault(id) : null) };
         _pending.Remove(id);
+        _roundClaims[task.SearchRound] = _roundClaims.GetValueOrDefault(task.SearchRound) + 1;
         return true;
+    }
+
+    private bool TryRound(ref int cursor, bool ranked, out int id)
+    {
+        // A cheap round-one replay must not indefinitely outrank every later
+        // native decision. Rotate observed rounds in two lanes, retaining the
+        // original global health and compound-descent lanes. Scores still
+        // order work inside a round; no state or legal branch is discarded.
+        int previous = cursor;
+        var rounds = _rounds.Keys.Where(r => r > previous).Concat(_rounds.Keys.Where(r => r <= previous)).ToArray();
+        foreach (int number in rounds)
+        {
+            var round = _rounds[number];
+            while (ranked ? round.Damage.TryDequeue(out id, out _) : round.Fair.TryDequeue(out id))
+                if (_pending.ContainsKey(id)) { cursor = number; return true; }
+        }
+        id = -1; return false;
+    }
+
+    private bool TryWinner(out int id)
+    {
+        while (_winner.TryDequeue(out var improvement))
+            if (_pending.ContainsKey(improvement.Id))
+            { id = improvement.Id; _lastContinuation = improvement.Tail; _lastStyle = _winningOutcome?.RolloutStyle; return true; }
+        id = -1; return false;
+    }
+
+    public void ObserveOutcome(LocalCandidate candidate)
+    {
+        if (!candidate.Won || candidate.Dead || !LocalSearchPolicy.Better(candidate, _winningOutcome)) return;
+        _winningOutcome = candidate;
+        _winner.Clear();
+        // Complete native outcomes guide exploration around the actual incumbent.
+        // Its exact alternatives have already been offered; no legal prefix is
+        // invented, reopened, merged, or discarded by this scheduling hint.
+        var alternatives = new List<(int Id, int Round, int Step, int Rank, LocalAction[] Tail)>();
+        foreach (var decision in candidate.Decisions ?? [])
+        {
+            if (decision.BeforeStep < 0 || decision.BeforeStep >= candidate.Actions.Length) continue;
+            var actual = candidate.Actions[decision.BeforeStep];
+            var hint = new LocalTurnHint(candidate.Hp, candidate.StartingHp ?? candidate.Hp, candidate.EnemyHp, 1);
+            foreach (var offer in Alternatives(candidate.Actions, decision, hint))
+            {
+                var key = (offer.SearchRound, PrefixId(offer.Prefix, false));
+                if (_seen.TryGetValue(key, out int id) && _pending.ContainsKey(id))
+                    alternatives.Add((id, actual.Round, decision.BeforeStep, offer.Prefix[^1].Preference,
+                        candidate.Actions.Skip(decision.BeforeStep).ToArray()));
+            }
+        }
+        foreach (var item in alternatives.OrderBy(x => x.Round).ThenBy(x => x.Step).ThenByDescending(x => x.Rank))
+            _winner.Enqueue((item.Id, item.Tail));
     }
 
     private bool TryGuidedFocus(out int id, out bool guided, bool winningAllowed)
@@ -123,9 +238,9 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         // Alternate incumbent improvements with compound descent. Every other
         // scheduler lane and FIFO still retain the unvisited legal histories.
         guided = false;
-        if (winningAllowed && _guidedTakes++ % 2 == 0 && TryStack(_winning, out id)) { guided = true; return true; }
-        if (TryFocus(out id)) return true;
+        if (_guidedTakes++ % 2 == 0 && TryFocus(out id)) return true;
         if (winningAllowed && TryStack(_winning, out id)) { guided = true; return true; }
+        if (TryFocus(out id)) return true;
         return false;
     }
 
@@ -139,6 +254,7 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         // A late, weaker local win must not replace the shared best's focus.
         _guidedIncumbent = candidate with { Continuation = null, Decisions = null };
         var options = new List<(int Id, double Priority)>();
+        var tails = new Dictionary<int, LocalAction[]>();
         foreach (var decision in candidate.Decisions)
         {
             int step = decision.BeforeStep;
@@ -146,14 +262,19 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
             var actual = candidate.Actions[step];
             foreach (var alternative in decision.Legal.Where(a => !SameAction(a, actual)))
             {
-                var key = actual.Round + ":" + HistoryKey([.. candidate.Actions.Take(step), alternative]);
+                var key = (actual.Round, PrefixId([.. candidate.Actions.Take(step), alternative], false));
                 int id = _seen.GetValueOrDefault(key, -1);
                 if (_pending.ContainsKey(id))
+                {
                     options.Add((id, (alternative.Preference - actual.Preference) / Math.Sqrt(1 + step)));
+                    tails[id] = candidate.Actions.Skip(step).ToArray();
+                }
             }
         }
         var ids = options.OrderByDescending(p => p.Priority).ThenBy(p => p.Id).Select(p => p.Id).Distinct().ToArray();
         if (ids.Length == 0) return;
+        _winningTails.Clear();
+        foreach (var item in tails) _winningTails.Add(item.Key, item.Value);
         _winning.Clear(); _winning.Push(ids); _guidedTakes = 0;
         _winningOwner = owner; _ownerGuidedTakes = 0;
         // No new branch, state merge or health proof is inferred here. These
@@ -205,7 +326,7 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         var prefix = actions.Take(step).ToArray();
         var ids = decision.Legal.OrderByDescending(a => a.Preference)
             .Where(a => !SameAction(a, actions[step]))
-            .Select(a => _seen.GetValueOrDefault(task.SearchRound + ":" + HistoryKey([..prefix, a]), -1))
+            .Select(a => _seen.GetValueOrDefault((task.SearchRound, PrefixId([..prefix, a], false)), -1))
             .Where(id => _pending.ContainsKey(id)).ToArray();
         if (ids.Length > 0) (focused ? _descent : _focus).Push(ids);
     }

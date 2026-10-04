@@ -18,7 +18,7 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     LocalSearchOrder SearchOrder = LocalSearchOrder.MonteCarlo, bool FastVerification = true,
     bool SkipFinalVerification = false, bool AdaptiveWorkers = true, bool CorrelatedRollouts = false,
     bool LeanSearchChecksums = true, string? TurnWorkPipe = null, bool ProbeChecksumListener = false,
-    int? TargetVictoryRounds = null, int? TargetPotionUses = null,
+    int? TargetVictoryRounds = null, int? TargetPotionUses = null, bool RequireKnownZeroEnemyDamage = false,
     bool EfficientTactics = true, bool LearnBuffDuration = true, bool GuideWinningRoutes = true,
     bool OwnedWinningFocus = true);
 
@@ -38,10 +38,17 @@ public sealed record LocalAction(int HandIndex, string ModelId, uint? TargetId,
 public sealed record LocalCardChoice(string OfferHash, int Index, string ModelId, string Name,
     int[]? Indices = null, string Kind = "offer", int Preference = 0);
 
+// Unknown/native-unrecorded HP changes must never establish an enemy-damage-free claim.
+public sealed record LocalDamageSources(int Enemy, int Self, int Unknown, int Unattributed, bool AccountingMatches)
+{
+    public bool Complete => AccountingMatches && Unknown == 0 && Unattributed == 0;
+}
+
 public sealed record LocalCandidate(LocalAction[] Actions, int Hp, int HpLost, int EnemyHp,
     int Gold, int MaxHp, bool Won, bool Dead, bool RewardCoverageKnown,
     int Rounds = 0, string StopReason = "", LocalContinuationPoint[]? Continuation = null,
-    LocalDecision[]? Decisions = null, int? StartingHp = null, bool ContinuationFromSearch = false)
+    LocalDecision[]? Decisions = null, int? StartingHp = null, bool ContinuationFromSearch = false,
+    LocalDamageSources? DamageSources = null, LocalRolloutStyle RolloutStyle = LocalRolloutStyle.Balanced)
 {
     // Gross HP costs remain useful diagnostics, but healing and victory hooks are part of the goal.
     public int? NetHpLoss => StartingHp.HasValue ? Math.Max(0, StartingHp.Value - Hp) : null;
@@ -82,11 +89,23 @@ public static class LocalSearchPolicy
         return true;
     }
 
-    public static bool CanStop(LocalCandidate? candidate, bool stopOnZeroLoss,
-        int? targetRounds = null, int? targetPotions = null) =>
+    public static bool CanStop(LocalCandidate? candidate, bool stopOnZeroLoss, int? targetRounds = null,
+        int? targetPotions = null, bool requireKnownZeroEnemyDamage = false) =>
         stopOnZeroLoss && candidate is { Won: true, Dead: false, NetHpLoss: 0 } &&
         (!targetRounds.HasValue || candidate.Rounds <= targetRounds.Value) &&
-        (!targetPotions.HasValue || candidate.Actions.Count(a => a.PotionSlot.HasValue) <= targetPotions.Value);
+        (!targetPotions.HasValue || candidate.Actions.Count(a => a.PotionSlot.HasValue) <= targetPotions.Value) &&
+        (!requireKnownZeroEnemyDamage || candidate.DamageSources is { Complete: true, Enemy: 0 });
+
+    public static bool HasSpecificGoal(LocalSearchRequest request) => request.TargetVictoryRounds.HasValue ||
+        request.TargetPotionUses.HasValue || request.RequireKnownZeroEnemyDamage;
+    public static bool MeetsGoal(LocalCandidate? candidate, LocalSearchRequest request) =>
+        CanStop(candidate, true, request.TargetVictoryRounds, request.TargetPotionUses, request.RequireKnownZeroEnemyDamage);
+    public static bool BetterForGoal(LocalCandidate candidate, LocalCandidate? prior, LocalSearchRequest request)
+    {
+        if (prior != null && HasSpecificGoal(request) && MeetsGoal(candidate, request) != MeetsGoal(prior, request))
+            return MeetsGoal(candidate, request);
+        return Better(candidate, prior);
+    }
 
     // Same root, completed native victory: net HP loss first, potions are a reserve resource.
     public static bool Better(LocalCandidate candidate, LocalCandidate? prior)
@@ -124,6 +143,9 @@ public static class LocalSearchPolicy
             lines.Insert(1, HasExecutionPoints(result) ?
                 "已跳过最终复核：可点击执行方案，执行时逐步核对首次模拟记录，偏离即停止。" :
                 "已跳过最终复核，但未取得完整逐步记录；目前仅供手动查看，暂不能自动执行。");
+        if (best.DamageSources is { } damage)
+            lines.Add($"伤害来源：敌方 {damage.Enemy}，自身 {damage.Self}，来源未明 {damage.Unknown + damage.Unattributed}" +
+                (damage.AccountingMatches ? "。" : "（来源记录与扣血统计不一致）。"));
         if (best.Won && best.NetHpLoss == 0 && !best.Actions.Any(a => a.PotionSlot.HasValue))
             lines.Add("已达到战后净损失 0 且不消耗药水的目标；其他收益和最短路线未证明最优。");
         if (!best.Won) lines.Add("以下仅为已模拟的部分路线，不代表能打赢本次战斗。停止原因：" + best.StopReason);

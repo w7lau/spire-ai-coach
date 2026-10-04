@@ -1,0 +1,245 @@
+{
+  "schema_version": 1,
+  "release": "0.7.20",
+  "game_version": "v0.111.0",
+  "native_dll_sha256": "0C64A549027DDA6498B2803F87B4F3311401545671F2CB268F98018AE6F03F44",
+  "core_checks_passed": 185,
+  "core_checks_total": 185,
+  "mod_build_warnings": 0,
+  "mod_build_errors": 0,
+  "manual_seed": false,
+  "budget": {
+    "attempts_per_worker": 64,
+    "seconds_per_worker": 60,
+    "maximum_rounds": 64,
+    "configured_workers": 4
+  },
+  "return_target": {
+    "maximum_victory_rounds": 6,
+    "maximum_potion_uses": 0,
+    "net_hp_loss": 0,
+    "require_complete_damage_sources": true,
+    "maximum_enemy_damage": 0
+  },
+  "samples": [
+    {
+      "sample": "cold",
+      "version": "0.7.20.0",
+      "Workers": 4,
+      "WorkerLimit": 4,
+      "workers_with_completed_trials": 1,
+      "Evaluated": 6,
+      "Victories": 6,
+      "Rejected": 0,
+      "ElapsedMs": 32702,
+      "Timing": {
+        "RestoreMs": 1586,
+        "ActionMs": 3305,
+        "DecisionMs": 1677,
+        "VerificationMs": 3760,
+        "StartupMs": 19850,
+        "Actions": 368,
+        "Restores": 6,
+        "Verifications": 1
+      },
+      "Rounds": 6,
+      "StartingHp": 87,
+      "Hp": 87,
+      "HpLost": 11,
+      "NetHpLoss": 0,
+      "DamageSources": {
+        "Enemy": 0,
+        "Self": 11,
+        "Unknown": 0,
+        "Unattributed": 0,
+        "AccountingMatches": true,
+        "Complete": true
+      },
+      "used_potions": 0,
+      "verified_steps": 45,
+      "first_goal_from_request_ms": 28227.1581,
+      "first_goal_from_search_ms": 8129.7492999999995,
+      "hp_before_final_action": 87,
+      "gross_loss_before_final_action": 11,
+      "completed_histories": 6,
+      "repeated_histories": 0,
+      "remaining_prefixes": 1582,
+      "post_goal_total_ms": 4474.841899999999,
+      "outcome_intervals": [
+        {
+          "attempt": 1,
+          "rounds": 12,
+          "completed_ms": 23065.246,
+          "interval_since_previous_outcome_ms": 2967.837199999998,
+          "enemy_damage": 0,
+          "self_damage": 17,
+          "known_damage_sources": true
+        },
+        {
+          "attempt": 2,
+          "rounds": 12,
+          "completed_ms": 24259.5184,
+          "interval_since_previous_outcome_ms": 1194.2724000000017,
+          "enemy_damage": 0,
+          "self_damage": 17,
+          "known_damage_sources": true
+        },
+        {
+          "attempt": 3,
+          "rounds": 12,
+          "completed_ms": 25249.3954,
+          "interval_since_previous_outcome_ms": 989.8770000000004,
+          "enemy_damage": 0,
+          "self_damage": 17,
+          "known_damage_sources": true
+        },
+        {
+          "attempt": 4,
+          "rounds": 6,
+          "completed_ms": 26005.2032,
+          "interval_since_previous_outcome_ms": 755.8077999999987,
+          "enemy_damage": 0,
+          "self_damage": 11,
+          "known_damage_sources": false
+        },
+        {
+          "attempt": 5,
+          "rounds": 13,
+          "completed_ms": 27375.6575,
+          "interval_since_previous_outcome_ms": 1370.4543000000012,
+          "enemy_damage": 0,
+          "self_damage": 18,
+          "known_damage_sources": true
+        },
+        {
+          "attempt": 6,
+          "rounds": 6,
+          "completed_ms": 28227.1581,
+          "interval_since_previous_outcome_ms": 851.5005999999994,
+          "enemy_damage": 0,
+          "self_damage": 11,
+          "known_damage_sources": true
+        }
+      ]
+    },
+    {
+      "sample": "reused",
+      "version": "0.7.20.0",
+      "Workers": 4,
+      "WorkerLimit": 4,
+      "workers_with_completed_trials": 1,
+      "Evaluated": 6,
+      "Victories": 6,
+      "Rejected": 0,
+      "ElapsedMs": 7678,
+      "Timing": {
+        "RestoreMs": 217,
+        "ActionMs": 2521,
+        "DecisionMs": 1433,
+        "VerificationMs": 1769,
+        "StartupMs": 0,
+        "Actions": 368,
+        "Restores": 6,
+        "Verifications": 1
+      },
+      "Rounds": 6,
+      "StartingHp": 87,
+      "Hp": 87,
+      "HpLost": 11,
+      "NetHpLoss": 0,
+      "DamageSources": {
+        "Enemy": 0,
+        "Self": 11,
+        "Unknown": 0,
+        "Unattributed": 0,
+        "AccountingMatches": true,
+        "Complete": true
+      },
+      "used_potions": 0,
+      "verified_steps": 45,
+      "first_goal_from_request_ms": 5470.8252,
+      "first_goal_from_search_ms": 5453.718,
+      "hp_before_final_action": 87,
+      "gross_loss_before_final_action": 11,
+      "completed_histories": 6,
+      "repeated_histories": 0,
+      "remaining_prefixes": 1582,
+      "post_goal_total_ms": 2207.1748,
+      "outcome_intervals": [
+        {
+          "attempt": 1,
+          "rounds": 12,
+          "completed_ms": 945.3826,
+          "interval_since_previous_outcome_ms": 928.2754,
+          "enemy_damage": 0,
+          "self_damage": 17,
+          "known_damage_sources": true
+        },
+        {
+          "attempt": 2,
+          "rounds": 12,
+          "completed_ms": 1921.5248,
+          "interval_since_previous_outcome_ms": 976.1421999999999,
+          "enemy_damage": 0,
+          "self_damage": 17,
+          "known_damage_sources": true
+        },
+        {
+          "attempt": 3,
+          "rounds": 12,
+          "completed_ms": 2851.5273,
+          "interval_since_previous_outcome_ms": 930.0025000000003,
+          "enemy_damage": 0,
+          "self_damage": 17,
+          "known_damage_sources": true
+        },
+        {
+          "attempt": 4,
+          "rounds": 6,
+          "completed_ms": 3519.3663,
+          "interval_since_previous_outcome_ms": 667.8389999999999,
+          "enemy_damage": 0,
+          "self_damage": 11,
+          "known_damage_sources": false
+        },
+        {
+          "attempt": 5,
+          "rounds": 13,
+          "completed_ms": 4781.4169,
+          "interval_since_previous_outcome_ms": 1262.0506,
+          "enemy_damage": 0,
+          "self_damage": 18,
+          "known_damage_sources": true
+        },
+        {
+          "attempt": 6,
+          "rounds": 6,
+          "completed_ms": 5470.8252,
+          "interval_since_previous_outcome_ms": 689.4083,
+          "enemy_damage": 0,
+          "self_damage": 11,
+          "known_damage_sources": true
+        }
+      ]
+    }
+  ],
+  "native_worker_game_errors": 0,
+  "limitations": [
+    "Two final-binary samples on one frozen encounter; not exhaustive or arbitrary-Mod proof.",
+    "One worker completed trials before the other three finished preparing.",
+    "Full route results include native effects; no hand-written card effects or human route seed.",
+    "The UI-only synthetic host has pre-existing HextechRunes/RitsuLib version-loader and headless renderer/exit diagnostics; native workers loaded v0.111.0 variants without game errors.",
+    "No rerun of the historical old algorithm. Common native state prefixes are still replayed."
+  ],
+  "installation": {
+    "version": "0.7.20",
+    "previous_version": "0.7.18",
+    "dll_sha256": "0C64A549027DDA6498B2803F87B4F3311401545671F2CB268F98018AE6F03F44",
+    "zip_sha256": "D1F2FF2E411BBB4C632AD38236769367EF89B0D0BCA643B97D4739697A60CD89",
+    "protected_files": 489,
+    "protected_files_unchanged": true,
+    "backups_verified": true,
+    "game_started": false,
+    "native_search_build_matches_final_release": true
+  }
+}

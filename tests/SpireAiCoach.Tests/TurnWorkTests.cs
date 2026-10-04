@@ -11,6 +11,17 @@ static class TurnWorkTests
 
     public static void Register(Action<string, Action> test, Action<string, Func<Task>> asyncTest)
     {
+        test("shared turn work closed broker still releases client resources", () =>
+        {
+            var captured = Request(); var broker = new LocalTurnWork(captured, 2);
+            var client = new LocalTurnWorkClient(captured with { TurnWorkPipe = broker.PipeName });
+            client.Offer([Move(0)], 1, Hint()); Check(client.TryTake(out var task), "Missing owned task");
+            client.Finish(task);
+            broker.Dispose();
+            client.Dispose();
+            client.Dispose();
+        });
+
         test("shared turn work winning improvement requires its exact owned native history", () =>
         {
             var captured = Request(); using var broker = new LocalTurnWork(captured, 2);
@@ -21,13 +32,19 @@ static class TurnWorkTests
             var decision = new LocalDecision(1, [actual, other]);
             owner.OfferAlternatives([start, actual], decision, Hint(), task);
             var win = new LocalCandidate([start, actual], 50, 0, 0, 0, 100, true, false, false,
-                Decisions: [decision], StartingHp: 50);
+                Decisions: [decision], StartingHp: 50, RolloutStyle: LocalRolloutStyle.Preparation);
             bool rejected = false;
             try { owner.PromoteWinning(win with { Actions = [start with { CombatCardIndex = 99 }, actual] }); }
             catch (InvalidOperationException) { rejected = true; }
             Check(rejected, "A different native prefix must not steer this owned task's improvements");
             owner.PromoteWinning(win); owner.Finish(task);
             Check(broker.Pending == 1, "Owned winning feedback duplicated or deleted pending siblings");
+            owner.Offer([Move(3)], 1, Hint());
+            Check(owner.TryTake(out var broad) && !broad.Focused, "Missing independent round work");
+            owner.Finish(broad);
+            Check(owner.TryTake(out var guided) && guided.FullRollout && guided.Style == LocalRolloutStyle.Preparation,
+                "Broker rotation replaced the winning route's exploration policy");
+            owner.Finish(guided);
         });
 
         asyncTest("shared turn work early consumers distinguish startup from exhausted work", async () =>
@@ -68,6 +85,7 @@ static class TurnWorkTests
             var captured = Request(); using var broker = new LocalTurnWork(captured, 8);
             var command = captured with { TurnWorkPipe = broker.PipeName };
             var keys = new System.Collections.Concurrent.ConcurrentBag<string>();
+            var styles = new System.Collections.Concurrent.ConcurrentBag<LocalRolloutStyle>();
             using (var producer = new LocalTurnWorkClient(command))
             {
                 for (int i = 0; i < 96; i++) producer.Offer([Move(0), Move(i + 1, "later")], 2, Hint());
@@ -77,10 +95,30 @@ static class TurnWorkTests
             {
                 using var client = new LocalTurnWorkClient(command with { Partition = i });
                 while (client.TryTake(out var task))
-                { keys.Add(LocalTurnSearch.HistoryKey(task.Prefix)); client.Finish(task); }
+                {
+                    keys.Add(LocalTurnSearch.HistoryKey(task.Prefix));
+                    if (task.FullRollout) styles.Add(task.Style);
+                    client.Finish(task);
+                }
             })));
             Check(keys.Count == 96 && keys.Distinct().Count() == 96 && broker.Pending == 0,
                 "Later branches were lost or claimed by two workers");
+            Check(styles.Count == 48 && Enum.GetValues<LocalRolloutStyle>().All(s => styles.Count(x => x == s) == 12),
+                "Concurrent owners must share an even portfolio of complete native rollouts");
+        });
+
+        test("shared turn work distinguishes a root not yet submitted from an exhausted frontier", () =>
+        {
+            var captured = Request(); using var broker = new LocalTurnWork(captured, 2);
+            var command = captured with { TurnWorkPipe = broker.PipeName };
+            using var waiting = new LocalTurnWorkClient(command with { Partition = 1 });
+            Check(!waiting.TryTake(out _) && !waiting.RootReady && waiting.Active == 0,
+                "A faster owner must wait for the initial native root");
+            using (var root = new LocalTurnWorkClient(command)) root.Offer([], 1, Hint());
+            Check(waiting.TryTake(out var task) && waiting.RootReady, "The later root was lost");
+            waiting.Finish(task);
+            Check(!waiting.TryTake(out _) && waiting.RootReady && waiting.Active == 0,
+                "An actually exhausted native frontier must remain distinguishable");
         });
 
         test("shared turn work retains its listener with all sixteen owners connected", () =>
