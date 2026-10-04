@@ -233,7 +233,9 @@ internal static class TwoWorkerAcceptance
 
         try
         {
-            var cold = Stopwatch.StartNew(); await pool.Prepare(installation, 2, CancellationToken.None); cold.Stop();
+            // Automatic mode still starts one instance; this scenario specifically
+            // verifies goal/cancellation while its second peer is being prepared.
+            var cold = Stopwatch.StartNew(); await pool.Prepare(installation, 0, CancellationToken.None); cold.Stop();
             Observe(0); Check(Child(1) == null, "Prewarming created more than the first lane");
             Record(new { stage = "prewarm_first_only", prepare_ms = cold.ElapsedMilliseconds, pid = Observe(0).Pid, live_workers = 1 });
             await Goal("goal_while_real_peer_preparing", coldPeer: true);

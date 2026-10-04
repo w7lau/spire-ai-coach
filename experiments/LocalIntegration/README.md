@@ -13,6 +13,7 @@ python experiments/LocalIntegration/run.py --workspace C:\path\owned-native-work
 
 定向用例：
 
+- `--selection-paging-test`：336 个原生有序选牌组合跨分页重放及两路并行预热/复用；带 `--replay` 时改为该冻结输入的一次搜索，保留原回合、时间和次数选项，检查没有因选牌分页切换执行方式。此病例是正确性与启动调度验证，不是八路等配置质量/速度对比。
 - `--mechanics`：通用牌序调整、坚毅＋消耗手牌、普通武装升级、准备＋多选弃牌、头槌弃牌堆取牌，以及超过十回合的胜利复核。可用 `--mechanic-cases exhaust,multi` 只运行指定流程。选择用例还在合成宿主显式执行方案，重新采集有选择历史的当前状态并再次计算。长战斗用例使用 1000 HP 人工角色、前十一回合结束回合的搜索种子，专门验证回合范围，不作真实打法或性能基准。
 - `--choices`：生成卡牌选择、方案执行、结束回合及已有选择历史重新计算。
 - `--execution` / `--optimization` / `--features`：执行保护、路线续用、药水与进度。

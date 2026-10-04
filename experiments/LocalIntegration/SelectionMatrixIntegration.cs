@@ -117,6 +117,11 @@ internal static class SelectionMatrixIntegration
         var records = new List<object>();
         try
         {
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SELECTION_PAGING_TEST") == "1")
+            {
+                await Paging(root, hand);
+                return;
+            }
             foreach (var sample in cases)
             {
                 CardModel[]? baseline = null; string[]? baselineBytes = null; LocalCardChoice[]? expected = null;
@@ -165,5 +170,64 @@ internal static class SelectionMatrixIntegration
                 note = "Synthetic shared-command/UI matrix; card effects and completed-action restoration have separate native tests." });
         }
         finally { active.SetValue(null, false); current.SetValue(null, null); mode.GetMethod("FreeSelections")!.Invoke(null, null); harmony.UnpatchAll(harmony.Id); }
+    }
+
+    private static async Task Paging(string root, CardModel[] cards)
+    {
+        var method = typeof(LocalChoices).GetMethod("SelectWithoutPresentation", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var cursor = new LocalSelectionCursor();
+        var prefs = new CardSelectorPrefs(CardSelectorPrefs.DiscardSelectionPrompt, 3) { RequireManualConfirmation = true };
+        var before = LocalCapture.Fingerprint();
+        CardModel[] Select(LocalChoices session) => ((IEnumerable<CardModel>)method.Invoke(session, ["hand", cards, prefs, false])!).ToArray();
+        bool Matches(LocalCardChoice left, LocalCardChoice right) => left.OfferHash == right.OfferHash &&
+            left.Index == right.Index && left.Kind == right.Kind && left.ModelId == right.ModelId &&
+            (left.Indices ?? []).SequenceEqual(right.Indices ?? []);
+        var first = new LocalChoices(choose: options => options.Single(o => o.Index == 17), cursor: cursor);
+        var original = Select(first);
+        var expected = first.Completed.Single();
+        bool missingOnNextPage = false;
+        var unpinned = new LocalChoices(choose: options =>
+        {
+            missingOnNextPage = !options.Any(o => Matches(o, expected));
+            return options[0];
+        }, cursor: cursor);
+        Select(unpinned);
+        var pinned = new LocalChoices([expected], options => options.Single(o => Matches(o, expected)), cursor);
+        var replayed = Select(pinned);
+        var wrong = expected with { OfferHash = "different-native-offer" };
+        bool wrongOfferRejected = false;
+        var mismatch = new LocalChoices([wrong], options =>
+        {
+            wrongOfferRejected = !options.Any(o => Matches(o, wrong));
+            return options[0];
+        }, cursor);
+        Select(mismatch);
+        if (!missingOnNextPage || !wrongOfferRejected || !original.SequenceEqual(replayed) || before != LocalCapture.Fingerprint())
+            throw new InvalidOperationException("Native selection paging replay changed identity or host state");
+
+        using var pool = new LocalWorkerPool(Path.Combine(root, "paging-pool"));
+        var installation = LocalCapture.Installation();
+        var timer = Stopwatch.StartNew();
+        var preparing = pool.Prepare(installation, 2, CancellationToken.None);
+        var gate = (SemaphoreSlim)typeof(LocalWorkerPool).GetField("_gate", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(pool)!;
+        if (!await gate.WaitAsync(TimeSpan.FromSeconds(1))) throw new InvalidOperationException("Warmup blocked calculation admission");
+        gate.Release();
+        var joined = pool.Prepare(installation, 2, CancellationToken.None);
+        await Task.WhenAll(preparing, joined);
+        var firstReady = pool.Resources();
+        var coldMs = timer.Elapsed.TotalMilliseconds;
+        timer.Restart();
+        await pool.Prepare(installation, 2, CancellationToken.None);
+        var reused = pool.Resources();
+        if (firstReady.Ready != 2 || firstReady.Starts != 2 || reused.Ready != 2 || reused.Starts != firstReady.Starts)
+            throw new InvalidOperationException("Concurrent prewarm duplicated or failed to reuse native workers");
+        LocalWire.Write(Path.Combine(root, "integration-selection-paging.json"), new {
+            version = typeof(LocalWorker).Assembly.GetName().Version!.ToString(3),
+            domain = new LocalSelectionSpace(cards.Length, 3, 3).Count.ToString(),
+            pageSize = 128, missingOnNextPage, replayedOutsidePage = true, wrongOfferRejected,
+            hostUnchanged = before == LocalCapture.Fingerprint(), configuredWorkers = 2,
+            readyWorkers = firstReady.Ready, starts = firstReady.Starts,
+            warmupGateReleased = true, concurrentWarmupsReuseSameInstances = true,
+            coldMs, reuseMs = timer.Elapsed.TotalMilliseconds });
     }
 }

@@ -6,6 +6,9 @@ public sealed record LocalWorkerDemand(int PendingJobs, int StartingWorkers, int
 // existing owners; this scheduler changes admission, never card rules or budgets.
 public static class LocalConcurrency
 {
+    public static int PrewarmCount(int configured) => configured > 0 ? Math.Clamp(configured, 1, 16) : 1;
+    public static bool AdaptiveAdmission(int configured, bool adaptive) => adaptive && configured <= 0;
+
     public static int Limit(int processors, ulong availableMemory, int configured)
     {
         int requested = LocalSearchPolicy.WorkerCount(processors, availableMemory, configured);
@@ -39,7 +42,20 @@ public static class LocalConcurrency
         CancellationToken cancellation, int pollMs = 250)
     {
         if (maximum is < 1 or > 16 || pollMs < 1) throw new ArgumentOutOfRangeException(nameof(maximum));
-        if (!adaptive) return await Task.WhenAll(Enumerable.Range(0, maximum).Select(launch));
+        if (!adaptive)
+        {
+            var admitted = new List<Task<T>>();
+            try
+            {
+                for (int index = 0; index < maximum && !stopped(); index++)
+                {
+                    cancellation.ThrowIfCancellationRequested();
+                    admitted.Add(launch(index));
+                }
+            }
+            finally { await Task.WhenAll(admitted); }
+            return admitted.Select(r => r.Result).ToArray();
+        }
         var runs = new List<Task<T>> { launch(0) };
         bool admissionClosed = false;
         try

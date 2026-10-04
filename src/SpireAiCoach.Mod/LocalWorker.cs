@@ -773,7 +773,7 @@ public static class LocalWorker
                                 else { covered = true; stop = completeOffer ? "该选牌前缀已全部评估" : "本组选牌已评估，继续探索其他组合"; return ownedOptions[0]; }
                                 coverage?.Follow(coveredTrial!, selected);
                                 return options.Single(c => SameOption(c, selected));
-                            });
+                            }, preferred != null ? plannedAction?.Choices : null);
                         }
                         finally { actionMs += (long)Stopwatch.GetElapsedTime(actionStarted).TotalMilliseconds; executed++; }
                         actions.Add(next);
@@ -1318,12 +1318,16 @@ public static class LocalWorker
         return result.Select(a => a with { BeforeHash = fingerprint }).ToArray();
     }
 
-    private static async Task<LocalAction> Play(LocalAction action, Func<LocalCardChoice[], LocalCardChoice>? choose = null)
+    private static async Task<LocalAction> Play(LocalAction action, Func<LocalCardChoice[], LocalCardChoice>? choose = null,
+        LocalCardChoice[]? selectionIntent = null)
     {
         CheckCancellation();
         using var playing = Trace(action.EndTurn ? "end_turn" : action.PotionSlot.HasValue ? "potion" : "card",
             action.EndTurn ? $"第 {action.Round} 回合" : action.CardName);
-        var session = new LocalChoices(action.Choices, choose, _selectionCursor);
+        // Search enumerates the next page of large native offers. Supply the
+        // planned choices as well, so exact replay can directly materialize its
+        // legal selection even when that rank is outside the current page.
+        var session = new LocalChoices(selectionIntent ?? action.Choices, choose, _selectionCursor);
         _choices = session;
         try
         {

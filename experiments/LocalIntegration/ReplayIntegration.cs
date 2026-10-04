@@ -56,6 +56,28 @@ public static class ReplayIntegration
         // Frozen execution controls retain the same startup; bootstrap has its own paired
         // cold measurements. Ordinary integration fixtures use the product's default.
         var installation = new LocalInstallation(game, directories, MinimalWorkerBootstrap: false);
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SELECTION_PAGING_TEST") == "1")
+        {
+            // Keep the incident's round/time/trial limits. Two owned lanes are
+            // sufficient to exercise shared prefix replay, without an 8-lane benchmark.
+            request = request with { MaxRounds = original.MaxRounds };
+            var sample = await Task.Run(() => pool.Analyze(request, installation, _ => { }, CancellationToken.None));
+            LocalWire.Write(Path.Combine(root, "integration-paging-incident-private.json"), sample);
+            if (sample.Status != "done" || sample.Best == null || sample.Rejected != 0 ||
+                (sample.RecoveredFailures?.Length ?? 0) != 0 || sample.Trace!.Spans.Any(s => s.Phase == "fallback"))
+                throw new InvalidOperationException("Paged incident still restarted or rejected native replay: " + sample.Message);
+            LocalWire.Write(Path.Combine(root, "integration-paging-incident-summary.json"), new {
+                version = typeof(LocalWorker).Assembly.GetName().Version!.ToString(3), sample.Status, sample.Workers,
+                sample.Evaluated, sample.Victories, sample.ElapsedMs, request.MaxNodes, request.MaxRounds, request.BudgetSeconds,
+                sample.Best.Won, sample.Best.Hp, sample.Best.NetHpLoss, sample.Best.Rounds,
+                recoveredFailures = sample.RecoveredFailures?.Length ?? 0, fallback = false,
+                nativeChoiceSteps = sample.Best.Actions.Sum(a => a.Choices?.Length ?? 0),
+                admissions = sample.Trace.Spans.Where(s => s.Phase == "admit_worker").Select(s => new {
+                    worker = s.Worker + 1, s.StartMs }),
+                sessions = sample.Trace.Spans.Where(s => s.Phase == "session").Select(s => new {
+                    worker = s.Worker + 1, s.StartMs, s.DurationMs }) });
+            return;
+        }
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_EXECUTION_REPLAY_TEST") == "1")
         {
             await ExecutionReplayIntegration.Run(root, original,

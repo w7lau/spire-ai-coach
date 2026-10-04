@@ -65,6 +65,7 @@ parser.add_argument('--scene-overhead-test', action='store_true')
 parser.add_argument('--visual-factory-test', action='store_true')
 parser.add_argument('--route-feedback-test', action='store_true')
 parser.add_argument('--route-feedback-focused-only', action='store_true')
+parser.add_argument('--selection-paging-test', action='store_true')
 args = parser.parse_args()
 if args.route_feedback_focused_only and not args.route_feedback_test:
     parser.error('--route-feedback-focused-only requires --route-feedback-test')
@@ -175,6 +176,9 @@ with worker_lock(root):
     env.pop('SPIRE_NATIVE_PROBE_ROOT', None)
     env.pop('SPIRE_COACH_WORKER', None)
     env['SPIRE_LOCAL_INTEGRATION_QUICK'] = '1' if args.quick else '0'
+    env['SPIRE_LOCAL_SELECTION_PAGING_TEST'] = '1' if args.selection_paging_test else '0'
+    if args.selection_paging_test:
+        env['SPIRE_LOCAL_SELECTION_MATRIX'] = '1'
     env['SPIRE_LOCAL_BENCHMARK'] = '1' if args.benchmark else '0'
     env['SPIRE_LOCAL_FEATURES'] = '1' if args.features else '0'
     env['SPIRE_LOCAL_OPTIMIZATION'] = '1' if args.optimization else '0'

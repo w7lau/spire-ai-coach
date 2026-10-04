@@ -1,0 +1,75 @@
+{
+  "version": "0.7.36",
+  "paging": {
+    "version": "0.7.36",
+    "domain": "336",
+    "pageSize": 128,
+    "missingOnNextPage": true,
+    "replayedOutsidePage": true,
+    "wrongOfferRejected": true,
+    "hostUnchanged": true,
+    "configuredWorkers": 2,
+    "readyWorkers": 2,
+    "starts": 2,
+    "warmupGateReleased": true,
+    "concurrentWarmupsReuseSameInstances": true,
+    "coldMs": 18535.8971,
+    "reuseMs": 0.721
+  },
+  "incident": {
+    "version": "0.7.36",
+    "Status": "done",
+    "Workers": 2,
+    "Evaluated": 128,
+    "Victories": 0,
+    "ElapsedMs": 47062,
+    "MaxNodes": 64,
+    "MaxRounds": 20,
+    "BudgetSeconds": 60,
+    "Won": false,
+    "Hp": 0,
+    "NetHpLoss": 35,
+    "Rounds": 4,
+    "recoveredFailures": 0,
+    "fallback": false,
+    "nativeChoiceSteps": 0,
+    "admissions": [
+      {
+        "worker": 1,
+        "StartMs": 38.3961
+      },
+      {
+        "worker": 2,
+        "StartMs": 39.4327
+      }
+    ],
+    "sessions": [
+      {
+        "worker": 2,
+        "StartMs": 22877.1397,
+        "DurationMs": 23082.158500000005
+      },
+      {
+        "worker": 1,
+        "StartMs": 24371.1284,
+        "DurationMs": 22363.3163
+      }
+    ]
+  },
+  "core_tests": {
+    "passed": 258,
+    "total": 258
+  },
+  "scope": "One native paged selection and two-lane frozen incident; not an eight-lane speed/quality comparison; installed while the game was closed.",
+  "installation": {
+    "version": "0.7.36",
+    "installed_at": "2026-10-04T23:24:51.5983856+08:00",
+    "dll_sha256": "5cc4f8240d37454e11fb0fb4a3c8f891cc4793a85d5dd99ba370e61c8b4ffeef",
+    "protected_file_count": 137,
+    "protected_files_unchanged": true,
+    "package_matches_native_validated_dll": true,
+    "game_was_closed": true,
+    "worker_cache_unchanged": true
+  },
+  "zip_sha256": "05eb3952fe1f889576d21400d14d3dc94100a0a8aecfdf5e228e0603a41eef69"
+}

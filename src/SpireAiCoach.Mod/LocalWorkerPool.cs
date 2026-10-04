@@ -36,15 +36,21 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
     public async Task Prepare(LocalInstallation installation, int configured, CancellationToken token)
     {
         var timeline = new LocalTimeline(capacity: 65536);
+        Task[] preparation;
         await _gate.WaitAsync(token);
         try
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            // Prewarm only the first instance. The setting caps later admissions;
-            // it must not create eight cold heaps before any branch is available.
-            await _workers[0].Ensure(directory, 0, installation, token, timeline);
+            // Manual concurrency is already an explicit resource choice. Start
+            // those preparations together; automatic mode still warms only one.
+            preparation = Enumerable.Range(0, LocalConcurrency.PrewarmCount(configured))
+                .Select(index => _workers[index].Ensure(directory, index, installation, token, timeline)).ToArray();
         }
-        finally { _lastPreparation = timeline.Snapshot(); _gate.Release(); }
+        finally { _gate.Release(); }
+        // Ensure owns and reuses a lane's in-flight preparation. A calculation
+        // may join it immediately instead of queuing behind the entire warmup.
+        try { await Task.WhenAll(preparation); }
+        finally { _lastPreparation = timeline.Snapshot(); }
     }
 
     public async Task<LocalSearchResult> Analyze(LocalSearchRequest request, LocalInstallation installation,
@@ -82,8 +88,6 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
         request = request with { TimelineOrigin = timeline.Origin, InitialTrace = null };
         double queueStart = timeline.ElapsedMs;
         using (timeline.Measure(-1, "main", "queue")) await _gate.WaitAsync(cancellation);
-        // Include only the portion of prewarming that really blocked this click.
-        timeline.Import(_lastPreparation, queueStart, timeline.ElapsedMs);
         try
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
@@ -104,10 +108,13 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             LocalSearchWork? schedulingWork = null;
             int launched = 0;
             progress("准备计算…");
-            var results = (await LocalConcurrency.Run(count, request.AdaptiveWorkers, shared, Launch, Demand,
+            var results = (await LocalConcurrency.Run(count, LocalConcurrency.AdaptiveAdmission(request.Workers, request.AdaptiveWorkers), shared, Launch, Demand,
                 () => goalReached.IsCancellationRequested,
                 r => request.DataOnlyCombat && r.Status is "failed" or "unsupported" or "partial", cancellation)).ToList();
             int used = results.Count;
+            // The warmup gate does not wait for engine startup. Import its
+            // completed startup spans now, clipped to this calculation only.
+            timeline.Import(_lastPreparation, queueStart, timeline.ElapsedMs);
             cancellation.ThrowIfCancellationRequested();
             if (request.DataOnlyCombat && !goalReached.IsCancellationRequested && results.Any(r => r.Status is "failed" or "unsupported" or "partial"))
             {
