@@ -26,6 +26,9 @@ public sealed class CoachOverlay
     private bool _disposed;
     private CanvasLayer _layer = null!;
     private PanelContainer _panel = null!;
+    private object? _panelCombat;
+    private bool _panelExecuting;
+    private bool? _manualPanelVisibility;
     private ScrollContainer _contentScroll = null!;
     private VBoxContainer _settingsPanel = null!;
     private Label _status = null!;
@@ -85,8 +88,8 @@ public sealed class CoachOverlay
         catch (Exception ex) { loadError = $"本地设置未能读取（{ex.GetType().Name}），请重新填写后保存。"; }
         _layer = new CanvasLayer { Name = "SpireAiCoach", Layer = 90 };
         _tree.Root.AddChild(_layer);
-        var toggle = new Button { Text = "尖塔教练 · F8", Position = new Vector2(24, 12) };
-        toggle.Pressed += () => _panel.Visible = !_panel.Visible;
+        var toggle = new Button { Name = "CoachToggle", Text = "尖塔教练 · F8", Position = new Vector2(24, 12) };
+        toggle.Pressed += TogglePanel;
         _layer.AddChild(toggle);
 
         _panel = new PanelContainer { Name = "CoachPanel", Visible = false };
@@ -116,7 +119,7 @@ public sealed class CoachOverlay
         var config = new Button { Text = "AI 设置 · F10" }; row.AddChild(config);
         config.Pressed += () => _settingsPanel.Visible = !_settingsPanel.Visible;
         var hide = new Button { Text = "收起" }; heading.AddChild(hide);
-        hide.Pressed += () => _panel.Hide();
+        hide.Pressed += () => SetPanelVisible(false);
         var localRow = new GridContainer { Columns = 2 }; shell.AddChild(localRow);
         _localAnalyze = new Button { Name = "LocalBattleSearch", Text = "本地计算", Disabled = true,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, TooltipText = "整场战斗 · 原算法。两种算法共用搜索设置；每路达到尝试次数或时间上限即结束，准备和复核另计。" }; localRow.AddChild(_localAnalyze);
@@ -280,9 +283,41 @@ public sealed class CoachOverlay
         _panel.Size = new Vector2(width, Math.Max(280, screen.Y - 80));
     }
 
+    private void RefreshPanelVisibility()
+    {
+        var manager = MegaCrit.Sts2.Core.Combat.CombatManager.Instance;
+        ApplyPanelContext(manager.IsInProgress && !manager.IsOverOrEnding ? manager.DebugOnlyGetState() : null, _executing);
+    }
+
+    private void ApplyPanelContext(object? combat, bool executing)
+    {
+        // A manual choice lasts for this battle/execution context. A new
+        // context restores the default, without reopening on every refresh.
+        if (!ReferenceEquals(_panelCombat, combat) || _panelExecuting != executing)
+        {
+            _panelCombat = combat; _panelExecuting = executing;
+            _manualPanelVisibility = null;
+        }
+        _panel.Visible = _manualPanelVisibility ?? (combat != null && !executing);
+    }
+
+    private void SetPanelVisible(bool visible)
+    {
+        RefreshPanelVisibility();
+        _manualPanelVisibility = visible;
+        _panel.Visible = visible;
+    }
+
+    private void TogglePanel()
+    {
+        RefreshPanelVisibility();
+        SetPanelVisible(!_panel.Visible);
+    }
+
     private void OnFrame()
     {
         if (_disposed) return;
+        RefreshPanelVisibility();
         if (_executing && Input.IsKeyPressed(Key.Escape)) Cancel("已停止执行；已出手的动作会正常结算。");
         while (_mainThread.TryDequeue(out var action)) action();
         foreach (var worker in _pendingLocalProgress.Keys)
@@ -301,9 +336,9 @@ public sealed class CoachOverlay
         var focus = _tree.Root.GuiGetFocusOwner();
         if (focus is not LineEdit && focus is not TextEdit)
         {
-            if (f8 && !_f8) _panel.Visible = !_panel.Visible;
-            if (f10 && !_f10) { _panel.Show(); _settingsPanel.Visible = !_settingsPanel.Visible; }
-            if (f9 && !_f9) { _panel.Show(); Analyze(); }
+            if (f8 && !_f8) TogglePanel();
+            if (f10 && !_f10) { SetPanelVisible(true); _settingsPanel.Visible = !_settingsPanel.Visible; }
+            if (f9 && !_f9) { SetPanelVisible(true); Analyze(); }
         }
         _f8 = f8; _f9 = f9; _f10 = f10;
         long now = System.Environment.TickCount64;
@@ -314,6 +349,7 @@ public sealed class CoachOverlay
 
     private void RefreshSnapshot()
     {
+        RefreshPanelVisibility();
         try
         {
             var snapshot = _capture.Capture(_settings.RevealDrawOrder);
@@ -681,6 +717,7 @@ public sealed class CoachOverlay
     private void Dispose()
     {
         _disposed = true;
+        _panelCombat = null;
         _lifetime.Cancel();
         Cancel("关闭");
         _tree.ProcessFrame -= OnFrame;
@@ -699,6 +736,7 @@ public sealed class CoachOverlay
         var plan = _continuation;
         using var cancellation = new CancellationTokenSource();
         _execution = cancellation; _executing = true;
+        RefreshPanelVisibility();
         _execute.Disabled = true; _stopExecution.Disabled = false;
         _continueOptimize.Disabled = true;
         _analyze.Disabled = true; _localAnalyze.Disabled = _turnAnalyze.Disabled = true;

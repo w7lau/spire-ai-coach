@@ -49,6 +49,36 @@ internal static class PresentationIntegration
 
         var overlay = new CoachOverlay(tree); overlay.Mount();
         var layer = tree.Root.GetNode<CanvasLayer>("SpireAiCoach");
+        var panel = layer.GetNode<PanelContainer>("CoachPanel");
+        var toggle = layer.GetNode<Button>("CoachToggle");
+        var visibility = typeof(CoachOverlay).GetMethod("ApplyPanelContext", fields)!;
+        var manual = typeof(CoachOverlay).GetField("_manualPanelVisibility", fields)!;
+        var visibilityChecks = new List<object>();
+        void CheckVisibility(string name, bool expected)
+        {
+            if (panel.Visible != expected) throw new InvalidOperationException("Panel visibility failed: " + name);
+            visibilityChecks.Add(new { name, visible = panel.Visible });
+        }
+        CheckVisibility("outside combat initially hidden", false);
+        toggle.EmitSignal(Button.SignalName.Pressed);
+        for (int i = 0; i < 4; i++) await tree.ToSignal(tree, SceneTree.SignalName.ProcessFrame);
+        CheckVisibility("manual outside-combat open survives frame and snapshot updates", true);
+        toggle.EmitSignal(Button.SignalName.Pressed);
+        CheckVisibility("manual toggle hides", false);
+        // Opaque context tokens test panel transitions only. They are never
+        // installed as game combat states or passed to gameplay code.
+        var battle = new object();
+        visibility.Invoke(overlay, [battle, false]); CheckVisibility("enter battle shows", true);
+        manual.SetValue(overlay, false);
+        visibility.Invoke(overlay, [battle, false]); CheckVisibility("manual battle hide persists", false);
+        visibility.Invoke(overlay, [battle, true]); CheckVisibility("execution starts hidden", false);
+        manual.SetValue(overlay, true);
+        visibility.Invoke(overlay, [battle, true]); CheckVisibility("manual execution open is retained", true);
+        visibility.Invoke(overlay, [battle, false]); CheckVisibility("execution stops in battle shows", true);
+        visibility.Invoke(overlay, [null, false]); CheckVisibility("combat exit hides", false);
+        visibility.Invoke(overlay, [new object(), false]); CheckVisibility("next combat resets manual override", true);
+        visibility.Invoke(overlay, [null, false]);
+        toggle.EmitSignal(Button.SignalName.Pressed);
         // Exercise the merged budget controls in this private userdata without
         // launching a search or substituting a route for a real combat.
         SpinBox Spin(string name) => layer.FindChild(name, true, false) as SpinBox
@@ -76,7 +106,6 @@ internal static class PresentationIntegration
                 (int)count.Invoke(pool, [request.Workers, request.AdaptiveWorkers])! != 8)
                 throw new InvalidOperationException("Merged controls no longer configure both algorithms or manual concurrency");
         }
-        var panel = layer.GetNode<PanelContainer>("CoachPanel"); panel.Show();
         var layouts = new List<object>();
         foreach (var size in new[] { new Vector2I(1280, 720), new Vector2I(1920, 1080) })
         {
@@ -128,7 +157,8 @@ internal static class PresentationIntegration
             regular_scene_dependency_preserved = nativeNeedsScene, data_callback_preserves_unsubscribe = true,
             creature_hp_unchanged = true, no_combat_scene = true, no_worker_started = true, layouts
             , merged_budget_controls_persisted = true, both_algorithm_requests_checked = true,
-            manual_worker_limit_preserved = 8
+            manual_worker_limit_preserved = 8, visibility_checks = visibilityChecks,
+            visibility_contexts_are_ui_only = true
         });
     }
 
