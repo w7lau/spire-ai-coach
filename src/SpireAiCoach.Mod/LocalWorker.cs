@@ -30,6 +30,11 @@ public static class LocalWorker
 {
     private static SceneTree _tree = null!;
     private static string _root = "";
+    private static LocalSearchRequest? _activeRequest;
+    private static void CheckCancellation()
+    {
+        if (_activeRequest != null) LocalWorkerSession.ThrowIfCancelled(_root, _activeRequest);
+    }
     private static bool _combatSettled;
     private static bool _combatWon;
     private static IReadOnlyDictionary<uint, string>? _targetLabels;
@@ -109,6 +114,9 @@ public static class LocalWorker
                     {
                         previous = request.Id;
                         if (!await Search(request)) break;
+                        LocalWire.Write(Path.Combine(_root, "idle.json"), new LocalWorkerIdle(request.Id,
+                            request.SnapshotId, request.NativeHash, request.Partition,
+                            System.Environment.GetEnvironmentVariable("SPIRE_COACH_WORKER_GENERATION") ?? "standalone"));
                         idle.Restart();
                     }
                 }
@@ -121,6 +129,7 @@ public static class LocalWorker
 
     private static async Task<bool> Search(LocalSearchRequest request)
     {
+        _activeRequest = request;
         LocalWorkerLogic.ResetCounters();
         LocalWorkerVerification.Reset();
         _timeline = new(request.TimelineOrigin);
@@ -159,6 +168,7 @@ public static class LocalWorker
         bool stoppedEarly = false;
         bool StopRequested()
         {
+            CheckCancellation();
             if (!request.StopOnZeroLoss || request.VerifyCandidate != null) return false;
             var path = Path.Combine(_root, "stop-search.json");
             if (!File.Exists(path)) return false;
@@ -200,10 +210,11 @@ public static class LocalWorker
         int executed = 0, restores = 0;
         async Task RestoreMeasured()
         {
+            CheckCancellation();
             LocalWorkerOverhead.LeanSearchChecksums = false;
             _nativeLearning?.ResetDecision();
             var started = Stopwatch.GetTimestamp();
-            try { await LocalWorkerLogic.Run(() => Restore(request), () => _choices?.Tick(), Frame, 60); }
+            try { await LocalWorkerLogic.Run(() => Restore(request), () => _choices?.Tick(), Frame, 60); CheckCancellation(); }
             finally { restoreMs += (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds; restores++; }
         }
         long sequence = 0, lastProgress = -1000, lastResult = -1000;
@@ -251,6 +262,7 @@ public static class LocalWorker
                 !LocalCalculation.ValidLimits(request.MaxNodes, request.MaxRounds, request.BudgetSeconds) ||
                 request.MaxDepth is < 1 or > 64 || request.SimulationSpeed is < 1 or > 16)
                 throw new InvalidDataException("Invalid search limits");
+            CheckCancellation();
             // Owned worker only. Accelerate native animation/timer waits, never model effects/RNG.
             if (request.SimulationSpeed > 1) { Engine.TimeScale = request.SimulationSpeed; Engine.MaxFps = 240; }
             LocalWorkerVisuals.Active = request.SimulationSpeed > 1;
@@ -734,7 +746,11 @@ public static class LocalWorker
                     }
                     // A peer reached the goal. Discard this unfinished trial; only a
                     // previously completed candidate may survive to final verification.
-                    if (stoppedEarly) break;
+                    if (stoppedEarly)
+                    {
+                        if (turnTask != null) turns!.ReturnInterrupted(turnTask, TurnHint(player, startingHp, actions));
+                        break;
+                    }
                     if (covered)
                     {
                         coveredTasks++;
@@ -820,6 +836,11 @@ public static class LocalWorker
                     Publish("running", turns != null ? $"已找到 {victories} 条整场获胜路线；另探查 {probes} 个回合组合，剪枝 {boundPruned} 次，等待 {turns.Count} 个操作前缀。" :
                         $"已找到 {victories} 条整场获胜路线；已记录 {noPotionSearch.Nodes + (request.IncludePotions ? potionSearch.Nodes : 0)} 个操作树节点，按实际结算反馈选路。");
                 }
+                catch (LocalWorkerCancelledException)
+                {
+                    if (turnTask != null) turns!.ReturnInterrupted(turnTask, TurnHint(player, startingHp, actions));
+                    throw;
+                }
                 catch (LocalChoiceException ex)
                 {
                     rejected++;
@@ -871,6 +892,15 @@ public static class LocalWorker
                 $"已完成当前预算，操作树 {noPotionSearch.Nodes + (request.IncludePotions ? potionSearch.Nodes : 0)} 个节点，比较了 {refinements} 条补牌、删牌、换牌和选牌路线。");
             return true;
         }
+        catch (LocalWorkerCancelledException)
+        {
+            best = null;
+            await Cleanup();
+            Progress("已取消计算", force: true, status: "cancelled");
+            session?.Dispose();
+            Publish("cancelled", "已安全停止本次计算。");
+            return true;
+        }
         catch (Exception ex)
         {
             // Any replay divergence invalidates this worker's result, including previous candidates.
@@ -897,7 +927,7 @@ public static class LocalWorker
         finally
         {
             try { sharedTurns?.Dispose(); work?.Retire(request.Partition); }
-            finally { NonInteractiveMode.AutoSlayerCheck = originalNativeMode; LocalWorkerOverhead.Enabled = false; LocalWorkerOverhead.LeanSearchChecksums = false; LocalWorkerLogic.Enabled = false; LocalWorkerDataMode.Reset(); LocalWorkerVisuals.Reset(); _fastNativeWaits = _fastStateSettling = false; LocalWorkerResources.Retain = LocalWorkerResources.FastCollection = false; Engine.TimeScale = originalScale; Engine.MaxFps = originalFps; _timeline = null; }
+            finally { NonInteractiveMode.AutoSlayerCheck = originalNativeMode; LocalWorkerOverhead.Enabled = false; LocalWorkerOverhead.LeanSearchChecksums = false; LocalWorkerLogic.Enabled = false; LocalWorkerDataMode.Reset(); LocalWorkerVisuals.Reset(); _fastNativeWaits = _fastStateSettling = false; LocalWorkerResources.Retain = LocalWorkerResources.FastCollection = false; Engine.TimeScale = originalScale; Engine.MaxFps = originalFps; _timeline = null; _activeRequest = null; _nativeLearning = null; _targetLabels = null; _choices = null; _excludedModels.Clear(); _includePotions = false; }
         }
     }
 
@@ -983,6 +1013,7 @@ public static class LocalWorker
         NonInteractiveMode.AutoSlayerCheck = _nativeModeBeforeRequest;
         using var presentation = LocalWorkerVerification.Begin(request.FastVerification);
         await Restore(request);
+        CheckCancellation();
         var player = LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!;
         _includePotions = request.IncludePotions;
         if (candidate.StartingHp is { } expectedHp && player.Creature.CurrentHp != expectedHp)
@@ -998,6 +1029,7 @@ public static class LocalWorker
             int step = 0;
             foreach (var action in candidate.Actions)
             {
+                CheckCancellation();
                 if (canContinue) points.Add(new(step, action.BeforeHash, LocalCapture.History(), lost, player.Creature.CurrentHp));
                 var before = Observe(player);
                 _traceStep = step + 1;
@@ -1005,6 +1037,7 @@ public static class LocalWorker
                 progress(action, ++step, before, Observe(player));
             }
             await StableOrTerminal(player);
+            CheckCancellation();
             var enemyHp = CombatManager.Instance.DebugOnlyGetState()?.Enemies.Sum(e => Math.Max(0, e.CurrentHp)) ?? 0;
             if ((_combatWon && !player.Creature.IsDead) != candidate.Won || player.Creature.IsDead != candidate.Dead ||
                 player.Creature.CurrentHp != candidate.Hp || lost != candidate.HpLost || enemyHp != candidate.EnemyHp ||
@@ -1042,6 +1075,7 @@ public static class LocalWorker
     private static async Task Restore(LocalSearchRequest request, bool completedReplayProbe = false, Action<Player>? atRoot = null,
         Action<GameAction, Player>? atAction = null, int rootAfterEvents = 0)
     {
+        CheckCancellation();
         using var restoring = Trace("restore", "战斗起点");
         _restoreDepth = 1;
         try
@@ -1197,6 +1231,7 @@ public static class LocalWorker
 
     private static async Task<LocalAction> Play(LocalAction action, Func<LocalCardChoice[], LocalCardChoice>? choose = null)
     {
+        CheckCancellation();
         using var playing = Trace(action.EndTurn ? "end_turn" : action.PotionSlot.HasValue ? "potion" : "card",
             action.EndTurn ? $"第 {action.Round} 回合" : action.CardName);
         var session = new LocalChoices(action.Choices, choose);
@@ -1205,6 +1240,7 @@ public static class LocalWorker
         {
             await LocalWorkerLogic.Run(() => PlayNative(action), () => _choices?.Tick(), Frame);
             session.Finish();
+            CheckCancellation();
             return action with { Choices = session.Completed };
         }
         catch (LocalChoiceException ex)

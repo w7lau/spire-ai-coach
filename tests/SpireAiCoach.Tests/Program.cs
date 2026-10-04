@@ -7,11 +7,14 @@ using SpireAiCoach.Mod;
 
 if (args.Length > 0 && args[0] == "--isolation-child")
     return await WorkerIsolationTests.Child(args);
+if (args.Contains("--headless") && Environment.GetEnvironmentVariable("SPIRE_COACH_WORKER") != null)
+    return await WorkerReuseTests.Child();
 
 var tests = new List<(string, Func<Task>)>();
 void Test(string name, Action test) => tests.Add((name, () => { test(); return Task.CompletedTask; }));
 void AsyncTest(string name, Func<Task> test) => tests.Add((name, test));
 TurnWorkTests.Register(Test, AsyncTest);
+WorkerReuseTests.Register(Test, AsyncTest);
 AsyncTest("worker isolation prevents inherited save locks and preserves environment and arguments", WorkerIsolationTests.Run);
 AsyncTest("shared file identity preserves locked hardlinks and replaces equal-metadata copies", WorkerSharingTests.Run);
 void Check(bool condition, string message = "Assertion failed") { if (!condition) throw new Exception(message); }

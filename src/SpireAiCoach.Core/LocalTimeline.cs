@@ -96,7 +96,7 @@ public sealed class LocalTimeline
         lock (_gate)
         {
             span = span with { Detail = span.Detail.Length <= 160 ? span.Detail : span.Detail[..160] };
-            if (_overviewCapacity > 0 && (span.Depth == 0 || span.Phase is "result_transfer" or "receive" or "stop_search"))
+            if (_overviewCapacity > 0 && (span.Depth == 0 || span.Phase is "result_transfer" or "receive" or "stop_search" or "await_idle" or "cancel_request"))
             {
                 if (_overview.Count == _overviewCapacity) { _overview.Dequeue(); _dropped++; }
                 _overview.Enqueue(span);
@@ -159,6 +159,7 @@ public sealed class LocalTimeline
         "capture" => "读取当前战斗", "queue" => "等待准备或计算队列", "prepare" => "准备计算",
         "files" => "共享资源、加载 Mod 配置", "launch" => "创建计算进程", "engine" => "引擎与 Mod 启动",
         "reuse" => "复用已启动进程", "session" => "搜索", "restore" => "恢复路线起点",
+        "cold_start" => "首次准备计算", "rebuild" => "重新准备计算", "retire" => "释放计算实例",
         "cleanup" => "清理上次模拟", "decode" => "解码战斗记录", "setup" => "建立运行状态",
         "assets" => "准备角色与地图资源", "scene" => "初始化战斗", "history" => "恢复已完成操作",
         "fingerprint" => "核对状态", "decision" => "枚举与选择动作", "refine" => "生成改进路线",
@@ -168,6 +169,7 @@ public sealed class LocalTimeline
         "executor" => "等待原生执行完成", "asset_gc" => "资源准备后的内存回收",
         "logic_frame" => "等待事件",
         "stop_search" => "停止其余搜索",
+        "await_ready" => "等待已启动实例就绪", "await_idle" => "等待实例安全清理", "cancel_request" => "取消并清理本次计算",
         "observe" => "读取过程预览", "publish" => "写入进度与候选", "ipc" => "传递计算请求",
         "receive" => "接收候选与检查运行日志", "dispatch" => "等待计算进程接收请求",
         "result_transfer" => "结果传递与轮询等待", "display_wait" => "等待界面显示",
@@ -184,7 +186,8 @@ public sealed class LocalTimeline
             "各路使用同一时间轴；下列并发用时不能相加作为总等待。动作耗时含原生结算等待，并非纯 CPU 用时。" };
         foreach (var span in trace.Spans.Where(s => s.Depth == 0))
             lines.Add($"{span.StartMs / 1000:F2}–{(span.StartMs + span.DurationMs) / 1000:F2}s　" +
-                (span.Worker < 0 ? "主流程" : $"计算 {span.Worker + 1}") + "　" + Label(span.Phase));
+                (span.Worker < 0 ? "主流程" : $"计算 {span.Worker + 1}") + "　" + Label(span.Phase) +
+                (span.Phase is "rebuild" or "retire" ? " · " + span.Detail : ""));
         foreach (var worker in trace.Spans.Where(s => s.Worker >= 0).GroupBy(s => s.Worker).OrderBy(g => g.Key))
         {
             lines.Add($"—— 计算 {worker.Key + 1}：各阶段内部累计 ——");

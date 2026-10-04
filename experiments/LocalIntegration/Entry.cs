@@ -45,6 +45,12 @@ public static class Entry
             await Frame(); await Frame();
             while (NAssetLoader.Instance.IsProcessing()) await Frame();
             SaveManager.Instance.PrefsSave.FastMode = FastModeType.Instant;
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_PRESENTATION_SMOKE") == "1")
+            {
+                await PresentationIntegration.Run(root, tree);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_REPLAY") is { Length: > 0 } replayPath)
             {
                 await ReplayIntegration.Run(root, pool, replayPath, System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_REPLAY_GAME")!);
