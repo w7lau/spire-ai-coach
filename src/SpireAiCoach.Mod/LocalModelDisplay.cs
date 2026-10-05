@@ -31,7 +31,8 @@ internal static class LocalModelDisplay
         {
             var state = effect.GetCustomAttribute<AsyncStateMachineAttribute>()?.StateMachineType;
             var method = state == null ? effect : AccessTools.Method(state, "MoveNext");
-            if (method == null || LocalDisplayBranch.Find(method, enabled, DisplayCall, DisplayValue).Length == 0) continue;
+            if (method == null || LocalDisplayBranch.Find(method, enabled,
+                call => DisplayCall(call) || LocalEnemyPresentation.ProjectionDisplayCall(call, method.DeclaringType!), DisplayValue).Length == 0) continue;
             var harmony = new Harmony("SpireAiCoach.owned-worker.model-display." + type.FullName + "." + effect.MetadataToken);
             try
             {
@@ -54,7 +55,7 @@ internal static class LocalModelDisplay
         // Recheck actual Harmony input: a Mod may have inserted a rule into this block.
         var guards = LocalDisplayBranch.Find(code.Select((c, i) => new LocalInstruction(i, c.opcode, Operand(c.operand))),
             original.DeclaringType!, original.GetMethodBody()!.LocalVariables.Select(l => l.LocalType).ToArray(),
-            enabled, DisplayCall, DisplayValue).ToHashSet();
+            enabled, call => DisplayCall(call) || LocalEnemyPresentation.ProjectionDisplayCall(call, original.DeclaringType!), DisplayValue).ToHashSet();
         if (guards.Count == 0) throw new InvalidOperationException("Optional display block now contains rules or escaping values");
         for (int i = 0; i < code.Length; i++)
         {

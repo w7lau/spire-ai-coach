@@ -85,6 +85,11 @@ parser.add_argument('--full-health-test', action='store_true', help='Short seede
 parser.add_argument('--animation-presentation-test', action='store_true', help='Measured death/summon prefix; compare native presentation modes, not full search')
 parser.add_argument('--passive-factory-test', action='store_true', help='Measured ground-fire prefix and idle/search FPS isolation; no full search')
 parser.add_argument('--snapshot-metadata-test', action='store_true', help='Same native route with immutable metadata reuse on/off; no algorithm comparison')
+parser.add_argument('--enemy-test', action='store_true', help='Native encounter catalogue and bounded enemy-turn comparison for both algorithms')
+parser.add_argument('--enemy-cases', help='Optional comma-separated native encounter IDs; default tests the entire native catalogue')
+parser.add_argument('--enemy-rounds', type=int, default=8)
+parser.add_argument('--enemy-fast-only', action='store_true', help='Diagnostic numerical smoke test without ordinary-scene comparison')
+parser.add_argument('--enemy-attack', action='store_true', help='Two unseeded short attack trials per algorithm with independent ordinary-scene replay')
 args = parser.parse_args()
 if args.snapshot_metadata_test and (not args.replay or not args.seed_result or args.recorded_replay):
     parser.error('--snapshot-metadata-test requires a frozen --replay and --seed-result')
@@ -279,6 +284,11 @@ with worker_lock(root):
     env['SPIRE_LOCAL_CHOICES'] = '1' if args.choices else '0'
     env['SPIRE_LOCAL_FALLBACK'] = '1' if args.fallback else '0'
     env['SPIRE_LOCAL_MECHANICS'] = '1' if args.mechanics else '0'
+    env['SPIRE_LOCAL_ENEMY_TEST'] = '1' if args.enemy_test else '0'
+    env['SPIRE_LOCAL_ENEMY_CASES'] = args.enemy_cases or ''
+    env['SPIRE_LOCAL_ENEMY_ROUNDS'] = str(args.enemy_rounds)
+    env['SPIRE_LOCAL_ENEMY_FAST_ONLY'] = '1' if args.enemy_fast_only else '0'
+    env['SPIRE_LOCAL_ENEMY_ATTACK'] = '1' if args.enemy_attack else '0'
     env['SPIRE_LOCAL_SURVIVAL_TEST'] = '1' if args.survival_test else '0'
     if args.mechanic_cases:
         env['SPIRE_LOCAL_MECHANICS_CASES'] = args.mechanic_cases
@@ -357,7 +367,7 @@ with worker_lock(root):
         try:
             # Each comparison retains the full product search budget. Several
             # resident-pool samples need a larger outer harness timeout.
-            process.wait(timeout=390 if args.route_feedback_test else
+            process.wait(timeout=2400 if args.enemy_test else 390 if args.route_feedback_test else
                          max(300, 90 + 75 * len(args.search_cases.split(','))) if args.search_cases else 300)
         except subprocess.TimeoutExpired:
             process.kill()
@@ -464,6 +474,9 @@ with worker_lock(root):
             names = ['integration-passive-summary.json', 'integration-success', 'integration-error.txt',
                      'integration-stdout.log', 'integration-game.log',
                      *[f'integration-passive-private-{i}.json' for i in range(4)]]
+        if args.enemy_test:
+            names = ['integration-enemy-summary.json', 'integration-enemy-catalogue.json',
+                     'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
         for name in names:
             if (root / name).is_file():
                 shutil.copy2(root / name, args.results_dir / name)

@@ -25,7 +25,12 @@ public static class Entry
     public static void Initialize()
     {
         var root = System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_INTEGRATION");
-        if (root == null || System.Environment.GetEnvironmentVariable("SPIRE_COACH_WORKER") != null) return;
+        if (root == null) return;
+        if (System.Environment.GetEnvironmentVariable("SPIRE_COACH_WORKER") is { } worker)
+        {
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_ENEMY_TEST") == "1") EnemyProbeObserver.Install(worker);
+            return;
+        }
         if (!File.Exists(Path.Combine(root, ".spire-native-probe-owner")) ||
             !string.Equals(OS.GetExecutablePath().Replace('/', '\\'), Path.Combine(root, "game", "SlayTheSpire2.exe"), StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Integration requires owned private game");
@@ -58,6 +63,12 @@ public static class Entry
                 return;
             }
             var save = JsonSerializer.Deserialize(File.ReadAllText(Path.Combine(root, "fixture.json")), JsonSerializationUtility.GetTypeInfo<SerializableRun>())!;
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_ENEMY_TEST") == "1")
+            {
+                await EnemyCompatibilityIntegration.Run(root, tree, save);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_MANUAL_VICTORY_TEST") == "1")
             {
                 await ManualVictoryReturnIntegration.Run(root, tree, pool, save);

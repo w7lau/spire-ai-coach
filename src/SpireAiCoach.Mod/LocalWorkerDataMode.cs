@@ -81,6 +81,7 @@ internal static class LocalWorkerDataMode
         harmony.Patch(AccessTools.Method(typeof(SoulNexus), "AfterDeath", [typeof(Creature)]),
             transpiler: new(AccessTools.Method(typeof(LocalWorkerDataMode), nameof(DeathCreatureVisual))));
         InstallSummonPresentation(harmony);
+        LocalEnemyPresentation.Install(harmony);
         Prefix(typeof(CardCmd), "PreviewInternal", nameof(Preview));
         Prefix(typeof(ForgeCmd), "PreviewSovereignBlade", nameof(PresentationVoid));
         var transform = typeof(CardCmd).GetMethods().Single(m => m.Name == nameof(CardCmd.Transform) &&
