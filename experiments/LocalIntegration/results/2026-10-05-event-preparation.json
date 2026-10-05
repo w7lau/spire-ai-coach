@@ -1,0 +1,150 @@
+{
+  "version": "0.7.46",
+  "source_commit": "71b221ae2233e0cd90d3ad812257eab8621d74ff",
+  "mod_sha256": "dd51471449e8e9573207e53c7e94905faeda34878e0749066d126be4507bc669",
+  "merged_installed_source": "c612341727ecd2b06b9cbb3008183803ddadc2a2",
+  "core_checks_passed": 334,
+  "mod_and_native_host_build": {
+    "warnings": 0,
+    "errors": 0
+  },
+  "historical_incident": {
+    "version": "0.7.42",
+    "local_time": "2026-10-05 14:18 +08:00",
+    "status": "failed",
+    "evaluated": 0,
+    "elapsed_ms": 60128,
+    "timing": {
+      "RestoreMs": 60006,
+      "ActionMs": 0,
+      "DecisionMs": 0,
+      "VerificationMs": 0,
+      "StartupMs": 19112,
+      "Actions": 0,
+      "Restores": 1,
+      "Verifications": 0
+    },
+    "nodes_per_lane": 64,
+    "rounds": 20,
+    "budget_seconds": 60,
+    "root_failure": "Native combat replay starts before event choices; restore waits on the event page instead of entering combat.",
+    "same_as_summon_node_incident": false,
+    "installed_0_7_44_observed_failing": false
+  },
+  "native_event_entry_regression": {
+    "version": "0.7.46",
+    "nativeModule": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
+    "preparationMs": 16265,
+    "preparationIncludedInSamples": false,
+    "exactFrozenRootRecreated": true,
+    "capturedNativeEntryChoices": 2,
+    "samples": [
+      {
+        "numerical": true,
+        "algorithm": "MonteCarlo",
+        "ElapsedMs": 1785,
+        "Timing": {
+          "RestoreMs": 1270,
+          "ActionMs": 223,
+          "DecisionMs": 101,
+          "VerificationMs": 0,
+          "StartupMs": 0,
+          "Actions": 1,
+          "Restores": 1,
+          "Verifications": 0
+        },
+        "exactRootAndHistory": true,
+        "completeNativeCheckpoints": true,
+        "sameNativeOutcome": true,
+        "reusedWorker": false
+      },
+      {
+        "numerical": false,
+        "algorithm": "MonteCarlo",
+        "ElapsedMs": 5828,
+        "Timing": {
+          "RestoreMs": 5514,
+          "ActionMs": 201,
+          "DecisionMs": 10,
+          "VerificationMs": 0,
+          "StartupMs": 0,
+          "Actions": 1,
+          "Restores": 1,
+          "Verifications": 0
+        },
+        "exactRootAndHistory": true,
+        "completeNativeCheckpoints": true,
+        "sameNativeOutcome": true,
+        "reusedWorker": true
+      },
+      {
+        "numerical": true,
+        "algorithm": "MonteCarlo",
+        "ElapsedMs": 71,
+        "Timing": {
+          "RestoreMs": 32,
+          "ActionMs": 3,
+          "DecisionMs": 8,
+          "VerificationMs": 0,
+          "StartupMs": 0,
+          "Actions": 1,
+          "Restores": 1,
+          "Verifications": 0
+        },
+        "exactRootAndHistory": true,
+        "completeNativeCheckpoints": true,
+        "sameNativeOutcome": true,
+        "reusedWorker": true
+      },
+      {
+        "numerical": true,
+        "algorithm": "TurnFrontier",
+        "ElapsedMs": 234,
+        "Timing": {
+          "RestoreMs": 21,
+          "ActionMs": 3,
+          "DecisionMs": 15,
+          "VerificationMs": 0,
+          "StartupMs": 0,
+          "Actions": 1,
+          "Restores": 1,
+          "Verifications": 0
+        },
+        "exactRootAndHistory": true,
+        "completeNativeCheckpoints": true,
+        "sameNativeOutcome": true,
+        "reusedWorker": true
+      }
+    ],
+    "missingEntry": {
+      "ElapsedMs": 58,
+      "Timing": {
+        "RestoreMs": 28,
+        "ActionMs": 0,
+        "DecisionMs": 0,
+        "VerificationMs": 0,
+        "StartupMs": 0,
+        "Actions": 0,
+        "Restores": 1,
+        "Verifications": 0
+      },
+      "Status": "failed",
+      "Category": "local_event_entry"
+    },
+    "fullSearchBenchmark": false,
+    "productionBudgetsUnchanged": true,
+    "passed": true
+  },
+  "limits": [
+    "This is one frozen event entry and one enemy turn; it is not a whole-search throughput or optimality benchmark.",
+    "A real owned host recreated the exact frozen root and native history, then captured its actual native event-choice history.",
+    "Only Coach build metadata was updated in the old request; root, replay, RNG, history and third-party Mod guards stayed intact.",
+    "The first numerical sample starts in a cold worker, followed by the regular scene control, numerical reuse and TurnFrontier reuse.",
+    "Cold engine preparation is measured separately and is excluded from every sample elapsed time.",
+    "Missing entry fails before actions; parent fallback uses its structured category and does not restart the same invalid event input.",
+    "The fixture root hash was supplied to the existing seeded-route guard; the production guard was not relaxed.",
+    "Existing engine exit resource-release diagnostics remain; no new native combat-loop error occurred.",
+    "No arbitrary-Mod, missing private event history or global search-quality compatibility guarantee.",
+    "Product budgets, potion settings, stopping goals, verification preference and guarded live execution are unchanged."
+  ]
+}
