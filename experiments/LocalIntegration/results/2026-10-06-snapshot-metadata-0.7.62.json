@@ -247,5 +247,11 @@
     "The native worker runtime-error gate passed; existing engine exit/resource warnings may remain.",
     "No arbitrary Mod private-state compatibility claim."
   ],
-  "private_game_inputs_paths_route_or_ids_included": false
+  "private_game_inputs_paths_route_or_ids_included": false,
+  "installed_temporarily": true,
+  "concurrent_same_version_detected": true,
+  "previous_manual_return_payload_restored": true,
+  "restored_dll_sha256": "37e9c90dc7483d3c257feffcfed681110620dd75221915e2a333a218473bc1e9",
+  "protected_files_checked_during_restore": 1427,
+  "protected_files_changed_during_restore": 0
 }

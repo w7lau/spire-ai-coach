@@ -332,6 +332,72 @@ internal static class WorkerReuseTests
                 Console.WriteLine($"  first-win protocol evidence: algorithm={algorithm}; loss_stop={lossStop}; skip_verify={lossStop}; elapsed_ms={watch.ElapsedMilliseconds}; loss=42; potions=1; rounds=10; verifications={result.Timing!.Verifications}; peer_budget_ms=10000; native_game=false");
             }
         });
+        asyncTest("both algorithms manually adopt a running victory with unfinished goals and either verification setting", async () =>
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            await using var f = new Fixture();
+            foreach (var algorithm in new[] { LocalSearchOrder.MonteCarlo, LocalSearchOrder.TurnFrontier })
+            foreach (bool autoStop in new[] { false, true })
+            foreach (bool skip in new[] { false, true })
+            {
+                var r = Request("manual-win") with { SearchOrder = algorithm, StopOnZeroLoss = autoStop,
+                    SkipFinalVerification = skip, IncludePotions = true, DataOnlyCombat = true,
+                    CardGoals = new("unplayed", "unfinished", 5) };
+                var control = new LocalVictoryReturn(r);
+                var watch = Stopwatch.StartNew();
+                var task = f.Pool.Analyze(r, f.Installation, _ => { }, CancellationToken.None, victoryReturn: control);
+                await Until(() => control.CanRequest, "Running victory did not enable manual return");
+                Check(!task.IsCompleted && control.TryRequest(), "Manual choice did not stop the active calculation");
+                var result = await task;
+                Check(result.Status == "done" && result.StoppedEarly && result.StoppedOnManualVictory &&
+                    !result.StoppedOnFirstWin && !result.StoppedOnCardGoals && !result.StoppedOnMinimum &&
+                    result.Best is { Won: true, Dead: false, Hp: 8 } && LocalSearchPolicy.HasExecutionPoints(result),
+                    "Manual stop discarded the victory or replaced it with an automatic goal claim");
+                Check(result.Timing?.Verifications == (skip ? 0 : 1) && result.MinimumLoss == null &&
+                    result.Trace!.Spans.Any(s => s.Phase == "stop_search") && watch.Elapsed < TimeSpan.FromSeconds(8) &&
+                    !control.CanRequest && result.Evidence is { ManualStopped: true, GoalStopped: false },
+                    "Manual stop ignored verification settings or waited for the full peer budget");
+            }
+        });
+        asyncTest("manual victory rejects poisoned owners failed victory verification and missing checkpoints without restarting search", async () =>
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            await using var f = new Fixture();
+            foreach (var scenario in new[] { "manual-win-errors", "manual-win-verify-mismatch", "manual-win-bad-points" })
+            {
+                var r = Request(scenario) with { DataOnlyCombat = true, SkipFinalVerification = scenario.EndsWith("bad-points") };
+                var control = new LocalVictoryReturn(r);
+                var task = f.Pool.Analyze(r, f.Installation, _ => { }, CancellationToken.None, victoryReturn: control);
+                await Until(() => control.CanRequest, "Synthetic provisional victory missing");
+                Check(control.TryRequest(), "Manual request rejected");
+                try { await task; throw new Exception("Invalid provisional victory became usable"); }
+                catch (CoachException ex) when (ex.Category is "local_failed" or "local_verify_failed") { }
+                Check(!control.CanRequest && !Directory.EnumerateFiles(f.Root, "request.json", SearchOption.AllDirectories)
+                    .Select(LocalWire.Read<LocalSearchRequest>).Any(x => x.Id.Contains("-regular", StringComparison.Ordinal)),
+                    "Manual stop triggered a fresh compatibility search");
+            }
+        });
+        asyncTest("cancel still abandons a found victory and interrupts manual final verification", async () =>
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            await using var f = new Fixture();
+            foreach (bool duringVerification in new[] { false, true })
+            {
+                var r = Request("manual-win-verify-slow") with { Workers = 1 };
+                var control = new LocalVictoryReturn(r);
+                using var cancellation = new CancellationTokenSource();
+                var task = f.Pool.Analyze(r, f.Installation, _ => { }, cancellation.Token, victoryReturn: control);
+                await Until(() => control.CanRequest, "Running victory missing before cancellation");
+                if (duringVerification)
+                {
+                    Check(control.TryRequest(), "Manual return rejected");
+                    await Until(() => Received(Workers(f.Pool)[0], r, true), "Manual final verification missing");
+                    Check(!control.CanRequest, "Return button remained enabled during verification");
+                }
+                cancellation.Cancel(); await Cancelled(task);
+                Check(!control.CanRequest && !f.Pool.CanResume(r), "Cancel retained the provisional plan or frontier");
+            }
+        });
         asyncTest("both algorithms stop all peers at fulfilled consumable goals inside the permitted loss range", async () =>
         {
             if (!OperatingSystem.IsWindows()) return;
@@ -423,10 +489,11 @@ internal static class WorkerReuseTests
             (scenario.StartsWith("minimum-zero", StringComparison.Ordinal) || scenario.StartsWith("minimum-healed", StringComparison.Ordinal)))
             candidate = candidate with { Hp = scenario.Contains("healed") ? 70 : 50, MaxHp = 100,
                 Actions = [MinimumLossTests.FirstTurn(request, request.Partition).Steps[0].Action] };
-        if (request.VerifyCandidate == null && request.DebugEncounter?.StartsWith("first-win", StringComparison.Ordinal) == true)
+        if (request.VerifyCandidate == null && (request.DebugEncounter?.StartsWith("first-win", StringComparison.Ordinal) == true ||
+            request.DebugEncounter?.StartsWith("manual-win", StringComparison.Ordinal) == true))
             candidate = candidate with { Hp = 8, HpLost = 42, Rounds = 10, DamageSources = new(42, 0, 0, 0, true),
                 Actions = [candidate.Actions[0] with { PotionSlot = 0, Round = 10 }] };
-        if (request.VerifyCandidate != null && request.DebugEncounter == "first-win-verify-mismatch")
+        if (request.VerifyCandidate != null && request.DebugEncounter is "first-win-verify-mismatch" or "manual-win-verify-mismatch")
             candidate = candidate with { Won = false, EnemyHp = 10 };
         if (request.VerifyCandidate == null && request.DebugEncounter?.StartsWith("card-goal", StringComparison.Ordinal) == true)
             candidate = candidate with { Hp = 46, HpLost = 4, CardGoalOutcome = new(null, "mod:finish", 0, 1,
@@ -439,7 +506,7 @@ internal static class WorkerReuseTests
                 Hp = request.DebugEncounter == "full-health-race" && request.Partition == 0 ? 250 : 100,
                 Actions = [candidate.Actions[0] with {
                     PotionSlot = request.DebugEncounter == "full-health-race" && request.Partition == 0 ? 0 : null }] };
-        return candidate with { Continuation = [new(0, request.NativeHash, new(0, "synthetic"), 0, 50)],
+        return candidate with { Continuation = request.DebugEncounter == "manual-win-bad-points" ? [] : [new(0, request.NativeHash, new(0, "synthetic"), 0, 50)],
             ContinuationFromSearch = request.SkipFinalVerification && request.VerifyCandidate == null };
     }
 
@@ -494,14 +561,23 @@ internal static class WorkerReuseTests
                         delay = request.Partition == 0 ? 600 : 10000;
                     if (request.DebugEncounter?.StartsWith("card-goal", StringComparison.Ordinal) == true && request.VerifyCandidate == null)
                         delay = request.Partition == 0 ? 600 : 10000;
-                    var timer = Stopwatch.StartNew(); bool cancelled = false, goal = false;
+                    bool manual = request.DebugEncounter?.StartsWith("manual-win", StringComparison.Ordinal) == true;
+                    if (manual && request.VerifyCandidate == null || request.DebugEncounter == "manual-win-verify-slow") delay = 10000;
+                    var timer = Stopwatch.StartNew(); bool cancelled = false, goal = false, manualStop = false, publishedWin = false;
                     while (timer.ElapsedMilliseconds < delay)
                     {
+                        if (manual && request.VerifyCandidate == null && request.Partition == 0 && !publishedWin && timer.ElapsedMilliseconds >= 600)
+                        {
+                            publishedWin = true;
+                            LocalWire.Write(Path.Combine(root, "result.json"), new LocalSearchResult(request.Id, request.SnapshotId,
+                                "running", "synthetic victory", 1, 0, timer.ElapsedMilliseconds, Candidate(request), RootBranches: 2));
+                        }
                         if (request.DebugEncounter != "ignore-stop")
                         {
                             cancelled = LocalWorkerSession.Cancelled(root, request);
                             var stop = Path.Combine(root, "stop-search.json");
                             goal = File.Exists(stop) && LocalWire.Read<LocalSearchStop>(stop).Matches(request);
+                            manualStop = goal && LocalWire.Read<LocalSearchStop>(stop).UseWinningRoute;
                             if (cancelled || goal) break;
                         }
                         await Task.Delay(15);
@@ -509,14 +585,17 @@ internal static class WorkerReuseTests
                     if (task != null) { if (cancelled || goal) client!.ReturnInterrupted(task, new(50, 50, 100, 100)); else client!.Finish(task); }
                     var result = new LocalSearchResult(request.Id, request.SnapshotId,
                         cancelled ? "cancelled" : request.VerifyCandidate == null ? "searched" : "done", "synthetic", 1, 0, timer.ElapsedMilliseconds,
-                        cancelled || goal ? null : Candidate(request), RootBranches: 2, Timing: new(Verifications: request.VerifyCandidate == null ? 0 : 1),
-                        MinimumLoss: minimum ? loss!.Observe(null) : null);
+                        cancelled || goal && !(manualStop && publishedWin) ? null : Candidate(request), RootBranches: 2,
+                        Timing: new(Verifications: request.VerifyCandidate == null ? 0 : 1),
+                        MinimumLoss: minimum ? loss!.Observe(null) : null, StoppedEarly: goal, StoppedOnManualVictory: manualStop);
                     LocalWire.Write(Path.Combine(root, "result.json"), result);
                     if (cancelled && request.DebugEncounter == "cancel-errors") File.AppendAllText(Path.Combine(root, "game.log"), "[ERROR] synthetic native error\n");
                     if (minimum && request.Partition == 1 && request.DebugEncounter == "minimum-errors")
                         File.AppendAllText(Path.Combine(root, "game.log"), "[ERROR] synthetic invalid proof contributor\n");
                     if (request.DebugEncounter == "first-win-errors" && request.VerifyCandidate == null)
                         File.AppendAllText(Path.Combine(root, "game.log"), "[ERROR] synthetic invalid first-win worker\n");
+                    if (request.DebugEncounter == "manual-win-errors" && request.VerifyCandidate == null && publishedWin)
+                        File.AppendAllText(Path.Combine(root, "game.log"), "[ERROR] synthetic invalid manual winner\n");
                     // Deliberately publish before teardown, like the native worker.
                     await Task.Delay(80); client?.Dispose();
                     LocalWire.Write(Path.Combine(root, "idle.json"), new LocalWorkerIdle(request.Id, request.SnapshotId, request.NativeHash, request.Partition,

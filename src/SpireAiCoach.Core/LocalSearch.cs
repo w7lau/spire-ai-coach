@@ -29,10 +29,10 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
 // A stop belongs to one frozen request. Goal stops exclude verification;
 // explicit caller cancellation also applies during verification or with goals off.
 public sealed record LocalSearchStop(string Id, string SnapshotId, string NativeHash, bool Cancel = false,
-    bool CardGoalsCompleted = false)
+    bool CardGoalsCompleted = false, bool UseWinningRoute = false)
 {
     public bool Matches(LocalSearchRequest request) =>
-        (Cancel || (request.StopOnFirstWin || request.StopOnZeroLoss &&
+        (Cancel || (UseWinningRoute || request.StopOnFirstWin || request.StopOnZeroLoss &&
             (request.CardGoals?.Enabled == true ? CardGoalsCompleted : !CardGoalsCompleted)) &&
             request.VerifyCandidate == null) &&
         Id == request.Id && SnapshotId == request.SnapshotId && NativeHash == request.NativeHash;
@@ -91,7 +91,7 @@ public sealed record LocalSearchResult(string Id, string SnapshotId, string Stat
     LocalSimulationFailure[]? RecoveredFailures = null, LocalCardGoals? CardGoals = null,
     LocalMinimumLossStatus? MinimumLoss = null, LocalSearchEvidence? Evidence = null,
     bool StoppedOnFirstWin = false, bool StoppedOnCardGoals = false, LocalSearchProgress? SearchProgress = null,
-    bool StoppedOnMinimum = false);
+    bool StoppedOnMinimum = false, bool StoppedOnManualVictory = false);
 
 public static class LocalSearchPolicy
 {
@@ -125,10 +125,12 @@ public static class LocalSearchPolicy
 
     // First-win mode is an explicit product choice, independent of loss and
     // potion targets. Only a complete victory from this frozen root qualifies.
-    public static bool CanStopAtFirstWin(LocalCandidate? candidate, LocalSearchRequest request) =>
-        request.StopOnFirstWin && request.VerifyCandidate == null &&
+    public static bool WinningRouteFrom(LocalCandidate? candidate, LocalSearchRequest request) =>
+        request.VerifyCandidate == null &&
         candidate is { Won: true, Dead: false, Hp: > 0, Actions.Length: > 0 } &&
         candidate.Actions[0].BeforeHash == request.NativeHash;
+    public static bool CanStopAtFirstWin(LocalCandidate? candidate, LocalSearchRequest request) =>
+        request.StopOnFirstWin && WinningRouteFrom(candidate, request);
     public static bool CanStopAfterVictory(LocalCandidate? candidate, LocalSearchRequest request,
         LocalMinimumLossCertificate? certificate = null) => request.VerifyCandidate == null &&
         (CanStop(candidate, request) || CanStopOnCardGoals(candidate, request) || CanStopAtMinimum(candidate, request, certificate));
@@ -164,7 +166,7 @@ public static class LocalSearchPolicy
         proof.MinimumNetHpLoss == candidate.NetHpLoss &&
         (proof.MaximumFinalHp is { } maximum ? maximum == candidate.Hp : proof.MinimumNetHpLoss > 0);
     public static bool HasMinimumProof(LocalSearchResult result) => result.CardGoals?.Enabled != true &&
-        result.Status == "done" && !result.StoppedOnFirstWin &&
+        result.Status == "done" && !result.StoppedOnFirstWin && !result.StoppedOnManualVictory &&
         result.Best is { Won: true, Dead: false, Hp: > 0, StartingHp: not null } best &&
         result.MinimumLoss is { Confirmed: true, Certificate: { } proof } &&
         proof.StartingHp == best.StartingHp && ReachesHealthProof(best, proof) &&
@@ -259,6 +261,8 @@ public static class LocalSearchPolicy
             lines.Insert(1, HasExecutionPoints(result) ?
                 "已跳过最终复核：可点击执行方案，执行时逐步核对首次模拟记录，偏离即停止。" :
                 "已跳过最终复核，但未取得完整逐步记录；目前仅供手动查看，暂不能自动执行。");
+        if (result.StoppedOnManualVictory)
+            lines.Add("已手动停止搜索并采用当前胜利路线；尚未证明最优。");
         if (result.StoppedOnFirstWin && best is { Won: true, Dead: false })
             lines.Add("已按「找到获胜路线即返回」停止搜索，未继续优化损失或用药。");
         if (HasMinimumProof(result)) lines.Add(MinimumProofDescription(best));
@@ -324,6 +328,8 @@ public static class LocalSearchPolicy
         };
         if (result.Evidence is { } evidence) lines.Insert(0, evidence.Description);
         if (best.Dead) lines.Add("注意：这条路线会死亡，不能保证存活。");
+        if (result.StoppedOnManualVictory)
+            lines.Add("已手动停止搜索并采用当前胜利路线；尚未证明最优。");
         if (result.StoppedOnFirstWin && best is { Won: true, Dead: false })
             lines.Add("已按「找到获胜路线即返回」停止搜索，未继续优化损失或用药。");
         if (HasMinimumProof(result)) lines.Add(MinimumProofDescription(best));

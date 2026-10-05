@@ -7,7 +7,7 @@ public sealed record LocalSearchEvidence(string Conclusion, string StopReason,
     int RoundLimitHits, int ActionLimitHits, int TimeLimitHits, int PagedChoiceObservations,
     int PagedReplayBranches, int UnconfirmedEnds, int PrunedPrefixes, int SimulationErrors,
     bool AttemptLimitReached, bool TimeLimitReached, bool GoalStopped, bool ExcludedActions,
-    bool IndependentVerification, int MaxRounds, int MaxActionsPerRound, bool IncludePotions)
+    bool IndependentVerification, int MaxRounds, int MaxActionsPerRound, bool IncludePotions, bool ManualStopped = false)
 {
     public string Description => Conclusion switch
     {
@@ -26,7 +26,8 @@ public sealed record LocalSearchEvidence(string Conclusion, string StopReason,
         int errors = reports.Sum(e => e.SimulationErrors) + runs.Count(r => r.Evidence == null ||
             r.Status is not ("done" or "searched") && r.Evidence.SimulationErrors == 0);
         bool excluded = request.ExcludedModels is { Length: > 0 } || reports.Any(e => e.ExcludedActions);
-        bool covered = reports.Any(e => e.ExactRootCovered && e.MaxRounds == request.MaxRounds &&
+        bool manualStopped = selected.StoppedOnManualVictory || reports.Any(e => e.ManualStopped);
+        bool covered = !manualStopped && reports.Any(e => e.ExactRootCovered && e.MaxRounds == request.MaxRounds &&
             e.MaxActionsPerRound == request.MaxDepth) && !excluded && errors == 0 && pending is null or 0;
         bool verified = !request.SkipFinalVerification && !selected.VerificationSkipped && selected.Status == "done" &&
             selected.Timing?.Verifications > 0 && LocalSearchPolicy.HasExecutionPoints(selected);
@@ -36,7 +37,7 @@ public sealed record LocalSearchEvidence(string Conclusion, string StopReason,
             reports.Sum(e => e.PagedChoiceObservations), reports.Sum(e => e.PagedReplayBranches),
             reports.Sum(e => e.UnconfirmedEnds), reports.Sum(e => e.PrunedPrefixes), errors,
             reports.Any(e => e.AttemptLimitReached), reports.Any(e => e.TimeLimitReached),
-            reports.Any(e => e.GoalStopped), excluded, verified, request.MaxRounds, request.MaxDepth, request.IncludePotions);
+            !manualStopped && reports.Any(e => e.GoalStopped), excluded, verified, request.MaxRounds, request.MaxDepth, request.IncludePotions, manualStopped);
         return merged.Classify(selected.Best);
     }
 
@@ -45,6 +46,7 @@ public sealed record LocalSearchEvidence(string Conclusion, string StopReason,
         string conclusion = best is { Won: true, Dead: false } ?
             IndependentVerification ? "verified-win" : "native-win" : ExactRootCovered ? "covered-no-win" : "unknown";
         var reasons = new List<string>();
+        if (ManualStopped) reasons.Add("已手动停止搜索并采用胜利路线");
         if (GoalStopped) reasons.Add("已达到配置的提前返回条件");
         if (AttemptLimitReached) reasons.Add("达到每路试走次数上限");
         if (TimeLimitReached || TimeLimitHits > 0) reasons.Add("达到搜索时间预算");
@@ -85,16 +87,16 @@ public sealed class LocalSearchAudit
 
     public LocalSearchEvidence Snapshot(LocalSearchRequest request, LocalCandidate? best,
         bool exactRootCovered, int? pending, int evaluated, bool timeReached, bool goalStopped,
-        int pruned, bool verified = false)
+        int pruned, bool verified = false, bool manualStopped = false)
     {
         // No certificate for partitioned roots, exclusions, unresolved stops or
         // optimization cuts. A completed rollout count alone is insufficient.
         bool covered = exactRootCovered && request.Partitions == 1 && request.Partition == 0 &&
             request.ExcludedModels is not { Length: > 0 } && SimulationErrors == 0 && UnconfirmedEnds == 0 &&
-            RoundLimitHits == 0 && ActionLimitHits == 0 && TimeLimitHits == 0 && pruned == 0 && !goalStopped;
+            RoundLimitHits == 0 && ActionLimitHits == 0 && TimeLimitHits == 0 && pruned == 0 && !goalStopped && !manualStopped;
         return new LocalSearchEvidence("unknown", "", covered, pending, TerminalWins, TerminalLosses,
             RoundLimitHits, ActionLimitHits, TimeLimitHits, PagedChoiceObservations, PagedReplayBranches,
-            UnconfirmedEnds, pruned, SimulationErrors, evaluated >= request.MaxNodes, timeReached, goalStopped,
-            request.ExcludedModels is { Length: > 0 }, verified, request.MaxRounds, request.MaxDepth, request.IncludePotions).Classify(best);
+            UnconfirmedEnds, pruned, SimulationErrors, evaluated >= request.MaxNodes, timeReached, goalStopped && !manualStopped,
+            request.ExcludedModels is { Length: > 0 }, verified, request.MaxRounds, request.MaxDepth, request.IncludePotions, manualStopped).Classify(best);
     }
 }
