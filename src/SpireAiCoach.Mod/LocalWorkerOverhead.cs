@@ -29,10 +29,11 @@ internal static class LocalWorkerOverhead
     private static readonly Dictionary<MethodBase, string> Names = [];
     private static readonly List<string> Boundaries = [];
     private static readonly List<string> Failures = [];
+    private static readonly HashSet<MethodBase> PassiveFactories = [];
+    private static readonly List<string> FactoryNames = [];
     public static bool Enabled { get; set; }
     public static bool LeanSearchChecksums { get; set; }
-    public static string[] OptionalFactories => Names.Keys.Where(m =>
-        m.DeclaringType?.Namespace == "MegaCrit.Sts2.Core.Nodes.Vfx.Forms").Select(m => Names[m]).Distinct().Order().ToArray();
+    public static string[] OptionalFactories => FactoryNames.Order().ToArray();
     // A regular compatibility search also runs in an owned hidden process.
     // Its graphics/output are unnecessary even though its real scene is retained.
     // An explicitly slow independent replay retains the complete original path.
@@ -82,22 +83,25 @@ internal static class LocalWorkerOverhead
         var disabled = AccessTools.PropertyGetter(typeof(TestMode), nameof(TestMode.IsOn));
         // Native factories already promise that presentation may be absent. Extend
         // only that leading null guard, never the global TestMode or model hooks.
-        // Form visuals have nullable power-owned receivers. Do not apply this to
-        // card-flight factories: those nodes also own pile completion callbacks.
+        // Keep the established form boundaries; additional passive factories
+        // require a lifecycle/body audit, never a card/model-name exception.
         foreach (var type in typeof(NCard).Assembly.GetTypes().Where(t =>
-            t.Namespace == "MegaCrit.Sts2.Core.Nodes.Vfx.Forms" &&
+            t.Namespace is "MegaCrit.Sts2.Core.Nodes.Vfx.Forms" or "MegaCrit.Sts2.Core.Nodes.Vfx" &&
             typeof(Node).IsAssignableFrom(t)))
         foreach (var method in type.GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Static | BindingFlags.DeclaredOnly)
             .Where(m => m.Name == "Create" && typeof(Node).IsAssignableFrom(m.ReturnType) &&
-                LocalPresentationGuard.OptionalNullFactory(m, disabled)))
+                LocalPresentationGuard.OptionalNullFactory(m, disabled) &&
+                (type.Namespace == "MegaCrit.Sts2.Core.Nodes.Vfx.Forms" || LocalPassiveVfx.Eligible(m))))
         {
             string name = type.Name + ".Create";
             var harmony = new Harmony("SpireAiCoach.owned-worker.overhead.factory." + type.FullName + "." + method.MetadataToken);
             try
             {
                 Names[method] = name;
+                if (type.Namespace != "MegaCrit.Sts2.Core.Nodes.Vfx.Forms") PassiveFactories.Add(method);
                 harmony.Patch(method, transpiler: new(AccessTools.Method(typeof(LocalWorkerOverhead), nameof(OptionalFactory))));
                 Boundaries.Add(name);
+                FactoryNames.Add(name);
             }
             catch (Exception ex)
             {
@@ -113,6 +117,13 @@ internal static class LocalWorkerOverhead
         var disabled = AccessTools.PropertyGetter(typeof(TestMode), nameof(TestMode.IsOn));
         int index = code.FindIndex(c => c.opcode != OpCodes.Nop);
         if (index < 0 || !code[index].Calls(disabled)) throw new InvalidOperationException("Native optional visual guard changed");
+        // Validate actual Harmony input, including the null return and any added
+        // factory calls, rather than relying only on original assembly metadata.
+        object? Operand(object? value) => value is Label label ? code.FindIndex(c => c.labels.Contains(label)) : value;
+        var body = code.Select((c, i) => new LocalInstruction(i, c.opcode, Operand(c.operand))).ToArray();
+        if (code.Any(c => c.blocks.Count != 0) || !LocalPresentationGuard.OptionalNullFactory(body, disabled) ||
+            PassiveFactories.Contains(original) && !LocalPassiveVfx.FactoryBody(body, original.DeclaringType!))
+            throw new InvalidOperationException("Optional factory no longer has a passive nullable boundary");
         var name = new CodeInstruction(OpCodes.Ldstr, Names[original]);
         name.labels.AddRange(code[index].labels); name.blocks.AddRange(code[index].blocks);
         code[index] = new(OpCodes.Call, AccessTools.Method(typeof(LocalWorkerOverhead), nameof(OptionalVisualsDisabled)));

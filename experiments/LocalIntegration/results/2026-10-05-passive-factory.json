@@ -1,0 +1,105 @@
+{
+  "version": "0.7.55",
+  "nativeModule": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
+  "fixedPreviouslyMeasuredPrefix": true,
+  "fullSearchBenchmark": false,
+  "productionBudgetsUnchanged": true,
+  "ordinaryFactoryPreserved": true,
+  "numericalFactorySuppressed": true,
+  "idleCpuMs": 78.125,
+  "idleMeasuredWallMs": 2000,
+  "samples": [
+    {
+      "numerical": false,
+      "order": "MonteCarlo",
+      "ElapsedMs": 12631,
+      "Timing": {
+        "RestoreMs": 9993,
+        "ActionMs": 2027,
+        "DecisionMs": 175,
+        "VerificationMs": 0,
+        "StartupMs": 0,
+        "Actions": 25,
+        "Restores": 1,
+        "Verifications": 0
+      },
+      "steps": 25,
+      "skipped": 0,
+      "nativeStateRngHistoryAndHealthMatch": true,
+      "idleMaxFps": 10,
+      "searchMaxFps": 240,
+      "reusedWorker": false
+    },
+    {
+      "numerical": true,
+      "order": "MonteCarlo",
+      "ElapsedMs": 297,
+      "Timing": {
+        "RestoreMs": 43,
+        "ActionMs": 52,
+        "DecisionMs": 114,
+        "VerificationMs": 0,
+        "StartupMs": 0,
+        "Actions": 25,
+        "Restores": 1,
+        "Verifications": 0
+      },
+      "steps": 25,
+      "skipped": 1,
+      "nativeStateRngHistoryAndHealthMatch": true,
+      "idleMaxFps": 10,
+      "searchMaxFps": 240,
+      "reusedWorker": true
+    },
+    {
+      "numerical": true,
+      "order": "MonteCarlo",
+      "ElapsedMs": 349,
+      "Timing": {
+        "RestoreMs": 42,
+        "ActionMs": 79,
+        "DecisionMs": 132,
+        "VerificationMs": 0,
+        "StartupMs": 0,
+        "Actions": 25,
+        "Restores": 1,
+        "Verifications": 0
+      },
+      "steps": 25,
+      "skipped": 1,
+      "nativeStateRngHistoryAndHealthMatch": true,
+      "idleMaxFps": 10,
+      "searchMaxFps": 240,
+      "reusedWorker": true
+    },
+    {
+      "numerical": true,
+      "order": "TurnFrontier",
+      "ElapsedMs": 639,
+      "Timing": {
+        "RestoreMs": 35,
+        "ActionMs": 55,
+        "DecisionMs": 150,
+        "VerificationMs": 0,
+        "StartupMs": 0,
+        "Actions": 25,
+        "Restores": 1,
+        "Verifications": 0
+      },
+      "steps": 25,
+      "skipped": 1,
+      "nativeStateRngHistoryAndHealthMatch": true,
+      "idleMaxFps": 10,
+      "searchMaxFps": 240,
+      "reusedWorker": true
+    }
+  ],
+  "passed": true,
+  "metadataAudit": {
+    "nativeFactoriesScanned": 142,
+    "newPassiveFactory": "NGroundFireVfx.Create",
+    "existingFormFactoriesRetained": 5,
+    "unknownFactoriesKeepOriginalPath": true,
+    "callbacksExecutedDuringAudit": false
+  }
+}

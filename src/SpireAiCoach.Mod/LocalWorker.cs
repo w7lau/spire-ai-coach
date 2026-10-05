@@ -113,6 +113,11 @@ public static class LocalWorker
             CombatManager.Instance.CombatEnded += _ => _combatSettled = true;
             CombatManager.Instance.CombatWon += _ => _combatWon = true;
             SaveManager.Instance.PrefsSave.FastMode = FastModeType.Instant;
+            // Keep the native runtime warm without rendering hundreds of empty
+            // frames between requests. Search restores the native/fast cap first.
+            int readyFps = Engine.MaxFps;
+            void IdleFrames() { Engine.MaxFps = 10; }
+            IdleFrames();
             File.WriteAllText(Path.Combine(_root, "ready"), "ready");
             string? previous = null;
             var idle = Stopwatch.StartNew();
@@ -128,7 +133,11 @@ public static class LocalWorker
                     if (request.Id != previous)
                     {
                         previous = request.Id;
-                        if (!await Search(request)) break;
+                        Engine.MaxFps = readyFps;
+                        try { if (!await Search(request)) break; }
+                        finally { IdleFrames(); }
+                        LocalWire.Write(Path.Combine(_root, "idle-runtime.json"), new { max_fps = Engine.MaxFps,
+                            observed_fps = Engine.GetFramesPerSecond(), native_search_fps = readyFps, warm = true });
                         LocalWire.Write(Path.Combine(_root, "idle.json"), new LocalWorkerIdle(request.Id,
                             request.SnapshotId, request.NativeHash, request.Partition,
                             System.Environment.GetEnvironmentVariable("SPIRE_COACH_WORKER_GENERATION") ?? "standalone"));

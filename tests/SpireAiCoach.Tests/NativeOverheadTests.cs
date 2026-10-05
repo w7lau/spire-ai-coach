@@ -17,6 +17,22 @@ public static class NativeOverheadTests
             // Metadata inspection must never execute even the disabled getter.
             Check(_effects == 0);
         });
+        test("actual optional factory input rejects a changed guard or non-null return", () =>
+        {
+            var disabled = typeof(NativeOverheadTests).GetProperty(nameof(PresentationDisabled))!.GetMethod!;
+            var valid = LocalMethodBody.Read(typeof(NativeOverheadTests).GetMethod(nameof(OptionalVisual))!)!;
+            Check(LocalPresentationGuard.OptionalNullFactory(valid, disabled));
+            var returnNull = valid.Single(i => i.Code == System.Reflection.Emit.OpCodes.Ldnull);
+            Check(!LocalPresentationGuard.OptionalNullFactory(valid.Select(i => i == returnNull ?
+                i with { Code = System.Reflection.Emit.OpCodes.Ldstr, Operand = "required visual" } : i), disabled));
+            var branch = valid.First(i => i.Code.FlowControl == System.Reflection.Emit.FlowControl.Cond_Branch);
+            Check(!LocalPresentationGuard.OptionalNullFactory(valid.Select(i => i == branch ?
+                i with { Operand = returnNull.Offset } : i), disabled));
+            var effect = typeof(Interlocked).GetMethod(nameof(Interlocked.Increment), [typeof(int).MakeByRefType()])!;
+            Check(!LocalPresentationGuard.OptionalNullFactory(
+                new[] { new LocalInstruction(-1, System.Reflection.Emit.OpCodes.Call, effect) }.Concat(valid), disabled));
+            Check(_effects == 0);
+        });
         test("decision fingerprints invalidate on state notifications frames state identity and reuse", () =>
         {
             var cache = new LocalDecisionFingerprint(); var state = new object();
