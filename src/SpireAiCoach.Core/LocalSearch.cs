@@ -57,7 +57,8 @@ public sealed record LocalCandidate(LocalAction[] Actions, int Hp, int HpLost, i
     int Rounds = 0, string StopReason = "", LocalContinuationPoint[]? Continuation = null,
     LocalDecision[]? Decisions = null, int? StartingHp = null, bool ContinuationFromSearch = false,
     LocalDamageSources? DamageSources = null, LocalRolloutStyle RolloutStyle = LocalRolloutStyle.Balanced,
-    int? InitialEnemyHp = null, double? EndTurnHpLossHint = null, LocalCardGoalOutcome? CardGoalOutcome = null)
+    int? InitialEnemyHp = null, double? EndTurnHpLossHint = null, LocalCardGoalOutcome? CardGoalOutcome = null,
+    LocalHealthChanges? HealthChanges = null)
 {
     // Gross HP costs remain useful diagnostics, but healing and victory hooks are part of the goal.
     public int? NetHpLoss => StartingHp.HasValue ? Math.Max(0, StartingHp.Value - Hp) : null;
@@ -225,7 +226,8 @@ public static class LocalSearchPolicy
             best.StartingHp is { } initial ?
                 $"{(best.Won ? "预测战后生命" : "已模拟到的生命")} {initial} → {best.Hp}/{best.MaxHp}；净生命损失 {best.NetHpLoss}{(best.Won ? "（包含战中、战后回血）" : "（战斗尚未完成）")}。" :
                 $"{(best.Won ? "预测战后生命" : "已模拟到的生命")} {best.Hp}/{best.MaxHp}。",
-            $"过程累计扣血 {best.HpLost}" + (best.StartingHp is { } start ? $"，已恢复或增加生命 {Math.Max(0, best.Hp - start + best.HpLost)}" : "") +
+            $"过程累计扣血 {best.HpLost}" + (best.HealthChanges is { } health ? $"，已恢复或增加生命 {health.HpGained}" :
+                best.StartingHp is { } start ? $"，已恢复或增加生命 {Math.Max(0, best.Hp - start + best.HpLost)}" : "") +
                 $"；敌人剩余生命合计 {best.EnemyHp}。" };
         if (result.Evidence is { } evidence)
         {
@@ -242,6 +244,13 @@ public static class LocalSearchPolicy
         if (best.DamageSources is { } damage)
             lines.Add($"伤害来源：敌方 {damage.Enemy}，自身 {damage.Self}，来源未明 {damage.Unknown + damage.Unattributed}" +
                 (damage.AccountingMatches ? "。" : "（来源记录与扣血统计不一致）。"));
+        if (best.HealthChanges is { } hpChanges)
+        {
+            if (hpChanges.MaxHpGained > 0 || hpChanges.MaxHpLost > 0)
+                lines.Add($"生命上限变化：增加 {hpChanges.MaxHpGained}，减少 {hpChanges.MaxHpLost}。");
+            if (!hpChanges.FullyObserved)
+                lines.Add("部分生命变化绕过了事件接口，已核对最终生命；中途扣血与回血次数可能不完整。");
+        }
         lines.AddRange(CardGoalAdvice(result));
         if (result.CardGoals?.Enabled != true && best.Won && best.NetHpLoss == 0 && !best.Actions.Any(a => a.PotionSlot.HasValue))
             lines.Add("已达到战后净损失 0 且不消耗药水的目标；其他收益和最短路线未证明最优。");
@@ -251,6 +260,10 @@ public static class LocalSearchPolicy
         if (result.WorkerLimit > 0) lines.Add($"本次使用 {result.Workers} 路计算，并发上限 {result.WorkerLimit}。");
         if (result.Work is { CoveredJobs: > 0 } covered) lines.Add($"跳过 {covered.CoveredJobs} 项已经完成的相同路线任务。");
         if (result.TurnSearch is { } turns) lines.Add($"另探查 {turns.Probes} 个回合组合，按可证明的界限剪枝 {turns.BoundPruned} 次，跳过 {turns.CoveredPrefixes} 个已评估前缀，仍待搜索 {turns.Pending} 个操作前缀。");
+        if (result.TurnSearch is { LossProofProbes: > 0 } proofTurns)
+            lines.Add($"其中 {proofTurns.LossProofProbes} 次只检查局部损失下界，达到界限后即结束该次探查。");
+        if (result.MinimumLoss is { Certificate: { } floor } && best.NetHpLoss is > 0 && !HasMinimumProof(result))
+            lines.Add($"已确认的净损失下界 {floor.MinimumNetHpLoss}，当前候选净损失 {best.NetHpLoss}；尚未达到已证明的最优。");
         if (result.HealthBounds is { } bounds)
         {
             if (result.TurnSearch == null) lines.Add($"按可证明的界限剪枝 {bounds.Pruned} 次。");

@@ -112,9 +112,9 @@ internal static class FollowupIntegration
             {
                 var session = new LocalChoices(choose: options => options.OrderByDescending(c => c.Preference).ThenBy(c => c.Index).First());
                 Func<CardModel, int, int> identity = (_, value) => value;
-                Func<string, CardModel[], CardSelectorPrefs?, int, Func<int[], int>?> priority = (kind, cards, prefs, ordinal) =>
+                Func<string, CardModel[], CardSelectorPrefs?, int, bool[], Func<int[], int>?> priority = (kind, cards, prefs, ordinal, gold) =>
                     (Func<int[], int>?)rank.Invoke(selectionLearner,
-                        [hologram, player, kind, cards, prefs, ordinal, LocalRolloutStyle.Balanced, true, identity]);
+                        [hologram, player, kind, cards, prefs, ordinal, LocalRolloutStyle.Balanced, true, identity, gold]);
                 priorityProperty.SetValue(session, priority); Set("_choices", session);
                 return session;
             }

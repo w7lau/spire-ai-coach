@@ -69,7 +69,15 @@ parser.add_argument('--recent-search-test', action='store_true', help='Frozen un
 parser.add_argument('--selection-paging-test', action='store_true')
 parser.add_argument('--card-goals-test', action='store_true')
 parser.add_argument('--followup-test', action='store_true', help='Short synthetic native return-to-hand/topdeck ordering probe; no full search')
+parser.add_argument('--recovery-audit', action='store_true', help='Inspect one frozen root and its actual loaded Mod callbacks; no route search or play')
+parser.add_argument('--health-audit', action='store_true', help='Also check low-level HP writes and nested healing in the owned worker')
+
+parser.add_argument('--discard-test', action='store_true', help='Short native discard/Sly/resource/selection probe; no full search')
 args = parser.parse_args()
+if args.recovery_audit and not args.replay:
+    parser.error('--recovery-audit requires --replay')
+if args.health_audit and not args.recovery_audit:
+    parser.error('--health-audit requires --recovery-audit')
 if args.recent_search_test and (not args.replay or args.seed_result or args.recorded_replay):
     parser.error('--recent-search-test requires an unseeded --replay')
 if args.route_feedback_focused_only and not args.route_feedback_test:
@@ -155,6 +163,8 @@ with worker_lock(root):
             (root / name).unlink(missing_ok=True)
     if args.followup_test:
         (root / 'integration-followup-summary.json').unlink(missing_ok=True)
+    if args.discard_test:
+        (root / 'integration-discard-summary.json').unlink(missing_ok=True)
     if args.survival_test:
         for name in ['integration-survival-summary.json', 'integration-survival-private.json']:
             (root / name).unlink(missing_ok=True)
@@ -186,7 +196,10 @@ with worker_lock(root):
     env.pop('SPIRE_NATIVE_PROBE_ROOT', None)
     env.pop('SPIRE_COACH_WORKER', None)
     env['SPIRE_LOCAL_INTEGRATION_QUICK'] = '1' if args.quick else '0'
+    env['SPIRE_COACH_RECOVERY_AUDIT'] = '1' if args.recovery_audit else '0'
+    env['SPIRE_COACH_HP_AUDIT'] = '1' if args.health_audit else '0'
     env['SPIRE_LOCAL_FOLLOWUP_TEST'] = '1' if args.followup_test else '0'
+    env['SPIRE_LOCAL_DISCARD_TEST'] = '1' if args.discard_test else '0'
     env['SPIRE_LOCAL_SELECTION_PAGING_TEST'] = '1' if args.selection_paging_test else '0'
     env['SPIRE_LOCAL_CARD_GOALS_TEST'] = '1' if args.card_goals_test else '0'
     if args.selection_paging_test:
@@ -334,6 +347,9 @@ with worker_lock(root):
                      'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
         if args.followup_test:
             names = ['integration-followup-summary.json', 'integration-success', 'integration-error.txt',
+                     'integration-stdout.log', 'integration-game.log']
+        if args.discard_test:
+            names = ['integration-discard-summary.json', 'integration-success', 'integration-error.txt',
                      'integration-stdout.log', 'integration-game.log']
         for name in names:
             if (root / name).is_file():

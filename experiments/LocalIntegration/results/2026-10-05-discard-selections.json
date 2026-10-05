@@ -1,0 +1,62 @@
+{
+  "modVersion": "0.7.42.0",
+  "nativeModule": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
+  "passed": true,
+  "zeroEnergySlyAttack": true,
+  "slyEnergyGain": 1,
+  "slyHandGain": 2,
+  "nativeDiscardRelic": true,
+  "batchSelection": true,
+  "exactOrderedReplay": true,
+  "nativeGoldQueries": 3,
+  "rankedCards": 3,
+  "rankingReadOnly": true,
+  "hookSamples": 6,
+  "autoSamples": 5,
+  "nativeSteps": 4,
+  "selections": [
+    {
+      "remainingEnergy": 0,
+      "offered": [
+        {
+          "ModelId": "CARD.WOUND",
+          "Preference": 0
+        },
+        {
+          "ModelId": "CARD.FLICK_FLACK",
+          "Preference": 48
+        }
+      ]
+    },
+    {
+      "remainingEnergy": 0,
+      "offered": [
+        {
+          "ModelId": "CARD.WOUND",
+          "Preference": 0
+        },
+        {
+          "ModelId": "CARD.TACTICIAN",
+          "Preference": 32
+        }
+      ]
+    },
+    {
+      "remainingEnergy": 0,
+      "offered": [
+        {
+          "ModelId": "CARD.WOUND",
+          "Preference": 0
+        },
+        {
+          "ModelId": "CARD.REFLEX",
+          "Preference": 20
+        }
+      ]
+    }
+  ],
+  "syntheticOnly": true,
+  "fullSearchBenchmark": false,
+  "modDllSha256": "FA9355922CB0A0A43B9880BBFB76E1E638836300C4A831F03A36B9CC4EC11C3D",
+  "sourceCommit": "20d9ec3"
+}

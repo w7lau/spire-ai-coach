@@ -14,7 +14,7 @@ public sealed class LocalTurnWork : IDisposable
         LocalTurnOffer[]? Offers = null, LocalTurnTask? Task = null,
         LocalAction[]? Actions = null, LocalDecision[]? Decisions = null,
         LocalTurnHint? Hint = null, LocalWinningBound? Bound = null, string? TerminalDigest = null,
-        LocalCandidate? Outcome = null, LocalCandidate? WinningCandidate = null);
+        LocalCandidate? Outcome = null, LocalCandidate? WinningCandidate = null, LocalLossProofFocus[]? LossProof = null);
     internal sealed record Reply(LocalTurnTask? Task, int Pending, int Active,
         int Offered, int Duplicates, int Affected = 0, string? Error = null, bool RootReady = false);
 
@@ -129,11 +129,13 @@ public sealed class LocalTurnWork : IDisposable
         switch (command.Operation)
         {
             case "offer": return Snapshot();
+            case "loss-proof":
+                _frontier.PrioritizeLossProof(command.LossProof ?? []); return Snapshot();
             case "take":
                 if (_active.ContainsKey(command.Owner)) throw new InvalidOperationException("Worker already owns a turn task");
                 if (!_frontier.TryTake(out var task, command.Owner)) return Snapshot();
                 bool guidedRollout = task.FullRollout;
-                task = task with { FullRollout = LocalTurnSearch.IsFullRollout(_taken++) || task.FullRollout || task.Prefix.Length == 1,
+                task = task with { FullRollout = !task.LossProof && (LocalTurnSearch.IsFullRollout(_taken++) || task.FullRollout || task.Prefix.Length == 1),
                     Lane = _frontier.LastLane, Focused = _frontier.LastFocused };
                 if (task.FullRollout && !guidedRollout) task = task with { Style = task.Prefix.Length <= 1 ?
                     LocalRolloutStyle.Preparation : (LocalRolloutStyle)(_rollouts++ % 4) };
@@ -236,9 +238,9 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
     private LocalTurnWork.Reply Exchange(string operation, LocalTurnTask? task = null,
         LocalAction[]? actions = null, LocalDecision[]? decisions = null,
         LocalTurnHint? hint = null, LocalWinningBound? bound = null, string? terminalDigest = null,
-        LocalCandidate? outcome = null, LocalCandidate? winningCandidate = null)
+        LocalCandidate? outcome = null, LocalCandidate? winningCandidate = null, LocalLossProofFocus[]? lossProof = null)
     {
-        var command = new LocalTurnWork.Command(_scope, _owner, operation, _offers.ToArray(), task, actions, decisions, hint, bound, terminalDigest, outcome, winningCandidate);
+        var command = new LocalTurnWork.Command(_scope, _owner, operation, _offers.ToArray(), task, actions, decisions, hint, bound, terminalDigest, outcome, winningCandidate, lossProof);
         _writer.WriteLine(JsonSerializer.Serialize(command));
         var reply = JsonSerializer.Deserialize<LocalTurnWork.Reply>(_reader.ReadLine() ?? throw new IOException("Turn task broker closed"))
             ?? throw new InvalidDataException("Empty turn task reply");
@@ -268,6 +270,7 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
         Exchange("focus", task, actions.Take(task.Prefix.Length + 1).ToArray(),
             decisions.Where(d => d.BeforeStep == task.Prefix.Length).ToArray());
     public void ObserveOutcome(LocalCandidate candidate) => Exchange("outcome", _owned, outcome: candidate);
+    public void PrioritizeLossProof(LocalLossProofFocus[] focus) => Exchange("loss-proof", lossProof: focus);
     public void PromoteWinning(LocalCandidate candidate)
     {
         if (!candidate.Won || candidate.Dead || _owned == null) return;
