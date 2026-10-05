@@ -15,6 +15,7 @@ void Test(string name, Action test) => tests.Add((name, () => { test(); return T
 void AsyncTest(string name, Func<Task> test) => tests.Add((name, test));
 TurnWorkTests.Register(Test, AsyncTest);
 MinimumLossTests.Register(Test, AsyncTest);
+HealthAccountingTests.Register(Test);
 SelectionSpaceTests.Register(Test);
 SearchEvidenceTests.Register(Test);
 

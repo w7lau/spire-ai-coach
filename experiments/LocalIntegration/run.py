@@ -69,11 +69,18 @@ parser.add_argument('--recent-search-test', action='store_true', help='Frozen un
 parser.add_argument('--selection-paging-test', action='store_true')
 parser.add_argument('--card-goals-test', action='store_true')
 parser.add_argument('--followup-test', action='store_true', help='Short synthetic native return-to-hand/topdeck ordering probe; no full search')
+parser.add_argument('--recovery-audit', action='store_true', help='Inspect one frozen root and its actual loaded Mod callbacks; no route search or play')
+parser.add_argument('--health-audit', action='store_true', help='Also check low-level HP writes and nested healing in the owned worker')
+
 parser.add_argument('--discard-test', action='store_true', help='Short native discard/Sly/resource/selection probe; no full search')
 parser.add_argument('--summon-presentation-test', action='store_true', help='Only the frozen incident first enemy turn; compare ordinary and scene-free native states')
 args = parser.parse_args()
 if args.summon_presentation_test and (not args.replay or args.seed_result or args.recorded_replay):
     parser.error('--summon-presentation-test requires an unseeded frozen --replay')
+if args.recovery_audit and not args.replay:
+    parser.error('--recovery-audit requires --replay')
+if args.health_audit and not args.recovery_audit:
+    parser.error('--health-audit requires --recovery-audit')
 if args.recent_search_test and (not args.replay or args.seed_result or args.recorded_replay):
     parser.error('--recent-search-test requires an unseeded --replay')
 if args.route_feedback_focused_only and not args.route_feedback_test:
@@ -194,6 +201,8 @@ with worker_lock(root):
     env.pop('SPIRE_NATIVE_PROBE_ROOT', None)
     env.pop('SPIRE_COACH_WORKER', None)
     env['SPIRE_LOCAL_INTEGRATION_QUICK'] = '1' if args.quick else '0'
+    env['SPIRE_COACH_RECOVERY_AUDIT'] = '1' if args.recovery_audit else '0'
+    env['SPIRE_COACH_HP_AUDIT'] = '1' if args.health_audit else '0'
     env['SPIRE_LOCAL_FOLLOWUP_TEST'] = '1' if args.followup_test else '0'
     env['SPIRE_LOCAL_DISCARD_TEST'] = '1' if args.discard_test else '0'
     env['SPIRE_LOCAL_SUMMON_PRESENTATION_TEST'] = '1' if args.summon_presentation_test else '0'

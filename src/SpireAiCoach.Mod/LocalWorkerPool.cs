@@ -123,6 +123,9 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             // completed startup spans now, clipped to this calculation only.
             timeline.Import(_lastPreparation, queueStart, timeline.ElapsedMs);
             cancellation.ThrowIfCancellationRequested();
+            if (System.Environment.GetEnvironmentVariable("SPIRE_COACH_RECOVERY_AUDIT") == "1" &&
+                results.Count == 1 && results[0].Status == "audited")
+                throw new CoachException("local_audit_complete", "所属实例已完成只读回复检查；没有可执行方案。");
             if (request.DataOnlyCombat && (!goalReached.IsCancellationRequested || goalMinimumLoss > 0) &&
                 results.Any(r => r.Status is "failed" or "unsupported" or "partial"))
             {
@@ -226,7 +229,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                         .GroupBy(p => p.Key).ToDictionary(g => g.Key, g => g.Sum(p => p.Value)),
                     results.SelectMany(r => r.TurnSearch?.RolloutStyles ?? new Dictionary<string, int>())
                         .GroupBy(p => p.Key).ToDictionary(g => g.Key, g => g.Sum(p => p.Value)),
-                    results.SelectMany(r => r.TurnSearch?.Outcomes ?? []).OrderBy(o => o.CompletedMs).ToArray()),
+                    results.SelectMany(r => r.TurnSearch?.Outcomes ?? []).OrderBy(o => o.CompletedMs).ToArray(),
+                    results.Sum(r => r.TurnSearch?.LossProofProbes ?? 0)),
                 Timing = new(allRuns.Sum(r => r.Timing?.RestoreMs ?? 0), allRuns.Sum(r => r.Timing?.ActionMs ?? 0),
                     allRuns.Sum(r => r.Timing?.DecisionMs ?? 0), allRuns.Sum(r => r.Timing?.VerificationMs ?? 0),
                     allRuns.Sum(r => r.Timing?.StartupMs ?? 0), allRuns.Sum(r => r.Timing?.Actions ?? 0), allRuns.Sum(r => r.Timing?.Restores ?? 0),

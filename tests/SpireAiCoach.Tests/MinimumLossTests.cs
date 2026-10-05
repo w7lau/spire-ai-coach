@@ -18,6 +18,84 @@ internal static class MinimumLossTests
     }
     public static void Register(Action<string, Action> test, Action<string, Func<Task>> asyncTest)
     {
+        test("loss proof targets open early turns without needing later battle terminals", () =>
+        {
+            var r = Request(); var proof = new LocalMinimumLossProof(r);
+            var root = new[] { Move(1), Move(2) };
+            var hint = new LocalTurnHint(50, 50, 100, 100, MaximumFurtherHpGain: 0);
+            LocalLossProofTrial Trial(int branch, bool finish, long? recovery = 0)
+            {
+                var next = Move(3, "round-2:" + branch, 2) with { EndTurn = true };
+                return new(50, [new(root[branch], root, [], Bound(r, 50, recovery), BeforeHint: hint,
+                    AfterHint: hint, AfterRound: 2), new(next, [next], [], Bound(r, 38, recovery),
+                    BeforeHint: hint, AfterHint: hint with { Hp = 38 }, AfterRound: 3)], 38, Won: finish);
+            }
+            proof.Observe(Trial(0, true));
+            Check(proof.Status.Certificate?.MinimumNetHpLoss == 0, "The unvisited first turn remains open");
+            var missing = proof.Status.Focus?.Single(f => f.Prefix.Length == 1);
+            Check(missing?.Prefix[0].CombatCardIndex == 2 && missing.SearchRound == 1,
+                "The missing early branch should be scheduled rather than another full winner");
+            proof.Observe(Trial(1, false));
+            Check(proof.Status.Certificate?.MinimumNetHpLoss == 12 && proof.Status.Focus?.Length == 0,
+                "Second-turn settled loss should close the bound while later turns remain open");
+            Check(proof.Status.Target?.NetHpLoss == 12 && LocalSearchPolicy.CanStopAtMinimum(Win([root[0]]), r,
+                proof.Status.Certificate), "The already acquired victory must return when the local floor catches up");
+            proof = new(r); proof.Observe(Trial(0, true, null));
+            Check(proof.Status.Focus?.Length == 0, "Unknown recovery must not monopolize scheduling for an unprovable floor");
+        });
+        test("loss proof scheduling retains native targets ordered selections and open pagination", () =>
+        {
+            var r = Request(); var proof = new LocalMinimumLossProof(r);
+            var action = Move(1) with { TargetId = 9 };
+            var choices = new[] { new LocalCardChoice("ordered-offer", 0, "opaque", "", [0, 1], "hand"),
+                new LocalCardChoice("ordered-offer", 0, "opaque", "", [1, 0], "hand") };
+            var hint = new LocalTurnHint(50, 50, 100, 100, MaximumFurtherHpGain: 0);
+            proof.Observe(new(50, [new(action with { Choices = [choices[0]] }, [action], [new(0, choices)],
+                Bound(r, 38), BeforeHint: hint)], 38, Won: true));
+            var focus = proof.Status.Focus!.Single();
+            Check(focus.Prefix[0].TargetId == 9 && focus.Prefix[0].BeforeHash == r.NativeHash &&
+                focus.Prefix[0].Choices![0].Indices!.SequenceEqual([1, 0]), "The alternate choice must retain exact ordered native identity");
+            proof.Observe(new(50, [new(action with { Choices = [choices[1]] }, [action], [new(0, choices)],
+                Bound(r, 38), BeforeHint: hint)], 38));
+            Check(proof.Status.Certificate?.MinimumNetHpLoss == 12, "All settled ordered choices establish the local floor");
+            var open = new LocalMinimumLossProof(r);
+            var page = choices.Select(c => c with { CompleteOffer = false }).ToArray();
+            foreach (int selected in new[] { 0, 1 }) open.Observe(new(50,
+                [new(action with { Choices = [page[selected]] }, [action], [new(0, page)], Bound(r, 38), BeforeHint: hint)],
+                38, Won: selected == 0));
+            Check(open.Status.Certificate?.MinimumNetHpLoss == 0, "A page never certifies unobserved choice combinations");
+        });
+        test("loss proof priority uses short probes while preserving other search lanes", () =>
+        {
+            var search = new LocalTurnSearch(3);
+            var hint = new LocalTurnHint(50, 50, 100, 100);
+            for (int i = 1; i <= 8; i++) search.Offer([Move(i)], 1, hint);
+            search.PrioritizeLossProof([new([Move(8)], 1, hint)]);
+            Check(search.TryTake(out var proof) && proof.Prefix[0].CombatCardIndex == 8 && proof.LossProof && !proof.FullRollout,
+                "A one-action proof prefix must not become a full battle rollout");
+            Check(search.TryTake(out var normal) && !normal.LossProof, "Normal exploration retains its lane");
+            var identities = new HashSet<uint?> { proof.Prefix[0].CombatCardIndex, normal.Prefix[0].CombatCardIndex };
+            while (search.TryTake(out var task)) identities.Add(task.Prefix[0].CombatCardIndex);
+            Check(identities.Count == 8, "Proof ordering cannot delete legal search work");
+        });
+        asyncTest("shared loss proof tasks stay short across native-owner scheduling protocol", async () =>
+        {
+            var r = Request(); using var broker = new LocalTurnWork(r, 2);
+            var wire = r with { TurnWorkPipe = broker.PipeName };
+            using var left = new LocalTurnWorkClient(wire);
+            using var right = new LocalTurnWorkClient(wire with { Partition = 1 });
+            var hint = new LocalTurnHint(50, 50, 100, 100, MaximumFurtherHpGain: 0);
+            left.Offer([], 1, hint);
+            Check(left.TryTake(out var root), "Root task missing");
+            for (int i = 1; i <= 8; i++) left.Offer([Move(i)], 1, hint);
+            left.PrioritizeLossProof([new([Move(8)], 1, hint)]);
+            Check(right.TryTake(out var normal) && !normal.LossProof, "Normal lane disappeared");
+            left.Finish(root);
+            Check(left.TryTake(out var proof) && proof.LossProof && !proof.FullRollout &&
+                proof.Prefix[0].CombatCardIndex == 8, "The broker upgraded a short one-card proof task into a full battle");
+            left.Finish(proof); right.Finish(normal);
+            await Task.CompletedTask;
+        });
         test("minimum loss covers all first-turn branches without finishing later battles", () =>
         {
             var r = Request(); var proof = new LocalMinimumLossProof(r);
