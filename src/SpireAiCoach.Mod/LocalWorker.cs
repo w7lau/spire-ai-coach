@@ -239,13 +239,17 @@ public static class LocalWorker
                 allowance.MaximumFurtherHpGain);
         }
         bool stoppedEarly = false;
+        bool stoppedOnManualVictory = false;
         bool StopRequested()
         {
             CheckCancellation();
-            if ((!request.StopOnZeroLoss && !request.StopOnFirstWin) || request.VerifyCandidate != null) return false;
+            if (request.VerifyCandidate != null) return false;
             var path = Path.Combine(_root, "stop-search.json");
             if (!File.Exists(path)) return false;
-            return LocalWire.Read<LocalSearchStop>(path).Matches(request);
+            var command = LocalWire.Read<LocalSearchStop>(path);
+            if (!command.Matches(request)) return false;
+            stoppedOnManualVictory |= command.UseWinningRoute;
+            return true;
         }
         var treeOrder = turnMode ? LocalSearchOrder.MonteCarlo : request.SearchOrder;
         var noPotionSearch = new LocalSearchTree(1729 + request.Partition, order: treeOrder, cardGoals: request.CardGoals);
@@ -356,12 +360,13 @@ public static class LocalWorker
                 Trace: status == "running" ? null : _timeline!.Snapshot(), StoppedEarly: stoppedEarly, TurnSearch: TurnStats(), RootBranches: rootBranches,
                 HealthBounds: HealthStats(), Failure: failure,
                 Trials: status == "running" ? null : trials.ToArray(), CardGoals: request.CardGoals, MinimumLoss: minimumStatus,
-                StoppedOnFirstWin: stoppedEarly && LocalSearchPolicy.CanStopAtFirstWin(best, request),
-                StoppedOnCardGoals: stoppedEarly && LocalSearchPolicy.CanStopOnCardGoals(best, request),
-                StoppedOnMinimum: stoppedEarly && LocalSearchPolicy.RequiresMinimumConfirmation(best, request, minimumStatus?.Certificate),
+                StoppedOnFirstWin: stoppedEarly && !stoppedOnManualVictory && LocalSearchPolicy.CanStopAtFirstWin(best, request),
+                StoppedOnCardGoals: stoppedEarly && !stoppedOnManualVictory && LocalSearchPolicy.CanStopOnCardGoals(best, request),
+                StoppedOnMinimum: stoppedEarly && !stoppedOnManualVictory && LocalSearchPolicy.RequiresMinimumConfirmation(best, request, minimumStatus?.Certificate),
+                StoppedOnManualVictory: stoppedOnManualVictory,
                 Evidence: status == "running" ? null : audit.Snapshot(request, best, coverage?.Exhausted == true,
                     turns?.Count, evaluated, searchFinished ? searchTimeReached : budget.Elapsed.TotalSeconds >= request.BudgetSeconds,
-                    stoppedEarly, boundPruned, independentlyVerified)));
+                    stoppedEarly, boundPruned, independentlyVerified, stoppedOnManualVictory)));
         }
         try
         {
@@ -1148,7 +1153,7 @@ public static class LocalWorker
             await Cleanup();
             session?.Dispose();
             Publish(best == null ? stoppedEarly || sharedExhausted ? "searched" : "unsupported" : request.DeferVerification ? "searched" : "done",
-                stoppedEarly ? request.StopOnFirstWin ? best?.Won == true ?
+                stoppedEarly ? stoppedOnManualVictory ? "已手动停止后续搜索，保留已取得的胜利候选。" : request.StopOnFirstWin ? best?.Won == true ?
                     "已找到获胜路线，停止后续搜索。" : "已停止其余搜索。" :
                     request.CardGoals?.Enabled == true ? LocalSearchPolicy.CanStopOnCardGoals(best, request) ?
                     "当前消耗目标已完成，损血符合设置，停止后续搜索。" : "已停止其余搜索。" :

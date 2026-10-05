@@ -46,6 +46,8 @@ public sealed class CoachOverlay
     private Button _continueOptimize = null!;
     private LocalWorkerPool _localPool = null!;
     private bool _localAnalyzing;
+    private LocalVictoryReturn? _victoryReturn;
+    private Button _useVictory = null!;
     private LocalSearchRequest? _lastSearchRequest;
     private CheckBox _localStopOnZeroLoss = null!;
     private CheckBox _localStopOnFirstWin = null!;
@@ -314,6 +316,11 @@ public sealed class CoachOverlay
         _feedback = Wrapped(loadError ?? "密钥不会写入游戏日志，也不会提交到 GitHub。"); _settingsPanel.AddChild(_feedback);
         var resultSection = CoachTheme.Section(body, "推荐路线");
         _freshness = Wrapped(""); _freshness.AddThemeColorOverride("font_color", CoachTheme.Muted); resultSection.AddChild(_freshness);
+        _useVictory = new Button { Name = "LocalUseWinningRoute", Text = "停止并使用胜利路线", Disabled = true,
+            TooltipText = "找到胜利路线后可用：停止后续搜索，按当前复核设置生成可执行方案；随后点击「执行方案」。",
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
+        _useVictory.Pressed += UseWinningRoute;
+        shell.AddChild(_useVictory);
         var executionRow = new GridContainer { Columns = 3 }; shell.AddChild(executionRow);
         _continueOptimize = new Button { Text = "继续搜索", Disabled = true,
             TooltipText = "从尚未探索的分支继续；没有获胜路线也可继续。次数、时间和并发可调整，改变战斗状态或搜索目标需重新计算。" }; resultSection.AddChild(_continueOptimize);
@@ -414,6 +421,7 @@ public sealed class CoachOverlay
         while (_mainThread.TryDequeue(out var action)) action();
         foreach (var worker in _pendingLocalProgress.Keys)
             if (_pendingLocalProgress.TryRemove(worker, out var local)) _localProgress.Accept(local);
+        _useVictory.Disabled = !_localAnalyzing || _request == null || _victoryReturn?.CanRequest != true;
         var preview = Interlocked.Exchange(ref _pendingStream, null);
         if (preview != null && preview.Generation == _generation && _streaming)
         {
@@ -802,6 +810,9 @@ public sealed class CoachOverlay
         _request = cancellation;
         _lastLocalOrder = order;
         _localAnalyzing = true;
+        var victoryReturn = new LocalVictoryReturn(request);
+        _victoryReturn = victoryReturn;
+        _useVictory.Disabled = true;
         _continuation = null;
         _pendingLocalProgress.Clear();
         _localProgress.Begin(request);
@@ -818,7 +829,7 @@ public sealed class CoachOverlay
             {
                 var result = await _localPool.Analyze(request, installation,
                     message => _mainThread.Enqueue(() => { if (generation == _generation) _status.Text = message; }), cancellation.Token,
-                    preview => { if (!cancellation.IsCancellationRequested && generation == Volatile.Read(ref _generation)) _pendingLocalProgress[preview.Worker] = preview; });
+                    preview => { if (!cancellation.IsCancellationRequested && generation == Volatile.Read(ref _generation)) _pendingLocalProgress[preview.Worker] = preview; }, victoryReturn);
                 double ready = timeline.ElapsedMs;
                 _mainThread.Enqueue(() =>
                 {
@@ -852,7 +863,7 @@ public sealed class CoachOverlay
                                 request.Id, request.SnapshotId, request.NativeHash, completed_at = DateTimeOffset.UtcNow,
                                 version = typeof(ModEntry).Assembly.GetName().Version!.ToString(3), request.SearchOrder, request.MaxNodes, request.MaxRounds, request.BudgetSeconds,
                                 ConfiguredWorkers = request.Workers, result.WorkerLimit,
-                                request.SkipFinalVerification, request.StopOnZeroLoss, request.StopOnFirstWin, result.StoppedOnFirstWin, result.StoppedOnCardGoals, result.StoppedOnMinimum, request.TargetVictoryRounds,
+                                request.SkipFinalVerification, request.StopOnZeroLoss, request.StopOnFirstWin, result.StoppedOnFirstWin, result.StoppedOnCardGoals, result.StoppedOnMinimum, result.StoppedOnManualVictory, request.TargetVictoryRounds,
                                 request.TargetPotionUses, request.RequireKnownZeroEnemyDamage, result.VerificationSkipped, result.ElapsedMs, result.Workers,
                                 request.CardGoals,
                                 result.Evaluated, result.Victories, result.HealthBounds, result.RecoveredFailures,
@@ -866,7 +877,7 @@ public sealed class CoachOverlay
                         catch (Exception ex) { GD.Print("[SpireAiCoach] Timing save failed: " + ex.GetType().Name); }
                     });
                     _adviceHash = request.SnapshotId;
-                    string optimality = result.StoppedOnFirstWin ? "已找到获胜路线，未继续优化损失。" :
+                    string optimality = result.StoppedOnManualVictory ? "已手动采用胜利路线，尚未证明最优。" : result.StoppedOnFirstWin ? "已找到获胜路线，未继续优化损失。" :
                         result.StoppedOnCardGoals ? "已完成当前消耗目标，损血符合设置。" :
                         LocalSearchPolicy.HasMinimumProof(result) ? "已达到可证明的最优战后血量。" : "候选路线尚未证明最优。";
                     _freshness.Text = result.VerificationSkipped ? LocalSearchPolicy.HasExecutionPoints(result) ?
@@ -895,11 +906,29 @@ public sealed class CoachOverlay
                 {
                     if (generation != _generation) return;
                     _localAnalyzing = false; _request = null; _cancel.Disabled = true;
+                    _victoryReturn = null; _useVictory.Disabled = true;
                     _analyze.Disabled = _snapshot?.CanAdvise != true; _localAnalyze.Disabled = _turnAnalyze.Disabled = _analyze.Disabled;
                 });
                 cancellation.Dispose();
             }
         });
+    }
+
+    private void UseWinningRoute()
+    {
+        // Refresh and fingerprint on the game thread before accepting this
+        // user's choice, using the same frozen root as completed-plan display.
+        RefreshSnapshot();
+        if (!_localAnalyzing || _request == null || _victoryReturn?.CanRequest != true) return;
+        try
+        {
+            if (!_victoryReturn.MatchesRoot(_snapshotHash, LocalCapture.Fingerprint()))
+            { Cancel("原生战斗状态已变化，请重新计算。"); return; }
+        }
+        catch (Exception ex) { Cancel("当前战斗状态无法确认：" + ex.Message); return; }
+        if (!_victoryReturn.TryRequest()) return;
+        _useVictory.Disabled = true;
+        _status.Text = "正在停止后续搜索并确认胜利路线…";
     }
 
     private void Cancel(string status)
@@ -909,6 +938,7 @@ public sealed class CoachOverlay
         _continuation = null; _continuationPending = false;
         _execute.Disabled = true;
         _continueOptimize.Disabled = true;
+        _victoryReturn?.CloseSearch(); _victoryReturn = null; _useVictory.Disabled = true;
         ++_generation;
         if (_localAnalyzing)
         {

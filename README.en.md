@@ -8,7 +8,7 @@ A **Slay the Spire 2** battle assistant with **AI advice for the current turn**,
 
 1. Subscribe through the Workshop, launch the game and enable the mod. Alternatively, place the release's `SpireAiCoach` folder in the game's `mods` directory. Choose one installation method.
 2. Press **F8** to open or close the panel.
-3. Under “本地整场计算” (Local whole-battle planning), choose “路线采样算法” (Rollout Sampling) or “分支扩展算法” (Branch Expansion). Follow the plan manually or click “执行方案” (Execute plan). **Esc stops execution**.
+3. Under “本地整场计算” (Local whole-battle planning), choose “路线采样算法” (Rollout Sampling) or “分支扩展算法” (Branch Expansion). Once a victory is found, “停止并使用胜利路线” (Stop and use winning route) ends further search and keeps a plan using your verification setting; Cancel discards the calculation. Follow the plan manually or click “执行方案” (Execute plan). **Esc stops execution**.
 4. For AI advice, enter a Chat Completions compatible URL, model and API key under “AI 指导与设置”, save, and click “AI 分析”.
 
 ## Local battle planning

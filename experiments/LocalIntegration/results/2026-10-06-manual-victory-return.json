@@ -1,0 +1,97 @@
+{
+  "version": "0.7.62",
+  "passed": true,
+  "nativeGame": true,
+  "scope": "Actual manual-return UI button; two algorithms; final verification on/off; owned synthetic native combat",
+  "samples": [
+    {
+      "algorithm": "MonteCarlo",
+      "skipFinalVerification": false,
+      "autoStopEnabled": false,
+      "cardGoalsEnabled": false,
+      "Evaluated": 9,
+      "Victories": 9,
+      "finalHp": 106,
+      "HpChange": 6,
+      "finalVerifications": 1,
+      "stopToResultMs": 5746,
+      "usableExecutionPoints": true,
+      "executeButtonEnabled": true,
+      "actualButtonSignal": true,
+      "automaticExecution": false,
+      "sourceCombatUnchanged": true
+    },
+    {
+      "algorithm": "MonteCarlo",
+      "skipFinalVerification": true,
+      "autoStopEnabled": true,
+      "cardGoalsEnabled": true,
+      "Evaluated": 9,
+      "Victories": 9,
+      "finalHp": 106,
+      "HpChange": 6,
+      "finalVerifications": 0,
+      "stopToResultMs": 531,
+      "usableExecutionPoints": true,
+      "executeButtonEnabled": true,
+      "actualButtonSignal": true,
+      "automaticExecution": false,
+      "sourceCombatUnchanged": true
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "skipFinalVerification": false,
+      "autoStopEnabled": false,
+      "cardGoalsEnabled": false,
+      "Evaluated": 11,
+      "Victories": 11,
+      "finalHp": 106,
+      "HpChange": 6,
+      "finalVerifications": 1,
+      "stopToResultMs": 1325,
+      "usableExecutionPoints": true,
+      "executeButtonEnabled": true,
+      "actualButtonSignal": true,
+      "automaticExecution": false,
+      "sourceCombatUnchanged": true
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "skipFinalVerification": true,
+      "autoStopEnabled": true,
+      "cardGoalsEnabled": true,
+      "Evaluated": 10,
+      "Victories": 10,
+      "finalHp": 106,
+      "HpChange": 6,
+      "finalVerifications": 0,
+      "stopToResultMs": 532,
+      "usableExecutionPoints": true,
+      "executeButtonEnabled": true,
+      "actualButtonSignal": true,
+      "automaticExecution": false,
+      "sourceCombatUnchanged": true
+    }
+  ],
+  "layout": [
+    {
+      "width": 1280,
+      "height": 720,
+      "fixedButtonVisible": true,
+      "overflow": false
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "fixedButtonVisible": true,
+      "overflow": false
+    }
+  ],
+  "testedDllSha256": "37e9c90dc7483d3c257feffcfed681110620dd75221915e2a333a218473bc1e9",
+  "installedDllUnchanged": true,
+  "nativeScope": "Native game with coach and private integration mod",
+  "validationLimits": [
+    "Owned synthetic native map-entry combat; actual button signals, not desktop input",
+    "No arbitrary-Mod compatibility, live-player execution or search speed/optimality claim"
+  ]
+}
