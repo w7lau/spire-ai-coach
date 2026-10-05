@@ -22,7 +22,7 @@ public sealed class CoachOverlay
     private CancellationTokenSource? _request;
     private int _generation;
     private long _nextPoll;
-    private bool _f8, _f9, _f10;
+    private bool _f8;
     private bool _disposed;
     private CanvasLayer _layer = null!;
     private PanelContainer _panel = null!;
@@ -99,7 +99,8 @@ public sealed class CoachOverlay
         catch (Exception ex) { loadError = $"本地设置未能读取（{ex.GetType().Name}），请重新填写后保存。"; }
         _layer = new CanvasLayer { Name = "SpireAiCoach", Layer = 90 };
         _tree.Root.AddChild(_layer);
-        var toggle = new Button { Name = "CoachToggle", Text = "尖塔教练 · F8", Position = new Vector2(24, 12) };
+        var toggle = new Button { Name = "CoachToggle", Text = "尖塔教练 · F8", Position = new Vector2(24, 12),
+            Visible = _settings.ShowOverlayButton };
         toggle.Pressed += TogglePanel;
         _layer.AddChild(toggle);
 
@@ -116,7 +117,7 @@ public sealed class CoachOverlay
         var heading = new HBoxContainer(); shell.AddChild(heading);
         var modVersion = typeof(CoachOverlay).Assembly.GetName().Version?.ToString(3) ?? "未知";
         var title = new Label { Text = "尖塔教练", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-            TooltipText = "F8 面板 · F9 AI 指导 · F10 AI 设置\nv" + modVersion };
+            TooltipText = "F8 打开 / 收起面板\nv" + modVersion };
         title.AddThemeFontSizeOverride("font_size", 22); title.AddThemeColorOverride("font_color", CoachTheme.Gold);
         heading.AddChild(title);
         var version = new Label { Name = "CoachVersion", Text = "v" + modVersion,
@@ -126,24 +127,34 @@ public sealed class CoachOverlay
         _battle = Wrapped("进入战斗后可计算。"); shell.AddChild(_battle);
         _status = Wrapped("本地计算无需配置 API。"); _status.AddThemeColorOverride("font_color", CoachTheme.Gold); shell.AddChild(_status);
         var row = new HBoxContainer();
-        _analyze = new Button { Text = "AI 分析 · F9", Disabled = true }; row.AddChild(_analyze);
+        _analyze = new Button { Text = "AI 分析", Disabled = true }; row.AddChild(_analyze);
         _analyze.Pressed += Analyze;
         _cancel = new Button { Text = "取消", Disabled = true };
         _cancel.Pressed += () => Cancel("已取消分析。");
-        var config = new Button { Text = "AI 设置 · F10" }; row.AddChild(config);
+        var config = new Button { Text = "AI 设置" }; row.AddChild(config);
         config.Pressed += () => { _aiOptions.Show(); _settingsPanel.Visible = !_settingsPanel.Visible; };
         var hide = new Button { Text = "收起" }; heading.AddChild(hide);
         hide.Pressed += () => SetPanelVisible(false);
         var localRow = new GridContainer { Columns = 2 }; shell.AddChild(localRow);
-        _localAnalyze = new Button { Name = "LocalBattleSearch", Text = "本地计算", Disabled = true,
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, TooltipText = "整场战斗 · 原算法。两种算法共用搜索设置；每路达到尝试次数或时间上限即结束，准备和复核另计。" }; localRow.AddChild(_localAnalyze);
+        _localAnalyze = new Button { Name = "LocalBattleSearch", Text = LocalCalculation.Name(LocalSearchOrder.MonteCarlo), Disabled = true,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, TooltipText = "整场战斗 · 以完整战斗路线组织探索。两种算法共用搜索设置；每路达到尝试次数或时间上限即结束，准备和复核另计。" }; localRow.AddChild(_localAnalyze);
         _localAnalyze.Pressed += () => AnalyzeLocal(LocalSearchOrder.MonteCarlo);
-        _turnAnalyze = new Button { Name = "LocalTurnSearch", Text = "新算法计算", Disabled = true,
+        _turnAnalyze = new Button { Name = "LocalTurnSearch", Text = LocalCalculation.Name(LocalSearchOrder.TurnFrontier), Disabled = true,
             SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, TooltipText = "整场战斗 · 按回合组织搜索。预算与本地计算一致，共用原生模拟和执行保护。" }; localRow.AddChild(_turnAnalyze);
         CoachTheme.Accent(_turnAnalyze);
         _turnAnalyze.Pressed += () => AnalyzeLocal(LocalSearchOrder.TurnFrontier);
         var options = CoachTheme.Section(body, "计算选项");
         var advanced = new VBoxContainer { Name = "LocalAdvancedOptions", Visible = false };
+        var showEntry = new CheckBox { Name = "ShowOverlayButton", Text = "显示左上角入口", ButtonPressed = _settings.ShowOverlayButton,
+            TooltipText = "默认隐藏。无论是否显示入口，都可以用 F8 打开面板。进入战斗不会自动展开。" };
+        showEntry.Toggled += enabled =>
+        {
+            _settings = _settings with { ShowOverlayButton = enabled };
+            toggle.Visible = enabled;
+            try { _store.SaveInterfaceOptions(enabled); }
+            catch (Exception ex) { _status.Text = "界面选项本次已生效，保存失败：" + ex.GetType().Name; }
+        };
+        advanced.AddChild(showEntry);
         _resources = Wrapped("计算资源 · 尚未准备"); _resources.AddThemeColorOverride("font_color", CoachTheme.Muted); advanced.AddChild(_resources);
         var localOptions = new GridContainer { Columns = 2 }; advanced.AddChild(localOptions);
         localOptions.AddChild(new Label { Text = "并发上限", TooltipText = "0 自动，1–16 为手动上限。按待办任务逐步增加，健康实例保留供后续计算。" });
@@ -355,14 +366,14 @@ public sealed class CoachOverlay
 
     private void ApplyPanelContext(object? combat, bool executing)
     {
-        // A manual choice lasts for this battle/execution context. A new
-        // context restores the default, without reopening on every refresh.
+        // Only a manual request opens the panel. New battle/execution contexts
+        // restore the hidden default, without reopening on polling or completion.
         if (!ReferenceEquals(_panelCombat, combat) || _panelExecuting != executing)
         {
             _panelCombat = combat; _panelExecuting = executing;
             _manualPanelVisibility = null;
         }
-        _panel.Visible = _manualPanelVisibility ?? (combat != null && !executing);
+        _panel.Visible = _manualPanelVisibility ?? false;
     }
 
     private void SetPanelVisible(bool visible)
@@ -396,15 +407,13 @@ public sealed class CoachOverlay
                 _status.Text = "正在接收 AI 回复…";
             }
         }
-        bool f8 = Input.IsKeyPressed(Key.F8), f9 = Input.IsKeyPressed(Key.F9), f10 = Input.IsKeyPressed(Key.F10);
+        bool f8 = Input.IsKeyPressed(Key.F8);
         var focus = _tree.Root.GuiGetFocusOwner();
         if (focus is not LineEdit && focus is not TextEdit)
         {
             if (f8 && !_f8) TogglePanel();
-            if (f10 && !_f10) { SetPanelVisible(true); _aiOptions.Show(); _settingsPanel.Visible = !_settingsPanel.Visible; }
-            if (f9 && !_f9) { SetPanelVisible(true); Analyze(); }
         }
-        _f8 = f8; _f9 = f9; _f10 = f10;
+        _f8 = f8;
         long now = System.Environment.TickCount64;
         if (now < _nextPoll) return;
         _nextPoll = now + 750;

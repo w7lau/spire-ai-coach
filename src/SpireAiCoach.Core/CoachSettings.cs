@@ -7,6 +7,7 @@ public sealed record CoachSettings
     public bool RevealDrawOrder { get; init; } = true;
     public bool RememberKey { get; init; }
     public bool IncludeStreamUsage { get; init; } = true;
+    public bool ShowOverlayButton { get; init; }
     public int TimeoutSeconds { get; init; } = 120;
     public int LocalWorkers { get; init; } = 0;
     public bool LocalIncludePotions { get; init; }

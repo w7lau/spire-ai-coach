@@ -95,6 +95,32 @@ internal static class PresentationIntegration
             visibilityChecks.Add(new { name, visible = panel.Visible });
         }
         CheckVisibility("outside combat initially hidden", false);
+        if (toggle.Visible) throw new InvalidOperationException("Corner entry must default to hidden");
+        async Task KeyStroke(Key key)
+        {
+            Input.ParseInputEvent(new InputEventKey { Keycode = key, PhysicalKeycode = key, Pressed = true });
+            for (int i = 0; i < 3; i++) await tree.ToSignal(tree, SceneTree.SignalName.ProcessFrame);
+            Input.ParseInputEvent(new InputEventKey { Keycode = key, PhysicalKeycode = key, Pressed = false });
+            await tree.ToSignal(tree, SceneTree.SignalName.ProcessFrame);
+        }
+        await KeyStroke(Key.F9); await KeyStroke(Key.F10);
+        CheckVisibility("former shortcuts do not open panel", false);
+        if (typeof(CoachOverlay).GetField("_request", fields)!.GetValue(overlay) != null ||
+            ((Control)typeof(CoachOverlay).GetField("_settingsPanel", fields)!.GetValue(overlay)!).Visible)
+            throw new InvalidOperationException("Former shortcuts triggered AI or settings");
+        await KeyStroke(Key.F8); CheckVisibility("single shortcut opens once while held", true);
+        await KeyStroke(Key.F8); CheckVisibility("single shortcut closes panel", false);
+        var entrySetting = CheckBox("ShowOverlayButton");
+        entrySetting.ButtonPressed = true;
+        if (!toggle.Visible) throw new InvalidOperationException("Entry opt-in did not apply");
+        var interfaceStore = (SettingsStore)typeof(CoachOverlay).GetField("_store", fields)!.GetValue(overlay)!;
+        if (!interfaceStore.Load().Settings.ShowOverlayButton) throw new InvalidOperationException("Entry preference was not saved");
+        entrySetting.ButtonPressed = false;
+        if (toggle.Visible || interfaceStore.Load().Settings.ShowOverlayButton)
+            throw new InvalidOperationException("Hidden entry preference was not saved");
+        foreach (var (node, order) in new[] { ("LocalBattleSearch", LocalSearchOrder.MonteCarlo), ("LocalTurnSearch", LocalSearchOrder.TurnFrontier) })
+            if (((Button)layer.FindChild(node, true, false)!).Text != LocalCalculation.Name(order))
+                throw new InvalidOperationException("Search button name differs from result name");
         toggle.EmitSignal(Button.SignalName.Pressed);
         for (int i = 0; i < 4; i++) await tree.ToSignal(tree, SceneTree.SignalName.ProcessFrame);
         CheckVisibility("manual outside-combat open survives frame and snapshot updates", true);
@@ -103,15 +129,15 @@ internal static class PresentationIntegration
         // Opaque context tokens test panel transitions only. They are never
         // installed as game combat states or passed to gameplay code.
         var battle = new object();
-        visibility.Invoke(overlay, [battle, false]); CheckVisibility("enter battle shows", true);
+        visibility.Invoke(overlay, [battle, false]); CheckVisibility("enter battle remains hidden", false);
         manual.SetValue(overlay, false);
         visibility.Invoke(overlay, [battle, false]); CheckVisibility("manual battle hide persists", false);
         visibility.Invoke(overlay, [battle, true]); CheckVisibility("execution starts hidden", false);
         manual.SetValue(overlay, true);
         visibility.Invoke(overlay, [battle, true]); CheckVisibility("manual execution open is retained", true);
-        visibility.Invoke(overlay, [battle, false]); CheckVisibility("execution stops in battle shows", true);
+        visibility.Invoke(overlay, [battle, false]); CheckVisibility("execution stops in battle remains hidden", false);
         visibility.Invoke(overlay, [null, false]); CheckVisibility("combat exit hides", false);
-        visibility.Invoke(overlay, [new object(), false]); CheckVisibility("next combat resets manual override", true);
+        visibility.Invoke(overlay, [new object(), false]); CheckVisibility("next combat resets to hidden", false);
         visibility.Invoke(overlay, [null, false]);
         toggle.EmitSignal(Button.SignalName.Pressed);
         // Exercise the merged budget controls in this private userdata without
@@ -271,6 +297,8 @@ internal static class PresentationIntegration
             , merged_budget_controls_persisted = true, both_algorithm_requests_checked = true,
             manual_worker_limit_preserved = 8, visibility_checks = visibilityChecks,
             visibility_contexts_are_ui_only = true
+            , entry_default_hidden = true, entry_opt_in_persisted = true, only_f8_global_shortcut = true,
+            previous_f9_f10_have_no_action = true, algorithm_names_match_results = true
             , skip_final_verification_defaults_checked = true, checkbox_options_persisted = true,
             checkbox_algorithm_checks = optionChecks, advanced_and_diagnostics_default_hidden = true,
             visualization_input_is_presentation_fixture_only = true, stale_and_late_progress_rejected = true,

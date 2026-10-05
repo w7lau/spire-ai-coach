@@ -32,6 +32,30 @@ static class LocalLimitsTests
                     copy.NumericalExecution && copy.DataOnlyCombat && copy.DataOnlyRun && copy.TrimWorkerOverhead);
             }
         });
+        test("interface preference defaults hidden and preserves credentials and unrelated settings", () =>
+        {
+            var directory = Path.Combine(Path.GetTempPath(), "spire-interface-" + Guid.NewGuid().ToString("N"));
+            try
+            {
+                Directory.CreateDirectory(directory);
+                var config = Path.Combine(directory, "config.json");
+                File.WriteAllText(config, "{\"model\":\"\",\"local_workers\":8,\"extension_setting\":{\"value\":7}}");
+                var key = Path.Combine(directory, "api-key.dpapi");
+                File.WriteAllBytes(key, [1, 2, 3, 4]);
+                var store = new SettingsStore(directory);
+                Check(!store.Load().Settings.ShowOverlayButton && !new CoachSettings().ShowOverlayButton);
+                var before = JsonNode.Parse(File.ReadAllText(config))!;
+                store.SaveInterfaceOptions(true);
+                before["show_overlay_button"] = true;
+                Check(JsonNode.DeepEquals(before, JsonNode.Parse(File.ReadAllText(config))));
+                Check(File.ReadAllBytes(key).SequenceEqual(new byte[] { 1, 2, 3, 4 }));
+                store.SaveLocalWorkers(4);
+                Check(store.Load().Settings.ShowOverlayButton && store.Load().Settings.LocalWorkers == 4);
+                store.SaveInterfaceOptions(false);
+                Check(!store.Load().Settings.ShowOverlayButton && store.Load().Settings.Model == "");
+            }
+            finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
+        });
         test("local search limits persist without AI credentials and survive a concurrency-only save", () =>
         {
             var directory = Path.Combine(Path.GetTempPath(), "spire-limits-" + Guid.NewGuid().ToString("N"));

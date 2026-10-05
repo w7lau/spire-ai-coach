@@ -1,0 +1,164 @@
+{
+  "passed": true,
+  "version": "0.7.51",
+  "regular_scene_dependency_preserved": true,
+  "data_callback_preserves_unsubscribe": true,
+  "creature_hp_unchanged": true,
+  "no_combat_scene": true,
+  "no_worker_started": true,
+  "layouts": [
+    {
+      "width": 1280,
+      "height": 720,
+      "measured_width": 560,
+      "measured_height": 1200,
+      "controls": 33,
+      "horizontal_overflow": 0,
+      "primary_actions_fixed": true,
+      "expanded_sections_checked": 3,
+      "visualization_workers": 16,
+      "visualization_rendered": true,
+      "hidden_and_finished_animation_stops": true,
+      "route_sixteen_selectable": true
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "measured_width": 560,
+      "measured_height": 1840,
+      "controls": 33,
+      "horizontal_overflow": 0,
+      "primary_actions_fixed": true,
+      "expanded_sections_checked": 3,
+      "visualization_workers": 16,
+      "visualization_rendered": true,
+      "hidden_and_finished_animation_stops": true,
+      "route_sixteen_selectable": true
+    }
+  ],
+  "merged_budget_controls_persisted": true,
+  "both_algorithm_requests_checked": true,
+  "manual_worker_limit_preserved": 8,
+  "visibility_checks": [
+    {
+      "name": "outside combat initially hidden",
+      "visible": false
+    },
+    {
+      "name": "former shortcuts do not open panel",
+      "visible": false
+    },
+    {
+      "name": "single shortcut opens once while held",
+      "visible": true
+    },
+    {
+      "name": "single shortcut closes panel",
+      "visible": false
+    },
+    {
+      "name": "manual outside-combat open survives frame and snapshot updates",
+      "visible": true
+    },
+    {
+      "name": "manual toggle hides",
+      "visible": false
+    },
+    {
+      "name": "enter battle remains hidden",
+      "visible": false
+    },
+    {
+      "name": "manual battle hide persists",
+      "visible": false
+    },
+    {
+      "name": "execution starts hidden",
+      "visible": false
+    },
+    {
+      "name": "manual execution open is retained",
+      "visible": true
+    },
+    {
+      "name": "execution stops in battle remains hidden",
+      "visible": false
+    },
+    {
+      "name": "combat exit hides",
+      "visible": false
+    },
+    {
+      "name": "next combat resets to hidden",
+      "visible": false
+    }
+  ],
+  "visibility_contexts_are_ui_only": true,
+  "entry_default_hidden": true,
+  "entry_opt_in_persisted": true,
+  "only_f8_global_shortcut": true,
+  "previous_f9_f10_have_no_action": true,
+  "algorithm_names_match_results": true,
+  "skip_final_verification_defaults_checked": true,
+  "checkbox_options_persisted": true,
+  "checkbox_algorithm_checks": [
+    {
+      "algorithm": "MonteCarlo",
+      "skip_final_verification": false
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "skip_final_verification": false
+    },
+    {
+      "algorithm": "MonteCarlo",
+      "skip_final_verification": true
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "skip_final_verification": true
+    }
+  ],
+  "advanced_and_diagnostics_default_hidden": true,
+  "visualization_input_is_presentation_fixture_only": true,
+  "stale_and_late_progress_rejected": true,
+  "visual_factories": [
+    "NDemonFormVfx.Create",
+    "NEchoFormVfx.Create",
+    "NReaperFormVfx.Create",
+    "NSerpentFormVfx.Create",
+    "NVoidFormVfx.Create"
+  ],
+  "form_visual_checks": [
+    {
+      "factory": "NDemonFormVfx",
+      "regular_requires_scene": true,
+      "numerical_returns_null": true
+    },
+    {
+      "factory": "NEchoFormVfx",
+      "regular_requires_scene": true,
+      "numerical_returns_null": true
+    },
+    {
+      "factory": "NReaperFormVfx",
+      "regular_requires_scene": true,
+      "numerical_returns_null": true
+    },
+    {
+      "factory": "NSerpentFormVfx",
+      "regular_requires_scene": true,
+      "numerical_returns_null": true
+    },
+    {
+      "factory": "NVoidFormVfx",
+      "regular_requires_scene": true,
+      "numerical_returns_null": true
+    }
+  ],
+  "global_test_mode_unchanged": true,
+  "elapsed_seconds": 36.737,
+  "installed_dll_unchanged": true,
+  "coreChecks": 357,
+  "modSha256": "2669964c16d801e86deb2e01b0142e4b1248b3e40da8ce8fadde7fce9e6fbf55"
+}

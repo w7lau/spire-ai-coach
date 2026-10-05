@@ -37,6 +37,14 @@ public sealed class SettingsStore
 
     public void SaveLocalWorkers(int workers) => SaveLocalOptions(workers, null);
 
+    public void SaveInterfaceOptions(bool showOverlayButton)
+    {
+        var settings = File.Exists(ConfigPath) ? JsonNode.Parse(File.ReadAllText(ConfigPath))!.AsObject() : new JsonObject();
+        settings["show_overlay_button"] = showOverlayButton;
+        Directory.CreateDirectory(_directory);
+        AtomicWrite(ConfigPath, Encoding.UTF8.GetBytes(settings.ToJsonString()));
+    }
+
     public void SaveLocalOptions(int workers, bool? includePotions, bool? stopOnZeroLoss = null,
         int? targetVictoryRounds = null, int? maxAttempts = null, int? maxRounds = null,
         int? searchSeconds = null, bool? skipFinalVerification = null,
