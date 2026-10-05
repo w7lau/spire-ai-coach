@@ -1,0 +1,242 @@
+{
+  "version": "0.7.45",
+  "source_commit": "323e6b21f41b7aafb10bb624715af6b8edd1d0c6",
+  "dll_sha256": "72bd92bd50279cf300f8580822d605b3a44a916ee807c789444755e920e8e624",
+  "core_checks": {
+    "passed": 329,
+    "total": 329
+  },
+  "native_scope": "Owned synthetic native cases, including real native completion and one independent final verification. Not unseeded optimizer quality, whole-battle speed, or arbitrary-Mod coverage proof.",
+  "native_records": [
+    {
+      "kind": "repeat-and-feed",
+      "Plays": 2,
+      "Kills": 1,
+      "consumable": {
+        "Copies": 1,
+        "CompletedCopies": 1,
+        "ExhaustedCopies": 1,
+        "LivingEnemies": 3,
+        "BattleEnded": false,
+        "Target": 1,
+        "Complete": true
+      },
+      "enemyHp": 0
+    },
+    {
+      "kind": "other-finisher",
+      "Plays": 3,
+      "Kills": 0,
+      "consumable": {
+        "Copies": 1,
+        "CompletedCopies": 0,
+        "ExhaustedCopies": 0,
+        "LivingEnemies": 3,
+        "BattleEnded": false,
+        "Target": 1,
+        "Complete": false
+      },
+      "enemyHp": 0
+    },
+    {
+      "kind": "feed-not-lethal",
+      "Plays": 0,
+      "Kills": 0,
+      "consumable": {
+        "Copies": 1,
+        "CompletedCopies": 0,
+        "ExhaustedCopies": 1,
+        "LivingEnemies": 3,
+        "BattleEnded": false,
+        "Target": 1,
+        "Complete": false
+      },
+      "enemyHp": 34
+    },
+    {
+      "kind": "feed-capped",
+      "Plays": 0,
+      "Kills": 0,
+      "consumable": {
+        "Copies": 1,
+        "CompletedCopies": 0,
+        "ExhaustedCopies": 1,
+        "LivingEnemies": 3,
+        "BattleEnded": false,
+        "Target": 1,
+        "Complete": false
+      },
+      "enemyHp": 4
+    },
+    {
+      "kind": "feed-two-copies",
+      "Plays": 0,
+      "Kills": 1,
+      "consumable": {
+        "Copies": 2,
+        "CompletedCopies": 1,
+        "ExhaustedCopies": 0,
+        "LivingEnemies": 1,
+        "BattleEnded": true,
+        "Target": 1,
+        "Complete": true
+      },
+      "enemyHp": 0
+    },
+    {
+      "kind": "MonteCarlo",
+      "Status": "done",
+      "Evaluated": 6,
+      "Victories": 4,
+      "StoppedEarly": false,
+      "Won": true,
+      "Hp": 7,
+      "NetHpLoss": 73,
+      "Plays": 31,
+      "Kills": 0,
+      "verified": 1,
+      "hostUnchanged": true
+    },
+    {
+      "kind": "TurnFrontier",
+      "Status": "done",
+      "Evaluated": 6,
+      "Victories": 4,
+      "StoppedEarly": false,
+      "Won": true,
+      "Hp": 7,
+      "NetHpLoss": 73,
+      "Plays": 31,
+      "Kills": 0,
+      "verified": 1,
+      "hostUnchanged": true
+    },
+    {
+      "kind": "goal-stop-MonteCarlo",
+      "Status": "done",
+      "Evaluated": 1,
+      "ElapsedMs": 3380,
+      "StoppedOnCardGoals": true,
+      "Hp": 669,
+      "NetHpLoss": 131,
+      "CardGoalOutcome": {
+        "PlayModelId": null,
+        "FinisherModelId": "CARD.FEED",
+        "Plays": 0,
+        "Kills": 1,
+        "ConsumableGoals": {
+          "Play": null,
+          "Finisher": {
+            "Copies": 1,
+            "CompletedCopies": 1,
+            "ExhaustedCopies": 1,
+            "LivingEnemies": 3,
+            "BattleEnded": true,
+            "Target": 1,
+            "Complete": true
+          },
+          "Scope": "current-consumable-copies-v1"
+        }
+      },
+      "verifications": 1,
+      "seeded": true,
+      "hostUnchanged": true
+    },
+    {
+      "kind": "goal-stop-TurnFrontier",
+      "Status": "done",
+      "Evaluated": 1,
+      "ElapsedMs": 1823,
+      "StoppedOnCardGoals": true,
+      "Hp": 669,
+      "NetHpLoss": 131,
+      "CardGoalOutcome": {
+        "PlayModelId": null,
+        "FinisherModelId": "CARD.FEED",
+        "Plays": 0,
+        "Kills": 1,
+        "ConsumableGoals": {
+          "Play": null,
+          "Finisher": {
+            "Copies": 1,
+            "CompletedCopies": 1,
+            "ExhaustedCopies": 1,
+            "LivingEnemies": 3,
+            "BattleEnded": true,
+            "Target": 1,
+            "Complete": true
+          },
+          "Scope": "current-consumable-copies-v1"
+        }
+      },
+      "verifications": 1,
+      "seeded": true,
+      "hostUnchanged": true
+    }
+  ],
+  "seeded_stop_fixture": {
+    "initial_hp": 800,
+    "strict_net_loss_threshold": 1000,
+    "observed_net_loss": 131,
+    "route_steps": 47,
+    "seeded": true,
+    "native_game": true
+  },
+  "synthetic_peer_protocols": [
+    {
+      "algorithm": "MonteCarlo",
+      "native_game": false,
+      "skip_verification": false,
+      "elapsed_ms": 2871,
+      "net_loss": 4,
+      "strict_threshold": 5,
+      "kills": 1,
+      "peers": 2,
+      "verifications": 1,
+      "slow_peer_budget_ms": 10000
+    },
+    {
+      "algorithm": "MonteCarlo",
+      "native_game": false,
+      "skip_verification": true,
+      "elapsed_ms": 1279,
+      "net_loss": 4,
+      "strict_threshold": 5,
+      "kills": 1,
+      "peers": 2,
+      "verifications": 0,
+      "slow_peer_budget_ms": 10000
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "native_game": false,
+      "skip_verification": false,
+      "elapsed_ms": 1557,
+      "net_loss": 4,
+      "strict_threshold": 5,
+      "kills": 1,
+      "peers": 2,
+      "verifications": 1,
+      "slow_peer_budget_ms": 10000
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "native_game": false,
+      "skip_verification": true,
+      "elapsed_ms": 1282,
+      "net_loss": 4,
+      "strict_threshold": 5,
+      "kills": 1,
+      "peers": 2,
+      "verifications": 0,
+      "slow_peer_budget_ms": 10000
+    }
+  ],
+  "protected_conditions": [
+    "Strict loss <5 permits 0 through 4; a zero-loss incumbent cannot close goal-improving affordable routes.",
+    "Actual native kill, distinct current consumable copies, alive player and completed battle are required.",
+    "Current finisher copy target is capped by current living enemies; terminal victory may omit native exhaust history.",
+    "Repeatable targets and future generated, recovered or duplicated copies are not finite optimality claims.",
+    "Failed final verification cannot produce a goal-completion return."
+  ]
+}
