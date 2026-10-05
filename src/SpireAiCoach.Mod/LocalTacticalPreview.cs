@@ -27,7 +27,12 @@ internal sealed class LocalTacticalPreview(Player player, bool efficient = false
     private bool _retainsBlock;
     private CardModel[] _playable = [];
 
-    public static LocalTacticalPreview Capture(Player player, CardModel[] playable, bool efficient = false)
+    public static LocalTacticalPreview Capture(Player player, CardModel[] playable, bool efficient = false) =>
+        CaptureCore(player, playable, efficient, null);
+    internal static LocalTacticalPreview CaptureDiscard(Player player, CardModel[] hand, bool efficient, bool retainsBlock) =>
+        CaptureCore(player, hand, efficient, retainsBlock);
+    internal bool RetainsBlockHint => _retainsBlock;
+    private static LocalTacticalPreview CaptureCore(Player player, CardModel[] playable, bool efficient, bool? retainsBlock)
     {
         var result = new LocalTacticalPreview(player, efficient);
         result._playable = playable;
@@ -40,7 +45,7 @@ internal sealed class LocalTacticalPreview(Player player, bool efficient = false
             }
             catch { /* A Mod's unknown end effect remains for native execution to evaluate. */ }
         }
-        try { result._retainsBlock = !Hook.ShouldClearBlock(player.Creature.CombatState!, player.Creature, out _); }
+        try { result._retainsBlock = retainsBlock ?? !Hook.ShouldClearBlock(player.Creature.CombatState!, player.Creature, out _); }
         catch { /* Unknown retention keeps the neutral prior; native execution remains authoritative. */ }
         foreach (var enemy in CombatManager.Instance.DebugOnlyGetState()!.Enemies)
         {
@@ -61,6 +66,42 @@ internal sealed class LocalTacticalPreview(Player player, bool efficient = false
         HandEndHpLoss: _handEndHpLoss));
 
     public double EndTurnHpLossHint => Math.Max(0, _incoming - player.Creature.Block) + _handEndHpLoss;
+
+    internal LocalTacticalFeatures DiscardContext => new(
+        EnemyHp: player.Creature.CombatState!.Enemies.Sum(e => Math.Max(0, e.CurrentHp)),
+        Incoming: _incoming, CurrentBlock: player.Creature.Block, Hp: player.Creature.CurrentHp,
+        RetainsBlock: _retainsBlock);
+
+    internal double DiscardHandEndLoss(CardModel card)
+    {
+        try { return card.HasTurnEndInHandEffect && Preview(card, null).TryGetValue("HpLoss", out var loss)
+            ? Math.Max(0, (double)loss.PreviewValue) : 0; }
+        catch { return 0; }
+    }
+
+    internal LocalDiscardYield DiscardAutoplay(CardModel card, LocalRolloutStyle style)
+    {
+        try
+        {
+            if (card.Keywords.Contains(CardKeyword.Unplayable) || card.EnergyCost.CostsX || card.HasStarCostX) return default;
+            // Sly chooses targets in the native command. Average current valid
+            // targets as an ordering hint; never draw or predict the native RNG.
+            var enemies = player.Creature.CombatState!.Enemies.Where(e => e.IsAlive).ToArray();
+            var valid = enemies.Where(card.IsValidTarget).ToArray();
+            double Hit(MegaCrit.Sts2.Core.Entities.Creatures.Creature enemy) =>
+                Math.Min(enemy.CurrentHp, Math.Max(0, PreviewDamage(card, enemy) - enemy.Block));
+            double damage = card.TargetType == TargetType.AllEnemies ? enemies.Sum(Hit) :
+                valid.Length > 0 ? valid.Average(Hit) : 0;
+            var vars = Preview(card, valid.FirstOrDefault());
+            double Value(string key) => vars.TryGetValue(key, out var v) ? Math.Max(0, (double)v.PreviewValue) : 0;
+            return new(Damage: damage,
+                Block: card.GainsBlock ? Math.Max(Value("Block"), Value("CalculatedBlock")) : 0,
+                Energy: Value("Energy"), HpCost: card.HasTurnEndInHandEffect ? 0 : Value("HpLoss"),
+                Setup: Math.Min(60, (Value("StrengthPower") + Value("VulnerablePower") + Value("WeakPower")) * 8) +
+                    (card.Type == CardType.Power ? 20 : 0));
+        }
+        catch { return default; }
+    }
 
     private DynamicVarSet Preview(CardModel card, Creature? target)
     {

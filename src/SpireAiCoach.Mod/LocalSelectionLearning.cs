@@ -11,6 +11,7 @@ namespace SpireAiCoach.Mod;
 // return-to-hand (it can also put on top of the deck, exhaust, etc.).
 internal sealed class LocalSelectionLearning
 {
+    internal LocalDiscardLearning Discards { get; } = new();
     private enum Effect { Hand, Draw, Exhaust, Other }
     private readonly record struct Slot(string Source, int Ordinal, string Kind, string Table, string Prompt);
     private sealed record Pool(PileType Origin, HashSet<string> Offered);
@@ -24,8 +25,15 @@ internal sealed class LocalSelectionLearning
 
     internal Func<int[], int>? Rank(CardModel source, Player player, string kind, CardModel[] cards,
         CardSelectorPrefs? prefs, int ordinal, LocalRolloutStyle style, bool efficient,
-        Func<CardModel, int, int> learned)
+        Func<CardModel, int, int> learned, bool[] nativeGold)
     {
+        if (kind is "hand" or "pile" or "grid" && LocalDiscardLearning.IsDiscard(prefs))
+        {
+            try { return Discards.Rank(cards, nativeGold,
+                LocalTacticalPreview.CaptureDiscard(player, player.PlayerCombatState!.Hand.Cards.ToArray(), efficient,
+                    Discards.RetainsBlockHint), style, learned); }
+            catch { return null; }
+        }
         if (kind is not ("pile" or "grid" or "offer" or "bundle") ||
             Prompt(prefs, CardSelectorPrefs.DiscardSelectionPrompt) || Prompt(prefs, CardSelectorPrefs.ExhaustSelectionPrompt)) return null;
         try
@@ -63,6 +71,7 @@ internal sealed class LocalSelectionLearning
     {
         foreach (var selection in selections)
         {
+            Discards.ObserveSelection(source, selection);
             if (selection.Selected.Length == 0) continue; // Skip is not evidence about the selector's effect.
             try
             {
@@ -89,13 +98,15 @@ internal sealed class LocalSelectionLearning
     internal int SourcePriority(CardModel source, Player player, LocalTacticalPreview preview,
         LocalRolloutStyle style, Func<CardModel, int, int> learned)
     {
-        if (!_returns.TryGetValue(Key(source), out var pools)) return 0;
+        Discards.RetainsBlockHint = preview.RetainsBlockHint;
+        int discard = Discards.SourcePriority(source, player, preview, style, learned);
+        if (!_returns.TryGetValue(Key(source), out var pools)) return discard;
         try
         {
             var pcs = player.PlayerCombatState!;
             int energy = (int)pcs.Energy - Math.Max(0, source.EnergyCost.GetAmountToSpend());
             int stars = pcs.Stars - Math.Max(0, source.HasStarCostX ? pcs.Stars : source.GetStarCostWithModifiers());
-            int best = 0;
+            int best = discard;
             foreach (var pool in pools)
                 foreach (var card in pcs.AllPiles.Where(p => p.Type == pool.Origin).SelectMany(p => p.Cards))
                 {

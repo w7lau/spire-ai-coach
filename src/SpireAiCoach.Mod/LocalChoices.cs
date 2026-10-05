@@ -28,7 +28,7 @@ public sealed class LocalChoices
     private readonly LocalSelectionCursor _cursor;
     internal sealed record Selection(string Kind, CardSelectorPrefs? Prefs, int Ordinal, CardModel[] Offered,
         CardModel[] Selected, PileType[] Origins);
-    internal Func<string, CardModel[], CardSelectorPrefs?, int, Func<int[], int>?>? SelectionPriority { get; init; }
+    internal Func<string, CardModel[], CardSelectorPrefs?, int, bool[], Func<int[], int>?>? SelectionPriority { get; init; }
     internal List<Selection> Selections { get; } = [];
     public LocalCardChoice[] Completed => _completed.ToArray();
     public LocalChoices(LocalCardChoice[]? expected = null, Func<LocalCardChoice[], LocalCardChoice>? choose = null,
@@ -90,17 +90,19 @@ public sealed class LocalChoices
         // The native selector explicitly describes discard/exhaust, independent of the
         // source card's name or Mod. These are exploration hints, never eliminated choices.
         var prompt = prefs.Prompt;
-        bool discards = prompt.LocTable == CardSelectorPrefs.DiscardSelectionPrompt.LocTable &&
-            prompt.LocEntryKey == CardSelectorPrefs.DiscardSelectionPrompt.LocEntryKey;
         bool exhausts = prompt.LocTable == CardSelectorPrefs.ExhaustSelectionPrompt.LocTable &&
             prompt.LocEntryKey == CardSelectorPrefs.ExhaustSelectionPrompt.LocEntryKey;
-        int Priority(CardModel card)
+        var gold = new bool[cards.Length];
+        int Priority(CardModel card, int index)
         {
             int score = 0;
-            if ((discards || exhausts) && card.Type is CardType.Status or CardType.Curse) score += 40;
+            // Discard is temporary movement, not permanent removal. A harmless
+            // status must not outrank a useful free play just because it is a status.
+            if (exhausts && card.Type is CardType.Status or CardType.Curse) score += 40;
             try
             {
-                if (prefs.ShouldGlowGold?.Invoke(card) == true) score += 20;
+                gold[index] = prefs.ShouldGlowGold?.Invoke(card) == true;
+                if (gold[index]) score += 20;
             }
             catch { /* Unknown native preview retains all alternatives. */ }
             return score;
@@ -108,7 +110,7 @@ public sealed class LocalChoices
         var priorities = cards.Select(Priority).ToArray();
         // Evaluate a selected set against ONE remaining resource budget. Simply
         // summing individual values overvalues several cards we cannot all play.
-        var followup = SelectionPriority?.Invoke(kind, cards, prefs, _completed.Count);
+        var followup = SelectionPriority?.Invoke(kind, cards, prefs, _completed.Count, gold);
         var seeds = priorities.Select((score, i) => score + (followup?.Invoke([i]) ?? 0)).ToArray();
         bool complete = space.Count <= 128;
         var ranks = _cursor.Page(hash, space).ToHashSet();
@@ -157,7 +159,7 @@ public sealed class LocalChoices
     private LocalCardChoice SelectOffer(IReadOnlyList<CardModel> cards, bool canSkip, object identity)
     {
         var hash = OfferHash("offer", cards, canSkip ? 0 : 1, 1);
-        var followup = SelectionPriority?.Invoke("offer", cards.ToArray(), null, _completed.Count);
+        var followup = SelectionPriority?.Invoke("offer", cards.ToArray(), null, _completed.Count, new bool[cards.Count]);
         var options = cards.Select((c, i) => new LocalCardChoice(hash, i, c.Id.ToString(), c.Title,
             Preference: followup?.Invoke([i]) ?? 0)).ToList();
         if (canSkip) options.Add(new(hash, -1, "", "跳过"));
@@ -177,7 +179,7 @@ public sealed class LocalChoices
         // and [A]/[B,C] are different native offers with different effects.
         var hash = OfferHash("bundle:" + string.Join(",", bundles.Select(b => b.Count)), bundles.SelectMany(b => b).ToArray(), 1, 1);
         var cards = bundles.SelectMany(b => b).ToArray();
-        var followup = SelectionPriority?.Invoke("bundle", cards, null, _completed.Count);
+        var followup = SelectionPriority?.Invoke("bundle", cards, null, _completed.Count, new bool[cards.Length]);
         int offset = 0;
         var options = bundles.Select((b, i) =>
         {
