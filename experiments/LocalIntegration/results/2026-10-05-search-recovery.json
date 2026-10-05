@@ -1,0 +1,319 @@
+{
+  "version": "0.7.49",
+  "date": "2026-10-05",
+  "gameVersion": "v0.111.0",
+  "incidents": [
+    {
+      "version": "0.7.48",
+      "completedAt": "2026-10-05T18:47:57+08:00",
+      "id": "1859a13ce0854eb293aa5ab249fb8059",
+      "elapsedMs": 119882,
+      "error": "NullReferenceException in BouncingFlask.OnPlay",
+      "cause": "A native optional display block accessed missing combat scene nodes in a numerical worker.",
+      "resolution": "Metadata-audited local display guard; keep native RNG, poison and Mod hooks."
+    },
+    {
+      "version": "0.7.48",
+      "completedAt": "2026-10-05T19:11:17+08:00",
+      "id": "6fbf703d71974e39b2ce85fe6a64cebc",
+      "elapsedMs": 173072,
+      "error": "Turn task is not owned by this worker",
+      "cause": "A budget-returned task was classified as a completed full rollout and sent outcome guidance after its ownership ended.",
+      "resolution": "Budget interruption cannot complete a trial or publish a best/goal seed; retain strict owner checks."
+    }
+  ],
+  "latestExistingBuildRecords": [
+    {
+      "version": "0.7.48",
+      "completedAt": "2026-10-05T19:13:07+08:00",
+      "elapsedMs": 99438,
+      "status": "done",
+      "recoveredFailures": 0,
+      "groupFallback": false
+    },
+    {
+      "version": "0.7.48",
+      "completedAt": "2026-10-05T19:17:20+08:00",
+      "elapsedMs": 60569,
+      "status": "done",
+      "recoveredFailures": 0,
+      "groupFallback": false
+    },
+    {
+      "version": "0.7.48",
+      "completedAt": "2026-10-05T19:20:03+08:00",
+      "elapsedMs": 55369,
+      "status": "done",
+      "recoveredFailures": 0,
+      "groupFallback": false,
+      "netHpLoss": 0
+    }
+  ],
+  "validation": {
+    "corePassed": 356,
+    "coreTotal": 356,
+    "modBuildWarnings": 0,
+    "modBuildErrors": 0,
+    "nativeTestDllSha256": "136d28b1fed448817a0d89f8b162670c50216f78763c9aa4d0fd1e4bd069180f",
+    "initialNativeProbe": {
+      "version": "0.7.49",
+      "passed": true,
+      "scope": "Native base/upgraded poison card, fixed short mechanism probe, ordinary/data/data; no full-search speed claim",
+      "productionBudgetsUnchanged": true,
+      "samples": [
+        {
+          "upgraded": false,
+          "numerical": false,
+          "ElapsedMs": 23021,
+          "Timing": {
+            "RestoreMs": 4807,
+            "ActionMs": 237,
+            "DecisionMs": 76,
+            "VerificationMs": 0,
+            "StartupMs": 16723,
+            "Actions": 1,
+            "Restores": 1,
+            "Verifications": 0
+          },
+          "skipped": 0,
+          "enemyHp": 174,
+          "nativeStateRngHistoryAndCheckpointsMatch": true,
+          "fallback": false
+        },
+        {
+          "upgraded": false,
+          "numerical": true,
+          "ElapsedMs": 276,
+          "Timing": {
+            "RestoreMs": 33,
+            "ActionMs": 13,
+            "DecisionMs": 1,
+            "VerificationMs": 0,
+            "StartupMs": 0,
+            "Actions": 1,
+            "Restores": 1,
+            "Verifications": 0
+          },
+          "skipped": 3,
+          "enemyHp": 174,
+          "nativeStateRngHistoryAndCheckpointsMatch": true,
+          "fallback": false
+        },
+        {
+          "upgraded": false,
+          "numerical": true,
+          "ElapsedMs": 274,
+          "Timing": {
+            "RestoreMs": 30,
+            "ActionMs": 0,
+            "DecisionMs": 0,
+            "VerificationMs": 0,
+            "StartupMs": 0,
+            "Actions": 1,
+            "Restores": 1,
+            "Verifications": 0
+          },
+          "skipped": 3,
+          "enemyHp": 174,
+          "nativeStateRngHistoryAndCheckpointsMatch": true,
+          "fallback": false
+        },
+        {
+          "upgraded": true,
+          "numerical": false,
+          "ElapsedMs": 775,
+          "Timing": {
+            "RestoreMs": 396,
+            "ActionMs": 16,
+            "DecisionMs": 0,
+            "VerificationMs": 0,
+            "StartupMs": 0,
+            "Actions": 1,
+            "Restores": 1,
+            "Verifications": 0
+          },
+          "skipped": 0,
+          "enemyHp": 174,
+          "nativeStateRngHistoryAndCheckpointsMatch": true,
+          "fallback": false
+        },
+        {
+          "upgraded": true,
+          "numerical": true,
+          "ElapsedMs": 276,
+          "Timing": {
+            "RestoreMs": 78,
+            "ActionMs": 0,
+            "DecisionMs": 0,
+            "VerificationMs": 0,
+            "StartupMs": 0,
+            "Actions": 1,
+            "Restores": 1,
+            "Verifications": 0
+          },
+          "skipped": 4,
+          "enemyHp": 174,
+          "nativeStateRngHistoryAndCheckpointsMatch": true,
+          "fallback": false
+        },
+        {
+          "upgraded": true,
+          "numerical": true,
+          "ElapsedMs": 275,
+          "Timing": {
+            "RestoreMs": 27,
+            "ActionMs": 0,
+            "DecisionMs": 0,
+            "VerificationMs": 0,
+            "StartupMs": 0,
+            "Actions": 1,
+            "Restores": 1,
+            "Verifications": 0
+          },
+          "skipped": 4,
+          "enemyHp": 174,
+          "nativeStateRngHistoryAndCheckpointsMatch": true,
+          "fallback": false
+        }
+      ]
+    },
+    "finalNativeProbe": {
+      "version": "0.7.49",
+      "passed": true,
+      "scope": "Native base/upgraded poison card, fixed short mechanism probe, ordinary/data/data; no full-search speed claim",
+      "productionBudgetsUnchanged": true,
+      "samples": [
+        {
+          "upgraded": false,
+          "numerical": false,
+          "ElapsedMs": 21335,
+          "Timing": {
+            "RestoreMs": 3517,
+            "ActionMs": 171,
+            "DecisionMs": 64,
+            "VerificationMs": 0,
+            "StartupMs": 16563,
+            "Actions": 1,
+            "Restores": 1,
+            "Verifications": 0
+          },
+          "skipped": 0,
+          "enemyHp": 174,
+          "nativeStateRngHistoryAndCheckpointsMatch": true,
+          "fallback": false
+        },
+        {
+          "upgraded": false,
+          "numerical": true,
+          "ElapsedMs": 274,
+          "Timing": {
+            "RestoreMs": 32,
+            "ActionMs": 10,
+            "DecisionMs": 1,
+            "VerificationMs": 0,
+            "StartupMs": 0,
+            "Actions": 1,
+            "Restores": 1,
+            "Verifications": 0
+          },
+          "skipped": 3,
+          "enemyHp": 174,
+          "nativeStateRngHistoryAndCheckpointsMatch": true,
+          "fallback": false
+        },
+        {
+          "upgraded": false,
+          "numerical": true,
+          "ElapsedMs": 271,
+          "Timing": {
+            "RestoreMs": 31,
+            "ActionMs": 0,
+            "DecisionMs": 0,
+            "VerificationMs": 0,
+            "StartupMs": 0,
+            "Actions": 1,
+            "Restores": 1,
+            "Verifications": 0
+          },
+          "skipped": 3,
+          "enemyHp": 174,
+          "nativeStateRngHistoryAndCheckpointsMatch": true,
+          "fallback": false
+        },
+        {
+          "upgraded": true,
+          "numerical": false,
+          "ElapsedMs": 520,
+          "Timing": {
+            "RestoreMs": 285,
+            "ActionMs": 11,
+            "DecisionMs": 0,
+            "VerificationMs": 0,
+            "StartupMs": 0,
+            "Actions": 1,
+            "Restores": 1,
+            "Verifications": 0
+          },
+          "skipped": 0,
+          "enemyHp": 174,
+          "nativeStateRngHistoryAndCheckpointsMatch": true,
+          "fallback": false
+        },
+        {
+          "upgraded": true,
+          "numerical": true,
+          "ElapsedMs": 273,
+          "Timing": {
+            "RestoreMs": 28,
+            "ActionMs": 0,
+            "DecisionMs": 0,
+            "VerificationMs": 0,
+            "StartupMs": 0,
+            "Actions": 1,
+            "Restores": 1,
+            "Verifications": 0
+          },
+          "skipped": 4,
+          "enemyHp": 174,
+          "nativeStateRngHistoryAndCheckpointsMatch": true,
+          "fallback": false
+        },
+        {
+          "upgraded": true,
+          "numerical": true,
+          "ElapsedMs": 272,
+          "Timing": {
+            "RestoreMs": 28,
+            "ActionMs": 1,
+            "DecisionMs": 0,
+            "VerificationMs": 0,
+            "StartupMs": 0,
+            "Actions": 1,
+            "Restores": 1,
+            "Verifications": 0
+          },
+          "skipped": 4,
+          "enemyHp": 174,
+          "nativeStateRngHistoryAndCheckpointsMatch": true,
+          "fallback": false
+        }
+      ]
+    }
+  },
+  "boundaries": {
+    "productionBudgetsUnchanged": true,
+    "nativeRuleCallsPreserved": true,
+    "ownerGatePreserved": true,
+    "laterRouteFailureDoesNotCancelHealthyPeers": true,
+    "usableNativeCandidatePreventsFullGroupRestart": true,
+    "rootBootstrapFailureStillStopsIncompatiblePass": true,
+    "noUsableCandidateStillUsesCompatibilityFallback": true,
+    "failedOwnerProofStillRejected": true,
+    "finalVerificationAndExecutionCheckpointsUnchanged": true,
+    "fullIncidentBattleRetested": false,
+    "fullSearchSpeedupMeasured": false,
+    "humanSixTurnRouteReproduced": false,
+    "nativeCardDisplayCoverage": "Only the audited original optional display block is skipped. Unknown/mixed blocks and Mod effect methods are not assumed safe.",
+    "engineShutdownReports": "Existing resource-release reports remain; clean mechanism results are not a claim of zero engine log errors."
+  }
+}

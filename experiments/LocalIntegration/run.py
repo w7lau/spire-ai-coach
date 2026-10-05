@@ -76,6 +76,7 @@ parser.add_argument('--health-audit', action='store_true', help='Also check low-
 parser.add_argument('--discard-test', action='store_true', help='Short native discard/Sly/resource/selection probe; no full search')
 parser.add_argument('--summon-presentation-test', action='store_true', help='Only the frozen incident first enemy turn; compare ordinary and scene-free native states')
 parser.add_argument('--event-entry-test', action='store_true', help='Recreate a frozen event-combat root and verify generic native entry-history replay')
+parser.add_argument('--model-display-test', action='store_true', help='Short native optional display comparison; base/upgraded card and exact state/RNG/history')
 args = parser.parse_args()
 if args.finisher_retention_test and (not args.replay or args.seed_result or args.recorded_replay):
     parser.error('--finisher-retention-test requires a frozen --replay without an extra answer seed or recorded replay')
@@ -283,6 +284,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_NATIVE_OVERHEAD_TEST'] = '1' if args.native_overhead_test else '0'
     env['SPIRE_LOCAL_SCENE_OVERHEAD_TEST'] = '1' if args.scene_overhead_test else '0'
     env['SPIRE_LOCAL_VISUAL_FACTORY_TEST'] = '1' if args.visual_factory_test else '0'
+    env['SPIRE_LOCAL_MODEL_DISPLAY_TEST'] = '1' if args.model_display_test else '0'
     env['SPIRE_LOCAL_ROUTE_FEEDBACK_TEST'] = '1' if args.route_feedback_test else '0'
     env['SPIRE_LOCAL_ROUTE_FEEDBACK_FOCUSED_ONLY'] = '1' if args.route_feedback_focused_only else '0'
     env['SPIRE_LOCAL_RECENT_SEARCH_TEST'] = '1' if args.recent_search_test else '0'
@@ -357,6 +359,9 @@ with worker_lock(root):
             names = ['integration-visual-factory-summary.json', 'integration-visual-factory-private-0.json',
                      'integration-visual-factory-private-1.json', 'integration-success',
                      'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.model_display_test:
+            names = ['integration-model-display-summary.json', *[f'integration-model-display-private-{i}.json' for i in range(6)],
+                     'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
         if args.route_feedback_test:
             names = ['integration-route-feedback-summary.json',
                      *[f'integration-route-feedback-private-{order}-{mode}.json'
