@@ -1,0 +1,126 @@
+{
+  "version": "0.7.53",
+  "nativeModule": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
+  "fixedPreviouslyMeasuredPrefix": true,
+  "fullSearchBenchmark": false,
+  "productionBudgetsUnchanged": true,
+  "ordinaryDeferredPresentationPreserved": true,
+  "numericalDeferredPresentationCompleted": true,
+  "boundaries": [
+    "InfestedPower.RevealWrigglersAfterDeathAnim",
+    "SandpitPower.AfterRemoved",
+    "BygoneEffigy.WakeMove",
+    "ToughEgg.AfterAddedToRoom",
+    "BouncingFlask.OnPlay"
+  ],
+  "samples": [
+    {
+      "numerical": false,
+      "order": "MonteCarlo",
+      "ElapsedMs": 12892,
+      "Timing": {
+        "RestoreMs": 9150,
+        "ActionMs": 2886,
+        "DecisionMs": 210,
+        "VerificationMs": 0,
+        "StartupMs": 0,
+        "Actions": 16,
+        "Restores": 1,
+        "Verifications": 0
+      },
+      "steps": 16,
+      "skipped": 0,
+      "summonedTargets": 4,
+      "nativeStateRngHistoryAndHealthMatch": true,
+      "reusedWorker": false
+    },
+    {
+      "numerical": true,
+      "order": "MonteCarlo",
+      "ElapsedMs": 301,
+      "Timing": {
+        "RestoreMs": 48,
+        "ActionMs": 74,
+        "DecisionMs": 89,
+        "VerificationMs": 0,
+        "StartupMs": 0,
+        "Actions": 16,
+        "Restores": 1,
+        "Verifications": 0
+      },
+      "steps": 16,
+      "skipped": 1,
+      "summonedTargets": 4,
+      "nativeStateRngHistoryAndHealthMatch": true,
+      "reusedWorker": true
+    },
+    {
+      "numerical": true,
+      "order": "MonteCarlo",
+      "ElapsedMs": 317,
+      "Timing": {
+        "RestoreMs": 38,
+        "ActionMs": 95,
+        "DecisionMs": 94,
+        "VerificationMs": 0,
+        "StartupMs": 0,
+        "Actions": 16,
+        "Restores": 1,
+        "Verifications": 0
+      },
+      "steps": 16,
+      "skipped": 1,
+      "summonedTargets": 4,
+      "nativeStateRngHistoryAndHealthMatch": true,
+      "reusedWorker": true
+    },
+    {
+      "numerical": true,
+      "order": "TurnFrontier",
+      "ElapsedMs": 694,
+      "Timing": {
+        "RestoreMs": 44,
+        "ActionMs": 56,
+        "DecisionMs": 100,
+        "VerificationMs": 0,
+        "StartupMs": 0,
+        "Actions": 16,
+        "Restores": 1,
+        "Verifications": 0
+      },
+      "steps": 16,
+      "skipped": 1,
+      "summonedTargets": 4,
+      "nativeStateRngHistoryAndHealthMatch": true,
+      "reusedWorker": true
+    }
+  ],
+  "passed": true,
+  "core_checks": {
+    "passed": 360,
+    "total": 360
+  },
+  "adapter_build": {
+    "warnings": 0,
+    "errors": 0
+  },
+  "dll_sha256": "280fceef0b684a007582a989e671f2f8070489533b0d8710e52c562106a1dc19",
+  "preserved_installed_baseline": {
+    "version": "0.7.52",
+    "source_commit": "833de0bc2a2e274a271582ce6b02deb172eb2405"
+  },
+  "metadata_audit": {
+    "model_types": 1687,
+    "methods_scanned": 10999,
+    "display_references": 474,
+    "guarded_methods": 40,
+    "eligible_methods": 5,
+    "unreadable_method_bodies": 0,
+    "callbacks_executed": false
+  },
+  "scope": "Fixed previously measured four-round prefix, not a full-search benchmark or global optimum proof",
+  "other_new_boundaries_validation": "metadata and installed native transpiler; not separate encounter executions",
+  "fixture_note": "A 13-action fixture ended mid-turn; TurnFrontier completed that turn. Final comparison uses the same 16-action complete-turn prefix in all four samples.",
+  "engine_exit_resource_diagnostics_remain": true,
+  "raw_inputs_logs_native_assets_and_decompiled_source_excluded": true
+}
