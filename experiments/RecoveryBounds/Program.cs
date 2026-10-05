@@ -12,6 +12,7 @@ var estimatorType = typeof(LocalWorker).Assembly.GetType("SpireAiCoach.Mod.Local
 var request = new LocalSearchRequest("metadata-audit", "root", [], "native", 1, [], false);
 var estimator = Activator.CreateInstance(estimatorType, request)!;
 var describe = estimatorType.GetMethod("Describe", BindingFlags.NonPublic | BindingFlags.Instance)!;
+var describeContent = estimatorType.GetMethod("DescribeContent", BindingFlags.NonPublic | BindingFlags.Instance)!;
 var output = new List<object>();
 foreach (var (property, field) in new[] { ("CurrentHp", "_currentHp"), ("MaxHp", "_maxHp") })
 {
@@ -43,7 +44,7 @@ foreach (var (id, expectedHeals, expectedUnknown) in new (string, int, bool)[]
     ("Cards.Armaments", 0, false), ("Cards.TrueGrit", 0, false),
     ("Cards.Barricade", 0, false), ("Cards.BodySlam", 0, false),
     ("Cards.Discovery", 0, true), ("Cards.Feed", 0, true),
-    ("Relics.BurningBlood", 1, false), ("Relics.BlackBlood", 1, false)
+    ("Relics.BurningBlood", 1, false), ("Relics.BlackBlood", 1, false), ("Relics.ChosenCheese", 0, false)
 })
 {
     var type = typeof(AbstractModel).Assembly.GetType("MegaCrit.Sts2.Core.Models." + id, true)!;
@@ -51,10 +52,20 @@ foreach (var (id, expectedHeals, expectedUnknown) in new (string, int, bool)[]
     var proofType = proof.GetType();
     var unknown = proofType.GetProperty("Unknown")!.GetValue(proof) as string;
     var heals = (int)proofType.GetProperty("VictoryHeals")!.GetValue(proof)!;
+    var maxHpGains = (int)proofType.GetProperty("VictoryMaxHpGains")!.GetValue(proof)!;
     var references = (Type[])proofType.GetProperty("References")!.GetValue(proof)!;
-    if ((unknown != null) != expectedUnknown || heals != expectedHeals)
+    if ((unknown != null) != expectedUnknown || heals != expectedHeals || maxHpGains != (id == "Relics.ChosenCheese" ? 1 : 0))
         throw new InvalidOperationException("Unexpected recovery certificate for " + id + ": " + unknown);
-    output.Add(new { Model = id, Unknown = unknown, VictoryHealCalls = heals, References = references.Select(t => t.Name).ToArray() });
+    output.Add(new { Model = id, Unknown = unknown, VictoryHealCalls = heals, VictoryMaxHpCalls = maxHpGains,
+        References = references.Select(t => t.Name).ToArray() });
+    var content = describeContent.Invoke(estimator, [type])!;
+    var contentType = content.GetType();
+    bool active = (bool)contentType.GetProperty("ActiveRecovery")!.GetValue(content)!;
+    int terminalHeals = (int)contentType.GetProperty("VictoryHeals")!.GetValue(content)!;
+    int terminalMax = (int)contentType.GetProperty("VictoryMaxHpGains")!.GetValue(content)!;
+    if (active != (id == "Cards.Feed") || terminalHeals != expectedHeals || terminalMax != maxHpGains)
+        throw new InvalidOperationException("Unexpected current-content recovery goal for " + id);
+    output.Add(new { ContentModel = id, ActiveRecovery = active, TerminalHeals = terminalHeals, TerminalMaxHpGains = terminalMax });
 }
 // Find real native healing powers by their code rather than assuming names
 // carried over from the first game.
@@ -73,17 +84,33 @@ foreach (var type in typeof(AbstractModel).Assembly.GetTypes().Where(t => !t.IsA
     var proof = describe.Invoke(estimator, [type])!;
     var unknown = proof.GetType().GetProperty("Unknown")!.GetValue(proof) as string;
     if (unknown == null) throw new InvalidOperationException("Repeated healing power became bounded: " + type.Name);
+    var content = describeContent.Invoke(estimator, [type])!;
+    if (!(bool)content.GetType().GetProperty("ActiveRecovery")!.GetValue(content)!)
+        throw new InvalidOperationException("Healing power was missed by content scan: " + type.Name);
     output.Add(new { Model = type.FullName, Unknown = unknown });
 }
+int healingPotions = 0;
+foreach (var type in typeof(AbstractModel).Assembly.GetTypes().Where(t => !t.IsAbstract && typeof(PotionModel).IsAssignableFrom(t)))
+{
+    var content = describeContent.Invoke(estimator, [type])!;
+    if (!(bool)content.GetType().GetProperty("ActiveRecovery")!.GetValue(content)!) continue;
+    healingPotions++;
+    output.Add(new { HealingPotion = type.FullName, DetectedByCode = true });
+}
+if (healingPotions == 0) throw new InvalidOperationException("No native healing potion was recognized");
 var external = Activator.CreateInstance(estimatorType, request with { LoadedMods = ["unknown-mod:1"] })!;
 var guarded = (LocalRecoveryAllowance)estimatorType.GetMethod("Estimate")!.Invoke(external, [null])!;
 if (guarded.MaximumFurtherHpGain != null || !guarded.Reason.Contains("Mod", StringComparison.Ordinal))
     throw new InvalidOperationException("External global effects were treated as no healing");
+var cached = (LocalRecoveryAllowance)estimatorType.GetMethod("Estimate")!.Invoke(external, [null])!;
+if (!ReferenceEquals(guarded, cached) || (int)estimatorType.GetProperty("AnalysisCount")!.GetValue(external)! != 1)
+    throw new InvalidOperationException("An unknown allowance was rescanned instead of cached");
 var report = new { ModVersion = typeof(LocalWorker).Assembly.GetName().Version!.ToString(3),
     ModSha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
         File.ReadAllBytes(typeof(LocalWorker).Assembly.Location))),
     NativeModule = typeof(AbstractModel).Assembly.ManifestModule.ModuleVersionId,
-    MetadataChecks = output.Count + 1, ExternalGlobalEffectsRemainUnknown = true, Models = output,
+    MetadataChecks = output.Count + 2, ExternalGlobalEffectsRemainUnknown = true, Models = output,
+    UnknownResultCached = true,
     NativeBattleExecuted = false, SpeedBenchmarkExecuted = false };
 var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true,
     Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });

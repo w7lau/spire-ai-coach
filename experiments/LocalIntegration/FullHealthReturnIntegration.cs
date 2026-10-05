@@ -25,16 +25,19 @@ internal static class FullHealthReturnIntegration
         async Task Frame() => await tree.ToSignal(tree, SceneTree.SignalName.ProcessFrame);
         var samples = new List<object>();
         var encounter = ModelDb.AllEncounters.Single(e => e.Id.Entry == "TOADPOLES_WEAK");
-        foreach (var initialHp in new[] { 100, 247 })
+        foreach (var initialHp in new[] { 52, 100, 247 })
         {
             if (RunManager.Instance.IsInProgress) RunManager.Instance.CleanUp();
             NGame.Instance!.RootSceneContainer.SetCurrentScene(new Control()); await Frame(); await Frame();
             var run = RunState.FromSerializable(fixture);
             await RunManager.Instance.SetUpSavedSingleplayer(run, fixture);
             var player = run.Players.Single();
-            player.Creature.SetMaxHpInternal(250); player.Creature.SetCurrentHpInternal(initialHp);
+            player.Creature.SetMaxHpInternal(initialHp == 52 ? 66 : 250); player.Creature.SetCurrentHpInternal(initialHp);
             if (!player.Relics.Any(r => r.Id.Entry == "BURNING_BLOOD"))
                 throw new InvalidOperationException("This mechanism fixture requires native Burning Blood");
+            if (initialHp == 52)
+                foreach (var relic in player.Relics.ToArray()) player.RemoveRelicInternal(relic, silent: true);
+            foreach (var potion in player.Potions.ToArray()) potion.Discard();
             var old = player.Deck.Cards.ToArray(); player.Deck.Clear(silent: true);
             foreach (var c in old) run.RemoveCard(c);
             for (int i = 0; i < 5; i++)
@@ -72,10 +75,13 @@ internal static class FullHealthReturnIntegration
                 var request = captured with { Id = Guid.NewGuid().ToString("N"), SearchOrder = order };
                 var result = await Task.Run(() => pool.Analyze(request, LocalCapture.Installation(), _ => { }, CancellationToken.None));
                 LocalWire.Write(Path.Combine(root, $"integration-full-health-{initialHp}-{order}-private.json"), result);
-                bool expectedStop = initialHp == 247;
-                if (result.Best is not { Won: true, Dead: false, MaxHp: 250, HpLost: 0, Rounds: 1 } best ||
-                    best.Hp != Math.Min(250, initialHp + 6) || best.NetHpLoss != 0 ||
-                    result.StoppedEarly != expectedStop || result.Timing?.Verifications != 1 ||
+                int cap = initialHp == 52 ? 66 : 250;
+                int expectedHp = initialHp == 52 ? 52 : Math.Min(250, initialHp + 6);
+                if (result.Best is not { Won: true, Dead: false, HpLost: 0, Rounds: 1 } best ||
+                    best.Hp != expectedHp || best.MaxHp != cap || best.NetHpLoss != 0 ||
+                    !result.StoppedEarly || !result.StoppedOnHealthTarget || result.HealthTarget?.TargetHp != expectedHp ||
+                    result.HealthBounds?.TargetAnalyses != 1 || result.StoppedOnMinimum || LocalSearchPolicy.HasMinimumProof(result) ||
+                    result.Evaluated >= captured.MaxNodes || result.Timing?.Verifications != 1 ||
                     result.Rejected != 0 || result.Failure != null || result.RecoveredFailures is { Length: > 0 } ||
                     !LocalSearchPolicy.HasExecutionPoints(result))
                     throw new InvalidOperationException("Native victory-healing/full-health return mismatch: " + result.Message);
@@ -84,13 +90,14 @@ internal static class FullHealthReturnIntegration
                 samples.Add(new { algorithm = order.ToString(), startingHp = initialHp, hp = best.Hp,
                     maxHp = best.MaxHp, netHpLoss = best.NetHpLoss, stoppedEarly = result.StoppedEarly,
                     result.Evaluated, result.Victories, result.ElapsedMs, verifications = result.Timing.Verifications,
+                    result.HealthTarget, result.StoppedOnHealthTarget, result.HealthBounds,
                     nativeVictoryHealingIncluded = true, sourceCombatUnchanged = true });
                 pool.DiscardSearch();
             }
         }
         LocalWire.Write(Path.Combine(root, "integration-full-health-summary.json"), new {
             version = typeof(LocalWorker).Assembly.GetName().Version!.ToString(3), passed = true,
-            scope = "Two native victory-healing endpoints per algorithm; one worker; seeded short mechanism probe",
+            scope = "No healing, fixed victory healing, capped victory healing; both algorithms; one worker; seeded short mechanism probe",
             encounter = encounter.Id.Entry,
             nativeGame = true, productLimitsUnchanged = true, samples });
     }

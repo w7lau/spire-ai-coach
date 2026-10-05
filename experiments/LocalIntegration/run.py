@@ -203,7 +203,7 @@ with worker_lock(root):
     if args.full_health_test:
         for name in ['integration-full-health-summary.json',
                      *[f'integration-full-health-{hp}-{order}-private.json'
-                       for hp in (100, 247) for order in ('MonteCarlo', 'TurnFrontier')]]:
+                       for hp in (52, 100, 247) for order in ('MonteCarlo', 'TurnFrontier')]]:
             (root / name).unlink(missing_ok=True)
     if args.recent_search_test:
         for name in ['integration-recent-search-summary.json', 'integration-recent-search-private.json']:
@@ -422,7 +422,7 @@ with worker_lock(root):
         if args.full_health_test:
             names = ['integration-full-health-summary.json',
                      *[f'integration-full-health-{hp}-{order}-private.json'
-                       for hp in (100, 247) for order in ('MonteCarlo', 'TurnFrontier')],
+                       for hp in (52, 100, 247) for order in ('MonteCarlo', 'TurnFrontier')],
                      'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
         if args.route_feedback_test:
             names = ['integration-route-feedback-summary.json',

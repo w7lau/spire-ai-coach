@@ -1,0 +1,264 @@
+{
+  "version": "0.7.64",
+  "dllSha256": "9e4ee85f6f9e34d2ea237ebbd9862a12b1e250167ccc7cd4e63470e87eda1555",
+  "zipSha256": "22bf2e36285455cd40407c89849600e4462c04572b623bb51dc7bd3271b3769b",
+  "nativeGame": true,
+  "coreChecks": "398/398",
+  "metadataChecks": 40,
+  "shortMechanisms": [
+    {
+      "algorithm": "MonteCarlo",
+      "startingHp": 52,
+      "hp": 52,
+      "maxHp": 66,
+      "netHpLoss": 0,
+      "stoppedEarly": true,
+      "Evaluated": 1,
+      "Victories": 1,
+      "ElapsedMs": 23816,
+      "verifications": 1,
+      "HealthTarget": {
+        "StartingHp": 52,
+        "TargetHp": 52,
+        "FullHealth": false,
+        "Basis": "当前内容未检测到生命恢复调用，目标为不净损血",
+        "Uncertain": true
+      },
+      "StoppedOnHealthTarget": true,
+      "HealthBounds": {
+        "Pruned": 0,
+        "KnownRecoveryChecks": 0,
+        "UnknownRecoveryChecks": 0,
+        "SharedIncumbentUpdates": 0,
+        "UnknownReason": "",
+        "TargetAnalyses": 1,
+        "TargetAnalysisMs": 16.9499,
+        "MethodBodyReads": 4
+      },
+      "nativeVictoryHealingIncluded": true,
+      "sourceCombatUnchanged": true
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "startingHp": 52,
+      "hp": 52,
+      "maxHp": 66,
+      "netHpLoss": 0,
+      "stoppedEarly": true,
+      "Evaluated": 1,
+      "Victories": 1,
+      "ElapsedMs": 1092,
+      "verifications": 1,
+      "HealthTarget": {
+        "StartingHp": 52,
+        "TargetHp": 52,
+        "FullHealth": false,
+        "Basis": "当前内容未检测到生命恢复调用，目标为不净损血",
+        "Uncertain": true
+      },
+      "StoppedOnHealthTarget": true,
+      "HealthBounds": {
+        "Pruned": 0,
+        "KnownRecoveryChecks": 0,
+        "UnknownRecoveryChecks": 0,
+        "SharedIncumbentUpdates": 0,
+        "UnknownReason": "",
+        "TargetAnalyses": 1,
+        "TargetAnalysisMs": 0.4719,
+        "MethodBodyReads": 4
+      },
+      "nativeVictoryHealingIncluded": true,
+      "sourceCombatUnchanged": true
+    },
+    {
+      "algorithm": "MonteCarlo",
+      "startingHp": 100,
+      "hp": 106,
+      "maxHp": 250,
+      "netHpLoss": 0,
+      "stoppedEarly": true,
+      "Evaluated": 1,
+      "Victories": 1,
+      "ElapsedMs": 1293,
+      "verifications": 1,
+      "HealthTarget": {
+        "StartingHp": 100,
+        "TargetHp": 106,
+        "FullHealth": false,
+        "Basis": "当前内容的固定战后生命增加",
+        "Uncertain": true
+      },
+      "StoppedOnHealthTarget": true,
+      "HealthBounds": {
+        "Pruned": 0,
+        "KnownRecoveryChecks": 0,
+        "UnknownRecoveryChecks": 0,
+        "SharedIncumbentUpdates": 0,
+        "UnknownReason": "",
+        "TargetAnalyses": 1,
+        "TargetAnalysisMs": 4.0217,
+        "MethodBodyReads": 6
+      },
+      "nativeVictoryHealingIncluded": true,
+      "sourceCombatUnchanged": true
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "startingHp": 100,
+      "hp": 106,
+      "maxHp": 250,
+      "netHpLoss": 0,
+      "stoppedEarly": true,
+      "Evaluated": 1,
+      "Victories": 1,
+      "ElapsedMs": 1048,
+      "verifications": 1,
+      "HealthTarget": {
+        "StartingHp": 100,
+        "TargetHp": 106,
+        "FullHealth": false,
+        "Basis": "当前内容的固定战后生命增加",
+        "Uncertain": true
+      },
+      "StoppedOnHealthTarget": true,
+      "HealthBounds": {
+        "Pruned": 0,
+        "KnownRecoveryChecks": 0,
+        "UnknownRecoveryChecks": 0,
+        "SharedIncumbentUpdates": 0,
+        "UnknownReason": "",
+        "TargetAnalyses": 1,
+        "TargetAnalysisMs": 0.4496,
+        "MethodBodyReads": 6
+      },
+      "nativeVictoryHealingIncluded": true,
+      "sourceCombatUnchanged": true
+    },
+    {
+      "algorithm": "MonteCarlo",
+      "startingHp": 247,
+      "hp": 250,
+      "maxHp": 250,
+      "netHpLoss": 0,
+      "stoppedEarly": true,
+      "Evaluated": 1,
+      "Victories": 1,
+      "ElapsedMs": 1252,
+      "verifications": 1,
+      "HealthTarget": {
+        "StartingHp": 247,
+        "TargetHp": 250,
+        "FullHealth": false,
+        "Basis": "当前内容的固定战后生命增加",
+        "Uncertain": true
+      },
+      "StoppedOnHealthTarget": true,
+      "HealthBounds": {
+        "Pruned": 0,
+        "KnownRecoveryChecks": 0,
+        "UnknownRecoveryChecks": 0,
+        "SharedIncumbentUpdates": 0,
+        "UnknownReason": "",
+        "TargetAnalyses": 1,
+        "TargetAnalysisMs": 0.8627,
+        "MethodBodyReads": 6
+      },
+      "nativeVictoryHealingIncluded": true,
+      "sourceCombatUnchanged": true
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "startingHp": 247,
+      "hp": 250,
+      "maxHp": 250,
+      "netHpLoss": 0,
+      "stoppedEarly": true,
+      "Evaluated": 1,
+      "Victories": 1,
+      "ElapsedMs": 1314,
+      "verifications": 1,
+      "HealthTarget": {
+        "StartingHp": 247,
+        "TargetHp": 250,
+        "FullHealth": false,
+        "Basis": "当前内容的固定战后生命增加",
+        "Uncertain": true
+      },
+      "StoppedOnHealthTarget": true,
+      "HealthBounds": {
+        "Pruned": 0,
+        "KnownRecoveryChecks": 0,
+        "UnknownRecoveryChecks": 0,
+        "SharedIncumbentUpdates": 0,
+        "UnknownReason": "",
+        "TargetAnalyses": 1,
+        "TargetAnalysisMs": 0.6514,
+        "MethodBodyReads": 6
+      },
+      "nativeVictoryHealingIncluded": true,
+      "sourceCombatUnchanged": true
+    }
+  ],
+  "frozenCheeseKnownRoute": {
+    "status": "done",
+    "evaluated": 3,
+    "victories": 3,
+    "workers": 2,
+    "startingHp": 38,
+    "hp": 39,
+    "maxHp": 67,
+    "grossHpLost": 0,
+    "rounds": 6,
+    "stoppedEarly": true,
+    "stoppedOnHealthTarget": true,
+    "stoppedOnMinimum": false,
+    "healthTarget": {
+      "StartingHp": 38,
+      "TargetHp": 39,
+      "FullHealth": false,
+      "Basis": "当前内容的固定战后生命增加",
+      "Uncertain": true
+    },
+    "healthBounds": {
+      "Pruned": 0,
+      "KnownRecoveryChecks": 0,
+      "UnknownRecoveryChecks": 13,
+      "SharedIncumbentUpdates": 0,
+      "UnknownReason": "外部 IL 补丁的回复效果尚未证明：MegaCrit.Sts2.Core.Entities.Cards.PileTypeExtensions.GetTargetPosition",
+      "TargetAnalyses": 1,
+      "TargetAnalysisMs": 25.1017,
+      "MethodBodyReads": 57
+    },
+    "verifications": 1,
+    "executionCheckpoints": true,
+    "independentVerification": true
+  },
+  "knownRouteSeeded": true,
+  "unseededTwoWorkerSample": {
+    "hp": 38,
+    "maxHp": 67,
+    "evaluated": 128,
+    "healthTarget": {
+      "StartingHp": 38,
+      "TargetHp": 39,
+      "FullHealth": false,
+      "Basis": "当前内容的固定战后生命增加",
+      "Uncertain": true
+    },
+    "stoppedOnHealthTarget": false,
+    "targetAnalyses": 1,
+    "targetAnalysisMs": 23.2994
+  },
+  "limits": [
+    "Known historical route confirms goal return, not unseeded search speed or global optimality.",
+    "Original no-healing replay was overwritten; zero-change cases are synthetic isolated native fixtures.",
+    "A first known-route harness required verification although the frozen request disabled it; rerun enabled verification and passed.",
+    "Dynamic global Mod effects remain unknown for pruning; content target is an estimate."
+  ],
+  "installation": {
+    "status": "done",
+    "version": "0.7.64",
+    "installedDllMatchesNativeTest": true,
+    "requiresNextGameStart": true
+  }
+}
