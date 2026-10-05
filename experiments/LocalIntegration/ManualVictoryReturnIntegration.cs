@@ -119,6 +119,8 @@ internal static class ManualVictoryReturnIntegration
             if (Field<Button>("_execute").Disabled || !button.Disabled || Field<bool>("_executing"))
                 throw new InvalidOperationException("Manual route was discarded or automatically executed: " + Field<Label>("_status").Text);
             var captured = Field<LocalSearchRequest>("_lastSearchRequest");
+            if (captured.ReuseSnapshotMetadata)
+                throw new InvalidOperationException("Manual UI search enabled the opt-in snapshot experiment");
             var result = Field<LocalContinuation>("_continuation").Advance(sourceSnapshot.CombatId,
                 captured.LoadedMods, nativeBefore, captured.History!)!;
             if (result.Status != "done" || !result.StoppedOnManualVictory || !result.StoppedEarly ||
@@ -134,7 +136,8 @@ internal static class ManualVictoryReturnIntegration
                 throw new InvalidOperationException("Manual adoption changed the source game");
             LocalWire.Write(Path.Combine(root, $"manual-{algorithm}-{skip}-private.json"), result);
             samples.Add(new { algorithm = algorithm.ToString(), skipFinalVerification = skip, autoStopEnabled = skip,
-                cardGoalsEnabled = captured.CardGoals?.Enabled == true, result.Evaluated, result.Victories,
+                cardGoalsEnabled = captured.CardGoals?.Enabled == true, snapshotMetadataEnabled = captured.ReuseSnapshotMetadata,
+                result.Evaluated, result.Victories,
                 finalHp = result.Best.Hp, result.Best.HpChange, finalVerifications = result.Timing.Verifications,
                 stopToResultMs = stop.ElapsedMilliseconds, usableExecutionPoints = true, executeButtonEnabled = true,
                 actualButtonSignal = true, automaticExecution = false, sourceCombatUnchanged = true });
