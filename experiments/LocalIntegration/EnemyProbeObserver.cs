@@ -55,15 +55,16 @@ internal static class EnemyProbeObserver
     }
     private static void Created(MonsterModel __0) => Record(__0, "created", null);
     private static void Moved(MonsterModel __instance) => Record(__instance, "move", __instance.NextMove?.Id);
-    private static void KillRequested(Creature __0) { if (__0.Monster != null) Record(__0.Monster, "kill-request", null); }
+    private static void KillRequested(Creature __0) => Record(__0.ModelId.Entry, "kill-request", null, __0.CurrentHp);
     private static void KillsRequested(IReadOnlyCollection<Creature> __0) { foreach (var c in __0) KillRequested(c); }
     private static void EscapeRequested(Creature __0) { if (__0.Monster != null) Record(__0.Monster, "escape-request", null); }
     private static void Record(MonsterModel monster, string kind, string? move)
+        => Record(monster.Id.Entry, kind, move, kind == "move" ? monster.Creature.CurrentHp : null);
+    private static void Record(string model, string kind, string? move, int? hp)
     {
         if (Request.GetValue(null) is not LocalSearchRequest request) return;
         var path = Path.Combine(_root, "enemy-probe.jsonl");
         if (_id != request.Id) { _id = request.Id; File.WriteAllText(path, ""); }
-        File.AppendAllText(path, JsonSerializer.Serialize(new { request = _id, model = monster.Id.Entry, kind, move,
-            hp = kind == "move" ? monster.Creature.CurrentHp : (int?)null }) + "\n");
+        File.AppendAllText(path, JsonSerializer.Serialize(new { request = _id, model, kind, move, hp }) + "\n");
     }
 }

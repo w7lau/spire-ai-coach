@@ -90,6 +90,9 @@ parser.add_argument('--enemy-cases', help='Optional comma-separated native encou
 parser.add_argument('--enemy-rounds', type=int, default=8)
 parser.add_argument('--enemy-fast-only', action='store_true', help='Diagnostic numerical smoke test without ordinary-scene comparison')
 parser.add_argument('--enemy-attack', action='store_true', help='Two unseeded short attack trials per algorithm with independent ordinary-scene replay')
+parser.add_argument('--enemy-seed', help='Create a new synthetic run through native APIs with this seed; never edit RNG state')
+parser.add_argument('--enemy-character', help='Native character model ID for a new owned synthetic run')
+parser.add_argument('--enemy-seeds', help='Comma-separated native run seeds for a bounded variant sweep in one owned host')
 args = parser.parse_args()
 if args.snapshot_metadata_test and (not args.replay or not args.seed_result or args.recorded_replay):
     parser.error('--snapshot-metadata-test requires a frozen --replay and --seed-result')
@@ -289,6 +292,9 @@ with worker_lock(root):
     env['SPIRE_LOCAL_ENEMY_ROUNDS'] = str(args.enemy_rounds)
     env['SPIRE_LOCAL_ENEMY_FAST_ONLY'] = '1' if args.enemy_fast_only else '0'
     env['SPIRE_LOCAL_ENEMY_ATTACK'] = '1' if args.enemy_attack else '0'
+    env['SPIRE_LOCAL_ENEMY_SEED'] = args.enemy_seed or ''
+    env['SPIRE_LOCAL_ENEMY_CHARACTER'] = args.enemy_character or ''
+    env['SPIRE_LOCAL_ENEMY_SEEDS'] = args.enemy_seeds or ''
     env['SPIRE_LOCAL_SURVIVAL_TEST'] = '1' if args.survival_test else '0'
     if args.mechanic_cases:
         env['SPIRE_LOCAL_MECHANICS_CASES'] = args.mechanic_cases

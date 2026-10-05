@@ -28,6 +28,7 @@ internal static class LocalEnemyPresentation
     private static readonly MethodInfo Projection = AccessTools.PropertyGetter(typeof(SandpitPower), "AllAffectedCreatures");
     private static readonly MethodInfo Initializer = AccessTools.Method(typeof(SandpitPower), nameof(SandpitPower.AfterApplied));
     private static readonly MethodInfo Update = AccessTools.Method(typeof(SandpitPower), "UpdateCreaturePositions");
+    private static readonly MethodInfo Removal = AccessTools.Method(typeof(SandpitPower), nameof(SandpitPower.AfterRemoved));
     private static readonly FieldInfo[] Positions = [AccessTools.Field(typeof(SandpitPower), "_initialAmount"),
         AccessTools.Field(typeof(SandpitPower), "_initialTargetPosition")];
     private static bool _projectionAudited;
@@ -132,7 +133,22 @@ internal static class LocalEnemyPresentation
     }
 
     public static bool ProjectionDisplayCall(MethodBase method, Type owner) => _projectionAudited &&
-        (owner.DeclaringType ?? owner) == typeof(SandpitPower) && (Equals(method, Projection) || Collection(method));
+        owner == Body(Removal).DeclaringType && (Equals(method, Projection) || Collection(method));
+
+    public static bool ProjectionBlock(IEnumerable<LocalInstruction> body, Type owner)
+    {
+        var code = body.ToArray();
+        if (owner != Body(Removal).DeclaringType || !code.Any(i => i.Operand is MethodBase m && Collection(m))) return true;
+        // The loop receiver must be the audited fresh projection, never an
+        // arbitrary field/argument/lazy sequence introduced by another Mod.
+        if (code.Any(i => i.Operand is FieldInfo f &&
+            (typeof(IEnumerable<Creature>).IsAssignableFrom(f.FieldType) || typeof(IEnumerator<Creature>).IsAssignableFrom(f.FieldType)))) return false;
+        var executable = code.Where(i => i.Code != OpCodes.Nop).ToArray();
+        for (int n = 0; n < executable.Length; n++)
+            if (executable[n].Operand is MethodBase m && m.DeclaringType == typeof(IEnumerable<Creature>) && m.Name == "GetEnumerator" &&
+                (n == 0 || !Equals(executable[n - 1].Operand, Projection))) return false;
+        return code.Count(i => Equals(i.Operand, Projection)) == 1;
+    }
 
     private static IEnumerable<CodeInstruction> PositionGuard(IEnumerable<CodeInstruction> instructions, MethodBase original)
     {

@@ -1,0 +1,421 @@
+{
+  "version": "0.7.66",
+  "native_game_version": "0.111.0",
+  "native_module": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
+  "source_base": "ec3230b",
+  "package": {
+    "dll_sha256": "1900400ace213e0fb4a062faa616057c1a911a96527af010dc8ce642454d56cd",
+    "zip_sha256": "0a1e799405ea3154405a4f8d227e4a208f6dd9e3205c6c2d7acb7042e8a4ed74",
+    "exact_prepared_package_tested": true
+  },
+  "core_checks": {
+    "passed": 404,
+    "total": 404
+  },
+  "catalogue": {
+    "actual_encounters": 85,
+    "possible_opponent_models": 107,
+    "concrete_metadata_monsters": 126,
+    "concrete_metadata_encounters": 98,
+    "concrete_metadata_powers": 283
+  },
+  "selected_validation_groups": [
+    {
+      "case": "passive",
+      "samples": 255,
+      "algorithm_samples": {
+        "regular": 85,
+        "MonteCarlo": 85,
+        "TurnFrontier": 85
+      },
+      "max_rounds": 8,
+      "native_checkpoints": 1977,
+      "failures": 0,
+      "independent_full_scene_replay": false,
+      "native_run_seeds": null,
+      "character": null
+    },
+    {
+      "case": "attack",
+      "samples": 170,
+      "algorithm_samples": {
+        "MonteCarlo": 85,
+        "TurnFrontier": 85
+      },
+      "max_rounds": 32,
+      "native_checkpoints": 1970,
+      "failures": 0,
+      "independent_full_scene_replay": true,
+      "native_run_seeds": null,
+      "character": null
+    },
+    {
+      "case": "osty-with-pet",
+      "samples": 3,
+      "algorithm_samples": {
+        "regular": 1,
+        "MonteCarlo": 1,
+        "TurnFrontier": 1
+      },
+      "max_rounds": 8,
+      "native_checkpoints": 15,
+      "failures": 0,
+      "independent_full_scene_replay": false,
+      "native_run_seeds": null,
+      "character": "NECROBINDER"
+    },
+    {
+      "case": "ruby-sweep",
+      "samples": 36,
+      "algorithm_samples": {
+        "regular": 12,
+        "MonteCarlo": 12,
+        "TurnFrontier": 12
+      },
+      "max_rounds": 8,
+      "native_checkpoints": 288,
+      "failures": 0,
+      "independent_full_scene_replay": false,
+      "native_run_seeds": [
+        "5",
+        "6",
+        "7",
+        "8",
+        "9",
+        "10",
+        "11",
+        "12",
+        "13",
+        "14",
+        "15",
+        "16"
+      ],
+      "character": null
+    }
+  ],
+  "selected_samples": 464,
+  "native_checkpoints": 4250,
+  "opponents_observed": [
+    "AEONGLASS",
+    "ASSASSIN_RUBY_RAIDER",
+    "AXEBOT",
+    "AXE_RUBY_RAIDER",
+    "BATTLE_FRIEND_V1",
+    "BATTLE_FRIEND_V2",
+    "BATTLE_FRIEND_V3",
+    "BOWLBUG_EGG",
+    "BOWLBUG_NECTAR",
+    "BOWLBUG_ROCK",
+    "BOWLBUG_SILK",
+    "BRUTE_RUBY_RAIDER",
+    "BYGONE_EFFIGY",
+    "BYRDONIS",
+    "CALCIFIED_CULTIST",
+    "CEREMONIAL_BEAST",
+    "CHOMPER",
+    "CORPSE_SLUG",
+    "CROSSBOW_RUBY_RAIDER",
+    "CRUSHER",
+    "CUBEX_CONSTRUCT",
+    "DAMP_CULTIST",
+    "DECIMILLIPEDE_SEGMENT_BACK",
+    "DECIMILLIPEDE_SEGMENT_FRONT",
+    "DECIMILLIPEDE_SEGMENT_MIDDLE",
+    "DEVOTED_SCULPTOR",
+    "ENTOMANCER",
+    "EXOSKELETON",
+    "EYE_WITH_TEETH",
+    "FABRICATOR",
+    "FAKE_MERCHANT_MONSTER",
+    "FAT_GREMLIN",
+    "FLAIL_KNIGHT",
+    "FLYCONID",
+    "FOGMOG",
+    "FOSSIL_STALKER",
+    "FROG_KNIGHT",
+    "FUZZY_WURM_CRAWLER",
+    "GAS_BOMB",
+    "GLOBE_HEAD",
+    "GREMLIN_MERC",
+    "GUARDBOT",
+    "HAUNTED_SHIP",
+    "HUNTER_KILLER",
+    "INFESTED_PRISM",
+    "INKLET",
+    "KIN_FOLLOWER",
+    "KIN_PRIEST",
+    "KNOWLEDGE_DEMON",
+    "LAGAVULIN_MATRIARCH",
+    "LEAF_SLIME_M",
+    "LEAF_SLIME_S",
+    "LIVING_FOG",
+    "LIVING_SHIELD",
+    "LOUSE_PROGENITOR",
+    "MAGI_KNIGHT",
+    "MAWLER",
+    "MECHA_KNIGHT",
+    "MYSTERIOUS_KNIGHT",
+    "MYTE",
+    "NIBBIT",
+    "NOISEBOT",
+    "OVICOPTER",
+    "OWL_MAGISTRATE",
+    "PARAFRIGHT",
+    "PHANTASMAL_GARDENER",
+    "PHROG_PARASITE",
+    "PUNCH_CONSTRUCT",
+    "QUEEN",
+    "ROCKET",
+    "SCROLL_OF_BITING",
+    "SEAPUNK",
+    "SEWER_CLAM",
+    "SHRINKER_BEETLE",
+    "SKULKING_COLONY",
+    "SLIMED_BERSERKER",
+    "SLITHERING_STRANGLER",
+    "SLUDGE_SPINNER",
+    "SLUMBERING_BEETLE",
+    "SNAPPING_JAXFRUIT",
+    "SNEAKY_GREMLIN",
+    "SOUL_FYSH",
+    "SOUL_NEXUS",
+    "SPECTRAL_KNIGHT",
+    "SPINY_TOAD",
+    "STABBOT",
+    "TERROR_EEL",
+    "TEST_SUBJECT",
+    "THE_FORGOTTEN",
+    "THE_INSATIABLE",
+    "THE_LOST",
+    "THE_OBSCURA",
+    "THIEVING_HOPPER",
+    "TOADPOLE",
+    "TORCH_HEAD_AMALGAM",
+    "TOUGH_EGG",
+    "TRACKER_RUBY_RAIDER",
+    "TUNNELER",
+    "TURRET_OPERATOR",
+    "TWIG_SLIME_M",
+    "TWIG_SLIME_S",
+    "TWO_TAILED_RAT",
+    "VANTOM",
+    "VINE_SHAMBLER",
+    "WATERFALL_GIANT",
+    "WRIGGLER",
+    "ZAPBOT"
+  ],
+  "opponents_observed_by_algorithm": {
+    "MonteCarlo": 107,
+    "TurnFrontier": 107
+  },
+  "attack_observation_scope": "For attack cases the observations come from independent ordinary-scene replay of the numerical candidate; all native checkpoints match. Passive observations come from each worker mode.",
+  "critical_phase_samples": [
+    {
+      "encounter": "DECIMILLIPEDE_ELITE",
+      "rounds": 32,
+      "steps": 64,
+      "won": false,
+      "dead": false,
+      "observed_models": [
+        "DECIMILLIPEDE_SEGMENT_BACK",
+        "DECIMILLIPEDE_SEGMENT_FRONT",
+        "DECIMILLIPEDE_SEGMENT_MIDDLE"
+      ],
+      "observed_moves": [
+        "BULK_MOVE",
+        "CONSTRICT_MOVE",
+        "DEAD_MOVE",
+        "REATTACH_MOVE",
+        "WRITHE_MOVE"
+      ]
+    },
+    {
+      "encounter": "PHROG_PARASITE_ELITE",
+      "rounds": 6,
+      "steps": 11,
+      "won": true,
+      "dead": false,
+      "observed_models": [
+        "PHROG_PARASITE",
+        "WRIGGLER"
+      ],
+      "observed_moves": [
+        "INFECT_MOVE",
+        "NASTY_BITE_MOVE",
+        "SPAWNED_MOVE",
+        "WRIGGLE_MOVE"
+      ]
+    },
+    {
+      "encounter": "QUEEN_BOSS",
+      "rounds": 19,
+      "steps": 37,
+      "won": true,
+      "dead": false,
+      "observed_models": [
+        "QUEEN",
+        "TORCH_HEAD_AMALGAM"
+      ],
+      "observed_moves": [
+        "BEAM_MOVE",
+        "BURN_BRIGHT_FOR_ME_MOVE",
+        "ENRAGE_MOVE",
+        "EXECUTION_MOVE",
+        "OFF_WITH_YOUR_HEAD_MOVE",
+        "PUPPET_STRINGS_MOVE",
+        "STRONG_TACKLE_MOVE",
+        "TACKLE_2_MOVE",
+        "TACKLE_3_MOVE",
+        "TACKLE_4_MOVE",
+        "YOU_ARE_MINE_MOVE"
+      ]
+    },
+    {
+      "encounter": "TEST_SUBJECT_BOSS",
+      "rounds": 27,
+      "steps": 47,
+      "won": true,
+      "dead": false,
+      "observed_models": [
+        "TEST_SUBJECT"
+      ],
+      "observed_moves": [
+        "BIG_POUNCE",
+        "BITE_MOVE",
+        "BURNING_GROWL_MOVE",
+        "MULTI_CLAW_MOVE",
+        "PHASE3_LACERATE_MOVE",
+        "RESPAWN_MOVE",
+        "SKULL_BASH_MOVE"
+      ]
+    },
+    {
+      "encounter": "THE_INSATIABLE_BOSS",
+      "rounds": 5,
+      "steps": 10,
+      "won": false,
+      "dead": true,
+      "observed_models": [
+        "THE_INSATIABLE"
+      ],
+      "observed_moves": [
+        "LIQUIFY_GROUND_MOVE",
+        "LUNGING_BITE_MOVE",
+        "SALIVATE_MOVE",
+        "THRASH_MOVE"
+      ]
+    }
+  ],
+  "reproduced_before_fix": {
+    "encounter": "THE_INSATIABLE_BOSS",
+    "algorithms": [
+      "MonteCarlo",
+      "TurnFrontier"
+    ],
+    "failure": "First enemy turn exceeded the 8 second owned rule-execution timeout while waiting for optional scene geometry",
+    "ordinary_scene_result": {
+      "rounds": 5,
+      "hp": 0,
+      "dead": true
+    }
+  },
+  "fixed_insatiable_passive_samples": [
+    {
+      "mode": "regular",
+      "rounds": 5,
+      "hp": 0,
+      "dead": true,
+      "elapsed_ms": 1274,
+      "optional_position_skips": 0
+    },
+    {
+      "mode": "MonteCarlo",
+      "rounds": 5,
+      "hp": 0,
+      "dead": true,
+      "elapsed_ms": 72,
+      "optional_position_skips": 10
+    },
+    {
+      "mode": "TurnFrontier",
+      "rounds": 5,
+      "hp": 0,
+      "dead": true,
+      "elapsed_ms": 71,
+      "optional_position_skips": 10
+    }
+  ],
+  "osty_swallow_checks": [
+    {
+      "mode": "regular",
+      "source_pets": 1,
+      "rounds": 5,
+      "hp": 0,
+      "dead": true,
+      "kill_request_models": [
+        "NECROBINDER",
+        "OSTY"
+      ],
+      "native_checkpoints_match": true
+    },
+    {
+      "mode": "MonteCarlo",
+      "source_pets": 1,
+      "rounds": 5,
+      "hp": 0,
+      "dead": true,
+      "kill_request_models": [
+        "NECROBINDER",
+        "OSTY"
+      ],
+      "native_checkpoints_match": true
+    },
+    {
+      "mode": "TurnFrontier",
+      "source_pets": 1,
+      "rounds": 5,
+      "hp": 0,
+      "dead": true,
+      "kill_request_models": [
+        "NECROBINDER",
+        "OSTY"
+      ],
+      "native_checkpoints_match": true
+    }
+  ],
+  "boundary_audit": {
+    "native_initializer_accepted": true,
+    "extra_gameplay_call_rejected": true,
+    "extra_global_write_rejected": true,
+    "once_at_worker_startup": true,
+    "global_test_mode_unchanged": true,
+    "mixed_removal_callback_preserved": true
+  },
+  "source_fixtures_unchanged": true,
+  "native_simulation_failures": 0,
+  "scope": {
+    "singleplayer_synthetic_fixtures": true,
+    "ascension": 0,
+    "player_hp": 20000,
+    "deck": "Five Defend Ironclad cards for passive prefixes; five upgraded Bludgeon cards for attack probes",
+    "active_potions": false,
+    "default_relics_removed": true,
+    "explicit_necrobinder_case_retains_native_starting_relics": true,
+    "mods": "Private fixed copies of the installed mods plus owned test observers; no live saves",
+    "all_strategies_proven": false,
+    "arbitrary_mod_private_state_proven": false,
+    "full_search_performance_benchmark": false,
+    "engine_exit_resource_warnings_still_present": true
+  },
+  "installation": {
+    "status": "installed",
+    "previous_version": "0.7.65",
+    "version": "0.7.66",
+    "installed_dll_sha256": "1900400ace213e0fb4a062faa616057c1a911a96527af010dc8ce642454d56cd",
+    "exact_tested_package_installed": true,
+    "backups_match_previous_files": true,
+    "worker_caches_cleaned": false,
+    "player_game_started": false,
+    "utc": "2026-10-05T20:52:34.4686258Z"
+  }
+}

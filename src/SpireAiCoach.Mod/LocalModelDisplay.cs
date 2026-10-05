@@ -53,9 +53,12 @@ internal static class LocalModelDisplay
             LocalBuilder local => local.LocalIndex, _ => value };
         var enabled = AccessTools.PropertyGetter(typeof(TestMode), nameof(TestMode.IsOff));
         // Recheck actual Harmony input: a Mod may have inserted a rule into this block.
-        var guards = LocalDisplayBranch.Find(code.Select((c, i) => new LocalInstruction(i, c.opcode, Operand(c.operand))),
+        var body = code.Select((c, i) => new LocalInstruction(i, c.opcode, Operand(c.operand))).ToArray();
+        var guards = LocalDisplayBranch.Find(body,
             original.DeclaringType!, original.GetMethodBody()!.LocalVariables.Select(l => l.LocalType).ToArray(),
-            enabled, call => DisplayCall(call) || LocalEnemyPresentation.ProjectionDisplayCall(call, original.DeclaringType!), DisplayValue).ToHashSet();
+            enabled, call => DisplayCall(call) || LocalEnemyPresentation.ProjectionDisplayCall(call, original.DeclaringType!), DisplayValue)
+            .Where(start => body.ElementAtOrDefault(start + 1)?.Operand is int end &&
+                LocalEnemyPresentation.ProjectionBlock(body.Skip(start + 2).Take(end - start - 2), original.DeclaringType!)).ToHashSet();
         if (guards.Count == 0) throw new InvalidOperationException("Optional display block now contains rules or escaping values");
         for (int i = 0; i < code.Length; i++)
         {

@@ -6,12 +6,15 @@ using MegaCrit.Sts2.Core.Assets;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Entities.Cards;
+using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Map;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Characters;
 using MegaCrit.Sts2.Core.Nodes;
 using MegaCrit.Sts2.Core.Rooms;
 using MegaCrit.Sts2.Core.Runs;
 using MegaCrit.Sts2.Core.Saves;
+using MegaCrit.Sts2.Core.Unlocks;
 using SpireAiCoach.Core;
 using SpireAiCoach.Mod;
 
@@ -37,6 +40,15 @@ internal static class EnemyCompatibilityIntegration
         int rounds = int.TryParse(System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_ENEMY_ROUNDS"), out var count) ? count : 8;
         bool regular = System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_ENEMY_FAST_ONLY") != "1";
         bool attack = System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_ENEMY_ATTACK") == "1";
+        var newSeed = System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_ENEMY_SEED");
+        var characterId = System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_ENEMY_CHARACTER");
+        var newCharacter = string.IsNullOrEmpty(characterId) ? null : ModelDb.AllCharacters.Single(c => c.Id.Entry == characterId);
+        var seedSweep = System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_ENEMY_SEEDS");
+        bool newRun = !string.IsNullOrEmpty(newSeed) || newCharacter != null || !string.IsNullOrEmpty(seedSweep);
+        if (newRun && string.IsNullOrEmpty(newSeed)) newSeed = "SPIRE-NATIVE-PROBE-1";
+        var seeds = string.IsNullOrEmpty(seedSweep) ? new[] { newSeed } : seedSweep.Split(',');
+        if (seeds.Length > 32 || seeds.Any(s => newRun && string.IsNullOrWhiteSpace(s)))
+            throw new ArgumentException("Enemy seed sweep requires one to 32 nonempty native run seeds");
         var samples = new List<object>();
         var failures = new List<object>();
         var pool = new LocalWorkerPool(Path.Combine(root, "integration-enemy-pool"));
@@ -45,22 +57,39 @@ internal static class EnemyCompatibilityIntegration
             version = typeof(LocalWorker).Assembly.GetName().Version!.ToString(3),
             nativeModule = typeof(MonsterModel).Assembly.ManifestModule.ModuleVersionId,
             catalogueEncounters = catalogue.Length, catalogueMonsters = monsters.Length,
-            seededEnemyTurns = attack ? 0 : rounds, attackSearch = attack, regularComparison = regular && !attack, samples, failures,
+            seededEnemyTurns = attack ? 0 : rounds, attackSearch = attack, regularComparison = regular && !attack,
+            newSyntheticRunSeed = newRun ? newSeed : null, syntheticRunSeeds = newRun ? seeds : null,
+            newSyntheticCharacter = newCharacter?.Id.Entry, samples, failures,
             scope = "Singleplayer synthetic native encounters; bounded seeded enemy turns; no full route coverage",
             passed = failures.Count == 0 });
         try
         {
-            foreach (var encounter in catalogue.Where(e => filter == null || filter.Contains(e.Id.Entry)))
+            foreach (var probe in catalogue.Where(e => filter == null || filter.Contains(e.Id.Entry))
+                .SelectMany(e => seeds.Select(seed => (encounter: e, seed))))
             {
+                var encounter = probe.encounter;
+                newSeed = probe.seed;
                 try
                 {
                     if (RunManager.Instance.IsInProgress) RunManager.Instance.CleanUp();
                     NGame.Instance!.RootSceneContainer.SetCurrentScene(new Control()); await Frame(); await Frame();
-                    var run = RunState.FromSerializable(fixture);
-                    await RunManager.Instance.SetUpSavedSingleplayer(run, fixture);
+                    RunState run;
+                    if (!newRun)
+                    {
+                        run = RunState.FromSerializable(fixture);
+                        await RunManager.Instance.SetUpSavedSingleplayer(run, fixture);
+                    }
+                    else
+                    {
+                        run = RunState.CreateForNewRun([Player.CreateForNewRun(newCharacter ?? ModelDb.Character<Ironclad>(), UnlockState.all, 1uL)],
+                            ActModel.GetDefaultList().Select(a => a.ToMutable()).ToList(), [], GameMode.Standard, fixture.Ascension, newSeed!);
+                        RunManager.Instance.SetUpNewSingleplayer(run, false, null);
+                        await RunManager.Instance.FinalizeStartingRelics();
+                    }
                     var player = run.Players.Single();
                     player.Creature.SetMaxHpInternal(20000); player.Creature.SetCurrentHpInternal(20000);
-                    foreach (var relic in player.Relics.ToArray()) player.RemoveRelicInternal(relic, silent: true);
+                    if (newCharacter == null)
+                        foreach (var relic in player.Relics.ToArray()) player.RemoveRelicInternal(relic, silent: true);
                     foreach (var potion in player.Potions.ToArray()) potion.Discard();
                     var old = player.Deck.Cards.ToArray(); player.Deck.Clear(silent: true);
                     foreach (var c in old) run.RemoveCard(c);
@@ -83,6 +112,9 @@ internal static class EnemyCompatibilityIntegration
                     }
                     var capture = new StateCapture();
                     var snapshot = capture.Capture(true)!;
+                    int sourcePets = player.Creature.Pets.Count;
+                    if (newCharacter is Necrobinder && !player.IsOstyAlive)
+                        throw new InvalidOperationException("Native character fixture did not create its starting pet");
                     var sourceHash = LocalCapture.Fingerprint();
                     int firstRound = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
                     var command = LocalCapture.Capture(snapshot.Fingerprint(), true) with {
@@ -133,12 +165,13 @@ internal static class EnemyCompatibilityIntegration
                             samples.Add(new { encounter = encounter.Id.Entry, mode, sample.Evaluated, steps = best.Actions.Length,
                                 best.Rounds, best.Won, best.Dead, best.Hp, best.EnemyHp, sample.ElapsedMs,
                                 observed = _observed, independentSceneReplay = attack,
+                                sourcePets, syntheticRunSeed = newRun ? newSeed : null,
                                 skippedPositions,
                                 nativeStateRngHistoryMatch = true, sourceUnchanged = true });
                         }
                         catch (Exception ex)
                         {
-                            failures.Add(new { encounter = encounter.Id.Entry, mode, type = ex.GetType().Name, message = ex.Message });
+                            failures.Add(new { encounter = encounter.Id.Entry, mode, seed = newSeed, type = ex.GetType().Name, message = ex.Message });
                             pool.Dispose(); pool = new LocalWorkerPool(Path.Combine(root, "integration-enemy-pool"));
                         }
                         Save();
@@ -146,7 +179,7 @@ internal static class EnemyCompatibilityIntegration
                 }
                 catch (Exception ex)
                 {
-                    failures.Add(new { encounter = encounter.Id.Entry, mode = "fixture", type = ex.GetType().Name, message = ex.Message });
+                    failures.Add(new { encounter = encounter.Id.Entry, mode = "fixture", seed = newSeed, type = ex.GetType().Name, message = ex.Message });
                     Save();
                 }
             }

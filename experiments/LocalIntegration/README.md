@@ -13,6 +13,8 @@ python experiments/LocalIntegration/run.py --workspace C:\path\owned-native-work
 
 定向用例：
 
+- `--enemy-test --enemy-rounds 8`：运行原生实际遭遇目录，对比普通场景与两种数值算法的固定结束回合前缀。`--enemy-attack --enemy-rounds 32` 改为每种算法两次不带答案的短搜索，再将最佳候选在普通场景独立复放；未获胜仍须原生检查点一致。`--enemy-cases <native-encounter-id,...>` 限定遭遇，未知 ID 直接失败。`--enemy-seed <seed>` 通过原生新开局 API 生成合成根，不直接修改 RNG；`--enemy-seeds <seed,...>` 在同一所属宿主中逐一检查最多32个原生种子，减少变体检查的重复冷启动。`--enemy-character <native-character-id>` 同时保留原生初始遗物，亡灵契约师用例要求奥斯蒂已实际生成。测试观察器记录真实创建、行动、死亡请求和逃跑请求，并检查位置审查拒绝新增规则调用或全局写入；原始目录、请求、路线和日志仍只保存在忽略目录。不得将普通模式回退算作数值通过，`--enemy-fast-only` 仅作诊断。
+
 - `--snapshot-metadata-test --replay <private-request.json> --seed-result <private-result.json> --game <installed-game> --mods <matching-frozen-mods>`：同一个所属常驻实例交替开启/关闭原生快照元数据复用，两次预热后八次测量相同15步已知路线；比较完整状态、RNG、操作/选牌历史、逐步生命与结算，再独立常规复核。检查反射读取和关键词数组复制实际减少，没有更换算法或测量自主搜索质量。原始记录留在忽略目录；结果需去除真实输入、身份、路线和本机路径再公开。
 
 - `--finisher-targets-test`：普通敌人、原生爪牙、外部Power禁止Fatal、混合敌人的最后一击和没有符合资格目标的五类原生检查。前四类实际出牌核对补刀奖励、计数及合法伤害分支；最后一类检查当前排序与账本，因为全是爪牙的原生战斗可能直接结束。此检查不运行整场搜索，也不作为任意Mod私有奖励兼容证明。
