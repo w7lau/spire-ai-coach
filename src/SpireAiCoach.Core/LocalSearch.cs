@@ -106,9 +106,16 @@ public static class LocalSearchPolicy
         return true;
     }
 
+    // Read the final native HP cap after victory hooks. Recovering only the
+    // starting HP is not full health, including when a Mod raises the cap.
+    public static bool FullHealthVictory(LocalCandidate? candidate) =>
+        candidate is { Won: true, Dead: false, Hp: > 0, MaxHp: > 0 } && candidate.Hp == candidate.MaxHp;
+    public static bool PrefersFullHealth(LocalSearchRequest request) =>
+        request.StopOnZeroLoss && !request.StopOnFirstWin && request.CardGoals?.Enabled != true;
+
     public static bool CanStop(LocalCandidate? candidate, bool stopOnZeroLoss, int? targetRounds = null,
         int? targetPotions = null, bool requireKnownZeroEnemyDamage = false) =>
-        stopOnZeroLoss && candidate is { Won: true, Dead: false, NetHpLoss: 0 } &&
+        stopOnZeroLoss && candidate is { NetHpLoss: 0 } && FullHealthVictory(candidate) &&
         (!targetRounds.HasValue || candidate.Rounds <= targetRounds.Value) &&
         (!targetPotions.HasValue || candidate.Actions.Count(a => a.PotionSlot.HasValue) <= targetPotions.Value) &&
         (!requireKnownZeroEnemyDamage || candidate.DamageSources is { Complete: true, Enemy: 0 });
@@ -128,7 +135,8 @@ public static class LocalSearchPolicy
         candidate is { Won: true, Dead: false, Hp: > 0, Actions.Length: > 0,
             CardGoalOutcome: { ConsumableGoals: { } consumable } outcome } &&
         candidate.Actions[0].BeforeHash == request.NativeHash && consumable.Complete(goals, outcome) &&
-        (goals.HpLossThreshold.HasValue ? goals.WithinThreshold(candidate) : candidate.NetHpLoss == 0) &&
+        (goals.HpLossThreshold.HasValue ? goals.WithinThreshold(candidate) :
+            candidate.NetHpLoss == 0 && FullHealthVictory(candidate)) &&
         (!request.TargetVictoryRounds.HasValue || candidate.Rounds <= request.TargetVictoryRounds.Value) &&
         (!request.TargetPotionUses.HasValue || candidate.Actions.Count(a => a.PotionSlot.HasValue) <= request.TargetPotionUses.Value) &&
         (!request.RequireKnownZeroEnemyDamage || candidate.DamageSources is { Complete: true, Enemy: 0 });
@@ -156,7 +164,8 @@ public static class LocalSearchPolicy
         CanStop(candidate, true, request.TargetVictoryRounds, request.TargetPotionUses, request.RequireKnownZeroEnemyDamage);
     public static bool BetterForGoal(LocalCandidate candidate, LocalCandidate? prior, LocalSearchRequest request)
     {
-        if (request.CardGoals?.Enabled != true && prior != null && HasSpecificGoal(request) && MeetsGoal(candidate, request) != MeetsGoal(prior, request))
+        if (request.CardGoals?.Enabled != true && prior != null &&
+            (PrefersFullHealth(request) || HasSpecificGoal(request)) && MeetsGoal(candidate, request) != MeetsGoal(prior, request))
             return MeetsGoal(candidate, request);
         return Better(candidate, prior, request.StopOnFirstWin ? null : request.CardGoals);
     }
@@ -257,8 +266,10 @@ public static class LocalSearchPolicy
                 lines.Add("部分生命变化绕过了事件接口，已核对最终生命；中途扣血与回血次数可能不完整。");
         }
         lines.AddRange(CardGoalAdvice(result));
-        if (result.CardGoals?.Enabled != true && best.Won && best.NetHpLoss == 0 && !best.Actions.Any(a => a.PotionSlot.HasValue))
-            lines.Add("已达到战后净损失 0 且不消耗药水的目标；其他收益和最短路线未证明最优。");
+        if (result.CardGoals?.Enabled != true && best.Won && best.NetHpLoss == 0)
+            lines.Add(FullHealthVictory(best) ?
+                "已达到战后满血目标；其他收益和最短路线未证明最优。" :
+                $"战后净损失为 0，但仍差 {Math.Max(0, best.MaxHp - best.Hp)} 点生命才满血；不满足满血提前返回条件。");
         if (!best.Won) lines.Add("以下仅为已模拟的部分路线，不代表能打赢本次战斗。停止原因：" + best.StopReason);
         if (best.Dead) lines.Add("注意：目前找到的路线仍会死亡，不能保证存活。");
         if (result.Work is { } work) lines.Add($"分支分工：领取 {work.Claimed} 项任务，合并 {work.DuplicateOffers} 次重复提交。");

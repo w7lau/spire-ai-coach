@@ -191,6 +191,26 @@ internal static class WorkerReuseTests
             Check(lanes[2].Process!.Id == pid && File.ReadAllLines(Path.Combine(lanes[2].Root, "launches.txt")).Length == 1, "Preparation waiters duplicated launch");
             Console.WriteLine($"  goal/preparation reuse: peer_pid={peer}, joined_pid={pid}, launches=1 per lane");
         });
+        asyncTest("both algorithms keep non-full zero-loss wins searching and return an achieved full-health route", async () =>
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            await using var f = new Fixture();
+            foreach (var algorithm in new[] { LocalSearchOrder.MonteCarlo, LocalSearchOrder.TurnFrontier })
+            foreach (var skip in new[] { false, true })
+            {
+                var request = Request("non-full-health") with { SearchOrder = algorithm, StopOnZeroLoss = true,
+                    IncludePotions = true, SkipFinalVerification = skip };
+                var partial = await f.Pool.Analyze(request, f.Installation, _ => { }, CancellationToken.None);
+                Check(!partial.StoppedEarly && partial.Best is { Hp: 100, MaxHp: 250, NetHpLoss: 0 } && partial.Evaluated == 2,
+                    "A non-full zero-loss winner prematurely stopped its peer");
+                var full = await f.Pool.Analyze(request with { Id = Guid.NewGuid().ToString("N"), DebugEncounter = "full-health-race" },
+                    f.Installation, _ => { }, CancellationToken.None);
+                Check(full.StoppedEarly && full.Best is { Hp: 250, MaxHp: 250, NetHpLoss: 0 } &&
+                    full.Best.Actions[0].PotionSlot == 0 && full.Timing?.Verifications == (skip ? 0 : 1),
+                    "A non-full no-potion peer displaced the complete full-health return goal");
+                Console.WriteLine($"  full-health protocol: algorithm={algorithm}; skip_verify={skip}; partial=100/250; partial_stopped=false; final=250/250; final_stopped=true; native_game=false");
+            }
+        });
         asyncTest("worker reuse isolated unsafe stop exit and configuration changes retire only owned processes", async () =>
         {
             if (!OperatingSystem.IsWindows()) return;
@@ -390,6 +410,11 @@ internal static class WorkerReuseTests
         if (request.VerifyCandidate != null && request.DebugEncounter == "card-goal-mismatch")
             candidate = candidate with { CardGoalOutcome = candidate.CardGoalOutcome! with { Kills = 0,
                 ConsumableGoals = new(null, new(1, 0, 1)) } };
+        if (request.VerifyCandidate == null && request.DebugEncounter is "non-full-health" or "full-health-race")
+            candidate = candidate with { StartingHp = 100, MaxHp = 250,
+                Hp = request.DebugEncounter == "full-health-race" && request.Partition == 0 ? 250 : 100,
+                Actions = [candidate.Actions[0] with {
+                    PotionSlot = request.DebugEncounter == "full-health-race" && request.Partition == 0 ? 0 : null }] };
         return candidate with { Continuation = [new(0, request.NativeHash, new(0, "synthetic"), 0, 50)],
             ContinuationFromSearch = request.SkipFinalVerification && request.VerifyCandidate == null };
     }
@@ -433,6 +458,8 @@ internal static class WorkerReuseTests
                     int delay = request.DebugEncounter is "slow" or "ignore-stop" or "cancel-errors" || request.DebugEncounter == "slow-verify" && request.VerifyCandidate != null ||
                         request.DebugEncounter == "peer-slow" && request.Partition == 1 && request.VerifyCandidate == null ? 10000 : 60;
                     if (minimum) delay = request.Partition == 0 ? 600 : 10000;
+                    if (request.DebugEncounter == "full-health-race" && request.VerifyCandidate == null)
+                        delay = request.Partition == 0 ? 250 : 60;
                     if (request.DebugEncounter?.StartsWith("first-win", StringComparison.Ordinal) == true && request.VerifyCandidate == null)
                         delay = request.Partition == 0 ? 600 : 10000;
                     if (request.DebugEncounter?.StartsWith("card-goal", StringComparison.Ordinal) == true && request.VerifyCandidate == null)

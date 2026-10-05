@@ -29,7 +29,7 @@ static class TurnSearchTests
                 "A six-round return target must not shorten the native search horizon or budget");
             Check(!LocalSearchPolicy.HasSpecificGoal(LocalCalculation.Configure(captured,
                 LocalSearchOrder.TurnFrontier, 4, true, true)), "Default settings unexpectedly impose a six-round goal");
-            var known = Win(50, 50) with { Rounds = 6, HpLost = 11, DamageSources = new(0, 11, 0, 0, true) };
+            var known = Win(100, 100) with { Rounds = 6, HpLost = 11, DamageSources = new(0, 11, 0, 0, true) };
             var unknown = known with { Rounds = 5, DamageSources = new(0, 10, 1, 0, true) };
             Check(LocalSearchPolicy.MeetsGoal(known, request) && !LocalSearchPolicy.MeetsGoal(unknown, request),
                 "Unknown damage cannot certify an enemy-damage-free target");

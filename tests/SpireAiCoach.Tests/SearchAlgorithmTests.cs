@@ -22,7 +22,7 @@ static class SearchAlgorithmTests
             Check(LocalTactics.Priority(free with { Known = false }) == 0,
                 "Cost does not invent an effect for an unknown Mod card");
         });
-        test("search goal gates complete zero-loss victories by rounds and optional potion allowance", () =>
+        test("search goal gates complete full-health victories by rounds and optional potion allowance", () =>
         {
             var victory = new LocalCandidate([Move("one"), Move("two")], 80, 12, 0, 0, 80,
                 true, false, false, Rounds: 6, StartingHp: 80);
@@ -34,7 +34,7 @@ static class SearchAlgorithmTests
             Check(!LocalSearchPolicy.CanStop(victory with { Won = false }, true, 6, 0), "A healthy horizon is not a victory");
             Check(!LocalSearchPolicy.CanStop(victory, false, 6, 0), "A disabled stop remains disabled");
             Check(LocalSearchPolicy.CanStop(victory with { Rounds = 20, Actions = [Move("potion") with { PotionSlot = 0 }] }, true),
-                "The existing product switch keeps its ordinary first-zero-loss semantics");
+                "Full-health return still permits native healing and allowed potions");
             var request = new LocalSearchRequest("request", "snapshot", [], "native", 0, [], false);
             Check(request.LeanSearchChecksums && request.EfficientTactics && request.LearnBuffDuration && request.GuideWinningRoutes &&
                 request.TargetVictoryRounds == null && request.TargetPotionUses == null,

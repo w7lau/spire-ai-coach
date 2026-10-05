@@ -79,6 +79,7 @@ parser.add_argument('--summon-presentation-test', action='store_true', help='Onl
 parser.add_argument('--event-entry-test', action='store_true', help='Recreate a frozen event-combat root and verify generic native entry-history replay')
 parser.add_argument('--model-display-test', action='store_true', help='Short native optional display comparison; base/upgraded card and exact state/RNG/history')
 parser.add_argument('--resume-search-test', action='store_true', help='Native two-batch continuation probe with pending work and no executable route')
+parser.add_argument('--full-health-test', action='store_true', help='Short seeded native victory-healing/full-health return probe for both algorithms')
 
 parser.add_argument('--animation-presentation-test', action='store_true', help='Measured death/summon prefix; compare native presentation modes, not full search')
 args = parser.parse_args()
@@ -188,6 +189,11 @@ with worker_lock(root):
                        for order in ('MonteCarlo', 'TurnFrontier')],
                      *[f'integration-resume-search-{order}-{batch}-private.json'
                        for order in ('MonteCarlo', 'TurnFrontier') for batch in ('first', 'second')]]:
+            (root / name).unlink(missing_ok=True)
+    if args.full_health_test:
+        for name in ['integration-full-health-summary.json',
+                     *[f'integration-full-health-{hp}-{order}-private.json'
+                       for hp in (100, 247) for order in ('MonteCarlo', 'TurnFrontier')]]:
             (root / name).unlink(missing_ok=True)
     if args.recent_search_test:
         for name in ['integration-recent-search-summary.json', 'integration-recent-search-private.json']:
@@ -305,6 +311,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_VISUAL_FACTORY_TEST'] = '1' if args.visual_factory_test else '0'
     env['SPIRE_LOCAL_MODEL_DISPLAY_TEST'] = '1' if args.model_display_test else '0'
     env['SPIRE_LOCAL_RESUME_SEARCH_TEST'] = '1' if args.resume_search_test else '0'
+    env['SPIRE_LOCAL_FULL_HEALTH_TEST'] = '1' if args.full_health_test else '0'
     env['SPIRE_LOCAL_ROUTE_FEEDBACK_TEST'] = '1' if args.route_feedback_test else '0'
     env['SPIRE_LOCAL_ROUTE_FEEDBACK_FOCUSED_ONLY'] = '1' if args.route_feedback_focused_only else '0'
     env['SPIRE_LOCAL_RECENT_SEARCH_TEST'] = '1' if args.recent_search_test else '0'
@@ -387,6 +394,11 @@ with worker_lock(root):
             names = ['integration-resume-search-summary.json',
                      *[f'integration-resume-search-{order}-{batch}-private.json'
                        for order in ('MonteCarlo', 'TurnFrontier') for batch in ('first', 'second')],
+                     'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.full_health_test:
+            names = ['integration-full-health-summary.json',
+                     *[f'integration-full-health-{hp}-{order}-private.json'
+                       for hp in (100, 247) for order in ('MonteCarlo', 'TurnFrontier')],
                      'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
         if args.route_feedback_test:
             names = ['integration-route-feedback-summary.json',

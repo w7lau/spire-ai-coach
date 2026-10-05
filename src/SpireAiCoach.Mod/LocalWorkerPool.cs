@@ -291,7 +291,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     "已找到获胜路线，已停止全部后续搜索；未继续优化损失或用药。" : Volatile.Read(ref consumableGoalReached) != 0 ?
                     "当前消耗出牌及补刀目标已完成，战斗获胜且损血符合设置，已停止全部后续搜索。" : goalMinimumLoss > 0 ?
                     $"已达到最低净损失 {best.Best!.NetHpLoss}（含回血），同等损失下用药也已达下界，已停止后续搜索。" :
-                    "已找到战后无伤获胜路线，已停止全部后续搜索。") +
+                    "已找到战后满血获胜路线，已停止全部后续搜索。") +
                     (request.SkipFinalVerification ? "已跳过最终复核，执行时逐步核对模拟记录。" : "路线已通过复核。") :
                     "本地整场计算完成。" + (request.SkipFinalVerification ? "已跳过最终复核，执行时逐步核对模拟记录。" : "") +
                     (results.Any(r => r.Status is not ("searched" or "done")) || verificationResults.Any(r => r.Status != "done") ?
@@ -329,7 +329,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 progress(request.StopOnFirstWin ? "已找到获胜路线，正在停止其余搜索并确认路线…" :
                     Volatile.Read(ref consumableGoalReached) != 0 ? "消耗目标已完成且获胜，正在停止其余搜索并确认路线…" :
                     goalMinimumLoss > 0 ? $"已达到最低净损失 {goalMinimumLoss}，正在停止其余搜索并确认路线…" :
-                    "已找到无伤获胜路线，正在停止其余搜索并复核…");
+                    "已找到战后满血获胜路线，正在停止其余搜索并确认路线…");
             }
 
             LocalWorkerDemand Demand(int admitted)

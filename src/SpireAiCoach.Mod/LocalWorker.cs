@@ -206,7 +206,7 @@ public static class LocalWorker
         LocalWinningBound? WinningBound()
         {
             var own = request.CardGoals?.Enabled != true && LocalSearchPolicy.HasSpecificGoal(request) && !LocalSearchPolicy.MeetsGoal(best, request)
-                ? null : LocalWinningBound.From(sharedBounds.Root, best);
+                ? null : LocalWinningBound.From(sharedBounds.Root, best, LocalSearchPolicy.PrefersFullHealth(request));
             var peer = sharedBounds.Read();
             var selected = LocalHealthBound.Better(own, peer);
             if (selected != null && Equals(selected, peer) && !Equals(selected, own) && !Equals(peer, lastSharedBound))
@@ -1133,7 +1133,7 @@ public static class LocalWorker
                     request.CardGoals?.Enabled == true ? LocalSearchPolicy.CanStopOnCardGoals(best, request) ?
                     "当前消耗目标已完成，损血符合设置，停止后续搜索。" : "已停止其余搜索。" :
                     best?.NetHpLoss is > 0 ? $"已达到最低净损失 {best.NetHpLoss}，停止后续搜索。" :
-                    "已达到无伤通关停止条件，停止后续搜索。" : best == null ? "没有找到可完整结算的路线。" :
+                    "已达到战后满血停止条件，停止后续搜索。" : best == null ? "没有找到可完整结算的路线。" :
                 turns != null ? $"已完成当前预算；评估 {evaluated} 条整场路线，另探查 {probes} 个回合组合，剪枝 {boundPruned} 次；尚未证明全局最优。" :
                 $"已完成当前预算，操作树 {noPotionSearch.Nodes + (request.IncludePotions ? potionSearch.Nodes : 0)} 个节点，比较了 {refinements} 条补牌、删牌、换牌和选牌路线。");
             return true;

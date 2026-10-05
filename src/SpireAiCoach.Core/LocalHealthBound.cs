@@ -7,8 +7,9 @@ public sealed record LocalHealthEnvelope(string Root, int StartingHp, int Hp, in
 
 public sealed record LocalWinningBound(string Root, int StartingHp, int NetHpLoss, int PotionsUsed)
 {
-    public static LocalWinningBound? From(string root, LocalCandidate? candidate) =>
+    public static LocalWinningBound? From(string root, LocalCandidate? candidate, bool requireFullHealthForZeroLoss = false) =>
         candidate is { Won: true, Dead: false, StartingHp: not null, NetHpLoss: not null }
+            && (!requireFullHealthForZeroLoss || candidate.NetHpLoss != 0 || LocalSearchPolicy.FullHealthVictory(candidate))
             ? new(root, candidate.StartingHp.Value, candidate.NetHpLoss.Value,
                 candidate.Actions.Count(a => a.PotionSlot.HasValue)) : null;
 }

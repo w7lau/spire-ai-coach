@@ -13,6 +13,7 @@ public sealed class LocalSharedHealthBound(string directory, LocalSearchRequest 
     {
         request.Id, request.SnapshotId, request.NativeHash, request.ModelHash, request.LoadedMods,
         request.MaxRounds, request.IncludePotions, request.TargetVictoryRounds, request.TargetPotionUses,
+        request.StopOnZeroLoss, request.StopOnFirstWin,
         request.RequireKnownZeroEnemyDamage, request.DataOnlyCombat, request.DataOnlyRun,
         request.NumericalExecution, request.FastNativeWaits, request.FastStateSettling, request.CardGoals
     }))));
@@ -31,7 +32,7 @@ public sealed class LocalSharedHealthBound(string directory, LocalSearchRequest 
             candidate.Actions[0].BeforeHash != request.NativeHash ||
             request.CardGoals?.Enabled != true && LocalSearchPolicy.HasSpecificGoal(request) &&
             !LocalSearchPolicy.MeetsGoal(candidate, request)) return false;
-        var bound = LocalWinningBound.From(Root, candidate);
+        var bound = LocalWinningBound.From(Root, candidate, LocalSearchPolicy.PrefersFullHealth(request));
         if (bound == null) return false;
         lock (_gate)
         {

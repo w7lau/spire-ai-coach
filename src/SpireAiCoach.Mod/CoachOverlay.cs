@@ -205,8 +205,8 @@ public sealed class CoachOverlay
             catch (Exception ex) { _status.Text = "选项本次已生效，保存失败：" + ex.GetType().Name; }
         };
         options.AddChild(_localPotions);
-        _localStopOnZeroLoss = new CheckBox { Name = "LocalStopOnZeroLoss", Text = "达到最低损失即返回", ButtonPressed = _settings.LocalStopOnZeroLoss,
-            TooltipText = "战后无伤，或路线达到已证明的最低净损失且无需多喝药水，就停止搜索。回复上限未知或操作尚未覆盖时，不按正数下界停止。关闭后继续优化；最终复核由下方开关决定。" };
+        _localStopOnZeroLoss = new CheckBox { Name = "LocalStopOnZeroLoss", Text = "满血或最低损失即返回", ButtonPressed = _settings.LocalStopOnZeroLoss,
+            TooltipText = "完整战斗结算后生命回满实际生命上限，才按无伤停止；只回到起点生命、净损血为零或增加上限但没回满时继续搜索。另保留已严格证明的最低正净损失返回；回复上限未知或操作尚未覆盖时不按正数下界停止。关闭后继续优化；最终复核由下方开关决定。" };
         _localStopOnZeroLoss.Toggled += enabled =>
         {
             _settings = _settings with { LocalStopOnZeroLoss = enabled };
@@ -637,10 +637,10 @@ public sealed class CoachOverlay
     private void UpdateCardGoalNotice()
     {
         bool hasGoals = CurrentCardGoals() is { Enabled: true };
-        _localStopOnZeroLoss.Text = hasGoals ? "完成消耗目标即返回" : "达到最低损失即返回";
+        _localStopOnZeroLoss.Text = hasGoals ? "完成消耗目标即返回" : "满血或最低损失即返回";
         _localStopOnZeroLoss.TooltipText = hasGoals ?
-            "当前消耗目标牌成功使用并实际消耗；补刀次数取当前可用目标牌张数与允许补刀的非爪牙活敌人数的较小值。战斗获胜且损血符合设置时停止所有搜索，不继续查找回收、复制或额外生成后的次数。可反复使用的目标牌仍继续原定搜索。" :
-            "战后无伤，或路线达到已证明的最低净损失且无需多喝药水，就停止搜索。回复上限未知或操作尚未覆盖时，不按正数下界停止。关闭后继续优化；最终复核由下方开关决定。";
+            "当前消耗目标牌成功使用并实际消耗；补刀次数取当前可用目标牌张数与允许补刀的非爪牙活敌人数的较小值。战斗获胜且战后满血时停止；明确允许少量损血时按所填阈值停止。不继续查找回收、复制或额外生成后的次数。可反复使用的目标牌仍继续原定搜索。" :
+            "完整战斗结算后生命回满实际生命上限，才按无伤停止；只回到起点生命、净损血为零或增加上限但没回满时继续搜索。另保留已严格证明的最低正净损失返回；回复上限未知或操作尚未覆盖时不按正数下界停止。关闭后继续优化；最终复核由下方开关决定。";
         if (_localStopOnFirstWin.ButtonPressed)
         {
             _localCardGoalLoss.Editable = false;
@@ -652,7 +652,10 @@ public sealed class CoachOverlay
             (_localCardGoalThreshold.ButtonPressed ? "在所填净损血范围内优先补刀及多打牌；没有符合路线时优先少损血。" :
                 "优先保住战后生命，同血量时优先补刀及多打牌。") +
             (_localStopOnZeroLoss.ButtonPressed ?
-                "\n当前消耗目标完成、获胜且损血符合设置就返回；补刀次数最多按当前允许补刀的非爪牙活敌人数计算。可反复使用的目标牌继续搜索。" :
+                (_localCardGoalThreshold.ButtonPressed ?
+                    "\n当前消耗目标完成、获胜且损血符合设置就返回；" :
+                    "\n当前消耗目标完成、获胜且战后满血才返回；") +
+                "补刀次数最多按当前允许补刀的非爪牙活敌人数计算。可反复使用的目标牌继续搜索。" :
                 "\n已关闭提前返回，继续比较目标次数直到原定搜索上限。");
     }
 

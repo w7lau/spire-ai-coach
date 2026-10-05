@@ -23,6 +23,7 @@ Both algorithms plan the whole battle from the current state without an API.
 - Prioritizes net HP loss after combat, including healing during and after battle. Equal-loss routes prefer preserving potions.
 - Configure concurrency, attempts, search time, turn limits, stopping conditions, potion use and card goals.
 - Inspect progress, routes and timing, or continue searching.
+- Zero-loss early return requires full HP after combat resolution, using the final HP cap. Zero net loss alone keeps searching.
 - Plan execution supports singleplayer and stops when the actual state diverges from the plan.
 
 To support different mods, local search aims to reuse underlying game rules and loaded mod hooks for plays and resolution, reducing per-card adapters.

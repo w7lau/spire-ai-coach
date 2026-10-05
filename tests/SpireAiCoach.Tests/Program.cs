@@ -17,6 +17,7 @@ TurnWorkTests.Register(Test, AsyncTest);
 ResumeSearchTests.Register(Test);
 MinimumLossTests.Register(Test, AsyncTest);
 HealthAccountingTests.Register(Test);
+FullHealthReturnTests.Register(Test);
 SelectionSpaceTests.Register(Test);
 SearchEvidenceTests.Register(Test);
 
@@ -652,9 +653,9 @@ AsyncTest("HTTP content has one JSON object encoding and readable diagnostics pr
     Check(DiagnosticDisplay.Format(new CallDiagnostics().RedactedJson("")).Contains("尚未生成请求"));
 });
 
-Test("local zero-loss switch stops complete wins without reward or potion gates", () =>
+Test("local full-health switch stops complete wins without reward or potion gates", () =>
 {
-    var safe = new LocalCandidate([], 50, 0, 0, 100, 80, true, false, false, StartingHp: 50);
+    var safe = new LocalCandidate([], 80, 0, 0, 100, 80, true, false, false, StartingHp: 50);
     Check(LocalSearchPolicy.CanStop(safe, true));
     Check(!LocalSearchPolicy.CanStop(safe, false));
     Check(LocalSearchPolicy.CanStop(safe with { HpLost = 3 }, true), "Native healing counts toward the final objective");

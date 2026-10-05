@@ -11,7 +11,7 @@ static class CardGoalTests
         Enumerable.Range(0, potions).Select(i => new LocalAction(-1, "potion", null, "药水", "", "root", PotionSlot: i)).ToArray(),
         hp, Math.Max(0, 50 - hp), 0, 0, 80, true, false, false, StartingHp: 50,
         CardGoalOutcome: new("mod:play", "mod:finish", plays, kills, [new(plays, kills)]));
-    static LocalCandidate Fulfilled(int hp = 50) => Win(hp, 2, 1) with
+    static LocalCandidate Fulfilled(int hp = 80) => Win(hp, 2, 1) with
     {
         Actions = [new(0, "mod:finish", null, "", "", "root", 1)],
         CardGoalOutcome = new("mod:play", "mod:finish", 2, 1, [new(2, 1)], new(new(1, 1, 1), new(1, 1, 1)))
@@ -168,7 +168,8 @@ static class CardGoalTests
             Check(!LocalSearchPolicy.CanStop(Win(50, 100, 9), request), "Stopped without any goal upper bound");
             Check(!new LocalSearchStop("request", "snapshot", "root").Matches(request), "Peer zero-loss stop ended goal search");
             Check(new LocalSearchStop("request", "snapshot", "root", true).Matches(request), "Explicit cancellation ignored");
-            Check(LocalSearchPolicy.CanStop(Win(50, 0, 0), request with { CardGoals = null }), "Ordinary no-loss stop changed");
+            Check(!LocalSearchPolicy.CanStop(Win(50, 0, 0), request with { CardGoals = null }), "Unfilled final health cap qualified");
+            Check(LocalSearchPolicy.CanStop(Win(80, 0, 0), request with { CardGoals = null }), "Ordinary full-health stop changed");
         });
         test("card goals keep searching after a certified minimum health loss", () =>
         {
@@ -191,6 +192,7 @@ static class CardGoalTests
             var request = new LocalSearchRequest("request", "snapshot", [], "root", 1, [], false, CardGoals: Goals());
             var good = Fulfilled();
             Check(LocalSearchPolicy.CanStopAfterVictory(good, request), "Completed consumable targets kept searching");
+            Check(!LocalSearchPolicy.CanStopAfterVictory(good with { Hp = 50 }, request), "Consumed targets bypassed the full-health requirement");
             Check(!LocalSearchPolicy.CanStopAfterVictory(good with { Won = false }, request), "Spent cards ended an ongoing battle");
             Check(!LocalSearchPolicy.CanStopAfterVictory(good with { Dead = true }, request), "Dead player supplied a goal stop");
             Check(!LocalSearchPolicy.CanStopAfterVictory(good with { Hp = 49 }, request), "HP sacrificed without an allowance");

@@ -13,7 +13,9 @@ internal static class HealthAccountingTests
             Check(health.HpLost == 14 && health.HpGained == 14 && health.FullyObserved);
             var candidate = new LocalCandidate([], 50, health.HpLost, 0, 0, 80, true, false, false,
                 StartingHp: 50, HealthChanges: health);
-            Check(candidate.NetHpLoss == 0 && LocalSearchPolicy.CanStop(candidate, true));
+            Check(candidate.NetHpLoss == 0 && !LocalSearchPolicy.CanStop(candidate, true));
+            accounting.Observe(80, 80);
+            Check(LocalSearchPolicy.CanStop(candidate with { Hp = 80, HealthChanges = accounting.Snapshot() }, true));
         });
         test("nested Mod healing before notification is counted once despite duplicate callbacks", () =>
         {
