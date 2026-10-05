@@ -18,10 +18,15 @@ using SpireAiCoach.Core;
 
 namespace SpireAiCoach.Mod;
 
-public sealed record LocalInstallation(string GameDirectory, string[] ModDirectories, bool MinimalWorkerBootstrap = true);
 
 public static class LocalCapture
 {
+    private static readonly FieldInfo? PendingStateChange = typeof(CombatStateTracker)
+        .GetField("_combatStateChangedDeferredTask", BindingFlags.NonPublic | BindingFlags.Instance);
+    [ThreadStatic] private static PacketWriter? _fingerprintWriter;
+    [ThreadStatic] private static bool _writerInUse;
+    [ThreadStatic] private static int _snapshotDepth;
+    internal static bool InFingerprintSnapshot => _snapshotDepth > 0;
     private static CombatReplay Replay() => typeof(CombatReplayWriter).GetField("_replay", BindingFlags.Instance | BindingFlags.NonPublic)
         ?.GetValue(RunManager.Instance.CombatReplayWriter) as CombatReplay ?? throw new InvalidOperationException("No combat replay");
 
@@ -66,20 +71,56 @@ public static class LocalCapture
             RunManager.Instance.ActionQueueSet.BecameEmpty().IsCompletedSuccessfully;
     }
 
+    // Queue-empty precedes executor cleanup and deferred state notifications in the native game.
+    // Live execution must wait for both before comparing the next recorded decision.
+    internal static bool ExecutionSettled()
+    {
+        if (PendingStateChange == null)
+            throw new InvalidOperationException("当前游戏版本的结算接口不可用，已停止执行。");
+        var executor = RunManager.Instance.ActionExecutor.FinishedExecutingActions();
+        if (executor.IsCompleted) executor.GetAwaiter().GetResult();
+        var notification = PendingStateChange.GetValue(CombatManager.Instance.StateTracker) as Task;
+        if (notification?.IsCompleted == true) notification.GetAwaiter().GetResult();
+        return executor.IsCompletedSuccessfully && (notification == null || notification.IsCompletedSuccessfully);
+    }
+
     public static string Fingerprint()
     {
         using var measuring = LocalWorker.MeasureMethod("LocalCapture.Fingerprint");
         var state = CombatManager.Instance.DebugOnlyGetState() ?? throw new InvalidOperationException("No combat");
-        var writer = new PacketWriter();
-        NetFullCombatState.FromRun(state.RunState, null).Serialize(writer);
-        var extra = Encoding.UTF8.GetBytes($"|{state.RoundNumber}|" + string.Join(";",
-            state.Enemies.Select(e => $"{e.CombatId}:{e.Monster?.NextMove?.Id}")) + "|potions|" +
-            string.Join(";", state.Players.SelectMany(p => p.PotionSlots.Select((potion, slot) =>
-                $"{p.NetId}:{slot}:{potion?.Id}:{potion?.IsQueued}"))));
-        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        hash.AppendData(writer.Buffer.AsSpan(0, (writer.BitPosition + 7) / 8));
-        hash.AppendData(extra);
-        return Convert.ToHexString(hash.GetHashAndReset());
+        bool reuse = LocalWorker.ReuseFingerprintBuffer && !_writerInUse;
+        var writer = reuse ? _fingerprintWriter ??= new PacketWriter { WarnOnGrow = false } : new PacketWriter();
+        if (reuse)
+        {
+            _writerInUse = true;
+            // Reset alone preserves unused tail bits. Clear them so a shorter,
+            // non-byte-aligned packet hashes exactly like a fresh native writer.
+            Array.Clear(writer.Buffer); writer.Reset();
+            LocalWorker.SkipMethod("LocalCapture.ReusedPacketBuffer");
+        }
+        try
+        {
+            _snapshotDepth++;
+            try { NetFullCombatState.FromRun(state.RunState, null).Serialize(writer); }
+            finally { _snapshotDepth--; }
+            var extra = Encoding.UTF8.GetBytes($"|{state.RoundNumber}|" + string.Join(";",
+                state.Enemies.Select(e => $"{e.CombatId}:{e.Monster?.NextMove?.Id}")) + "|potions|" +
+                string.Join(";", state.Players.SelectMany(p => p.PotionSlots.Select((potion, slot) =>
+                    $"{p.NetId}:{slot}:{potion?.Id}:{potion?.IsQueued}"))));
+            using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            hash.AppendData(writer.Buffer.AsSpan(0, (writer.BitPosition + 7) / 8));
+            hash.AppendData(extra);
+            return Convert.ToHexString(hash.GetHashAndReset());
+        }
+        finally
+        {
+            if (reuse)
+            {
+                _writerInUse = false;
+                // Do not keep an unusually large Mod packet for the process lifetime.
+                if (writer.Buffer.Length > 1024 * 1024) _fingerprintWriter = null;
+            }
+        }
     }
 
     public static string[] LoadedMods() => ModManager.GetLoadedMods()
@@ -103,6 +144,7 @@ public static class LocalCapture
         if (replay == null)
             throw new CoachException("local_replay", "这场战斗没有可用的原生重放记录，请在下一场战斗重试。");
         var before = Fingerprint();
+        var eventEntry = LocalEventReplay.Capture(player);
         var packet = new PacketWriter();
         replay.Serialize(packet);
         if (before != Fingerprint()) throw new CoachException("local_changed", "采集期间战斗发生变化，请重试。");
@@ -112,7 +154,7 @@ public static class LocalCapture
             TargetLabels: state.Enemies.Where(e => e.IsAlive && e.CombatId.HasValue)
                 .OrderBy(e => e.GetCreatureNode()?.GlobalPosition.X ?? float.MaxValue)
                 .Select((e, index) => new { Id = e.CombatId!.Value, Label = $"从左到右第 {index + 1} 个敌人「{e.Name}」" })
-                .ToDictionary(e => e.Id, e => e.Label), History: History());
+                .ToDictionary(e => e.Id, e => e.Label), History: History(), EventEntry: eventEntry);
     }
 
     public static LocalInstallation Installation() => new(

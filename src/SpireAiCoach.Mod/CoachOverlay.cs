@@ -22,13 +22,19 @@ public sealed class CoachOverlay
     private CancellationTokenSource? _request;
     private int _generation;
     private long _nextPoll;
-    private bool _f8, _f9, _f10;
+    private bool _f8;
     private bool _disposed;
     private CanvasLayer _layer = null!;
     private PanelContainer _panel = null!;
+    private object? _panelCombat;
+    private bool _panelExecuting;
+    private bool? _manualPanelVisibility;
+    private ScrollContainer _contentScroll = null!;
     private VBoxContainer _settingsPanel = null!;
+    private VBoxContainer _aiOptions = null!;
     private Label _status = null!;
     private Label _battle = null!;
+    private Label _resources = null!;
     private Label _feedback = null!;
     private Label _freshness = null!;
     private RichTextLabel _advice = null!;
@@ -41,8 +47,9 @@ public sealed class CoachOverlay
     private LocalWorkerPool _localPool = null!;
     private bool _localAnalyzing;
     private CheckBox _localStopOnZeroLoss = null!;
+    private CheckBox _localStopOnFirstWin = null!;
     private SpinBox _localTargetVictoryRounds = null!;
-    private Button _localSkipVerification = null!;
+    private CheckBox _localSkipVerification = null!;
     private bool _executing;
     private CancellationTokenSource? _execution;
     private readonly CancellationTokenSource _lifetime = new();
@@ -56,8 +63,17 @@ public sealed class CoachOverlay
     private SpinBox _localMaxRounds = null!;
     private SpinBox _localSearchSeconds = null!;
     private CheckBox _localPotions = null!;
+    private OptionButton _localPlayCard = null!;
+    private OptionButton _localFinisherCard = null!;
+    private CheckBox _localCardGoalThreshold = null!;
+    private SpinBox _localCardGoalLoss = null!;
+    private Label _localCardGoalNotice = null!;
+    private string? _cardGoalDeckKey;
+    private Dictionary<string, string> _cardGoalNames = new(StringComparer.Ordinal);
+    private bool _refreshingCardGoals;
     private LocalProgressPanel _localProgress = null!;
     private TextEdit _localTiming = null!;
+    private TextEdit _localResultDetails = null!;
     private readonly ConcurrentDictionary<int, LocalProgress> _pendingLocalProgress = new();
     private Button _cancel = null!;
     private LineEdit _url = null!;
@@ -83,60 +99,86 @@ public sealed class CoachOverlay
         catch (Exception ex) { loadError = $"本地设置未能读取（{ex.GetType().Name}），请重新填写后保存。"; }
         _layer = new CanvasLayer { Name = "SpireAiCoach", Layer = 90 };
         _tree.Root.AddChild(_layer);
-        var toggle = new Button { Text = "尖塔教练 · F8", Position = new Vector2(24, 12) };
-        toggle.Pressed += () => _panel.Visible = !_panel.Visible;
+        var toggle = new Button { Name = "CoachToggle", Text = "尖塔教练 · F8", Position = new Vector2(24, 12),
+            Visible = _settings.ShowOverlayButton };
+        toggle.Pressed += TogglePanel;
         _layer.AddChild(toggle);
 
         _panel = new PanelContainer { Name = "CoachPanel", Visible = false };
-        var font = new SystemFont { FontNames = ["Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC"] };
-        _panel.Theme = new Theme { DefaultFont = font, DefaultFontSize = 17 };
-        toggle.AddThemeFontOverride("font", font);
-        _panel.AddThemeStyleboxOverride("panel", new StyleBoxFlat
-        {
-            BgColor = new Color("17202bef"), BorderColor = new Color("b89965"),
-            BorderWidthLeft = 1, BorderWidthRight = 1, BorderWidthTop = 1, BorderWidthBottom = 1,
-            CornerRadiusTopLeft = 10, CornerRadiusTopRight = 10,
-            CornerRadiusBottomLeft = 10, CornerRadiusBottomRight = 10,
-            ContentMarginLeft = 16, ContentMarginRight = 16, ContentMarginTop = 14, ContentMarginBottom = 14
-        });
+        _panel.Theme = CoachTheme.Create(); toggle.Theme = _panel.Theme;
         _layer.AddChild(_panel);
-        var scroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled };
-        _panel.AddChild(scroll);
+        var shell = new VBoxContainer(); shell.AddThemeConstantOverride("separation", 10); _panel.AddChild(shell);
+        var scroll = _contentScroll = new ScrollContainer { HorizontalScrollMode = ScrollContainer.ScrollMode.Disabled,
+            VerticalScrollMode = ScrollContainer.ScrollMode.Auto,
+            SizeFlagsVertical = Control.SizeFlags.ExpandFill };
         var body = new VBoxContainer { SizeFlagsHorizontal = Control.SizeFlags.ExpandFill };
         body.AddThemeConstantOverride("separation", 10);
         scroll.AddChild(body);
-        body.AddChild(new Label { Text = "尖塔教练 · AI / 本地", ThemeTypeVariation = "HeaderLarge" });
-        body.AddChild(Wrapped("F9 调用 AI · 本地计算无需 API · 算好后可点击执行方案 · F10 设置"));
-        _battle = Wrapped("进入战斗后可分析当前回合。"); body.AddChild(_battle);
-        _status = Wrapped("本地计算无需 API；使用 AI 时请先填写地址、模型和密钥。"); body.AddChild(_status);
-        var row = new HBoxContainer(); body.AddChild(row);
-        _analyze = new Button { Text = "AI 分析 · F9", Disabled = true }; row.AddChild(_analyze);
+        var heading = new HBoxContainer(); shell.AddChild(heading);
+        var modVersion = typeof(CoachOverlay).Assembly.GetName().Version?.ToString(3) ?? "未知";
+        var title = new Label { Text = "尖塔教练", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            TooltipText = "F8 打开 / 收起面板\nv" + modVersion };
+        title.AddThemeFontSizeOverride("font_size", 22); title.AddThemeColorOverride("font_color", CoachTheme.Gold);
+        heading.AddChild(title);
+        var version = new Label { Name = "CoachVersion", Text = "v" + modVersion,
+            VerticalAlignment = VerticalAlignment.Center, TooltipText = "当前已加载的 Mod 版本" };
+        version.AddThemeFontSizeOverride("font_size", 13); version.AddThemeColorOverride("font_color", CoachTheme.Muted);
+        heading.AddChild(version);
+        _battle = Wrapped("进入战斗后可计算。"); shell.AddChild(_battle);
+        _status = Wrapped("本地计算无需配置 API。"); _status.AddThemeColorOverride("font_color", CoachTheme.Gold); shell.AddChild(_status);
+        var row = new HBoxContainer();
+        _analyze = new Button { Text = "AI 分析", Disabled = true }; row.AddChild(_analyze);
         _analyze.Pressed += Analyze;
-        _cancel = new Button { Text = "取消", Disabled = true }; row.AddChild(_cancel);
+        _cancel = new Button { Text = "取消", Disabled = true };
         _cancel.Pressed += () => Cancel("已取消分析。");
-        var config = new Button { Text = "设置" }; row.AddChild(config);
-        config.Pressed += () => _settingsPanel.Visible = !_settingsPanel.Visible;
-        var hide = new Button { Text = "收起" }; row.AddChild(hide);
-        hide.Pressed += () => _panel.Hide();
-        var localRow = new HBoxContainer(); body.AddChild(localRow);
-        _localAnalyze = new Button { Name = "LocalBattleSearch", Text = "本地整场计算（实验）", Disabled = true }; localRow.AddChild(_localAnalyze);
+        var config = new Button { Text = "AI 设置" }; row.AddChild(config);
+        config.Pressed += () => { _aiOptions.Show(); _settingsPanel.Visible = !_settingsPanel.Visible; };
+        var hide = new Button { Text = "收起" }; heading.AddChild(hide);
+        hide.Pressed += () => SetPanelVisible(false);
+        var localRow = new GridContainer { Columns = 2 }; shell.AddChild(localRow);
+        _localAnalyze = new Button { Name = "LocalBattleSearch", Text = LocalCalculation.Name(LocalSearchOrder.MonteCarlo), Disabled = true,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, TooltipText = "整场战斗 · 以完整战斗路线组织探索。两种算法共用搜索设置；每路达到尝试次数或时间上限即结束，准备和复核另计。" }; localRow.AddChild(_localAnalyze);
         _localAnalyze.Pressed += () => AnalyzeLocal(LocalSearchOrder.MonteCarlo);
-        _turnAnalyze = new Button { Name = "LocalTurnSearch", Text = "新算法整场计算（实验）", Disabled = true }; localRow.AddChild(_turnAnalyze);
+        _turnAnalyze = new Button { Name = "LocalTurnSearch", Text = LocalCalculation.Name(LocalSearchOrder.TurnFrontier), Disabled = true,
+            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, TooltipText = "整场战斗 · 按回合组织搜索。预算与本地计算一致，共用原生模拟和执行保护。" }; localRow.AddChild(_turnAnalyze);
+        CoachTheme.Accent(_turnAnalyze);
         _turnAnalyze.Pressed += () => AnalyzeLocal(LocalSearchOrder.TurnFrontier);
-        body.AddChild(Wrapped("两种算法共用下方搜索设置。每路达到尝试次数或时间上限即结束；准备和最终复核另计。"));
-        body.AddChild(Wrapped("规划整场战斗，优先减少战后净生命损失、保留药水。关闭“无伤通关后立即返回”可继续优化无伤路线。"));
-        var localOptions = new HBoxContainer(); body.AddChild(localOptions);
-        localOptions.AddChild(new Label { Text = "并发上限（0 自动，1–16）" });
+        var options = CoachTheme.Section(body, "计算选项");
+        var advanced = new VBoxContainer { Name = "LocalAdvancedOptions", Visible = false };
+        var showEntry = new CheckBox { Name = "ShowOverlayButton", Text = "显示左上角入口", ButtonPressed = _settings.ShowOverlayButton,
+            TooltipText = "左上角入口默认隐藏。无论是否显示入口，都可以用 F8 打开面板。" };
+        showEntry.Toggled += enabled =>
+        {
+            _settings = _settings with { ShowOverlayButton = enabled };
+            toggle.Visible = enabled;
+            try { _store.SaveInterfaceOptions(enabled); }
+            catch (Exception ex) { _status.Text = "界面选项本次已生效，保存失败：" + ex.GetType().Name; }
+        };
+        advanced.AddChild(showEntry);
+        var autoShow = new CheckBox { Name = "AutoShowCombatPanel", Text = "进入战斗自动展开面板",
+            ButtonPressed = _settings.AutoShowCombatPanel,
+            TooltipText = "默认开启。关闭后只通过 F8 或左上角入口手动打开；本次已打开的面板保持显示。" };
+        autoShow.Toggled += enabled =>
+        {
+            _settings = _settings with { AutoShowCombatPanel = enabled };
+            _manualPanelVisibility = _panel.Visible;
+            try { _store.SaveInterfaceOptions(autoShowCombatPanel: enabled); }
+            catch (Exception ex) { _status.Text = "界面选项本次已生效，保存失败：" + ex.GetType().Name; }
+        };
+        advanced.AddChild(autoShow);
+        _resources = Wrapped("计算资源 · 尚未准备"); _resources.AddThemeColorOverride("font_color", CoachTheme.Muted); advanced.AddChild(_resources);
+        var localOptions = new GridContainer { Columns = 2 }; advanced.AddChild(localOptions);
+        localOptions.AddChild(new Label { Text = "并发上限", TooltipText = "0 自动，1–16 为手动上限。按待办任务逐步增加，健康实例保留供后续计算。" });
         _localWorkers = new SpinBox { Name = "LocalWorkers", MinValue = 0, MaxValue = 16, Step = 1, Value = Math.Clamp(_settings.LocalWorkers, 0, 16),
             TooltipText = "0 按 CPU 和内存自动估算；手动值为实际并发上限。按待办任务逐步增加，无伤返回或任务结束后停止扩并。" };
         localOptions.AddChild(_localWorkers);
-        var saveLocal = new Button { Name = "LocalSaveSettings", Text = "保存本地设置" }; localOptions.AddChild(saveLocal);
+        var saveLocal = new Button { Name = "LocalSaveSettings", Text = "保存计算选项" }; advanced.AddChild(saveLocal);
         saveLocal.Pressed += () =>
         {
             try { SaveLocalSettings(); _status.Text = "本地设置已保存，下次计算生效。"; }
             catch (Exception ex) { _status.Text = "本地设置保存失败：" + ex.GetType().Name; }
         };
-        var limits = new HBoxContainer(); body.AddChild(limits);
+        var limits = new GridContainer { Columns = 2 }; advanced.AddChild(limits);
         limits.AddChild(new Label { Text = "每路尝试上限" });
         _localMaxAttempts = new SpinBox { Name = "LocalMaxAttempts", MinValue = 1, MaxValue = LocalCalculation.MaximumAttempts, Step = 1,
             Value = Math.Clamp(_settings.LocalMaxAttempts, 1, LocalCalculation.MaximumAttempts) };
@@ -145,31 +187,48 @@ public sealed class CoachOverlay
         _localMaxRounds = new SpinBox { Name = "LocalMaxRounds", MinValue = 1, MaxValue = LocalCalculation.MaximumRounds, Step = 1,
             Value = Math.Clamp(_settings.LocalMaxRounds, 1, LocalCalculation.MaximumRounds) };
         limits.AddChild(_localMaxRounds);
-        var timeLimit = new HBoxContainer(); body.AddChild(timeLimit);
-        timeLimit.AddChild(new Label { Text = "每路搜索上限（秒）" });
+        limits.AddChild(new Label { Text = "每路搜索秒数" });
         _localSearchSeconds = new SpinBox { Name = "LocalSearchSeconds", MinValue = 1, MaxValue = LocalCalculation.MaximumSearchSeconds, Step = 1,
             Value = Math.Clamp(_settings.LocalSearchSeconds, 1, LocalCalculation.MaximumSearchSeconds) };
-        timeLimit.AddChild(_localSearchSeconds);
-        _localPotions = new CheckBox { Text = "必要时考虑药水（优先保留）", ButtonPressed = _settings.LocalIncludePotions };
+        limits.AddChild(_localSearchSeconds);
+        _localPotions = new CheckBox { Name = "LocalIncludePotions", Text = "必要时考虑药水", ButtonPressed = _settings.LocalIncludePotions,
+            TooltipText = "优先选择战后净损血较少的路线；同等损血优先保留药水，不会要求全部喝掉。" };
         _localPotions.Toggled += _ =>
         {
-            if (_continuation == null && !_localAnalyzing) return;
-            Cancel("药水选项已变化，请重新计算。");
-            _adviceHash = null; _advice.Text = "药水策略已改变，原本地路线已清除。";
+            if (_continuation != null || _localAnalyzing)
+            {
+                Cancel("药水选项已变化，请重新计算。");
+                _adviceHash = null; _advice.Text = "药水策略已改变，原本地路线已清除。";
+            }
+            try { SaveLocalSettings(); }
+            catch (Exception ex) { _status.Text = "选项本次已生效，保存失败：" + ex.GetType().Name; }
         };
-        body.AddChild(_localPotions);
-        _localStopOnZeroLoss = new CheckBox { Text = "无伤通关后立即返回（含回血）", ButtonPressed = _settings.LocalStopOnZeroLoss,
-            TooltipText = "默认开启。找到获胜且战后生命不低于计算起点的路线，就停止全部搜索；默认复核后返回，开启跳过复核则直接显示结果。关闭后可继续搜索更佳路线。" };
+        options.AddChild(_localPotions);
+        _localStopOnZeroLoss = new CheckBox { Name = "LocalStopOnZeroLoss", Text = "达到最低损失即返回", ButtonPressed = _settings.LocalStopOnZeroLoss,
+            TooltipText = "战后无伤，或路线达到已证明的最低净损失且无需多喝药水，就停止搜索。回复上限未知或操作尚未覆盖时，不按正数下界停止。关闭后继续优化；最终复核由下方开关决定。" };
         _localStopOnZeroLoss.Toggled += enabled =>
         {
             _settings = _settings with { LocalStopOnZeroLoss = enabled };
             if (_localAnalyzing) Cancel("停止条件已改变，请重新计算。");
+            UpdateCardGoalNotice();
             try { SaveLocalSettings(); }
             catch (Exception ex) { _status.Text = "选项本次已生效，保存失败：" + ex.GetType().Name; }
         };
-        body.AddChild(_localStopOnZeroLoss);
-        var targetOptions = new HBoxContainer(); body.AddChild(targetOptions);
-        targetOptions.AddChild(new Label { Text = "提前返回目标回合（0 不限）" });
+        options.AddChild(_localStopOnZeroLoss);
+        _localStopOnFirstWin = new CheckBox { Name = "LocalStopOnFirstWin", Text = "找到获胜路线即返回",
+            ButtonPressed = _settings.LocalStopOnFirstWin,
+            TooltipText = "适合最终 Boss 等只需获胜的战斗。找到完整获胜路线后立即停止搜索，允许掉血或用药；不再继续优化损失、补刀或使用次数。与最低损失、目标回合或可选出牌目标同时设置时，优先按此选项返回。最终复核仍由下方开关决定。" };
+        _localStopOnFirstWin.Toggled += enabled =>
+        {
+            _settings = _settings with { LocalStopOnFirstWin = enabled };
+            if (_localAnalyzing) Cancel("停止条件已改变，请重新计算。");
+            UpdateCardGoalNotice();
+            try { SaveLocalSettings(); }
+            catch (Exception ex) { _status.Text = "选项本次已生效，保存失败：" + ex.GetType().Name; }
+        };
+        options.AddChild(_localStopOnFirstWin);
+        var targetOptions = new GridContainer { Columns = 2 }; advanced.AddChild(targetOptions);
+        targetOptions.AddChild(new Label { Text = "目标回合", TooltipText = "提前返回的目标回合数；0 不限。不是战斗搜索的回合上限。" });
         _localTargetVictoryRounds = new SpinBox { Name = "LocalTargetVictoryRounds", MinValue = 0, MaxValue = _localMaxRounds.Value,
             Step = 1, Value = Math.Clamp(_settings.LocalTargetVictoryRounds, 0, (int)_localMaxRounds.Value),
             TooltipText = "填 6：只有六回合内获胜、战后生命不低于起点、不主动用药且确认敌方伤害为 0，才提前返回。允许自身扣血后回复。0 沿用原无伤条件；搜索上限由本地设置决定。" };
@@ -180,24 +239,62 @@ public sealed class CoachOverlay
             _settings = _settings with { LocalTargetVictoryRounds = (int)value };
             if (_localAnalyzing) Cancel("目标回合已改变，请重新计算。");
         };
-        _localSkipVerification = new Button { Name = "LocalSkipVerification", Text = "跳过最终复核：关闭", ToggleMode = true,
-            TooltipText = "默认关闭。开启后省去最终路线的独立重放，仍可点击执行方案；执行时逐步核对首次模拟记录，偏离即停止。" };
+        _localSkipVerification = new CheckBox { Name = "LocalSkipVerification", Text = "跳过最终复核",
+            ButtonPressed = _settings.LocalSkipFinalVerification,
+            TooltipText = "默认勾选，省去最终路线的再次模拟，取得完整记录后仍可执行；执行时每一步都会核对，偏离即停止。取消勾选可恢复独立复核。" };
         _localSkipVerification.Toggled += enabled =>
         {
-            _localSkipVerification.Text = enabled ? "跳过最终复核：开启" : "跳过最终复核：关闭";
             if (_localAnalyzing) Cancel("复核选项已改变，请重新计算。");
-            _status.Text = enabled ? "下次本地计算跳过最终复核，仍可执行取得完整逐步记录的方案。" : "下次本地计算会复核最终路线。";
+            _status.Text = enabled ? "下次计算跳过最终复核。" : "下次计算会复核最终路线。";
+            try { SaveLocalSettings(); }
+            catch (Exception ex) { _status.Text = "选项本次已生效，保存失败：" + ex.GetType().Name; }
         };
-        body.AddChild(_localSkipVerification);
+        options.AddChild(_localSkipVerification);
+        var cardGoals = new VBoxContainer { Name = "LocalCardGoals", Visible = false };
+        options.AddChild(CoachTheme.Disclosure("可选出牌目标", cardGoals)); options.AddChild(cardGoals);
+        var cardFields = new GridContainer { Columns = 2 }; cardGoals.AddChild(cardFields);
+        cardFields.AddChild(new Label { Text = "尽可能多打" });
+        _localPlayCard = new OptionButton { Name = "LocalPlayCard", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            TooltipText = "从当前牌组选一张；从当前状态起统计后续打出次数，合并所有副本和升级版，包含自动和重复打出。选“不启用”关闭目标。" };
+        cardFields.AddChild(_localPlayCard);
+        cardFields.AddChild(new Label { Text = "尽量用来补刀" });
+        _localFinisherCard = new OptionButton { Name = "LocalFinisherCard", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            TooltipText = "尽量用这张牌补刀非爪牙敌人，只计入游戏允许触发补刀收益的实际击杀，包含 Mod 的补刀限制。两项都启用时，先比较补刀次数，再比较使用次数。" };
+        cardFields.AddChild(_localFinisherCard);
+        _localCardGoalThreshold = new CheckBox { Name = "LocalCardGoalThreshold", Text = "允许少量损血，优先可选目标",
+            ButtonPressed = _settings.LocalCardGoalThresholdEnabled };
+        cardGoals.AddChild(_localCardGoalThreshold);
+        cardFields = new GridContainer { Columns = 2 }; cardGoals.AddChild(cardFields);
+        cardFields.AddChild(new Label { Text = "战后净损血小于" });
+        _localCardGoalLoss = new SpinBox { Name = "LocalCardGoalLoss", MinValue = 1, MaxValue = int.MaxValue,
+            Step = 1, Value = Math.Max(1, _settings.LocalCardGoalHpLossThreshold),
+            TooltipText = "严格小于：填 5 表示净损血 0–4。包含战中和战后回血；没有符合的获胜路线时，仍按损血较少选路。" };
+        cardFields.AddChild(_localCardGoalLoss);
+        _localCardGoalNotice = Wrapped(""); cardGoals.AddChild(_localCardGoalNotice);
+        _localPlayCard.ItemSelected += _ => CardGoalsChanged();
+        _localFinisherCard.ItemSelected += _ => CardGoalsChanged();
+        _localCardGoalThreshold.Toggled += _ => CardGoalsChanged();
+        _localCardGoalLoss.ValueChanged += _ => CardGoalsChanged();
+        UpdateCardGoalNotice();
+        options.AddChild(CoachTheme.Disclosure("高级设置", advanced)); options.AddChild(advanced);
         _localProgress = new LocalProgressPanel(); body.AddChild(_localProgress.View);
-        var timing = new Button { Text = "展开 / 收起耗时分析" }; body.AddChild(timing);
+        var tools = new VBoxContainer { Name = "CoachDiagnostics", Visible = false };
+        _localResultDetails = new TextEdit { Name = "LocalResultDetails", Editable = false, Visible = false,
+            Text = "计算完成后显示详细结果。", CustomMinimumSize = new Vector2(0, 260), WrapMode = TextEdit.LineWrappingMode.Boundary };
+        tools.AddChild(CoachTheme.Disclosure("搜索统计与完整结果", _localResultDetails)); tools.AddChild(_localResultDetails);
         _localTiming = new TextEdit { Editable = false, Visible = false, Text = "计算完成后显示耗时分析。",
             CustomMinimumSize = new Vector2(0, 260), WrapMode = TextEdit.LineWrappingMode.Boundary };
-        body.AddChild(_localTiming);
-        timing.Pressed += () => _localTiming.Visible = !_localTiming.Visible;
+        tools.AddChild(CoachTheme.Disclosure("耗时分析", _localTiming)); tools.AddChild(_localTiming);
 
-        _settingsPanel = new VBoxContainer { Visible = string.IsNullOrEmpty(_settings.Model) || loadError != null };
-        body.AddChild(_settingsPanel);
+        _aiOptions = new VBoxContainer { Name = "AiOptions", Visible = loadError != null };
+        _settingsPanel = new VBoxContainer { Visible = loadError != null };
+        _settingsPanel.VisibilityChanged += () =>
+        {
+            if (_settingsPanel.IsVisibleInTree()) Callable.From(() =>
+            {
+                if (!_disposed && _settingsPanel.IsVisibleInTree()) _contentScroll.EnsureControlVisible(_settingsPanel);
+            }).CallDeferred();
+        };
         _url = Field("API URL（基础地址或完整 /chat/completions 地址）", _settings.BaseUrl);
         _model = Field("模型名称", _settings.Model);
         _apiKey = Field("API Key（本地免密服务可以留空）", _key); _apiKey.Secret = true;
@@ -210,39 +307,47 @@ public sealed class CoachOverlay
         _settingsPanel.AddChild(Wrapped("点击分析时，会将下方战斗信息发送到你填写的服务商；每次点击调用一次，可能产生费用。支持 Chat Completions 兼容接口。"));
         var save = new Button { Text = "保存设置" }; save.Pressed += SaveSettings; _settingsPanel.AddChild(save);
         _feedback = Wrapped(loadError ?? "密钥不会写入游戏日志，也不会提交到 GitHub。"); _settingsPanel.AddChild(_feedback);
-        _freshness = Wrapped(""); body.AddChild(_freshness);
-        var executionRow = new HBoxContainer(); body.AddChild(executionRow);
-        _continueOptimize = new Button { Text = "继续优化", Disabled = true }; executionRow.AddChild(_continueOptimize);
+        var resultSection = CoachTheme.Section(body, "推荐路线");
+        _freshness = Wrapped(""); _freshness.AddThemeColorOverride("font_color", CoachTheme.Muted); resultSection.AddChild(_freshness);
+        var executionRow = new GridContainer { Columns = 3 }; shell.AddChild(executionRow);
+        _continueOptimize = new Button { Text = "继续优化", Disabled = true }; resultSection.AddChild(_continueOptimize);
         _continueOptimize.Pressed += () => AnalyzeLocal(_lastLocalOrder, true);
-        _execute = new Button { Text = "执行方案", Disabled = true }; executionRow.AddChild(_execute);
+        _execute = new Button { Text = "执行方案", Disabled = true, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; executionRow.AddChild(_execute);
+        CoachTheme.Accent(_execute);
         _execute.Pressed += ExecuteLocalPlan;
-        _stopExecution = new Button { Text = "停止执行 · Esc", Disabled = true }; executionRow.AddChild(_stopExecution);
+        _stopExecution = new Button { Text = "停止 · Esc", Disabled = true, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; executionRow.AddChild(_stopExecution);
         _stopExecution.Pressed += () => Cancel("已停止执行；已出手的动作会正常结算。");
+        executionRow.AddChild(_cancel);
         _advice = new RichTextLabel
         {
             BbcodeEnabled = false, SelectionEnabled = true, FitContent = true,
             ScrollActive = false, CustomMinimumSize = new Vector2(0, 190),
-            Text = "等待分析。建议出现后，按编号顺序操作；遇到抽牌、随机结果或额外选牌时可再次分析。"
+            Text = "计算后显示出牌方案。"
         };
-        body.AddChild(_advice);
-        var preview = new Button { Text = "展开 / 收起实时战斗预览（尚未发送）" }; body.AddChild(preview);
+        _advice.AddThemeConstantOverride("line_separation", 5); resultSection.AddChild(_advice);
+        _aiOptions.AddChild(row); _aiOptions.AddChild(_settingsPanel);
+        body.AddChild(CoachTheme.Disclosure("AI 指导与设置", _aiOptions)); body.AddChild(_aiOptions);
         _context = new TextEdit
         {
             Editable = false, Visible = false, CustomMinimumSize = new Vector2(0, 240),
             WrapMode = TextEdit.LineWrappingMode.Boundary
         };
-        body.AddChild(_context);
-        preview.Pressed += () => { _context.Visible = !_context.Visible; RefreshPreview(); };
-        var diagnosticButton = new Button { Text = "展开 / 收起最近请求与 AI 原始回复" }; body.AddChild(diagnosticButton);
+        var preview = CoachTheme.Disclosure("当前战斗信息（尚未发送）", _context);
+        tools.AddChild(preview); tools.AddChild(_context);
+        preview.Pressed += RefreshPreview;
         _diagnosticView = new TextEdit { Editable = false, Visible = false, Text = "暂无请求记录。",
             CustomMinimumSize = new Vector2(0, 300), WrapMode = TextEdit.LineWrappingMode.Boundary };
-        body.AddChild(_diagnosticView);
-        diagnosticButton.Pressed += () => _diagnosticView.Visible = !_diagnosticView.Visible;
-        var copy = new Button { Text = "复制最近诊断记录（含战斗信息，已隐藏本次密钥）" }; body.AddChild(copy);
+        tools.AddChild(CoachTheme.Disclosure("最近请求与 AI 原始回复", _diagnosticView)); tools.AddChild(_diagnosticView);
+        var copy = new Button { Text = "复制诊断记录", TooltipText = "含战斗信息，已隐藏本次 API 密钥。" }; tools.AddChild(copy);
         copy.Pressed += () => DisplayServer.ClipboardSet(_diagnosticJson);
+        body.AddChild(CoachTheme.Disclosure("详细记录", tools)); body.AddChild(tools);
+        shell.AddChild(scroll);
         _tree.ProcessFrame += OnFrame;
         _layer.TreeExiting += Dispose;
         Resize();
+        // Wrapped text settles its minimum height after the first layout frame.
+        // Reapply the viewport height when that temporary minimum shrinks.
+        _panel.MinimumSizeChanged += Resize;
         _tree.Root.SizeChanged += Resize;
         GD.Print("[SpireAiCoach] UI mounted.");
     }
@@ -257,15 +362,48 @@ public sealed class CoachOverlay
     }
     private void Resize()
     {
+        if (_disposed) return;
         var screen = _tree.Root.GetVisibleRect().Size;
-        var width = Math.Min(610, Math.Max(320, screen.X - 48));
+        var width = Math.Min(560, Math.Max(300, screen.X - 32));
         _panel.Position = new Vector2(Math.Max(12, screen.X - width - 20), 50);
         _panel.Size = new Vector2(width, Math.Max(280, screen.Y - 80));
+    }
+
+    private void RefreshPanelVisibility()
+    {
+        var manager = MegaCrit.Sts2.Core.Combat.CombatManager.Instance;
+        ApplyPanelContext(manager.IsInProgress && !manager.IsOverOrEnding ? manager.DebugOnlyGetState() : null, _executing);
+    }
+
+    private void ApplyPanelContext(object? combat, bool executing)
+    {
+        // The corner entry and combat popup are independent preferences.
+        // A manual choice lasts for the current battle/execution context.
+        if (!ReferenceEquals(_panelCombat, combat) || _panelExecuting != executing)
+        {
+            _panelCombat = combat; _panelExecuting = executing;
+            _manualPanelVisibility = null;
+        }
+        _panel.Visible = _manualPanelVisibility ?? (_settings.AutoShowCombatPanel && combat != null && !executing);
+    }
+
+    private void SetPanelVisible(bool visible)
+    {
+        RefreshPanelVisibility();
+        _manualPanelVisibility = visible;
+        _panel.Visible = visible;
+    }
+
+    private void TogglePanel()
+    {
+        RefreshPanelVisibility();
+        SetPanelVisible(!_panel.Visible);
     }
 
     private void OnFrame()
     {
         if (_disposed) return;
+        RefreshPanelVisibility();
         if (_executing && Input.IsKeyPressed(Key.Escape)) Cancel("已停止执行；已出手的动作会正常结算。");
         while (_mainThread.TryDequeue(out var action)) action();
         foreach (var worker in _pendingLocalProgress.Keys)
@@ -280,15 +418,13 @@ public sealed class CoachOverlay
                 _status.Text = "正在接收 AI 回复…";
             }
         }
-        bool f8 = Input.IsKeyPressed(Key.F8), f9 = Input.IsKeyPressed(Key.F9), f10 = Input.IsKeyPressed(Key.F10);
+        bool f8 = Input.IsKeyPressed(Key.F8);
         var focus = _tree.Root.GuiGetFocusOwner();
         if (focus is not LineEdit && focus is not TextEdit)
         {
-            if (f8 && !_f8) _panel.Visible = !_panel.Visible;
-            if (f10 && !_f10) { _panel.Show(); _settingsPanel.Visible = !_settingsPanel.Visible; }
-            if (f9 && !_f9) { _panel.Show(); Analyze(); }
+            if (f8 && !_f8) TogglePanel();
         }
-        _f8 = f8; _f9 = f9; _f10 = f10;
+        _f8 = f8;
         long now = System.Environment.TickCount64;
         if (now < _nextPoll) return;
         _nextPoll = now + 750;
@@ -297,9 +433,11 @@ public sealed class CoachOverlay
 
     private void RefreshSnapshot()
     {
+        RefreshPanelVisibility();
         try
         {
             var snapshot = _capture.Capture(_settings.RevealDrawOrder);
+            RefreshCardGoalDeck();
             var hash = snapshot?.Fingerprint();
             var changed = hash != _snapshotHash;
             if (changed)
@@ -313,14 +451,23 @@ public sealed class CoachOverlay
             }
             if (!_executing && _continuation != null && (changed || _continuationPending)) ContinueLocalPlan(snapshot);
             _battle.Text = snapshot == null ? "当前不在战斗中。" :
-                $"第 {snapshot.Round} 轮 · {snapshot.Phase}\n生命 {snapshot.Player.Hp}/{snapshot.Player.MaxHp} · 格挡 {snapshot.Player.Block} · 能量 {snapshot.Player.Energy}\n手牌 {snapshot.Hand.Count} / 抽牌 {snapshot.DrawPile.Count} / 弃牌 {snapshot.DiscardPile.Count} / 消耗 {snapshot.ExhaustPile.Count}";
+                $"第 {snapshot.Round} 回合 · 生命 {snapshot.Player.Hp}/{snapshot.Player.MaxHp} · 能量 {snapshot.Player.Energy}";
             _analyze.Disabled = _executing || _request != null || snapshot?.CanAdvise != true;
             _localAnalyze.Disabled = _turnAnalyze.Disabled = _analyze.Disabled;
-            _execute.Disabled = _analyze.Disabled || _continuation == null || _continuation.Invalid || !LocalCapture.Stable();
+            _localPlayCard.Disabled = _localFinisherCard.Disabled = _executing;
+            _localCardGoalThreshold.Disabled = _executing;
+            _localCardGoalLoss.Editable = !_executing && _localCardGoalThreshold.ButtonPressed;
+            _execute.Disabled = _analyze.Disabled || _continuation == null || _continuation.Invalid ||
+                !LocalCapture.Stable() || !LocalCapture.ExecutionSettled();
             _continueOptimize.Disabled = _execute.Disabled;
             _stopExecution.Disabled = !_executing;
-            var preparationScope = snapshot?.CombatId ??
-                (MegaCrit.Sts2.Core.Runs.RunManager.Instance.IsInProgress ? "active-run" : null);
+            var resources = _localPool.Resources();
+            _resources.Text = $"计算资源 · {resources.Ready} 路可复用" +
+                (resources.Preparing > 0 ? $" · {resources.Preparing} 路准备中" : "");
+            _resources.TooltipText = resources.LastChange + "\n手动并发提前准备所选数量，自动模式按需增加；可用实例会复用。";
+            // Finish run/room loading before background games compete for CPU.
+            // This changes warmup timing, not configured calculation concurrency.
+            var preparationScope = snapshot is { CanAdvise: true } && LocalCapture.Stable() ? snapshot.CombatId : null;
             if (preparationScope != null && _preparedCombat != preparationScope && _request == null && !_executing &&
                 MegaCrit.Sts2.Core.Runs.RunManager.Instance.NetService.Type == MegaCrit.Sts2.Core.Multiplayer.Game.NetGameType.Singleplayer &&
                 System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_INTEGRATION") == null)
@@ -359,7 +506,7 @@ public sealed class CoachOverlay
         if (_continuation == null) return;
         if (snapshot == null)
         { _continuation = null; _adviceHash = null; _advice.Text = "当前战斗已结束，路线已清除。"; return; }
-        if (!snapshot.CanAdvise || !LocalCapture.Stable())
+        if (!snapshot.CanAdvise || !LocalCapture.Stable() || !LocalCapture.ExecutionSettled())
         {
             _continuationPending = true;
             _freshness.Text = "正在结算，暂停建议；稳定后核对操作历史与预测状态。";
@@ -372,9 +519,9 @@ public sealed class CoachOverlay
             var next = _continuation.Advance(snapshot.CombatId, LocalCapture.LoadedMods(),
                 LocalCapture.Fingerprint(), LocalCapture.History(), requireProgress: _adviceHash != _snapshotHash);
             if (next == null) throw new InvalidOperationException("Continuation mismatch");
-            _advice.Text = LocalSearchPolicy.Format(next);
+            ShowLocalAdvice(next);
             _adviceHash = _snapshotHash;
-            _freshness.Text = "实际操作历史和下一步原生状态一致，已续用原路线；仍受原有 Mod 覆盖限制。";
+            _freshness.Text = "已跟随你的操作更新剩余方案。";
             _status.Text = $"已完成 {_continuation.CompletedActions} 步 · 续用剩余方案，无需重新搜索";
         }
         catch
@@ -390,17 +537,24 @@ public sealed class CoachOverlay
         LocalWorkers = (int)_localWorkers.Value,
         LocalIncludePotions = _localPotions.ButtonPressed,
         LocalStopOnZeroLoss = _localStopOnZeroLoss.ButtonPressed,
+        LocalStopOnFirstWin = _localStopOnFirstWin.ButtonPressed,
+        LocalSkipFinalVerification = _localSkipVerification.ButtonPressed,
         LocalTargetVictoryRounds = (int)_localTargetVictoryRounds.Value,
         LocalMaxAttempts = (int)_localMaxAttempts.Value,
         LocalMaxRounds = (int)_localMaxRounds.Value,
-        LocalSearchSeconds = (int)_localSearchSeconds.Value
+        LocalSearchSeconds = (int)_localSearchSeconds.Value,
+        LocalPlayCardModelId = SelectedCard(_localPlayCard), LocalFinisherCardModelId = SelectedCard(_localFinisherCard),
+        LocalCardGoalThresholdEnabled = _localCardGoalThreshold.ButtonPressed,
+        LocalCardGoalHpLossThreshold = (int)_localCardGoalLoss.Value
     };
 
     private void SaveLocalSettings()
     {
         var next = ReadLocalSettings();
         _store.SaveLocalOptions(next.LocalWorkers, next.LocalIncludePotions, next.LocalStopOnZeroLoss,
-            next.LocalTargetVictoryRounds, next.LocalMaxAttempts, next.LocalMaxRounds, next.LocalSearchSeconds);
+            next.LocalTargetVictoryRounds, next.LocalMaxAttempts, next.LocalMaxRounds, next.LocalSearchSeconds,
+            next.LocalSkipFinalVerification, next.LocalPlayCardModelId, next.LocalFinisherCardModelId,
+            next.LocalCardGoalThresholdEnabled, next.LocalCardGoalHpLossThreshold, next.LocalStopOnFirstWin);
         _settings = next;
     }
 
@@ -408,7 +562,100 @@ public sealed class CoachOverlay
         LocalCalculation.Configure(captured, order, (int)_localWorkers.Value, _localPotions.ButtonPressed,
             _localStopOnZeroLoss.ButtonPressed, _localSkipVerification.ButtonPressed,
             (int)_localTargetVictoryRounds.Value, (int)_localMaxAttempts.Value, (int)_localMaxRounds.Value,
-            (int)_localSearchSeconds.Value);
+            (int)_localSearchSeconds.Value, CurrentCardGoals(), _localStopOnFirstWin.ButtonPressed);
+
+    private static string SelectedCard(OptionButton picker) => picker.Selected > 0 && !picker.IsItemDisabled(picker.Selected)
+        ? picker.GetItemMetadata(picker.Selected).AsString() : "";
+
+    private LocalCardGoals? CurrentCardGoals()
+    {
+        var play = SelectedCard(_localPlayCard); var finisher = SelectedCard(_localFinisherCard);
+        if (play.Length == 0 && finisher.Length == 0) return null;
+        return new(play.Length == 0 ? null : play, finisher.Length == 0 ? null : finisher,
+            _localCardGoalThreshold.ButtonPressed ? (int)_localCardGoalLoss.Value : null,
+            play.Length == 0 ? null : _cardGoalNames.GetValueOrDefault(play, play),
+            finisher.Length == 0 ? null : _cardGoalNames.GetValueOrDefault(finisher, finisher));
+    }
+
+    private void RefreshCardGoalDeck()
+    {
+        var state = MegaCrit.Sts2.Core.Combat.CombatManager.Instance.DebugOnlyGetState();
+        var player = state == null ? null : MegaCrit.Sts2.Core.Context.LocalContext.GetMe(state);
+        if (player == null) return; // Preserve the selection while outside combat.
+        var cards = player.Deck.Cards.GroupBy(c => c.Id.ToString(), StringComparer.Ordinal)
+            .Select(g => (Id: g.Key, Name: string.Join(" / ", g.Select(c => c.Title).Distinct(StringComparer.Ordinal)), Count: g.Count()))
+            .OrderBy(c => c.Name, StringComparer.Ordinal).ThenBy(c => c.Id, StringComparer.Ordinal).ToArray();
+        var key = string.Join("\n", cards.Select(c => c.Id + ":" + c.Name + ":" + c.Count));
+        if (key == _cardGoalDeckKey) return;
+        _cardGoalNames = cards.ToDictionary(c => c.Id, c => c.Name, StringComparer.Ordinal);
+        _refreshingCardGoals = true;
+        try
+        {
+            void Fill(OptionButton picker, string selected)
+            {
+                picker.Clear(); picker.AddItem("不启用"); picker.SetItemMetadata(0, "");
+                foreach (var card in cards)
+                {
+                    string label = card.Name + $" ×{card.Count}";
+                    if (cards.Count(c => c.Name == card.Name) > 1) label += " · " + card.Id;
+                    picker.AddItem(label); int index = picker.ItemCount - 1;
+                    picker.SetItemMetadata(index, card.Id);
+                    if (card.Id == selected) picker.Select(index);
+                }
+                if (selected.Length > 0 && !cards.Any(c => c.Id == selected))
+                {
+                    picker.AddItem("原选择已不在牌组，本次不启用");
+                    int index = picker.ItemCount - 1; picker.SetItemDisabled(index, true); picker.Select(index);
+                }
+            }
+            Fill(_localPlayCard, _settings.LocalPlayCardModelId);
+            Fill(_localFinisherCard, _settings.LocalFinisherCardModelId);
+            _cardGoalDeckKey = key;
+        }
+        finally { _refreshingCardGoals = false; }
+        UpdateCardGoalNotice();
+    }
+
+    private void CardGoalsChanged()
+    {
+        if (_refreshingCardGoals) return;
+        if (_localAnalyzing || _continuation != null)
+        {
+            Cancel("出牌目标已变化，请重新计算。");
+            _adviceHash = null; _advice.Text = "出牌目标已变化，请重新计算。";
+        }
+        UpdateCardGoalNotice();
+        try { SaveLocalSettings(); }
+        catch (Exception ex) { _status.Text = "目标本次已生效，保存失败：" + ex.GetType().Name; }
+    }
+
+    private void UpdateCardGoalNotice()
+    {
+        bool hasGoals = CurrentCardGoals() is { Enabled: true };
+        _localStopOnZeroLoss.Text = hasGoals ? "完成消耗目标即返回" : "达到最低损失即返回";
+        _localStopOnZeroLoss.TooltipText = hasGoals ?
+            "当前消耗目标牌成功使用并实际消耗；补刀次数取当前可用目标牌张数与允许补刀的非爪牙活敌人数的较小值。战斗获胜且损血符合设置时停止所有搜索，不继续查找回收、复制或额外生成后的次数。可反复使用的目标牌仍继续原定搜索。" :
+            "战后无伤，或路线达到已证明的最低净损失且无需多喝药水，就停止搜索。回复上限未知或操作尚未覆盖时，不按正数下界停止。关闭后继续优化；最终复核由下方开关决定。";
+        if (_localStopOnFirstWin.ButtonPressed)
+        {
+            _localCardGoalLoss.Editable = false;
+            _localCardGoalNotice.Text = "找到获胜路线即返回；多打牌、补刀和损血阈值暂不参与优化。取消勾选后恢复已保存的目标。";
+            return;
+        }
+        _localCardGoalLoss.Editable = _localCardGoalThreshold.ButtonPressed && !_executing;
+        _localCardGoalNotice.Text = CurrentCardGoals() is not { Enabled: true } ? "未启用可选目标，按原生命与药水策略选路。" :
+            (_localCardGoalThreshold.ButtonPressed ? "在所填净损血范围内优先补刀及多打牌；没有符合路线时优先少损血。" :
+                "优先保住战后生命，同血量时优先补刀及多打牌。") +
+            (_localStopOnZeroLoss.ButtonPressed ?
+                "\n当前消耗目标完成、获胜且损血符合设置就返回；补刀次数最多按当前允许补刀的非爪牙活敌人数计算。可反复使用的目标牌继续搜索。" :
+                "\n已关闭提前返回，继续比较目标次数直到原定搜索上限。");
+    }
+
+    private void ShowLocalAdvice(LocalSearchResult result)
+    {
+        _advice.Text = LocalSearchPolicy.FormatAdvice(result);
+        _localResultDetails.Text = LocalSearchPolicy.Format(result);
+    }
 
     private void SaveSettings()
     {
@@ -433,7 +680,7 @@ public sealed class CoachOverlay
         RefreshSnapshot();
         if (_snapshot?.CanAdvise != true) { _status.Text = "请等待自己的出牌阶段，再分析当前回合。"; return; }
         try { _settings.Validate(); }
-        catch (CoachException ex) { _status.Text = ex.Message; _settingsPanel.Show(); return; }
+        catch (CoachException ex) { _status.Text = ex.Message; _aiOptions.Show(); _settingsPanel.Show(); return; }
         var frozen = _snapshot;
         var settings = _settings;
         var key = _key;
@@ -446,6 +693,7 @@ public sealed class CoachOverlay
         _pendingLocalProgress.Clear(); _localProgress.Finish("当前使用 AI 分析。", true);
         _adviceHash = null;
         _advice.Text = "等待 AI 开始回复…";
+        _localResultDetails.Text = "当前使用 AI 指导。";
         _freshness.Text = "接收中的内容尚未完成，请等待整理后的出牌建议。";
         _analyze.Disabled = true; _localAnalyze.Disabled = _turnAnalyze.Disabled = true; _cancel.Disabled = false;
         _status.Text = "正在分析… 可以取消；继续出牌会使本次分析失效。";
@@ -525,7 +773,7 @@ public sealed class CoachOverlay
             request = ConfigureLocalRequest(LocalCapture.Capture(_snapshotHash!, continueOptimization), order);
             // Reuse only the suffix matching this combat, mods, native state and complete history.
             // It is an exploration seed; the worker re-executes and verifies it, never copies its score.
-            if (order == LocalSearchOrder.MonteCarlo && _continuation != null && request.History != null)
+            if (_continuation != null && request.History != null)
             {
                 var seed = _continuation.Advance(_snapshot!.CombatId, request.LoadedMods, request.NativeHash, request.History);
                 if (seed?.IncludePotions == request.IncludePotions) request = request with { InitialPlan = seed.Best?.Actions };
@@ -545,6 +793,7 @@ public sealed class CoachOverlay
         _localProgress.Begin(request);
         _adviceHash = null;
         _advice.Text = LocalCalculation.Name(order) + "进行中，不调用 AI…";
+        _localResultDetails.Text = "正在计算，完成后显示详细结果。";
         _status.Text = "准备计算…";
         _freshness.Text = "继续出牌会取消本次计算；候选路线仅在后台执行。";
         _analyze.Disabled = true; _localAnalyze.Disabled = _turnAnalyze.Disabled = true; _cancel.Disabled = false;
@@ -574,7 +823,9 @@ public sealed class CoachOverlay
                         result = result with { Message = (LocalSearchPolicy.MeetsGoal(result.Best, request) ?
                             $"已达到 {target} 回合内获胜、净损失 0、无药且敌方伤害 0 的目标。" :
                             $"未达到 {target} 回合目标，显示预算内已取得的可用路线。") + "\n" + result.Message };
-                    _advice.Text = LocalSearchPolicy.Format(result);
+                    ShowLocalAdvice(result);
+                    if (request.TargetVictoryRounds is { } requestedTarget && !LocalSearchPolicy.MeetsGoal(result.Best, request))
+                        _advice.Text = $"尚未达成 {requestedTarget} 回合目标。\n" + _advice.Text;
                     _localTiming.Text = LocalTimeline.Format(result);
                     var timingPath = ProjectSettings.GlobalizePath("user://spire_ai_coach/diagnostics/local-timing-latest.json");
                     _ = Task.Run(() =>
@@ -582,26 +833,38 @@ public sealed class CoachOverlay
                         try
                         {
                             Directory.CreateDirectory(Path.GetDirectoryName(timingPath)!);
-                            LocalWire.Write(timingPath, new { version = typeof(ModEntry).Assembly.GetName().Version!.ToString(3), request.SearchOrder, request.MaxNodes, request.MaxRounds, request.BudgetSeconds,
+                            LocalTimingArchive.Write(Path.GetDirectoryName(timingPath)!, request.Id, new {
+                                request.Id, request.SnapshotId, request.NativeHash, completed_at = DateTimeOffset.UtcNow,
+                                version = typeof(ModEntry).Assembly.GetName().Version!.ToString(3), request.SearchOrder, request.MaxNodes, request.MaxRounds, request.BudgetSeconds,
                                 ConfiguredWorkers = request.Workers, result.WorkerLimit,
-                                request.SkipFinalVerification, request.StopOnZeroLoss, request.TargetVictoryRounds,
+                                request.SkipFinalVerification, request.StopOnZeroLoss, request.StopOnFirstWin, result.StoppedOnFirstWin, result.StoppedOnCardGoals, request.TargetVictoryRounds,
                                 request.TargetPotionUses, request.RequireKnownZeroEnemyDamage, result.VerificationSkipped, result.ElapsedMs, result.Workers,
-                                result.Evaluated, result.Victories, result.Timing, result.Trace });
+                                request.CardGoals,
+                                result.Evaluated, result.Victories, result.HealthBounds, result.RecoveredFailures,
+                                turn_search = result.TurnSearch is { } turns ? new { turns.Probes, turns.BoundPruned,
+                                    turns.Offered, turns.DuplicateOffers, turns.Pending, turns.UnknownRecoveryChecks, turns.LossProofProbes,
+                                    turns.CoveredPrefixes, turns.CompletedHistories, turns.RepeatedHistories } : null,
+                                result.Status, result.Best, result.MinimumLoss,
+                                round_losses = result.Best is { } candidate ? LocalRouteFeedback.RoundLosses(candidate) : null,
+                                result.Timing, result.Trace });
                         }
                         catch (Exception ex) { GD.Print("[SpireAiCoach] Timing save failed: " + ex.GetType().Name); }
                     });
                     _adviceHash = request.SnapshotId;
+                    string optimality = result.StoppedOnFirstWin ? "已找到获胜路线，未继续优化损失。" :
+                        result.StoppedOnCardGoals ? "已完成当前消耗目标，损血符合设置。" :
+                        LocalSearchPolicy.HasMinimumProof(result) ? "已达到最低净损失。" : "候选路线尚未证明最优。";
                     _freshness.Text = result.VerificationSkipped ? LocalSearchPolicy.HasExecutionPoints(result) ?
-                        "已跳过最终复核；可执行方案，实际状态偏离时自动停止。当前为预算内候选。" :
-                        "已跳过最终复核，但逐步记录不完整；目前仅供手动查看。" :
-                        "路线已复核；按建议操作可续用。当前为预算内最佳候选，尚未证明全局最优。";
-                    _status.Text = LocalCalculation.Name(order) + "完成 · 不消耗 API";
+                        "可执行方案，偏离时自动停止。" + optimality :
+                        "暂不能自动执行，可手动参考。" :
+                        "路线已复核，偏离时自动停止。" + optimality;
+                    _status.Text = $"计算完成 · {result.ElapsedMs / 1000d:F1} 秒";
                     if (LocalSearchPolicy.HasExecutionPoints(result))
                     {
                         _continuation = new(_snapshot!.CombatId, request.LoadedMods, result);
                         _continuationPending = false;
                     }
-                    _localProgress.Finish("计算完成。以下保留后台过程记录，正式建议见下方。", false);
+                    _localProgress.Finish("查看路线探索回放", false);
                 });
             }
             catch (OperationCanceledException) { }
@@ -656,6 +919,7 @@ public sealed class CoachOverlay
     private void Dispose()
     {
         _disposed = true;
+        _panelCombat = null;
         _lifetime.Cancel();
         Cancel("关闭");
         _tree.ProcessFrame -= OnFrame;
@@ -674,13 +938,15 @@ public sealed class CoachOverlay
         var plan = _continuation;
         using var cancellation = new CancellationTokenSource();
         _execution = cancellation; _executing = true;
+        RefreshPanelVisibility();
         _execute.Disabled = true; _stopExecution.Disabled = false;
         _continueOptimize.Disabled = true;
         _analyze.Disabled = true; _localAnalyze.Disabled = _turnAnalyze.Disabled = true;
         _freshness.Text = "正在按方案执行。点击停止或按 Esc 可随时停止后续动作。";
+        var executor = new LocalPlanExecutor(_tree);
         try
         {
-            _status.Text = await new LocalPlanExecutor(_tree).Execute(plan,
+            _status.Text = await executor.Execute(plan,
                 () => _capture.Capture(false)?.CombatId, _localPotions.ButtonPressed,
                 text => _status.Text = text, cancellation.Token);
         }
@@ -688,11 +954,31 @@ public sealed class CoachOverlay
         catch (Exception ex) { if (!_disposed) _status.Text = ex.Message; }
         finally
         {
+            if (executor.Report is { } report)
+            {
+                GD.Print($"[SpireAiCoach] execution request={report.RequestId} " +
+                    $"settled={report.StartingActionIndex + report.SettledActions}/{report.PlannedActions} " +
+                    $"dispatched={report.DispatchedActions} stage={report.Stage}: {report.Message}");
+                var directory = ProjectSettings.GlobalizePath("user://spire_ai_coach/diagnostics");
+                _ = Task.Run(() =>
+                {
+                    try
+                    {
+                        Directory.CreateDirectory(directory);
+                        var json = System.Text.Json.JsonSerializer.Serialize(report);
+                        LocalWire.WriteJson(Path.Combine(directory, $"local-execution-{report.Id}.json"), json);
+                        LocalWire.WriteJson(Path.Combine(directory, "local-execution-latest.json"), json);
+                    }
+                    catch (Exception ex) { GD.Print("[SpireAiCoach] Execution diagnostic save failed: " + ex.GetType().Name); }
+                });
+            }
             _execution = null; _executing = false; _continuation = null; _adviceHash = null;
             if (!_disposed)
             {
                 _stopExecution.Disabled = true; _execute.Disabled = true;
-                _freshness.Text = "执行已停止。若需继续，请重新计算当前状态。";
+                _freshness.Text = executor.Report?.BattleEnded == true ? "战斗已结束。" :
+                    executor.Report?.ExpectedVictory == false && executor.Report.Stage == "partial-route" ?
+                    "已到达部分路线的末尾，尚未完成战斗。" : "执行已停止。原因见上方状态，请重新计算当前状态。";
                 RefreshSnapshot();
             }
         }

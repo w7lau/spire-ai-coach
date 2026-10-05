@@ -1,0 +1,115 @@
+{
+  "version": "0.7.37",
+  "game_version": "v0.111.0",
+  "native_module": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
+  "coach_module": "78f1c9b3-995c-4649-9c65-0bd5e07f000f",
+  "dll_sha256": "f5b4e77b49f9139ed789c47da761fd0a14fe382e171d92890ccf074ed3df3bb6",
+  "core_checks": {
+    "passed": 265,
+    "total": 265
+  },
+  "build": {
+    "warnings": 0,
+    "errors": 0
+  },
+  "same_frozen_incident": true,
+  "unseeded": true,
+  "historical_baseline_reused": true,
+  "search": {
+    "Workers": 2,
+    "originalWorkers": 8,
+    "MaxNodes": 64,
+    "BudgetSeconds": 60,
+    "MaxRounds": 20,
+    "IncludePotions": true,
+    "SkipFinalVerification": true,
+    "Status": "done",
+    "Evaluated": 128,
+    "Rejected": 0,
+    "Victories": 0,
+    "ElapsedMs": 52380,
+    "SearchElapsedMs": 23831
+  },
+  "turn_search": {
+    "Probes": 49,
+    "BoundPruned": 0,
+    "Offered": 10530,
+    "DuplicateOffers": 1050,
+    "Pending": 10353,
+    "CoveredPrefixes": 13,
+    "CompletedHistories": 128,
+    "RepeatedHistories": 0,
+    "ClaimedByRound": {
+      "1": 97,
+      "2": 12,
+      "3": 12,
+      "4": 16,
+      "5": 10,
+      "6": 10,
+      "7": 10,
+      "8": 10
+    },
+    "RolloutStyles": {
+      "Preparation": 69,
+      "Attack": 16,
+      "Correlated": 16,
+      "Balanced": 17
+    }
+  },
+  "evidence": {
+    "Conclusion": "unknown",
+    "StopReason": "达到每路试走次数上限；仍有 10353 个已发现的待探索前缀，继续探索还可能新增",
+    "ExactRootCovered": false,
+    "PendingPrefixes": 10353,
+    "TerminalWins": 0,
+    "TerminalLosses": 128,
+    "RoundLimitHits": 0,
+    "ActionLimitHits": 0,
+    "TimeLimitHits": 0,
+    "PagedChoiceObservations": 167,
+    "PagedReplayBranches": 1803,
+    "UnconfirmedEnds": 0,
+    "PrunedPrefixes": 0,
+    "SimulationErrors": 0,
+    "AttemptLimitReached": true,
+    "TimeLimitReached": false,
+    "GoalStopped": false,
+    "ExcludedActions": false,
+    "IndependentVerification": false,
+    "MaxRounds": 20,
+    "MaxActionsPerRound": 24,
+    "IncludePotions": true,
+    "Description": "是否有解尚未确定：达到每路试走次数上限；仍有 10353 个已发现的待探索前缀，继续探索还可能新增。"
+  },
+  "recovered_failures": 0,
+  "before_local_dedup": {
+    "duplicate_offers": 17696,
+    "paged_replay_submissions": 18321,
+    "evaluated": 128,
+    "victories": 0
+  },
+  "paged_replay_overhead_ms": [
+    {
+      "worker": 0,
+      "calls": 2089,
+      "total_ms": 104.22640000000074
+    },
+    {
+      "worker": 1,
+      "calls": 1858,
+      "total_ms": 148.36299999999972
+    }
+  ],
+  "limits": [
+    "The real game and its workers were running; no controlled speed comparison",
+    "Pending prefixes are discovered work, not all remaining game possibilities",
+    "No victory, impossibility or global optimality was established",
+    "Multi-worker coverage and incomplete large choice domains do not receive an impossibility certificate",
+    "Old algorithm full searches were not rerun; no claim of native validation of every Mod"
+  ],
+  "installation": {
+    "status": "packaged_not_installed",
+    "observed_installed_version": "0.7.36",
+    "observed_installed_sha256": "5cc4f8240d37454e11fb0fb4a3c8f891cc4793a85d5dd99ba370e61c8b4ffeef"
+  }
+}

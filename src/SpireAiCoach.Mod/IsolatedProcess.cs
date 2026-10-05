@@ -26,8 +26,10 @@ internal static class IsolatedProcess
             // In a live incident a worker retained current_run.save and prevented all later saves.
             // FALSE is essential: do not clear flags on the host's handles (that would race other mods).
             // Start suspended so the Process object binds its handle before even a fast child exits.
+            // Background games yield CPU to the foreground game while loading or playing.
             if (!CreateProcessW(start.FileName, command, IntPtr.Zero, IntPtr.Zero, false,
-                    0x08000000 | 0x00000400 | 0x00000004, block, start.WorkingDirectory, ref info, out var created))
+                    0x08000000 | 0x00000400 | 0x00000004 | (uint)ProcessPriorityClass.BelowNormal,
+                    block, start.WorkingDirectory, ref info, out var created))
                 throw new Win32Exception(Marshal.GetLastWin32Error(), "Could not start isolated worker");
             Process? process = null;
             try

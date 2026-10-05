@@ -1,0 +1,99 @@
+{
+  "version": "0.7.36",
+  "game_version": "v0.111.0",
+  "native_module": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
+  "coach_module": "fe9727fb-3c1f-41e8-bdb3-5604ba2d81f1",
+  "dll_sha256": "649ae52d229d61ed550d5c66081477e0c435e3b5f002d36810c29c3023a1e019",
+  "candidate_only": true,
+  "retained_installed_release": {
+    "version": "0.7.36",
+    "implementation_commit": "265f66ed645a2f703e4239f61663c88d67864a8e",
+    "dll_sha256": "5cc4f8240d37454e11fb0fb4a3c8f891cc4793a85d5dd99ba370e61c8b4ffeef",
+    "contains_same_paged_choice_fix": true,
+    "contains_manual_concurrency_prewarm": true,
+    "not_reinstalled_by_this_task": true,
+    "native_acceptance": "2026-10-04-selection-paging.json"
+  },
+  "core_checks": { "passed": 255, "total": 255 },
+  "merged_acceptance": {
+    "core_passed": 258,
+    "core_total": 258,
+    "build_warnings": 0,
+    "build_errors": 0,
+    "product_source_matches_installed_commit": true,
+    "installed_dll_hash_rechecked": true
+  },
+  "build": { "warnings": 0, "errors": 0 },
+  "native_selection_pairs": { "passed": 22, "synchronization_identity_preserved": true },
+  "native_paged_selection": {
+    "selection_space": 326,
+    "page_size": 128,
+    "prior_rank": 111,
+    "planned_prefix_retained": true,
+    "unplanned_page_advanced": true,
+    "changed_offer_ignored_old_plan": true,
+    "native_state_and_history_unchanged": true
+  },
+  "historical_incident": {
+    "same_frozen_root": true,
+    "monte_carlo": { "workers": 8, "evaluated": 512, "victories": 0, "elapsed_ms": 81979 },
+    "turn_frontier": {
+      "workers": 8,
+      "evaluated": 52,
+      "victories": 0,
+      "elapsed_ms": 110716,
+      "pending": 3757,
+      "recovered_failures": 1,
+      "failure": "Exact native selection prefix diverged"
+    }
+  },
+  "accepted_native_search": {
+    "unseeded": true,
+    "same_frozen_root": true,
+    "order": "TurnFrontier",
+    "workers": 4,
+    "original_workers": 8,
+    "attempts_per_worker": 64,
+    "budget_seconds": 60,
+    "maximum_rounds": 20,
+    "include_potions": true,
+    "skip_final_verification": true,
+    "status": "done",
+    "evaluated": 256,
+    "victories": 0,
+    "rejected": 0,
+    "repeated_histories": 0,
+    "recovered_failures": 0,
+    "health_pruned": 0,
+    "elapsed_ms": 80478,
+    "maximum_lane_search_ms": 27776,
+    "offered": 20666,
+    "pending": 20330,
+    "probes": 80,
+    "best_dead": true,
+    "best_enemy_hp": 117
+  },
+  "unshipped_death_feedback_trial": {
+    "coach_module": "5d2867f1-42cb-4c75-a253-b187f977f172",
+    "order": "MonteCarlo",
+    "workers": 4,
+    "attempts_per_worker": 64,
+    "budget_seconds": 60,
+    "maximum_rounds": 20,
+    "unseeded": true,
+    "evaluated": 256,
+    "victories": 0,
+    "rejected": 0,
+    "recovered_failures": 0,
+    "best_dead": true,
+    "best_enemy_hp": 118,
+    "shipped": false,
+    "reason": "No measured improvement on this incident; reward experiment reverted"
+  },
+  "limitations": [
+    "No proof of impossibility or global optimality",
+    "Four-worker rerun is not a controlled speed comparison with the eight-worker historical run",
+    "Only shared native selection boundaries and this incident were checked",
+    "Replay, complete routes, third-party code and game assets remain private"
+  ]
+}

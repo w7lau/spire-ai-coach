@@ -23,6 +23,7 @@ parser.add_argument('--choices', action='store_true')
 parser.add_argument('--fallback', action='store_true')
 parser.add_argument('--mechanics', action='store_true')
 parser.add_argument('--mechanic-cases')
+parser.add_argument('--survival-test', action='store_true')
 parser.add_argument('--replay', type=Path)
 parser.add_argument('--game', type=Path)
 parser.add_argument('--mods', type=Path)
@@ -59,7 +60,47 @@ parser.add_argument('--final-verification-test', action='store_true')
 parser.add_argument('--concurrency-test', action='store_true')
 parser.add_argument('--incident-verification', action='store_true')
 parser.add_argument('--limits-test', action='store_true')
+parser.add_argument('--native-overhead-test', action='store_true')
+parser.add_argument('--scene-overhead-test', action='store_true')
+parser.add_argument('--visual-factory-test', action='store_true')
+parser.add_argument('--route-feedback-test', action='store_true')
+parser.add_argument('--route-feedback-focused-only', action='store_true')
+parser.add_argument('--recent-search-test', action='store_true', help='Frozen unseeded incident; preserve its trial/time/turn limits and report incomplete search honestly')
+parser.add_argument('--selection-paging-test', action='store_true')
+parser.add_argument('--card-goals-test', action='store_true')
+parser.add_argument('--finisher-targets-test', action='store_true', help='Four direct native Fatal eligibility cases; no route search or benchmark')
+parser.add_argument('--finisher-retention-test', action='store_true', help='Selected-finisher frozen incident, including previous route, with original budget and independent final verification')
+parser.add_argument('--followup-test', action='store_true', help='Short synthetic native return-to-hand/topdeck ordering probe; no full search')
+parser.add_argument('--recovery-audit', action='store_true', help='Inspect one frozen root and its actual loaded Mod callbacks; no route search or play')
+parser.add_argument('--health-audit', action='store_true', help='Also check low-level HP writes and nested healing in the owned worker')
+
+parser.add_argument('--discard-test', action='store_true', help='Short native discard/Sly/resource/selection probe; no full search')
+parser.add_argument('--summon-presentation-test', action='store_true', help='Only the frozen incident first enemy turn; compare ordinary and scene-free native states')
+parser.add_argument('--event-entry-test', action='store_true', help='Recreate a frozen event-combat root and verify generic native entry-history replay')
+parser.add_argument('--model-display-test', action='store_true', help='Short native optional display comparison; base/upgraded card and exact state/RNG/history')
 args = parser.parse_args()
+if args.finisher_retention_test and (not args.replay or args.seed_result or args.recorded_replay):
+    parser.error('--finisher-retention-test requires a frozen --replay without an extra answer seed or recorded replay')
+if args.event_entry_test and (not args.replay or args.seed_result or args.recorded_replay):
+    parser.error('--event-entry-test requires an unseeded frozen --replay')
+if args.summon_presentation_test and (not args.replay or args.seed_result or args.recorded_replay):
+    parser.error('--summon-presentation-test requires an unseeded frozen --replay')
+if args.recovery_audit and not args.replay:
+    parser.error('--recovery-audit requires --replay')
+if args.health_audit and not args.recovery_audit:
+    parser.error('--health-audit requires --recovery-audit')
+if args.recent_search_test and (not args.replay or args.seed_result or args.recorded_replay):
+    parser.error('--recent-search-test requires an unseeded --replay')
+if args.route_feedback_focused_only and not args.route_feedback_test:
+    parser.error('--route-feedback-focused-only requires --route-feedback-test')
+if args.route_feedback_test and (not args.replay or not args.seed_result or args.recorded_replay):
+    parser.error('--route-feedback-test requires frozen --replay and previous native --seed-result')
+if args.scene_overhead_test and (not args.replay or not args.seed_result):
+    parser.error('--scene-overhead-test requires a frozen --replay and --seed-result')
+if args.native_overhead_test and (not args.replay or not args.seed_result):
+    parser.error('--native-overhead-test requires a frozen --replay and --seed-result')
+if args.visual_factory_test and (not args.replay or not args.seed_result):
+    parser.error('--visual-factory-test requires --replay and --seed-result')
 if args.limits_test and (not args.replay or not args.seed_result):
     parser.error('--limits-test requires --replay and --seed-result')
 if args.incident_verification and (not args.replay or not args.seed_result):
@@ -112,6 +153,12 @@ if not (root / '.spire-native-probe-owner').is_file() or not (root / 'fixture.js
     raise ValueError('Prepare an owned synthetic NativeProbe workspace first')
 with worker_lock(root):
     repo = here.parent.parent
+    if args.finisher_retention_test:
+        if not args.game or not (args.game / 'release_info.json').is_file():
+            raise ValueError('Frozen Mod regression requires the actual game release metadata')
+        # Version-selecting Mod loaders need the same native release metadata.
+        # Copy it into this owned host, never invent a version or relax model checks.
+        shutil.copy2(args.game / 'release_info.json', root / 'game/release_info.json')
     coach = root / 'game/mods/SpireAiCoach'
     coach.mkdir(exist_ok=True)
     shutil.copy2(repo / 'src/SpireAiCoach.Mod/bin/Release/net9.0/SpireAiCoach.dll', coach)
@@ -128,6 +175,31 @@ with worker_lock(root):
     for name in ['integration-success', 'integration-error.txt', 'integration-result.json',
                  'integration-algorithm-private.json', 'integration-algorithm-summary.json']:
         (root / name).unlink(missing_ok=True)
+    if args.finisher_targets_test:
+        (root / 'integration-finisher-targets-summary.json').unlink(missing_ok=True)
+    if args.recent_search_test:
+        for name in ['integration-recent-search-summary.json', 'integration-recent-search-private.json']:
+            (root / name).unlink(missing_ok=True)
+    if args.finisher_retention_test:
+        for name in ['integration-finisher-retention-summary.json',
+                     *[f'integration-finisher-retention-{order}-private.json' for order in ('MonteCarlo', 'TurnFrontier')]]:
+            (root / name).unlink(missing_ok=True)
+    if args.followup_test:
+        (root / 'integration-followup-summary.json').unlink(missing_ok=True)
+    if args.discard_test:
+        (root / 'integration-discard-summary.json').unlink(missing_ok=True)
+    if args.summon_presentation_test:
+        (root / 'integration-summon-summary.json').unlink(missing_ok=True)
+    if args.event_entry_test:
+        (root / 'integration-event-summary.json').unlink(missing_ok=True)
+    if args.survival_test:
+        for name in ['integration-survival-summary.json', 'integration-survival-private.json']:
+            (root / name).unlink(missing_ok=True)
+    if args.route_feedback_test:
+        for name in ['integration-route-feedback-summary.json',
+                     *[f'integration-route-feedback-private-{order}-{mode}.json'
+                       for order in ('MonteCarlo', 'TurnFrontier') for mode in ('baseline', 'reuse')]]:
+            (root / name).unlink(missing_ok=True)
     if args.algorithm_goal_test:
         for name in ['integration-algorithm-goal-summary.json', 'integration-algorithm-goal-private-0.json',
                      'integration-algorithm-goal-private-1.json']:
@@ -151,6 +223,17 @@ with worker_lock(root):
     env.pop('SPIRE_NATIVE_PROBE_ROOT', None)
     env.pop('SPIRE_COACH_WORKER', None)
     env['SPIRE_LOCAL_INTEGRATION_QUICK'] = '1' if args.quick else '0'
+    env['SPIRE_COACH_RECOVERY_AUDIT'] = '1' if args.recovery_audit else '0'
+    env['SPIRE_COACH_HP_AUDIT'] = '1' if args.health_audit else '0'
+    env['SPIRE_LOCAL_FOLLOWUP_TEST'] = '1' if args.followup_test else '0'
+    env['SPIRE_LOCAL_DISCARD_TEST'] = '1' if args.discard_test else '0'
+    env['SPIRE_LOCAL_SUMMON_PRESENTATION_TEST'] = '1' if args.summon_presentation_test else '0'
+    env['SPIRE_LOCAL_EVENT_ENTRY_TEST'] = '1' if args.event_entry_test else '0'
+    env['SPIRE_LOCAL_SELECTION_PAGING_TEST'] = '1' if args.selection_paging_test else '0'
+    env['SPIRE_LOCAL_CARD_GOALS_TEST'] = '1' if args.card_goals_test else '0'
+    env['SPIRE_LOCAL_FINISHER_TARGETS_TEST'] = '1' if args.finisher_targets_test else '0'
+    if args.selection_paging_test:
+        env['SPIRE_LOCAL_SELECTION_MATRIX'] = '1'
     env['SPIRE_LOCAL_BENCHMARK'] = '1' if args.benchmark else '0'
     env['SPIRE_LOCAL_FEATURES'] = '1' if args.features else '0'
     env['SPIRE_LOCAL_OPTIMIZATION'] = '1' if args.optimization else '0'
@@ -159,11 +242,13 @@ with worker_lock(root):
     env['SPIRE_LOCAL_CHOICES'] = '1' if args.choices else '0'
     env['SPIRE_LOCAL_FALLBACK'] = '1' if args.fallback else '0'
     env['SPIRE_LOCAL_MECHANICS'] = '1' if args.mechanics else '0'
+    env['SPIRE_LOCAL_SURVIVAL_TEST'] = '1' if args.survival_test else '0'
     if args.mechanic_cases:
         env['SPIRE_LOCAL_MECHANICS_CASES'] = args.mechanic_cases
     env['SPIRE_LOCAL_REPLAY'] = str(args.replay.resolve()) if args.replay else ''
     env['SPIRE_LOCAL_REPLAY_GAME'] = str(args.game.resolve()) if args.game else ''
     env['SPIRE_LOCAL_REPLAY_MODS'] = str(args.mods.resolve()) if args.mods else ''
+    env['SPIRE_LOCAL_FINISHER_RETENTION_TEST'] = '1' if args.finisher_retention_test else '0'
     env['SPIRE_LOCAL_SEED_RESULT'] = str(args.seed_result.resolve()) if args.seed_result else ''
     env['SPIRE_LOCAL_SPEED_BENCHMARK'] = '1' if args.speed_benchmark else '0'
     env['SPIRE_LOCAL_VISUAL_BENCHMARK'] = '1' if args.visual_benchmark else '0'
@@ -200,10 +285,29 @@ with worker_lock(root):
     env['SPIRE_LOCAL_CONCURRENCY_TEST'] = '1' if args.concurrency_test else '0'
     env['SPIRE_LOCAL_INCIDENT_VERIFICATION'] = '1' if args.incident_verification else '0'
     env['SPIRE_LOCAL_LIMITS_TEST'] = '1' if args.limits_test else '0'
+    env['SPIRE_LOCAL_NATIVE_OVERHEAD_TEST'] = '1' if args.native_overhead_test else '0'
+    env['SPIRE_LOCAL_SCENE_OVERHEAD_TEST'] = '1' if args.scene_overhead_test else '0'
+    env['SPIRE_LOCAL_VISUAL_FACTORY_TEST'] = '1' if args.visual_factory_test else '0'
+    env['SPIRE_LOCAL_MODEL_DISPLAY_TEST'] = '1' if args.model_display_test else '0'
+    env['SPIRE_LOCAL_ROUTE_FEEDBACK_TEST'] = '1' if args.route_feedback_test else '0'
+    env['SPIRE_LOCAL_ROUTE_FEEDBACK_FOCUSED_ONLY'] = '1' if args.route_feedback_focused_only else '0'
+    env['SPIRE_LOCAL_RECENT_SEARCH_TEST'] = '1' if args.recent_search_test else '0'
     settings = root / 'Roaming/SlayTheSpire2/default/1/settings.save'
     settings_data = json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}
     settings_data.update(volume_master=0, volume_bgm=0, volume_sfx=0, volume_ambience=0)
     settings.write_text(json.dumps(settings_data), encoding='utf-8')
+    if args.survival_test or args.card_goals_test or args.finisher_targets_test:
+        # Match the product worker's private tutorial state. A fresh headless
+        # profile must not open the interactive combat tutorial during settlement.
+        progress = settings.parent / 'modded/profile1/saves/progress.save'
+        progress.parent.mkdir(parents=True, exist_ok=True)
+        progress_data = json.loads(progress.read_text(encoding='utf-8-sig')) if progress.exists() else {'schema_version': 24}
+        progress_data.update(enable_ftues=False, ftue_completed=['combat_rules_ftue'])
+        progress.write_text(json.dumps(progress_data), encoding='utf-8')
+        if args.card_goals_test or args.finisher_targets_test:
+            ordinary_progress = settings.parent / 'profile1/saves/progress.save'
+            ordinary_progress.parent.mkdir(parents=True, exist_ok=True)
+            ordinary_progress.write_text(json.dumps(progress_data), encoding='utf-8')
     with (root / 'integration-stdout.log').open('wb') as output:
         process = subprocess.Popen([str(root / 'game/SlayTheSpire2.exe'), '--headless', '--audio-driver', 'Dummy', '--max-fps', '120',
                                     '--force-steam=off', '--log-file', str(root / 'integration-game.log')],
@@ -211,7 +315,8 @@ with worker_lock(root):
         try:
             # Each comparison retains the full product search budget. Several
             # resident-pool samples need a larger outer harness timeout.
-            process.wait(timeout=max(300, 90 + 75 * len(args.search_cases.split(','))) if args.search_cases else 300)
+            process.wait(timeout=390 if args.route_feedback_test else
+                         max(300, 90 + 75 * len(args.search_cases.split(','))) if args.search_cases else 300)
         except subprocess.TimeoutExpired:
             process.kill()
             process.wait(timeout=10)
@@ -224,6 +329,10 @@ with worker_lock(root):
         # experiments may reuse the host immediately after it exits.
         args.results_dir.mkdir(parents=True, exist_ok=True)
         names = ['integration-replay-private.json', 'integration-replay-summary.json',
+                     'integration-finisher-targets-summary.json',
+                     'integration-card-goals-summary.json', 'integration-card-goals-MonteCarlo-private.json',
+                     'integration-card-goals-TurnFrontier-private.json',
+                     'integration-card-goal-stop-MonteCarlo-private.json', 'integration-card-goal-stop-TurnFrontier-private.json',
                      'integration-algorithm-private.json', 'integration-algorithm-summary.json',
                      'integration-algorithm-goal-summary.json', 'integration-algorithm-goal-private-0.json', 'integration-algorithm-goal-private-1.json',
                      'integration-concurrency-summary.json', 'integration-concurrency-MonteCarlo-private.json',
@@ -237,12 +346,59 @@ with worker_lock(root):
             names = ['integration-limits-summary.json', 'integration-limits-MonteCarlo-private.json',
                      'integration-limits-TurnFrontier-private.json', 'integration-success',
                      'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.native_overhead_test:
+            names = ['integration-native-overhead-summary.json',
+                     *[f'integration-native-overhead-private-{i}.json' for i in range(4)],
+                     'integration-native-overhead-verification-private.json', 'integration-success',
+                     'integration-native-overhead-shared-private.json',
+                     'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.scene_overhead_test:
+            names = ['integration-scene-overhead-summary.json',
+                     *[f'integration-scene-overhead-private-{i}.json' for i in range(8)], 'integration-success',
+                     'integration-scene-overhead-failure-private.json',
+                     'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.survival_test:
+            names = ['integration-survival-summary.json', 'integration-survival-private.json',
+                     'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.visual_factory_test:
+            names = ['integration-visual-factory-summary.json', 'integration-visual-factory-private-0.json',
+                     'integration-visual-factory-private-1.json', 'integration-success',
+                     'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.model_display_test:
+            names = ['integration-model-display-summary.json', *[f'integration-model-display-private-{i}.json' for i in range(6)],
+                     'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.route_feedback_test:
+            names = ['integration-route-feedback-summary.json',
+                     *[f'integration-route-feedback-private-{order}-{mode}.json'
+                       for order in ('MonteCarlo', 'TurnFrontier') for mode in ('baseline', 'reuse')],
+                     'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.recent_search_test:
+            names = ['integration-recent-search-summary.json', 'integration-recent-search-private.json',
+                     'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.finisher_retention_test:
+            names = ['integration-finisher-retention-summary.json',
+                     *[f'integration-finisher-retention-{order}-private.json' for order in ('MonteCarlo', 'TurnFrontier')],
+                     'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
         if args.search_cases:
             names = ['integration-self-search-summary.json', *[f'integration-self-search-private-{i}.json' for i in range(4)],
                      'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
         if args.lean_checksum_test:
             names = ['integration-lean-checksum-summary.json', 'integration-lean-checksum-private-0.json', 'integration-lean-checksum-private-1.json',
                      'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.followup_test:
+            names = ['integration-followup-summary.json', 'integration-success', 'integration-error.txt',
+                     'integration-stdout.log', 'integration-game.log']
+        if args.discard_test:
+            names = ['integration-discard-summary.json', 'integration-success', 'integration-error.txt',
+                     'integration-stdout.log', 'integration-game.log']
+        if args.summon_presentation_test:
+            names = ['integration-summon-summary.json', 'integration-success', 'integration-error.txt',
+                     'integration-stdout.log', 'integration-game.log',
+                     *[f'integration-summon-private-{i}.json' for i in range(3)]]
+        if args.event_entry_test:
+            names = ['integration-event-summary.json', 'integration-event-capture-private.json',
+                     'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log',
+                     *[f'integration-event-result-private-{i}.json' for i in range(5)]]
         for name in names:
             if (root / name).is_file():
                 shutil.copy2(root / name, args.results_dir / name)

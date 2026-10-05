@@ -56,6 +56,104 @@ public static class ReplayIntegration
         // Frozen execution controls retain the same startup; bootstrap has its own paired
         // cold measurements. Ordinary integration fixtures use the product's default.
         var installation = new LocalInstallation(game, directories, MinimalWorkerBootstrap: false);
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_FINISHER_RETENTION_TEST") == "1")
+        {
+            await FinisherRetentionIntegration.Run(root, pool, original, request, installation);
+            return;
+        }
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_EVENT_ENTRY_TEST") == "1")
+        {
+            await EventEntryIntegration.Run(root, pool, request with { MaxRounds = original.MaxRounds }, installation);
+            return;
+        }
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SUMMON_PRESENTATION_TEST") == "1")
+        {
+            await SummonPresentationIntegration.Run(root, pool, request with { MaxRounds = original.MaxRounds }, installation);
+            return;
+        }
+        if (System.Environment.GetEnvironmentVariable("SPIRE_COACH_RECOVERY_AUDIT") == "1")
+        {
+            installation = installation with { GameDirectory = Path.Combine(root, "game") };
+            request = request with { Workers = 1, AdaptiveWorkers = false };
+            try { await Task.Run(() => pool.Analyze(request, installation, _ => { }, CancellationToken.None)); }
+            catch (CoachException ex) when (ex.Category == "local_audit_complete")
+            { /* An audit is deliberately not a usable combat result. */ }
+            var auditFiles = Directory.EnumerateFiles(Path.Combine(root, ".spire-ai-coach-workers"),
+                "recovery-audit.json", SearchOption.AllDirectories).Where(p =>
+                {
+                    using var doc = JsonDocument.Parse(File.ReadAllText(p));
+                    return doc.RootElement.GetProperty("Id").GetString() == request.Id;
+                }).ToArray();
+            if (auditFiles.Length != 1) throw new InvalidOperationException("One current native recovery audit was not produced");
+            File.Copy(auditFiles[0], Path.Combine(root, "integration-recovery-audit.json"), true);
+            return;
+        }
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_RECENT_SEARCH_TEST") == "1")
+        {
+            await RecentSearchIntegration.Run(root, pool, original, request, installation);
+            return;
+        }
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SELECTION_PAGING_TEST") == "1")
+        {
+            // Keep the incident's round/time/trial limits. Two owned lanes are
+            // sufficient to exercise shared prefix replay, without an 8-lane benchmark.
+            request = request with { MaxRounds = original.MaxRounds };
+            var sample = await Task.Run(() => pool.Analyze(request, installation, _ => { }, CancellationToken.None));
+            LocalWire.Write(Path.Combine(root, "integration-paging-incident-private.json"), sample);
+            if (sample.Status != "done" || sample.Best == null || sample.Rejected != 0 ||
+                (sample.RecoveredFailures?.Length ?? 0) != 0 || sample.Trace!.Spans.Any(s => s.Phase == "fallback"))
+                throw new InvalidOperationException("Paged incident still restarted or rejected native replay: " + sample.Message);
+            LocalWire.Write(Path.Combine(root, "integration-paging-incident-summary.json"), new {
+                version = typeof(LocalWorker).Assembly.GetName().Version!.ToString(3), sample.Status, sample.Workers,
+                sample.Evaluated, sample.Victories, sample.ElapsedMs, request.MaxNodes, request.MaxRounds, request.BudgetSeconds,
+                sample.Best.Won, sample.Best.Hp, sample.Best.NetHpLoss, sample.Best.Rounds,
+                recoveredFailures = sample.RecoveredFailures?.Length ?? 0, fallback = false,
+                nativeChoiceSteps = sample.Best.Actions.Sum(a => a.Choices?.Length ?? 0),
+                admissions = sample.Trace.Spans.Where(s => s.Phase == "admit_worker").Select(s => new {
+                    worker = s.Worker + 1, s.StartMs }),
+                sessions = sample.Trace.Spans.Where(s => s.Phase == "session").Select(s => new {
+                    worker = s.Worker + 1, s.StartMs, s.DurationMs }) });
+            return;
+        }
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_EXECUTION_REPLAY_TEST") == "1")
+        {
+            await ExecutionReplayIntegration.Run(root, original,
+                System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT")!);
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_DRAW_GATE_TEST") == "1")
+                await DrawGateIntegration.Run(root, pool, request, installation,
+                    System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT")!,
+                    System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_EXECUTION_REPORT")!);
+            return;
+        }
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_PROGRESS_TRANSPORT_TEST") == "1")
+        {
+            await ProgressTransportIntegration.Run(root, pool, request, installation,
+                System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT")!);
+            return;
+        }
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_ROUTE_FEEDBACK_TEST") == "1")
+        {
+            await RouteFeedbackIntegration.Run(root, pool, request with { MaxRounds = original.MaxRounds }, installation);
+            return;
+        }
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SCENE_OVERHEAD_TEST") == "1")
+        {
+            await SceneOverheadIntegration.Run(root, pool, request, installation,
+                System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT")!);
+            return;
+        }
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_NATIVE_OVERHEAD_TEST") == "1")
+        {
+            await NativeOverheadIntegration.Run(root, pool, request, installation,
+                System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT")!);
+            return;
+        }
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_VISUAL_FACTORY_TEST") == "1")
+        {
+            await VisualFactoryIntegration.Run(root, pool, request with { MaxRounds = original.MaxRounds }, installation,
+                System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT")!);
+            return;
+        }
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_LIMITS_TEST") == "1")
         {
             await LimitsIntegration.Run(root, pool, request, installation,

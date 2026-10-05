@@ -1,0 +1,141 @@
+{
+  "version": "0.7.44",
+  "source_commit": "963b2db9f2f7e2c3a3779e5b94eeea31fd5282a4",
+  "mod_sha256": "a268dc8ea11a6c9a319e590874203ab5453e257ba1f6799dfab636cc9b8cfe1b",
+  "merged_installed_source": "ee4b884",
+  "core_checks_passed": 319,
+  "mod_and_native_host_build": {
+    "warnings": 0,
+    "errors": 0
+  },
+  "historical_incident": {
+    "version": "0.7.42",
+    "completed_at": "2026-10-05T06:00:55.5922801+00:00",
+    "elapsed_ms": 106723,
+    "workers": 8,
+    "evaluated": 121,
+    "victories": 76,
+    "budget_seconds": 60,
+    "nodes_per_lane": 64,
+    "verification_ms": 0,
+    "first_enemy_turn_timed_out_ms": 8006.9639,
+    "fallback_started_ms": 9246.5474,
+    "rebuilds": 8,
+    "prepare_duration_range_ms": [
+      29203.938800000004,
+      31792.1075
+    ],
+    "engine_duration_range_ms": [
+      27565.9311,
+      29810.557700000005
+    ],
+    "root_failure": "Native summoned Guardbot.AfterAddedToRoom accessed an optional scene node in data-only execution."
+  },
+  "historical_warm_samples": [
+    {
+      "version": "0.7.42",
+      "completed_at": "2026-10-05T06:03:05.9244209+00:00",
+      "elapsed_ms": 63177,
+      "startup_ms": 0,
+      "evaluated": 437,
+      "recovered_failures": 0
+    },
+    {
+      "version": "0.7.42",
+      "completed_at": "2026-10-05T06:04:14.7212727+00:00",
+      "elapsed_ms": 2056,
+      "startup_ms": 0,
+      "evaluated": 2,
+      "recovered_failures": 0
+    },
+    {
+      "version": "0.7.42",
+      "completed_at": "2026-10-05T06:04:24.4594205+00:00",
+      "elapsed_ms": 1306,
+      "startup_ms": 0,
+      "evaluated": 4,
+      "recovered_failures": 0
+    }
+  ],
+  "fixed_first_enemy_turn_native_comparison": {
+    "version": "0.7.44",
+    "nativeModule": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
+    "fixedIncidentFirstEnemyTurn": true,
+    "fullSearchBenchmark": false,
+    "productionBudgetsUnchanged": true,
+    "boundaries": [
+      "MegaCrit.Sts2.Core.Models.Monsters.Guardbot",
+      "MegaCrit.Sts2.Core.Models.Monsters.Noisebot",
+      "MegaCrit.Sts2.Core.Models.Monsters.Stabbot",
+      "MegaCrit.Sts2.Core.Models.Monsters.Zapbot"
+    ],
+    "samples": [
+      {
+        "numerical": false,
+        "ElapsedMs": 7963,
+        "Timing": {
+          "RestoreMs": 7018,
+          "ActionMs": 632,
+          "DecisionMs": 67,
+          "VerificationMs": 0,
+          "StartupMs": 0,
+          "Actions": 1,
+          "Restores": 1,
+          "Verifications": 0
+        },
+        "steps": 1,
+        "skipped": 0,
+        "completeNativeCheckpoints": true,
+        "nativeStateRngAndHistoryMatch": true,
+        "reusedWorker": false
+      },
+      {
+        "numerical": true,
+        "ElapsedMs": 250,
+        "Timing": {
+          "RestoreMs": 203,
+          "ActionMs": 6,
+          "DecisionMs": 10,
+          "VerificationMs": 0,
+          "StartupMs": 0,
+          "Actions": 1,
+          "Restores": 1,
+          "Verifications": 0
+        },
+        "steps": 1,
+        "skipped": 2,
+        "completeNativeCheckpoints": true,
+        "nativeStateRngAndHistoryMatch": true,
+        "reusedWorker": true
+      },
+      {
+        "numerical": true,
+        "ElapsedMs": 86,
+        "Timing": {
+          "RestoreMs": 41,
+          "ActionMs": 6,
+          "DecisionMs": 10,
+          "VerificationMs": 0,
+          "StartupMs": 0,
+          "Actions": 1,
+          "Restores": 1,
+          "Verifications": 0
+        },
+        "steps": 1,
+        "skipped": 2,
+        "completeNativeCheckpoints": true,
+        "nativeStateRngAndHistoryMatch": true,
+        "reusedWorker": true
+      }
+    ],
+    "passed": true
+  },
+  "limits": [
+    "One frozen native enemy-turn comparison in one owned prewarmed worker; not a whole-search throughput measurement.",
+    "The ordinary scene control and both numerical samples matched complete native state, RNG and action history.",
+    "First cold engine startup is outside sample elapsed times; simultaneous preparation durations must not be summed into wall time.",
+    "Existing engine resource-release diagnostics remain; no new native combat-loop error occurred.",
+    "No changes to product trial, time, round, potion, final verification or execution settings.",
+    "No arbitrary-Mod compatibility or global optimality claim."
+  ]
+}

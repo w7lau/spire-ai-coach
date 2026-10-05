@@ -39,9 +39,10 @@ internal sealed class LocalDiscrepancyTree(LocalSearchOrder order)
         private LocalCandidate? _best;
         public int Visits;
         public bool Closed;
+        private bool _completeLegal;
 
         internal static bool TrySelect(Node parent, LocalDiscrepancyTree tree, Trial trial,
-            IReadOnlyList<LocalAction> legal, [NotNullWhen(true)] out LocalAction? result, LocalAction? preferred)
+            IReadOnlyList<LocalAction> legal, [NotNullWhen(true)] out LocalAction? result, LocalAction? preferred, bool completeLegal)
         {
             result = null;
             if (preferred != null && !legal.Contains(preferred)) throw new InvalidOperationException("Preferred action is not legal");
@@ -56,8 +57,14 @@ internal sealed class LocalDiscrepancyTree(LocalSearchOrder order)
                     .Select((x, rank) => (x.Key, Edge: new Edge(rank, rank != 0)))
                     .ToDictionary(x => x.Key, x => x.Edge);
             }
-            else if (parent._edges.Count != keyed.Length || keyed.Any(x => !parent._edges.ContainsKey(x.Key)))
+            else if (parent._completeLegal && completeLegal &&
+                (parent._edges.Count != keyed.Length || keyed.Any(x => !parent._edges.ContainsKey(x.Key))))
                 throw new InvalidOperationException("Native legal actions changed at the same exact history");
+            else
+                foreach (var item in keyed.OrderByDescending(x => x.Action.Preference))
+                    if (!parent._edges.ContainsKey(item.Key))
+                        parent._edges.Add(item.Key, new(parent._edges.Count, true));
+            parent._completeLegal |= completeLegal;
 
             Edge? selected = null;
             LocalAction? action = null;
@@ -107,7 +114,8 @@ internal sealed class LocalDiscrepancyTree(LocalSearchOrder order)
                 if (CountPending == null || Compare(count, CountPending.Value, LocalSearchOrder.LimitedDiscrepancy) < 0) CountPending = count;
                 if (DepthPending == null || Compare(depth, DepthPending.Value, LocalSearchOrder.DepthDiscrepancy) < 0) DepthPending = depth;
             }
-            Closed = CountPending == null;
+            Closed = _completeLegal && CountPending == null;
+            if (!_completeLegal) { CountPending ??= Bound.None; DepthPending ??= Bound.None; }
         }
 
         internal sealed class Edge(int rank, bool deviation)
@@ -132,11 +140,12 @@ internal sealed class LocalDiscrepancyTree(LocalSearchOrder order)
     public Trial Begin() => new(_root, order == LocalSearchOrder.DiscrepancyPortfolio ?
         CompletedTrials % 2 == 0 ? LocalSearchOrder.DepthDiscrepancy : LocalSearchOrder.LimitedDiscrepancy : order);
 
-    public bool TrySelect(Trial trial, IReadOnlyList<LocalAction> legal, [NotNullWhen(true)] out LocalAction? result, LocalAction? preferred)
+    public bool TrySelect(Trial trial, IReadOnlyList<LocalAction> legal, [NotNullWhen(true)] out LocalAction? result, LocalAction? preferred,
+        bool completeLegal = true)
     {
         Check(trial);
         if (legal.Count == 0) throw new InvalidOperationException("No legal action");
-        return Node.TrySelect(trial.Current, this, trial, legal, out result, preferred);
+        return Node.TrySelect(trial.Current, this, trial, legal, out result, preferred, completeLegal);
     }
 
     public void Complete(Trial trial, LocalCandidate result, bool closeExactPrefix)

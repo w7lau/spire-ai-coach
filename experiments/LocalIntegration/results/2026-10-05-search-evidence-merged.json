@@ -1,0 +1,170 @@
+{
+  "version": "0.7.41",
+  "game_version": "v0.111.0",
+  "native_module": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
+  "coach_module": "59343196-b3ff-45b3-8a27-0e67c68558b2",
+  "dll_sha256": "f8b62a0ac9c64dcf58f7bd5f7d80007a579e37cbf128004c5fd1c044e2ba1051",
+  "core_checks": {
+    "passed": 296,
+    "total": 296
+  },
+  "build": {
+    "warnings": 0,
+    "errors": 0
+  },
+  "same_frozen_incident": true,
+  "unseeded": true,
+  "historical_baseline_reused": true,
+  "search": {
+    "Workers": 4,
+    "originalWorkers": 8,
+    "MaxNodes": 64,
+    "BudgetSeconds": 60,
+    "MaxRounds": 20,
+    "IncludePotions": true,
+    "SkipFinalVerification": true,
+    "Status": "done",
+    "Evaluated": 256,
+    "Rejected": 0,
+    "Victories": 0,
+    "ElapsedMs": 57790,
+    "SearchElapsedMs": 30040
+  },
+  "turn_search": {
+    "Probes": 88,
+    "BoundPruned": 0,
+    "Offered": 21986,
+    "DuplicateOffers": 4587,
+    "Pending": 21642,
+    "CoveredPrefixes": 34,
+    "CompletedHistories": 256,
+    "RepeatedHistories": 0,
+    "ClaimedByRound": {
+      "1": 145,
+      "2": 24,
+      "3": 35,
+      "4": 33,
+      "5": 21,
+      "6": 29,
+      "7": 29,
+      "8": 28
+    },
+    "RolloutStyles": {
+      "Preparation": 132,
+      "Attack": 32,
+      "Correlated": 32,
+      "Balanced": 32
+    }
+  },
+  "evidence": {
+    "Conclusion": "unknown",
+    "StopReason": "达到每路试走次数上限；仍有 21642 个已发现的待探索前缀，继续探索还可能新增",
+    "ExactRootCovered": false,
+    "PendingPrefixes": 21642,
+    "TerminalWins": 0,
+    "TerminalLosses": 256,
+    "RoundLimitHits": 0,
+    "ActionLimitHits": 0,
+    "TimeLimitHits": 0,
+    "PagedChoiceObservations": 356,
+    "PagedReplayBranches": 5767,
+    "UnconfirmedEnds": 0,
+    "PrunedPrefixes": 0,
+    "SimulationErrors": 0,
+    "AttemptLimitReached": true,
+    "TimeLimitReached": false,
+    "GoalStopped": false,
+    "ExcludedActions": false,
+    "IndependentVerification": false,
+    "MaxRounds": 20,
+    "MaxActionsPerRound": 24,
+    "IncludePotions": true,
+    "Description": "是否有解尚未确定：达到每路试走次数上限；仍有 21642 个已发现的待探索前缀，继续探索还可能新增。"
+  },
+  "minimum_loss": {
+    "Trials": 344,
+    "Nodes": 4817,
+    "Certificate": {
+      "Scope": "41F5FD7AD9F16938EE38115C82BB648A17C96353339806D1002E71E41C045E3F",
+      "StartingHp": 35,
+      "MinimumNetHpLoss": 0,
+      "MinimumPotionsUsed": 0
+    },
+    "InvalidReason": "",
+    "Confirmed": true
+  },
+  "card_goals": null,
+  "recovered_failures": 0,
+  "new_methods_ms": [
+    {
+      "worker": 0,
+      "method": "LocalMinimumLoss.ObserveTrial",
+      "calls": 83,
+      "total_ms": 391.20430000000005
+    },
+    {
+      "worker": 0,
+      "method": "LocalTurnFrontier.ReplayPages",
+      "calls": 2130,
+      "total_ms": 254.90949999999418
+    },
+    {
+      "worker": 1,
+      "method": "LocalMinimumLoss.ObserveTrial",
+      "calls": 87,
+      "total_ms": 357.3555999999999
+    },
+    {
+      "worker": 1,
+      "method": "LocalTurnFrontier.ReplayPages",
+      "calls": 2147,
+      "total_ms": 289.65500000000105
+    },
+    {
+      "worker": 2,
+      "method": "LocalMinimumLoss.ObserveTrial",
+      "calls": 85,
+      "total_ms": 384.1092
+    },
+    {
+      "worker": 2,
+      "method": "LocalTurnFrontier.ReplayPages",
+      "calls": 2200,
+      "total_ms": 265.9381999999975
+    },
+    {
+      "worker": 3,
+      "method": "LocalMinimumLoss.ObserveTrial",
+      "calls": 89,
+      "total_ms": 458.5615
+    },
+    {
+      "worker": 3,
+      "method": "LocalTurnFrontier.ReplayPages",
+      "calls": 2175,
+      "total_ms": 249.0420999999945
+    }
+  ],
+  "limits": [
+    "Pending prefixes are discovered work, not the entire remaining tree",
+    "An incomplete search without a winning route does not establish impossibility",
+    "Different worker counts and native policies do not form a controlled speed or quality comparison",
+    "Native Mod state and frozen replay fidelity remain model assumptions"
+  ],
+  "installation": {
+    "status": "installed",
+    "completed_utc": "2026-10-04T18:11:08.9045103Z",
+    "implementation_commit": "e32e6ed1df93320a533df701867a56eca3edd087",
+    "game_was_closed": true,
+    "dll_sha256": "f8b62a0ac9c64dcf58f7bd5f7d80007a579e37cbf128004c5fd1c044e2ba1051",
+    "manifest_sha256": "cd226bcdd145c059440fd300427c0ddc850d065e4fa7017598983d3e817e6d45",
+    "zip_sha256": "45bfef4a0ba146858be0c6feb672fa95f92e8193a4634fa06552755716194ea5",
+    "package_matches_native_tested_dll": true,
+    "previous_version": "0.7.39",
+    "previous_mod_files_backed_up": 2,
+    "protected_file_count": 351,
+    "protected_files_unchanged": true,
+    "worker_cache_unchanged": true,
+    "game_executable_unchanged": true
+  }
+}

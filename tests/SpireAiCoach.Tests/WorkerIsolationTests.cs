@@ -50,6 +50,8 @@ internal static class WorkerIsolationTests
                     var timer = Stopwatch.StartNew();
                     while (!File.Exists(ready) && timer.Elapsed < TimeSpan.FromSeconds(10) && !process.HasExited) await Task.Delay(25);
                     if (!File.Exists(ready)) throw new Exception("Child did not become ready.");
+                    if (isolated && process.PriorityClass != ProcessPriorityClass.BelowNormal)
+                        throw new Exception("Owned background child did not yield CPU priority to the foreground game.");
                     // The child finished writing before this wait; retry reading only transient sharing.
                     JsonDocument? document = null;
                     for (int i = 0; i < 20 && document == null; i++)

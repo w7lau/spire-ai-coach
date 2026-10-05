@@ -45,6 +45,12 @@ public static class Entry
             await Frame(); await Frame();
             while (NAssetLoader.Instance.IsProcessing()) await Frame();
             SaveManager.Instance.PrefsSave.FastMode = FastModeType.Instant;
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_PRESENTATION_SMOKE") == "1")
+            {
+                await PresentationIntegration.Run(root, tree);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_REPLAY") is { Length: > 0 } replayPath)
             {
                 await ReplayIntegration.Run(root, pool, replayPath, System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_REPLAY_GAME")!);
@@ -52,6 +58,48 @@ public static class Entry
                 return;
             }
             var save = JsonSerializer.Deserialize(File.ReadAllText(Path.Combine(root, "fixture.json")), JsonSerializationUtility.GetTypeInfo<SerializableRun>())!;
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_FINISHER_TARGETS_TEST") == "1")
+            {
+                await FinisherTargetIntegration.Run(root, tree, save);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_MODEL_DISPLAY_TEST") == "1")
+            {
+                await ModelDisplayIntegration.Run(root, tree, pool, save);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_DISCARD_TEST") == "1")
+            {
+                await DiscardIntegration.Run(root, tree, save);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_CARD_GOALS_TEST") == "1")
+            {
+                await CardGoalIntegration.Run(root, tree, pool, save);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_FOLLOWUP_TEST") == "1")
+            {
+                await FollowupIntegration.Run(root, tree, save);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SELECTION_MATRIX") == "1")
+            {
+                await SelectionMatrixIntegration.Run(root, tree, save);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SURVIVAL_TEST") == "1")
+            {
+                await SurvivalIntegration.Run(root, tree, save);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_MECHANICS") == "1")
             {
                 await MechanicsIntegration.Run(root, tree, pool, save);

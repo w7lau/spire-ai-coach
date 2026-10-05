@@ -17,6 +17,9 @@ try {
     Copy-Item -LiteralPath 'src/SpireAiCoach.Mod/bin/Release/net9.0/SpireAiCoach.dll' -Destination $package
     Copy-Item -LiteralPath 'SpireAiCoach.json' -Destination $package
     Copy-Item -LiteralPath 'README.md' -Destination (Join-Path $package 'README.md')
+    foreach ($name in @('README.en.md', 'LICENSE', 'ACKNOWLEDGEMENTS.md', 'CONTRIBUTING.md')) {
+        Copy-Item -LiteralPath $name -Destination (Join-Path $package $name)
+    }
     $version = (Get-Content -LiteralPath 'SpireAiCoach.json' -Raw | ConvertFrom-Json).version
     $zipPath = Join-Path $root "dist/SpireAiCoach-$version.zip"
     Compress-Archive -LiteralPath $package -DestinationPath $zipPath -Force

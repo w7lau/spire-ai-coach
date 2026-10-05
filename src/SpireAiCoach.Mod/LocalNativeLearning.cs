@@ -4,7 +4,6 @@ using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Entities.Powers;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Entities.Multiplayer;
-using MegaCrit.Sts2.Core.Hooks;
 using SpireAiCoach.Core;
 
 namespace SpireAiCoach.Mod;
@@ -13,17 +12,16 @@ namespace SpireAiCoach.Mod;
 // This is not an effect mirror: native hooks still execute every proposed line.
 internal sealed class LocalNativeLearning(bool trackCosts = false, bool trackDurations = false)
 {
+    internal LocalSelectionLearning Selections { get; } = new();
     internal sealed record Observation(string Card, int Round, decimal Energy, int PaidEnergy, int Hand,
         int Upgrades, int Statuses, int Buffs, int BuffAmount, int Hp, uint Played,
         IReadOnlyDictionary<uint, int>? HandCosts, bool HasHandEndEffect, IReadOnlyDictionary<uint, int> Hints,
-        bool? DrawAllowed, IReadOnlyDictionary<uint, string> HintModels, IReadOnlyDictionary<PowerModel, int> BuffPowers);
+        IReadOnlyDictionary<uint, string> HintModels, IReadOnlyDictionary<PowerModel, int> BuffPowers);
     private readonly Dictionary<string, (double Total, int Samples)> _bonuses = new(StringComparer.Ordinal);
     private Dictionary<uint, int> _hints = [];
     private Dictionary<uint, string> _hintModels = [];
     private readonly Dictionary<(string Source, string Target), int> _dependencies = new();
     private Observation? _pending;
-    private readonly HashSet<string> _drawSources = new(StringComparer.Ordinal);
-    private readonly HashSet<string> _drawLocks = new(StringComparer.Ordinal);
     private sealed record BuffCredit(string Card, int Round, IReadOnlyDictionary<PowerModel, int> Before,
         Dictionary<PowerModel, int> Gained, double Bonus);
     private readonly List<BuffCredit> _credits = [];
@@ -34,11 +32,9 @@ internal sealed class LocalNativeLearning(bool trackCosts = false, bool trackDur
     private static double BuffBonus(IReadOnlyDictionary<PowerModel, int> before, Dictionary<PowerModel, int> gained) =>
         Math.Min(40, gained.Count(p => !before.ContainsKey(p.Key)) * 20) + Math.Min(40, Math.Sqrt(gained.Values.Sum()) * 8);
     private static string Key(CardModel card) => $"{card.Id}:{card.CurrentUpgradeLevel}";
-    private static bool? DrawAllowed(Player player)
-    {
-        try { return Hook.ShouldDraw(player.Creature.CombatState!, player, false, out _); }
-        catch { return null; }
-    }
+    // A permission hook is not necessarily a pure query: Mods can consume a
+    // draw-prevention charge inside ShouldDraw. Observe settled effects only;
+    // the native draw command owns every call to that hook.
 
     private static Dictionary<uint, int> Costs(Player player) => player.PlayerCombatState!.Hand.Cards
         // Spending energy makes an X card's spending amount fall; that is not a
@@ -58,7 +54,7 @@ internal sealed class LocalNativeLearning(bool trackCosts = false, bool trackDur
                 player.Creature.Powers.Count(p => p.TypeForCurrentAmount == PowerType.Buff),
                 player.Creature.Powers.Where(p => p.TypeForCurrentAmount == PowerType.Buff).Sum(p => Math.Max(0, p.Amount)),
                 player.Creature.CurrentHp, NetCombatCard.FromModel(card).CombatCardIndex, trackCosts ? Costs(player) : null,
-                card.HasTurnEndInHandEffect, new Dictionary<uint, int>(_hints), DrawAllowed(player), new Dictionary<uint, string>(_hintModels),
+                card.HasTurnEndInHandEffect, new Dictionary<uint, int>(_hints), new Dictionary<uint, string>(_hintModels),
                 trackDurations ? Buffs(player) : new Dictionary<PowerModel, int>(PowerIdentity));
         }
         catch { return null; }
@@ -73,8 +69,6 @@ internal sealed class LocalNativeLearning(bool trackCosts = false, bool trackDur
             // Exclude turn changes and victory hooks from a card's learned hint.
             if (player.Creature.CombatState!.RoundNumber != before.Round || CombatManager.Instance.IsOverOrEnding) return;
             var drawn = Math.Max(0, pcs.Hand.Cards.Count - before.Hand + 1);
-            if (drawn > 0) _drawSources.Add(before.Card);
-            if (before.DrawAllowed == true && DrawAllowed(player) == false) _drawLocks.Add(before.Card);
             var energy = Math.Max(0, pcs.Energy - before.Energy + before.PaidEnergy);
             var upgrades = Math.Max(0, pcs.AllPiles.SelectMany(p => p.Cards).Sum(c => c.CurrentUpgradeLevel) - before.Upgrades);
             var removed = Math.Max(0, before.Statuses - pcs.AllPiles.Where(p => p.Type != PileType.Exhaust)
@@ -155,12 +149,6 @@ internal sealed class LocalNativeLearning(bool trackCosts = false, bool trackDur
     {
         string key = Key(card);
         int priority = _bonuses.TryGetValue(key, out var learned) ? nativePreview + (int)(learned.Total / learned.Samples) : nativePreview;
-        // Observe the native draw gate rather than identifying a particular card
-        // or mirroring its power. Generation can also enlarge a hand, so these
-        // are scheduling hints only; every outcome still runs the actual hooks.
-        if (_drawLocks.Contains(key) && card.Owner.PlayerCombatState!.Hand.Cards.Any(c => c != card &&
-            _drawSources.Contains(Key(c)) && _hints.ContainsKey(NetCombatCard.FromModel(c).CombatCardIndex)))
-            priority -= 80;
         return priority;
     }
 

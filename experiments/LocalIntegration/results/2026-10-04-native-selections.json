@@ -1,0 +1,323 @@
+{
+  "version": "0.7.34",
+  "game_version": "v0.111.0",
+  "native_module": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
+  "dll_sha256": "6822801ec76ee8fa7055fd6c74af66ad5f3516c3bdb88fa00989e0733f381084",
+  "core_checks": {
+    "passed": 255,
+    "total": 255
+  },
+  "build": {
+    "warnings": 0,
+    "errors": 0
+  },
+  "metadata": {
+    "model_counts": {
+      "Cards": 603,
+      "Relics": 299,
+      "Powers": 283,
+      "Potions": 66
+    },
+    "counts_include_mock_deprecated_internal": true,
+    "selection_entry_points": 16,
+    "direct_model_choice_calls": 87,
+    "other_direct_choice_references": 0,
+    "coverage_failures": []
+  },
+  "native_command_pairs": {
+    "passed": 22,
+    "synchronization_identity_preserved": true,
+    "cases": [
+      {
+        "Name": "hand-multiple-ordered",
+        "choiceCount": 1,
+        "synchronizationCount": 1,
+        "begun": 1,
+        "ended": 1,
+        "ordinaryAndDataMatch": true
+      },
+      {
+        "Name": "hand-discard",
+        "choiceCount": 1,
+        "synchronizationCount": 1,
+        "begun": 1,
+        "ended": 1,
+        "ordinaryAndDataMatch": true
+      },
+      {
+        "Name": "hand-upgrade",
+        "choiceCount": 1,
+        "synchronizationCount": 1,
+        "begun": 1,
+        "ended": 1,
+        "ordinaryAndDataMatch": true
+      },
+      {
+        "Name": "grid-manual-multiple",
+        "choiceCount": 1,
+        "synchronizationCount": 1,
+        "begun": 1,
+        "ended": 1,
+        "ordinaryAndDataMatch": true
+      },
+      {
+        "Name": "grid-sorted",
+        "choiceCount": 1,
+        "synchronizationCount": 1,
+        "begun": 1,
+        "ended": 1,
+        "ordinaryAndDataMatch": true
+      },
+      {
+        "Name": "grid-created",
+        "choiceCount": 1,
+        "synchronizationCount": 1,
+        "begun": 1,
+        "ended": 1,
+        "ordinaryAndDataMatch": true
+      },
+      {
+        "Name": "grid-optional-empty",
+        "choiceCount": 1,
+        "synchronizationCount": 1,
+        "begun": 1,
+        "ended": 1,
+        "ordinaryAndDataMatch": true
+      },
+      {
+        "Name": "grid-auto-max",
+        "choiceCount": 1,
+        "synchronizationCount": 1,
+        "begun": 1,
+        "ended": 1,
+        "ordinaryAndDataMatch": true
+      },
+      {
+        "Name": "offer",
+        "choiceCount": 1,
+        "synchronizationCount": 1,
+        "begun": 1,
+        "ended": 1,
+        "ordinaryAndDataMatch": true
+      },
+      {
+        "Name": "offer-skip",
+        "choiceCount": 1,
+        "synchronizationCount": 1,
+        "begun": 1,
+        "ended": 1,
+        "ordinaryAndDataMatch": true
+      },
+      {
+        "Name": "deck-generic",
+        "choiceCount": 1,
+        "synchronizationCount": 1,
+        "begun": 0,
+        "ended": 0,
+        "ordinaryAndDataMatch": true
+      },
+      {
+        "Name": "deck-upgrade",
+        "choiceCount": 1,
+        "synchronizationCount": 1,
+        "begun": 0,
+        "ended": 0,
+        "ordinaryAndDataMatch": true
+      },
+      {
+        "Name": "deck-removal",
+        "choiceCount": 1,
+        "synchronizationCount": 1,
+        "begun": 0,
+        "ended": 0,
+        "ordinaryAndDataMatch": true
+      },
+      {
+        "Name": "deck-transform",
+        "choiceCount": 1,
+        "synchronizationCount": 1,
+        "begun": 0,
+        "ended": 0,
+        "ordinaryAndDataMatch": true
+      },
+      {
+        "Name": "deck-enchant",
+        "choiceCount": 1,
+        "synchronizationCount": 1,
+        "begun": 0,
+        "ended": 0,
+        "ordinaryAndDataMatch": true
+      },
+      {
+        "Name": "deck-enchant-filter",
+        "choiceCount": 1,
+        "synchronizationCount": 1,
+        "begun": 0,
+        "ended": 0,
+        "ordinaryAndDataMatch": true
+      },
+      {
+        "Name": "deck-enchant-list",
+        "choiceCount": 1,
+        "synchronizationCount": 1,
+        "begun": 0,
+        "ended": 0,
+        "ordinaryAndDataMatch": true
+      },
+      {
+        "Name": "pile-multiple",
+        "choiceCount": 1,
+        "synchronizationCount": 1,
+        "begun": 1,
+        "ended": 1,
+        "ordinaryAndDataMatch": true
+      },
+      {
+        "Name": "pile-filter",
+        "choiceCount": 1,
+        "synchronizationCount": 1,
+        "begun": 1,
+        "ended": 1,
+        "ordinaryAndDataMatch": true
+      },
+      {
+        "Name": "bundle",
+        "choiceCount": 1,
+        "synchronizationCount": 1,
+        "begun": 0,
+        "ended": 0,
+        "ordinaryAndDataMatch": true
+      },
+      {
+        "Name": "empty-filter",
+        "choiceCount": 0,
+        "synchronizationCount": 0,
+        "begun": 1,
+        "ended": 1,
+        "ordinaryAndDataMatch": true
+      },
+      {
+        "Name": "autopick",
+        "choiceCount": 0,
+        "synchronizationCount": 0,
+        "begun": 1,
+        "ended": 1,
+        "ordinaryAndDataMatch": true
+      }
+    ]
+  },
+  "native_actual_execution": {
+    "cases": [
+      {
+        "kind": "exhaust",
+        "steps": 4,
+        "checkpoints": 4,
+        "starting_hp": 80,
+        "hp": 80,
+        "rejected": 0,
+        "actual_execution_and_completed_choice_continuation_passed": true,
+        "independent_final_verification_skipped": true
+      },
+      {
+        "kind": "multi",
+        "steps": 4,
+        "checkpoints": 4,
+        "starting_hp": 80,
+        "hp": 75,
+        "rejected": 0,
+        "actual_execution_and_completed_choice_continuation_passed": true,
+        "independent_final_verification_skipped": true
+      },
+      {
+        "kind": "upgrade",
+        "steps": 4,
+        "checkpoints": 4,
+        "starting_hp": 80,
+        "hp": 80,
+        "rejected": 0,
+        "actual_execution_and_completed_choice_continuation_passed": true,
+        "independent_final_verification_skipped": true
+      },
+      {
+        "kind": "retrieve",
+        "steps": 4,
+        "checkpoints": 4,
+        "starting_hp": 80,
+        "hp": 75,
+        "rejected": 0,
+        "actual_execution_and_completed_choice_continuation_passed": true,
+        "independent_final_verification_skipped": true
+      }
+    ]
+  },
+  "presentation": {
+    "passed": true,
+    "form_factories": [
+      {
+        "factory": "NDemonFormVfx",
+        "regular_requires_scene": true,
+        "numerical_returns_null": true
+      },
+      {
+        "factory": "NEchoFormVfx",
+        "regular_requires_scene": true,
+        "numerical_returns_null": true
+      },
+      {
+        "factory": "NReaperFormVfx",
+        "regular_requires_scene": true,
+        "numerical_returns_null": true
+      },
+      {
+        "factory": "NSerpentFormVfx",
+        "regular_requires_scene": true,
+        "numerical_returns_null": true
+      },
+      {
+        "factory": "NVoidFormVfx",
+        "regular_requires_scene": true,
+        "numerical_returns_null": true
+      }
+    ],
+    "global_test_mode_unchanged": true,
+    "native_death_subscription_cleanup_preserved": true,
+    "both_algorithms_checked": true,
+    "layouts": [
+      {
+        "width": 1280,
+        "height": 720,
+        "measured_width": 560,
+        "measured_height": 640,
+        "controls": 30,
+        "horizontal_overflow": 0,
+        "primary_actions_fixed": true,
+        "expanded_sections_checked": 3,
+        "visualization_workers": 16,
+        "visualization_rendered": true,
+        "hidden_and_finished_animation_stops": true,
+        "route_sixteen_selectable": true
+      },
+      {
+        "width": 1920,
+        "height": 1080,
+        "measured_width": 560,
+        "measured_height": 1000,
+        "controls": 30,
+        "horizontal_overflow": 0,
+        "primary_actions_fixed": true,
+        "expanded_sections_checked": 3,
+        "visualization_workers": 16,
+        "visualization_rendered": true,
+        "hidden_and_finished_animation_stops": true,
+        "route_sixteen_selectable": true
+      }
+    ]
+  },
+  "production_budgets_unchanged": true,
+  "limits": [
+    "Finite installed-version metadata and shared-interface checks; not every native card or third-party Mod was executed.",
+    "Native card cases are short synthetic routes, not a complete search-quality or speed comparison.",
+    "No global optimality or arbitrary private-UI/unserialized-Mod-state compatibility claim.",
+    "Native engine shutdown still reports texture/RID/resource leaks."
+  ]
+}

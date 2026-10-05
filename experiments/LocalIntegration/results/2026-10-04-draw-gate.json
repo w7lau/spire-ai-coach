@@ -1,0 +1,58 @@
+{
+  "scope": "Frozen incident, permission-hook causality, one prescribed native route. No full search quality benchmark.",
+  "version": "0.7.34",
+  "native_game_version": "0.111.0",
+  "other_mods": 6,
+  "regular_execution": {
+    "planned_steps": 12,
+    "settled_steps": 10,
+    "stage": "checkpoint",
+    "matches_live_stop_and_native_hash": true,
+    "draw_commands": 4,
+    "draw_gate_calls": 4,
+    "extra_draw_allowed": false
+  },
+  "old_learning_causal_control": {
+    "settled_steps": 12,
+    "battle_ended": true,
+    "rounds": 3,
+    "hp": 46,
+    "draw_commands": 4,
+    "draw_gate_calls": 15
+  },
+  "fixed_learning_control": {
+    "settled_steps": 10,
+    "stage": "checkpoint",
+    "matches_regular_execution_native_hash": true,
+    "draw_commands": 4,
+    "draw_gate_calls": 4,
+    "extra_draw_allowed": false
+  },
+  "corrected_numeric_candidate": {
+    "evaluated": 1,
+    "preserved_prefix_steps": 10,
+    "blocked_draw_checkpoint_matches_actual": true,
+    "steps": 17,
+    "rounds": 4,
+    "hp": 28,
+    "net_hp_loss": 19,
+    "native_verified_steps": 17,
+    "executed_search_checkpoint_steps": 17,
+    "battle_ended": true,
+    "final_verification_optional_in_product": true,
+    "optimality_proven": false
+  },
+  "core_checks": "245/245",
+  "build_warnings": 0,
+  "build_errors": 0,
+  "native_checked_and_packaged_dll_sha256": "b42e714236cb7ffafbdfdafcb9147a487bba298a83f4ac5326058125c65d28e5",
+  "package_sha256": "fd6ff7d40798a7eb668727cb7280cd60d3dfe5217fd3513ca1148a5c3434297b",
+  "installation": {
+    "version": "0.7.34",
+    "matches_native_checked_and_packaged_dll": true,
+    "selected_files_checked": 213,
+    "selected_files_unchanged": true,
+    "old_binary_and_manifest_backed_up": true,
+    "game_started": false
+  }
+}

@@ -11,6 +11,7 @@ using MegaCrit.Sts2.Core.Context;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Encounters;
 using MegaCrit.Sts2.Core.Models.Monsters;
 using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Nodes.Cards;
@@ -19,10 +20,12 @@ using MegaCrit.Sts2.Core.Nodes.Rooms;
 using MegaCrit.Sts2.Core.Nodes.Screens.CardSelection;
 using MegaCrit.Sts2.Core.Nodes.Screens.Overlays;
 using MegaCrit.Sts2.Core.Nodes.Vfx;
+using MegaCrit.Sts2.Core.Nodes.Vfx.Forms;
 using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Runs;
 using MegaCrit.Sts2.Core.Saves;
 using MegaCrit.Sts2.Core.TestSupport;
+using SpireAiCoach.Core;
 
 namespace SpireAiCoach.Mod;
 
@@ -33,8 +36,11 @@ internal static class LocalWorkerDataMode
     public static bool Active { get; set; }
     public static bool Available { get; private set; }
     public static bool MinimalRun { get; set; }
+    public static string[] VisualFactories => LocalWorkerOverhead.OptionalFactories;
     private static NOverlayStack? _emptyOverlays;
     private static readonly Dictionary<Node, Func<IEnumerable<CardModel>>> Selections = new(ReferenceEqualityComparer.Instance);
+    private static readonly Dictionary<Node, Func<IEnumerable<IReadOnlyList<CardModel>>>> Bundles = new(ReferenceEqualityComparer.Instance);
+    public static string[] SummonPresentationBoundaries { get; private set; } = [];
     public static void Install(Harmony _)
     {
         var harmony = new Harmony("SpireAiCoach.owned-worker.data");
@@ -47,6 +53,8 @@ internal static class LocalWorkerDataMode
     }
     private static void InstallBoundaries(Harmony harmony)
     {
+        var missing = LocalSelectionCoverage.Audit();
+        if (missing.Length > 0) throw new InvalidOperationException(string.Join("; ", missing));
         void Prefix(Type type, string name, string patch, Type[]? arguments = null) => harmony.Patch(
             arguments == null ? AccessTools.Method(type, name) : AccessTools.Method(type, name, arguments),
             prefix: new(AccessTools.Method(typeof(LocalWorkerDataMode), patch)));
@@ -65,11 +73,14 @@ internal static class LocalWorkerDataMode
         foreach (var factory in typeof(NDamageNumVfx).GetMethods().Where(m => m.Name == nameof(NDamageNumVfx.Create)))
             harmony.Patch(factory, prefix: new(AccessTools.Method(typeof(LocalWorkerDataMode), nameof(DamageVisual))));
         Prefix(typeof(PlayerHurtVignetteHelper), nameof(PlayerHurtVignetteHelper.Play), nameof(PresentationVoid));
+        // Form factories are guarded once by LocalWorkerOverhead. Other VFX
+        // factories can own pile/selection completion callbacks and stay native.
         // The native death callback removes its subscription before obtaining
         // an optional animation node. Keep that cleanup and every death hook;
         // only guard the missing presentation receiver in scene-free workers.
         harmony.Patch(AccessTools.Method(typeof(SoulNexus), "AfterDeath", [typeof(Creature)]),
             transpiler: new(AccessTools.Method(typeof(LocalWorkerDataMode), nameof(DeathCreatureVisual))));
+        InstallSummonPresentation(harmony);
         Prefix(typeof(CardCmd), "PreviewInternal", nameof(Preview));
         Prefix(typeof(ForgeCmd), "PreviewSovereignBlade", nameof(PresentationVoid));
         var transform = typeof(CardCmd).GetMethods().Single(m => m.Name == nameof(CardCmd.Transform) &&
@@ -79,6 +90,12 @@ internal static class LocalWorkerDataMode
             transpiler: new(AccessTools.Method(typeof(LocalWorkerDataMode), nameof(TransformPresentation))));
         Prefix(typeof(NChooseACardSelectionScreen), nameof(NChooseACardSelectionScreen.ShowScreen), nameof(Offer));
         Prefix(typeof(NChooseACardSelectionScreen), nameof(NChooseACardSelectionScreen.CardsSelected), nameof(Selected));
+        Prefix(typeof(NChooseABundleSelectionScreen), nameof(NChooseABundleSelectionScreen.ShowScreen), nameof(Bundle));
+        Prefix(typeof(NChooseABundleSelectionScreen), nameof(NChooseABundleSelectionScreen.CardsSelected), nameof(SelectedBundle));
+        Prefix(typeof(NDeckCardSelectScreen), nameof(NDeckCardSelectScreen.Create), nameof(Deck));
+        Prefix(typeof(NDeckUpgradeSelectScreen), nameof(NDeckUpgradeSelectScreen.ShowScreen), nameof(DeckUpgrade));
+        Prefix(typeof(NDeckTransformSelectScreen), nameof(NDeckTransformSelectScreen.ShowScreen), nameof(DeckTransform));
+        Prefix(typeof(NDeckEnchantSelectScreen), nameof(NDeckEnchantSelectScreen.ShowScreen), nameof(DeckEnchant));
         Prefix(typeof(NSimpleCardSelectScreen), nameof(NSimpleCardSelectScreen.Create), nameof(Grid),
             [typeof(IReadOnlyList<CardModel>), typeof(CardSelectorPrefs)]);
         Prefix(typeof(NSimpleCardSelectScreen), nameof(NSimpleCardSelectScreen.Create), nameof(CreatedGrid),
@@ -102,8 +119,71 @@ internal static class LocalWorkerDataMode
     }
     public static void FreeSelections()
     {
-        foreach (var node in Selections.Keys) if (GodotObject.IsInstanceValid(node)) node.Free();
-        Selections.Clear();
+        foreach (var node in Selections.Keys.Concat(Bundles.Keys)) if (GodotObject.IsInstanceValid(node)) node.Free();
+        Selections.Clear(); Bundles.Clear();
+    }
+    private static void InstallSummonPresentation(Harmony harmony)
+    {
+        var enabled = AccessTools.PropertyGetter(typeof(TestMode), nameof(TestMode.IsOff));
+        // This native helper changes only a scene node's fall position. Match
+        // its complete optional room/node lookup block, independent of monster
+        // names. Base initialization and subsequent effects remain original.
+        var calls = SummonVisualCalls();
+        var boundaries = new List<string>();
+        foreach (var type in typeof(MonsterModel).Assembly.GetTypes().Where(t => typeof(MonsterModel).IsAssignableFrom(t)))
+        {
+            var callback = type.GetMethod(nameof(MonsterModel.AfterAddedToRoom), BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+            var machine = callback?.GetCustomAttribute<AsyncStateMachineAttribute>()?.StateMachineType;
+            var method = machine == null ? callback : AccessTools.Method(machine, "MoveNext");
+            if (method == null || !LocalPresentationGuard.OptionalGuardedCalls(method, enabled, calls)) continue;
+            harmony.Patch(method, transpiler: new(AccessTools.Method(typeof(LocalWorkerDataMode), nameof(SummonPresentation))));
+            boundaries.Add(type.FullName!);
+        }
+        SummonPresentationBoundaries = boundaries.ToArray();
+        if (boundaries.Count == 0) throw new InvalidOperationException("Native optional summon presentation block changed");
+    }
+    private static MethodInfo[] SummonVisualCalls() => [AccessTools.PropertyGetter(typeof(NCombatRoom), nameof(NCombatRoom.Instance)),
+        AccessTools.PropertyGetter(typeof(MonsterModel), nameof(MonsterModel.Creature)),
+        AccessTools.Method(typeof(NCombatRoom), nameof(NCombatRoom.GetCreatureNode), [typeof(Creature)]),
+        AccessTools.Method(typeof(FabricatorNormal), nameof(FabricatorNormal.SetBotFallPosition))];
+    private static bool SummonPresentationEnabled()
+    {
+        if (Active) LocalWorker.SkipMethod("Summon.OptionalNodeInitialization");
+        return !Active && TestMode.IsOff;
+    }
+    private static IEnumerable<CodeInstruction> SummonPresentation(IEnumerable<CodeInstruction> instructions)
+    {
+        var code = instructions.ToArray();
+        int Offset(System.Reflection.Emit.Label label)
+        {
+            int target = Array.FindIndex(code, c => c.labels.Contains(label));
+            if (target < 0) throw new InvalidOperationException("Unresolved native summon branch");
+            while (target < code.Length && code[target].opcode == OpCodes.Nop) target++;
+            return target;
+        }
+        object? Operand(object? operand) => operand switch
+        {
+            System.Reflection.Emit.Label label => Offset(label),
+            System.Reflection.Emit.Label[] labels => labels.Select(Offset).ToArray(),
+            LocalBuilder local => local.LocalIndex,
+            _ => operand
+        };
+        var enabled = AccessTools.PropertyGetter(typeof(TestMode), nameof(TestMode.IsOff));
+        // Validate the actual Harmony input too. If another Mod inserts rules
+        // into this display block, retain compatibility rather than skipping them.
+        if (!LocalPresentationGuard.OptionalGuardedCalls(code.Select((c, i) => new LocalInstruction(i, c.opcode, Operand(c.operand))), enabled, SummonVisualCalls()))
+            throw new InvalidOperationException("Modified native summon block contains more than optional presentation");
+        int count = 0;
+        foreach (var instruction in code)
+        {
+            if (instruction.Calls(enabled))
+            {
+                count++;
+                yield return new CodeInstruction(instruction) { operand = AccessTools.Method(typeof(LocalWorkerDataMode), nameof(SummonPresentationEnabled)) };
+            }
+            else yield return instruction;
+        }
+        if (count != 1) throw new InvalidOperationException("Native optional summon presentation gate changed");
     }
     public static void Reset()
     {
@@ -199,6 +279,40 @@ internal static class LocalWorkerDataMode
     }
     private static bool CreatedGrid(IReadOnlyList<CardCreationResult> cards, CardSelectorPrefs prefs, ref NSimpleCardSelectScreen __result) =>
         Grid(cards.Select(c => c.Card).ToArray(), prefs, ref __result);
+    private static T DeckSelection<T>(IReadOnlyList<CardModel> cards, CardSelectorPrefs prefs, string kind,
+        Func<CardModel, CardTransformation>? preview = null) where T : NCardGridSelectionScreen, new()
+    {
+        var screen = new T();
+        Selections.Add(screen, () =>
+        {
+            var selected = LocalWorker.CurrentChoices.SelectWithoutPresentation(kind, cards.ToArray(), prefs).ToArray();
+            if (preview != null && prefs.RequireManualConfirmation)
+                foreach (var card in selected) _ = preview(card);
+            return selected;
+        });
+        return screen;
+    }
+    private static bool Deck(IReadOnlyList<CardModel> cards, CardSelectorPrefs prefs, ref NDeckCardSelectScreen __result)
+    { if (!Active) return true; __result = DeckSelection<NDeckCardSelectScreen>(cards, prefs, "deck"); return false; }
+    private static bool DeckUpgrade(IReadOnlyList<CardModel> cards, CardSelectorPrefs prefs, ref NDeckUpgradeSelectScreen __result)
+    { if (!Active) return true; __result = DeckSelection<NDeckUpgradeSelectScreen>(cards, prefs, "deck-upgrade"); return false; }
+    private static bool DeckTransform(IReadOnlyList<CardModel> cards, Func<CardModel, CardTransformation> cardToTransformation,
+        CardSelectorPrefs prefs, ref NDeckTransformSelectScreen __result)
+    { if (!Active) return true; __result = DeckSelection<NDeckTransformSelectScreen>(cards, prefs, "deck-transform", cardToTransformation); return false; }
+    private static bool DeckEnchant(IReadOnlyList<CardModel> cards, CardSelectorPrefs prefs, ref NDeckEnchantSelectScreen __result)
+    { if (!Active) return true; __result = DeckSelection<NDeckEnchantSelectScreen>(cards, prefs, "deck-enchant"); return false; }
+    private static bool Bundle(IReadOnlyList<IReadOnlyList<CardModel>> bundles, ref NChooseABundleSelectionScreen __result)
+    {
+        if (!Active) return true;
+        __result = new NChooseABundleSelectionScreen();
+        Bundles.Add(__result, () => LocalWorker.CurrentChoices.BundleWithoutPresentation(bundles));
+        return false;
+    }
+    private static bool SelectedBundle(Node __instance, ref Task<IEnumerable<IReadOnlyList<CardModel>>> __result)
+    {
+        if (!Bundles.TryGetValue(__instance, out var select)) return true;
+        __result = Task.FromResult(select()); return false;
+    }
     private static bool Pile(CardPile pile, CardSelectorPrefs prefs, Func<CardModel, bool>? filter, ref NCombatPileCardSelectScreen __result)
     {
         if (!Active) return true;
@@ -207,7 +321,7 @@ internal static class LocalWorkerDataMode
             pile.Cards.Where(filter ?? (_ => true)).ToArray(), prefs, true));
         return false;
     }
-    private static bool Push(IOverlayScreen screen) => screen is not Node node || !Selections.ContainsKey(node);
+    private static bool Push(IOverlayScreen screen) => screen is not Node node || !Selections.ContainsKey(node) && !Bundles.ContainsKey(node);
     private static bool OverlayReceiver(ref NOverlayStack? __result)
     {
         if (!MinimalRun || NRun.Instance != null) return true;

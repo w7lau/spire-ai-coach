@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using System.Numerics;
 using Godot;
 using MegaCrit.Sts2.Core.CardSelection;
 using MegaCrit.Sts2.Core.Entities.Cards;
@@ -9,6 +10,7 @@ using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Multiplayer.Serialization;
 using MegaCrit.Sts2.Core.Nodes.Combat;
+using MegaCrit.Sts2.Core.Nodes.Cards;
 using MegaCrit.Sts2.Core.Nodes.Cards.Holders;
 using MegaCrit.Sts2.Core.Nodes.Screens.CardSelection;
 using MegaCrit.Sts2.Core.Nodes.Screens.Overlays;
@@ -23,9 +25,15 @@ public sealed class LocalChoices
     private readonly Func<LocalCardChoice[], LocalCardChoice>? _choose;
     private readonly List<LocalCardChoice> _completed = [];
     private readonly HashSet<object> _handled = new(ReferenceEqualityComparer.Instance);
+    private readonly LocalSelectionCursor _cursor;
+    internal sealed record Selection(string Kind, CardSelectorPrefs? Prefs, int Ordinal, CardModel[] Offered,
+        CardModel[] Selected, PileType[] Origins);
+    internal Func<string, CardModel[], CardSelectorPrefs?, int, bool[], Func<int[], int>?>? SelectionPriority { get; init; }
+    internal List<Selection> Selections { get; } = [];
     public LocalCardChoice[] Completed => _completed.ToArray();
-    public LocalChoices(LocalCardChoice[]? expected = null, Func<LocalCardChoice[], LocalCardChoice>? choose = null)
-    { _expected = expected ?? []; _choose = choose; }
+    public LocalChoices(LocalCardChoice[]? expected = null, Func<LocalCardChoice[], LocalCardChoice>? choose = null,
+        LocalSelectionCursor? cursor = null)
+    { _expected = expected ?? []; _choose = choose; _cursor = cursor ?? new(); }
 
     private static FieldInfo FindField(object owner, string name)
     {
@@ -34,8 +42,14 @@ public sealed class LocalChoices
         throw new InvalidOperationException("游戏选牌接口已变化：" + name);
     }
     private static T Field<T>(object owner, string name) => (T)FindField(owner, name).GetValue(owner)!;
-    private static void Invoke(object owner, string name, params object?[] arguments) => owner.GetType()
-        .GetMethod(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!.Invoke(owner, arguments);
+    private static void Invoke(object owner, string name, params object?[] arguments)
+    {
+        for (var type = owner.GetType(); type != null; type = type.BaseType)
+            if (type.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly)
+                .SingleOrDefault(m => m.Name == name && m.GetParameters().Length == arguments.Length) is { } method)
+            { method.Invoke(owner, arguments); return; }
+        throw new InvalidOperationException("游戏选牌接口已变化：" + name);
+    }
 
     private static string OfferHash(string kind, IReadOnlyList<CardModel> cards, int minimum, int maximum)
     {
@@ -65,30 +79,67 @@ public sealed class LocalChoices
     {
         var minimum = clampCount ? Math.Min(cards.Length, prefs.MinSelect) : prefs.MinSelect;
         var maximum = clampCount ? Math.Min(cards.Length, prefs.MaxSelect) : prefs.MaxSelect;
-        var hash = OfferHash(kind, cards, minimum, maximum);
+        maximum = Math.Min(cards.Length, maximum);
+        // Grid confirmation buttons do not permit intermediate counts unless
+        // manual confirmation is requested. Hand selectors do permit them.
+        int[]? sizes = kind is "grid" or "pile" && !prefs.RequireManualConfirmation
+            ? (minimum == 0 && maximum > 0 ? [0, maximum] : [maximum])
+            : kind == "deck-upgrade" ? [maximum] : null;
+        var space = new LocalSelectionSpace(cards.Length, minimum, maximum, sizes: sizes);
+        var hash = OfferHash(kind + ":ordered-v2:" + string.Join(",", sizes ?? []), cards, minimum, maximum);
         // The native selector explicitly describes discard/exhaust, independent of the
         // source card's name or Mod. These are exploration hints, never eliminated choices.
         var prompt = prefs.Prompt;
-        bool discards = prompt.LocTable == CardSelectorPrefs.DiscardSelectionPrompt.LocTable &&
-            prompt.LocEntryKey == CardSelectorPrefs.DiscardSelectionPrompt.LocEntryKey;
         bool exhausts = prompt.LocTable == CardSelectorPrefs.ExhaustSelectionPrompt.LocTable &&
             prompt.LocEntryKey == CardSelectorPrefs.ExhaustSelectionPrompt.LocEntryKey;
-        int Priority(CardModel card)
+        var gold = new bool[cards.Length];
+        int Priority(CardModel card, int index)
         {
             int score = 0;
-            if ((discards || exhausts) && card.Type is CardType.Status or CardType.Curse) score += 40;
+            // Discard is temporary movement, not permanent removal. A harmless
+            // status must not outrank a useful free play just because it is a status.
+            if (exhausts && card.Type is CardType.Status or CardType.Curse) score += 40;
             try
             {
-                if (prefs.ShouldGlowGold?.Invoke(card) == true) score += 20;
+                gold[index] = prefs.ShouldGlowGold?.Invoke(card) == true;
+                if (gold[index]) score += 20;
             }
             catch { /* Unknown native preview retains all alternatives. */ }
             return score;
         }
-        var options = LocalSelectionBranches.Generate(cards.Length, minimum, maximum).Select((indexes, i) =>
-            new LocalCardChoice(hash, i, string.Join(";", indexes.Select(n => cards[n].Id)),
+        var priorities = cards.Select(Priority).ToArray();
+        // Evaluate a selected set against ONE remaining resource budget. Simply
+        // summing individual values overvalues several cards we cannot all play.
+        var followup = SelectionPriority?.Invoke(kind, cards, prefs, _completed.Count, gold);
+        var seeds = priorities.Select((score, i) => score + (followup?.Invoke([i]) ?? 0)).ToArray();
+        bool complete = space.Count <= 128;
+        var ranks = _cursor.Page(hash, space).ToHashSet();
+        // Explore native glow/status hints early without deleting any alternative.
+        // Stable ranks depend only on the offer, never on changing preference scores.
+        foreach (var size in sizes ?? Enumerable.Range(minimum, maximum - minimum + 1).ToArray())
+        {
+            var indices = Enumerable.Range(0, cards.Length).OrderByDescending(i => seeds[i]).ThenBy(i => i).Take(size).ToArray();
+            ranks.Add(space.Rank(indices)); ranks.Add(space.Rank(indices.Reverse().ToArray()));
+        }
+        var expected = _expected.ElementAtOrDefault(_completed.Count);
+        if (expected?.Kind == kind && expected.OfferHash == hash && expected.Indices != null)
+            ranks.Add(space.Rank(expected.Indices));
+        LocalCardChoice Make(BigInteger rank)
+        {
+            var indexes = space.At(rank);
+            return new LocalCardChoice(hash, rank <= int.MaxValue ? (int)rank : -2,
+                string.Join(";", indexes.Select(n => cards[n].Id)),
                 string.Join("、", indexes.Select(n => $"{n + 1}. {cards[n].Title}")), indexes, kind,
-                Preference: indexes.Sum(n => Priority(cards[n])))).ToArray();
-        return Select(options, identity);
+                Preference: indexes.Sum(n => priorities[n]) + (followup?.Invoke(indexes) ?? 0), CompleteOffer: complete);
+        }
+        var options = ranks.Order().Select(Make).ToArray();
+        var selected = Select(options, identity);
+        if (SelectionPriority != null)
+        {
+            var picked = selected.Indices!.Select(i => cards[i]).ToArray();
+            Selections.Add(new(kind, prefs, _completed.Count - 1, cards, picked, picked.Select(c => c.Pile?.Type ?? PileType.None).ToArray()));
+        }
+        return selected;
     }
 
     // Used only by owned workers replacing presentation. Native CardSelectCmd still reserves
@@ -101,12 +152,59 @@ public sealed class LocalChoices
 
     internal IEnumerable<CardModel> OfferWithoutPresentation(IReadOnlyList<CardModel> cards, bool canSkip)
     {
-        var hash = OfferHash("offer", cards, canSkip ? 0 : 1, 1);
-        var options = cards.Select((c, i) => new LocalCardChoice(hash, i, c.Id.ToString(), c.Title)).ToList();
-        if (canSkip) options.Add(new(hash, -1, "", "跳过"));
-        var selected = Select(options.ToArray(), new object());
+        var selected = SelectOffer(cards, canSkip, new object());
         return selected.Index < 0 ? [] : [cards[selected.Index]];
     }
+
+    private LocalCardChoice SelectOffer(IReadOnlyList<CardModel> cards, bool canSkip, object identity)
+    {
+        var hash = OfferHash("offer", cards, canSkip ? 0 : 1, 1);
+        var followup = SelectionPriority?.Invoke("offer", cards.ToArray(), null, _completed.Count, new bool[cards.Count]);
+        var options = cards.Select((c, i) => new LocalCardChoice(hash, i, c.Id.ToString(), c.Title,
+            Preference: followup?.Invoke([i]) ?? 0)).ToList();
+        if (canSkip) options.Add(new(hash, -1, "", "跳过"));
+        var selected = Select(options.ToArray(), identity);
+        if (SelectionPriority != null)
+        {
+            CardModel[] picked = selected.Index < 0 ? [] : [cards[selected.Index]];
+            Selections.Add(new("offer", null, _completed.Count - 1, cards.ToArray(), picked,
+                picked.Select(c => c.Pile?.Type ?? PileType.None).ToArray()));
+        }
+        return selected;
+    }
+
+    private LocalCardChoice SelectBundle(IReadOnlyList<IReadOnlyList<CardModel>> bundles, object identity)
+    {
+        // Include bundle boundaries, not only the flattened cards: [A,B]/[C]
+        // and [A]/[B,C] are different native offers with different effects.
+        var hash = OfferHash("bundle:" + string.Join(",", bundles.Select(b => b.Count)), bundles.SelectMany(b => b).ToArray(), 1, 1);
+        var cards = bundles.SelectMany(b => b).ToArray();
+        var followup = SelectionPriority?.Invoke("bundle", cards, null, _completed.Count, new bool[cards.Length]);
+        int offset = 0;
+        var options = bundles.Select((b, i) =>
+        {
+            var indices = Enumerable.Range(offset, b.Count).ToArray(); offset += b.Count;
+            return new LocalCardChoice(hash, i, string.Join(";", b.Select(c => c.Id)),
+                string.Join("、", b.Select(c => c.Title)), Kind: "bundle", Preference: followup?.Invoke(indices) ?? 0);
+        }).ToArray();
+        var selected = Select(options, identity);
+        if (SelectionPriority != null)
+        {
+            var picked = bundles[selected.Index].ToArray();
+            Selections.Add(new("bundle", null, _completed.Count - 1, cards, picked,
+                picked.Select(c => c.Pile?.Type ?? PileType.None).ToArray()));
+        }
+        return selected;
+    }
+    internal IEnumerable<IReadOnlyList<CardModel>> BundleWithoutPresentation(IReadOnlyList<IReadOnlyList<CardModel>> bundles) =>
+        [bundles[SelectBundle(bundles, new object()).Index]];
+
+    internal static bool SupportedGrid(Type type) => type == typeof(NSimpleCardSelectScreen) ||
+        type == typeof(NCombatPileCardSelectScreen) || type == typeof(NDeckCardSelectScreen) ||
+        type == typeof(NDeckUpgradeSelectScreen) || type == typeof(NDeckTransformSelectScreen) || type == typeof(NDeckEnchantSelectScreen);
+    internal static string GridKind(Type type) => type == typeof(NCombatPileCardSelectScreen) ? "pile" :
+        type == typeof(NDeckCardSelectScreen) ? "deck" : type == typeof(NDeckUpgradeSelectScreen) ? "deck-upgrade" :
+        type == typeof(NDeckTransformSelectScreen) ? "deck-transform" : type == typeof(NDeckEnchantSelectScreen) ? "deck-enchant" : "grid";
 
     public void Tick(CancellationToken token = default)
     {
@@ -121,10 +219,7 @@ public sealed class LocalChoices
             if (Godot.Time.GetTicksMsec() - Field<ulong>(screen, "_openedTicks") <= 350) return;
             var cards = Field<IReadOnlyList<CardModel>>(screen, "_cards");
             var canSkip = Field<bool>(screen, "_canSkip");
-            var hash = OfferHash("offer", cards, canSkip ? 0 : 1, 1);
-            var options = cards.Select((c, i) => new LocalCardChoice(hash, i, c.Id.ToString(), c.Title)).ToList();
-            if (canSkip) options.Add(new(hash, -1, "", "跳过"));
-            var selected = Select(options.ToArray(), screen);
+            var selected = SelectOffer(cards, canSkip, screen);
             token.ThrowIfCancellationRequested();
             if (selected.Index < 0) screen.Call("OnSkipButtonReleased", default(Variant));
             else
@@ -135,8 +230,19 @@ public sealed class LocalChoices
             }
             return;
         }
-        if (top is NCardGridSelectionScreen grid && (top.GetType() == typeof(NSimpleCardSelectScreen) ||
-            top.GetType() == typeof(NCombatPileCardSelectScreen)))
+        if (top is NChooseABundleSelectionScreen bundleScreen && top.GetType() == typeof(NChooseABundleSelectionScreen))
+        {
+            if (!bundleScreen.IsNodeReady() || _handled.Contains(bundleScreen)) return;
+            var bundles = Field<IReadOnlyList<IReadOnlyList<CardModel>>>(bundleScreen, "_bundles");
+            var selected = SelectBundle(bundles, bundleScreen);
+            token.ThrowIfCancellationRequested();
+            var row = Field<Control>(bundleScreen, "_bundleRow");
+            var node = row.GetChildren().OfType<NCardBundle>().Single(n => ReferenceEquals(n.Bundle, bundles[selected.Index]));
+            Invoke(bundleScreen, "OnBundleClicked", node);
+            Invoke(bundleScreen, "ConfirmSelection", new object?[] { null });
+            return;
+        }
+        if (top is NCardGridSelectionScreen grid && SupportedGrid(top.GetType()))
         {
             if (!grid.IsNodeReady() || _handled.Contains(grid)) return;
             bool pileSelection = top.GetType() == typeof(NCombatPileCardSelectScreen);
@@ -144,10 +250,23 @@ public sealed class LocalChoices
                 .Where(Field<Func<CardModel, bool>?>(grid, "_filter") ?? (_ => true)).ToArray() :
                 Field<IReadOnlyList<CardModel>>(grid, "_cards").ToArray();
             var prefs = Field<CardSelectorPrefs>(grid, "_prefs");
-            var selected = SelectCards(pileSelection ? "pile" : "grid", cards, prefs, grid, pileSelection);
+            var kind = GridKind(top.GetType());
+            var selected = SelectCards(kind, cards, prefs, grid, pileSelection);
             token.ThrowIfCancellationRequested();
             foreach (var index in selected.Indices!) Invoke(grid, "OnCardClicked", cards[index]);
-            if (prefs.RequireManualConfirmation || selected.Indices!.Length == 0) Invoke(grid, "CompleteSelection");
+            if (!Field<TaskCompletionSource<IEnumerable<CardModel>>>(grid, "_completionSource").Task.IsCompleted)
+            {
+                if (kind is "grid" or "pile") Invoke(grid, "CompleteSelection");
+                else if (kind == "deck-transform")
+                {
+                    // Preserve native preview construction before confirming; its
+                    // callback is supplied by the caller, potentially a Mod.
+                    if (selected.Indices.Length < prefs.MaxSelect) Invoke(grid, "ConfirmSelection", new object?[] { null });
+                    if (!Field<TaskCompletionSource<IEnumerable<CardModel>>>(grid, "_completionSource").Task.IsCompleted)
+                        Invoke(grid, "CompleteSelection", new object?[] { null });
+                }
+                else Invoke(grid, "CheckIfSelectionComplete");
+            }
             return;
         }
         if (NPlayerHand.Instance is { IsInCardSelection: true } hand)
@@ -158,6 +277,9 @@ public sealed class LocalChoices
             var filter = Field<Func<CardModel, bool>?>(hand, "_currentSelectionFilter");
             var cards = LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!.PlayerCombatState!.Hand.Cards
                 .Where(filter ?? (_ => true)).ToArray();
+            // Native selection mode can become visible before restored card holders
+            // finish entering the hand. Defer the click, not the native command.
+            if (cards.Any(c => hand.GetCardHolder(c) is not NHandCardHolder)) return;
             var selected = SelectCards("hand", cards, prefs, completion);
             token.ThrowIfCancellationRequested();
             foreach (var index in selected.Indices!)

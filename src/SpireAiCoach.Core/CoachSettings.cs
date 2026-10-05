@@ -7,14 +7,22 @@ public sealed record CoachSettings
     public bool RevealDrawOrder { get; init; } = true;
     public bool RememberKey { get; init; }
     public bool IncludeStreamUsage { get; init; } = true;
+    public bool ShowOverlayButton { get; init; }
+    public bool AutoShowCombatPanel { get; init; } = true;
     public int TimeoutSeconds { get; init; } = 120;
     public int LocalWorkers { get; init; } = 0;
     public bool LocalIncludePotions { get; init; }
     public bool LocalStopOnZeroLoss { get; init; } = true;
+    public bool LocalStopOnFirstWin { get; init; }
+    public bool LocalSkipFinalVerification { get; init; } = true;
     public int LocalTargetVictoryRounds { get; init; }
     public int LocalMaxAttempts { get; init; } = LocalCalculation.AttemptsPerWorker;
     public int LocalMaxRounds { get; init; } = LocalCalculation.Rounds;
     public int LocalSearchSeconds { get; init; } = LocalCalculation.SearchSeconds;
+    public string LocalPlayCardModelId { get; init; } = "";
+    public string LocalFinisherCardModelId { get; init; } = "";
+    public bool LocalCardGoalThresholdEnabled { get; init; }
+    public int LocalCardGoalHpLossThreshold { get; init; } = 5;
 
     public Uri Endpoint()
     {

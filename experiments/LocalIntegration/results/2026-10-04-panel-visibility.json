@@ -1,0 +1,79 @@
+{
+  "passed": true,
+  "version": "0.7.27",
+  "regular_scene_dependency_preserved": true,
+  "data_callback_preserves_unsubscribe": true,
+  "creature_hp_unchanged": true,
+  "no_combat_scene": true,
+  "no_worker_started": true,
+  "layouts": [
+    {
+      "width": 1280,
+      "height": 720,
+      "measured_width": 560,
+      "measured_height": 640,
+      "controls": 43,
+      "horizontal_overflow": 0,
+      "primary_actions_fixed": true,
+      "expanded_sections_checked": 3
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "measured_width": 560,
+      "measured_height": 1000,
+      "controls": 43,
+      "horizontal_overflow": 0,
+      "primary_actions_fixed": true,
+      "expanded_sections_checked": 3
+    }
+  ],
+  "merged_budget_controls_persisted": true,
+  "both_algorithm_requests_checked": true,
+  "manual_worker_limit_preserved": 8,
+  "visibility_checks": [
+    {
+      "name": "outside combat initially hidden",
+      "visible": false
+    },
+    {
+      "name": "manual outside-combat open survives frame and snapshot updates",
+      "visible": true
+    },
+    {
+      "name": "manual toggle hides",
+      "visible": false
+    },
+    {
+      "name": "enter battle shows",
+      "visible": true
+    },
+    {
+      "name": "manual battle hide persists",
+      "visible": false
+    },
+    {
+      "name": "execution starts hidden",
+      "visible": false
+    },
+    {
+      "name": "manual execution open is retained",
+      "visible": true
+    },
+    {
+      "name": "execution stops in battle shows",
+      "visible": true
+    },
+    {
+      "name": "combat exit hides",
+      "visible": false
+    },
+    {
+      "name": "next combat resets manual override",
+      "visible": true
+    }
+  ],
+  "visibility_contexts_are_ui_only": true,
+  "tested_dll_sha256": "B949C185BF156035B7BBD11C05F2AD35DFAB4DFDF03AFE229ABABBFE9F0B589E",
+  "zip_sha256": "32BB8F0EC75503A79A38194863546324EF92BB9DDEEF00B4EF97E6E9AC329F12"
+}

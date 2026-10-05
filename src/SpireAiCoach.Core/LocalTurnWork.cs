@@ -14,7 +14,7 @@ public sealed class LocalTurnWork : IDisposable
         LocalTurnOffer[]? Offers = null, LocalTurnTask? Task = null,
         LocalAction[]? Actions = null, LocalDecision[]? Decisions = null,
         LocalTurnHint? Hint = null, LocalWinningBound? Bound = null, string? TerminalDigest = null,
-        LocalCandidate? Outcome = null, LocalCandidate? WinningCandidate = null);
+        LocalCandidate? Outcome = null, LocalCandidate? WinningCandidate = null, LocalLossProofFocus[]? LossProof = null);
     internal sealed record Reply(LocalTurnTask? Task, int Pending, int Active,
         int Offered, int Duplicates, int Affected = 0, string? Error = null, bool RootReady = false);
 
@@ -30,6 +30,8 @@ public sealed class LocalTurnWork : IDisposable
     private readonly string _scope;
     private readonly int _maximum;
     private readonly bool _ownedWinningFocus;
+    private readonly LocalAction[]? _initialPlan;
+    private readonly string _nativeRoot;
     private int _taken;
     private int _rollouts;
     private bool _rootReady;
@@ -45,25 +47,44 @@ public sealed class LocalTurnWork : IDisposable
     {
         if (maximum is < 1 or > 16) throw new ArgumentOutOfRangeException(nameof(maximum));
         _maximum = maximum; _scope = Scope(request); _ownedWinningFocus = request.OwnedWinningFocus;
-        _frontier = new(1729, request.SnapshotId + ":" + request.NativeHash);
+        _initialPlan = request.InitialPlan?.ToArray();
+        _nativeRoot = request.NativeHash;
+        _frontier = new(1729, request.SnapshotId + ":" + request.NativeHash, request.CardGoals);
         _listener = Task.Run(Listen);
     }
 
     internal static string Scope(LocalSearchRequest request) => request.Id + "\n" + request.SnapshotId + "\n" +
-        request.NativeHash + "\n" + request.ModelHash + "\n" + string.Join("\n", request.LoadedMods);
+        request.NativeHash + "\n" + request.ModelHash + "\n" + string.Join("\n", request.LoadedMods) +
+        "\n" + JsonSerializer.Serialize(request.CardGoals);
 
     private async Task Listen()
     {
         try
         {
+            NamedPipeServerStream CreateListener()
+            {
+                var listener = new NamedPipeServerStream(PipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
+                    PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                _pipes.TryAdd(listener, 0);
+                return listener;
+            }
+            var pipe = CreateListener();
             while (!_stop.IsCancellationRequested)
             {
-                // Keep room for the next listener while all sixteen owners are connected.
-                var pipe = new NamedPipeServerStream(PipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
-                    PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
-                _pipes.TryAdd(pipe, 0);
-                await pipe.WaitForConnectionAsync(_stop.Token);
-                _sessions.Add(Serve(pipe));
+                try { await pipe.WaitForConnectionAsync(_stop.Token); }
+                catch (IOException ex) when (OperatingSystem.IsWindows() && (ex.HResult & 0xffff) == 232)
+                {
+                    // ERROR_NO_DATA: the peer closed before the accept completed.
+                    // Keep the endpoint alive while retiring this empty session.
+                    var closed = pipe; pipe = CreateListener();
+                    _pipes.TryRemove(closed, out _); closed.Dispose();
+                    continue;
+                }
+                var connected = pipe;
+                // A closing session can complete synchronously. Keep the next
+                // listener alive so Unix does not unlink/reset queued peers.
+                pipe = CreateListener();
+                _sessions.Add(Serve(connected));
             }
         }
         catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException or IOException && _stop.IsCancellationRequested) { }
@@ -109,16 +130,28 @@ public sealed class LocalTurnWork : IDisposable
 
     private Reply Apply(Command command)
     {
+        if (command.Operation == "seed")
+        {
+            if (command.Owner != 0 || _rootReady || command.Offers is { Length: > 0 } || command.Task?.Prefix.Length != 0 ||
+                _initialPlan is not { Length: > 0 } || _initialPlan[0].BeforeHash != _nativeRoot || command.Actions == null ||
+                command.Actions.Length != _initialPlan.Length || !LocalSearchWork.MatchesPrefix(command.Actions, _initialPlan))
+                throw new InvalidDataException("Initial route does not match the frozen producer request");
+            _frontier.SeedRoot(_initialPlan, command.Task.SearchRound,
+                command.Hint ?? throw new InvalidDataException("Missing initial native root hint"));
+            _rootReady = true; return Snapshot();
+        }
         foreach (var offer in command.Offers ?? []) _frontier.Offer(offer.Prefix, offer.SearchRound, offer.Hint);
         if (command.Offers is { Length: > 0 }) _rootReady = true;
         switch (command.Operation)
         {
             case "offer": return Snapshot();
+            case "loss-proof":
+                _frontier.PrioritizeLossProof(command.LossProof ?? []); return Snapshot();
             case "take":
                 if (_active.ContainsKey(command.Owner)) throw new InvalidOperationException("Worker already owns a turn task");
                 if (!_frontier.TryTake(out var task, command.Owner)) return Snapshot();
                 bool guidedRollout = task.FullRollout;
-                task = task with { FullRollout = LocalTurnSearch.IsFullRollout(_taken++) || task.FullRollout || task.Prefix.Length == 1,
+                task = task with { FullRollout = !task.LossProof && (LocalTurnSearch.IsFullRollout(_taken++) || task.FullRollout || task.Prefix.Length == 1),
                     Lane = _frontier.LastLane, Focused = _frontier.LastFocused };
                 if (task.FullRollout && !guidedRollout) task = task with { Style = task.Prefix.Length <= 1 ?
                     LocalRolloutStyle.Preparation : (LocalRolloutStyle)(_rollouts++ % 4) };
@@ -211,7 +244,7 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
     public LocalTurnWorkClient(LocalSearchRequest request)
     {
         _scope = LocalTurnWork.Scope(request); _owner = request.Partition;
-        _choices = new(1729 + _owner);
+        _choices = new(1729 + _owner, cardGoals: request.CardGoals);
         _pipe = new(".", request.TurnWorkPipe ?? throw new ArgumentException("Missing turn pipe"), PipeDirection.InOut);
         _pipe.Connect(10000);
         _reader = new(_pipe, new UTF8Encoding(false), false, 4096, true);
@@ -221,9 +254,9 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
     private LocalTurnWork.Reply Exchange(string operation, LocalTurnTask? task = null,
         LocalAction[]? actions = null, LocalDecision[]? decisions = null,
         LocalTurnHint? hint = null, LocalWinningBound? bound = null, string? terminalDigest = null,
-        LocalCandidate? outcome = null, LocalCandidate? winningCandidate = null)
+        LocalCandidate? outcome = null, LocalCandidate? winningCandidate = null, LocalLossProofFocus[]? lossProof = null)
     {
-        var command = new LocalTurnWork.Command(_scope, _owner, operation, _offers.ToArray(), task, actions, decisions, hint, bound, terminalDigest, outcome, winningCandidate);
+        var command = new LocalTurnWork.Command(_scope, _owner, operation, _offers.ToArray(), task, actions, decisions, hint, bound, terminalDigest, outcome, winningCandidate, lossProof);
         _writer.WriteLine(JsonSerializer.Serialize(command));
         var reply = JsonSerializer.Deserialize<LocalTurnWork.Reply>(_reader.ReadLine() ?? throw new IOException("Turn task broker closed"))
             ?? throw new InvalidDataException("Empty turn task reply");
@@ -236,6 +269,9 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
         _offers.Add(new(prefix.ToArray(), searchRound, hint));
         if (_offers.Count >= 32 || Environment.TickCount64 - _lastFlush >= 100) Exchange("offer");
     }
+
+    public void SeedRoot(LocalAction[] continuation, int searchRound, LocalTurnHint hint) =>
+        Exchange("seed", new LocalTurnTask(-1, [], searchRound), actions: continuation.ToArray(), hint: hint);
 
     public bool TryTake(out LocalTurnTask task)
     {
@@ -250,6 +286,7 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
         Exchange("focus", task, actions.Take(task.Prefix.Length + 1).ToArray(),
             decisions.Where(d => d.BeforeStep == task.Prefix.Length).ToArray());
     public void ObserveOutcome(LocalCandidate candidate) => Exchange("outcome", _owned, outcome: candidate);
+    public void PrioritizeLossProof(LocalLossProofFocus[] focus) => Exchange("loss-proof", lossProof: focus);
     public void PromoteWinning(LocalCandidate candidate)
     {
         if (!candidate.Won || candidate.Dead || _owned == null) return;

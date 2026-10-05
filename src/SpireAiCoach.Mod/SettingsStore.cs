@@ -37,11 +37,23 @@ public sealed class SettingsStore
 
     public void SaveLocalWorkers(int workers) => SaveLocalOptions(workers, null);
 
+    public void SaveInterfaceOptions(bool? showOverlayButton = null, bool? autoShowCombatPanel = null)
+    {
+        var settings = File.Exists(ConfigPath) ? JsonNode.Parse(File.ReadAllText(ConfigPath))!.AsObject() : new JsonObject();
+        if (showOverlayButton.HasValue) settings["show_overlay_button"] = showOverlayButton.Value;
+        if (autoShowCombatPanel.HasValue) settings["auto_show_combat_panel"] = autoShowCombatPanel.Value;
+        Directory.CreateDirectory(_directory);
+        AtomicWrite(ConfigPath, Encoding.UTF8.GetBytes(settings.ToJsonString()));
+    }
+
     public void SaveLocalOptions(int workers, bool? includePotions, bool? stopOnZeroLoss = null,
         int? targetVictoryRounds = null, int? maxAttempts = null, int? maxRounds = null,
-        int? searchSeconds = null)
+        int? searchSeconds = null, bool? skipFinalVerification = null,
+        string? playCardModelId = null, string? finisherCardModelId = null,
+        bool? cardGoalThresholdEnabled = null, int? cardGoalHpLossThreshold = null, bool? stopOnFirstWin = null)
     {
         if (workers is < 0 or > 16) throw new ArgumentOutOfRangeException(nameof(workers));
+        if (cardGoalHpLossThreshold is < 1) throw new ArgumentOutOfRangeException(nameof(cardGoalHpLossThreshold));
         if (targetVictoryRounds is < 0 or > LocalCalculation.MaximumRounds) throw new ArgumentOutOfRangeException(nameof(targetVictoryRounds));
         if (!LocalCalculation.ValidLimits(maxAttempts ?? LocalCalculation.AttemptsPerWorker,
             maxRounds ?? LocalCalculation.Rounds, searchSeconds ?? LocalCalculation.SearchSeconds))
@@ -50,10 +62,16 @@ public sealed class SettingsStore
         settings["local_workers"] = workers;
         if (includePotions.HasValue) settings["local_include_potions"] = includePotions.Value;
         if (stopOnZeroLoss.HasValue) settings["local_stop_on_zero_loss"] = stopOnZeroLoss.Value;
+        if (stopOnFirstWin.HasValue) settings["local_stop_on_first_win"] = stopOnFirstWin.Value;
         if (targetVictoryRounds.HasValue) settings["local_target_victory_rounds"] = targetVictoryRounds.Value;
         if (maxAttempts.HasValue) settings["local_max_attempts"] = maxAttempts.Value;
         if (maxRounds.HasValue) settings["local_max_rounds"] = maxRounds.Value;
         if (searchSeconds.HasValue) settings["local_search_seconds"] = searchSeconds.Value;
+        if (skipFinalVerification.HasValue) settings["local_skip_final_verification"] = skipFinalVerification.Value;
+        if (playCardModelId != null) settings["local_play_card_model_id"] = playCardModelId;
+        if (finisherCardModelId != null) settings["local_finisher_card_model_id"] = finisherCardModelId;
+        if (cardGoalThresholdEnabled.HasValue) settings["local_card_goal_threshold_enabled"] = cardGoalThresholdEnabled.Value;
+        if (cardGoalHpLossThreshold.HasValue) settings["local_card_goal_hp_loss_threshold"] = cardGoalHpLossThreshold.Value;
         Directory.CreateDirectory(_directory);
         AtomicWrite(ConfigPath, Encoding.UTF8.GetBytes(settings.ToJsonString()));
         // Local-only preferences must not require AI credentials or rewrite the encrypted key.

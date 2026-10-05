@@ -15,7 +15,23 @@ public sealed record LocalWinningBound(string Root, int StartingHp, int NetHpLos
 
 public static class LocalHealthBound
 {
-    public static bool CannotImprove(LocalHealthEnvelope branch, LocalWinningBound? incumbent)
+    public static long MinimumNetHpLoss(LocalHealthEnvelope branch)
+    {
+        if (branch.PotionsUsed < 0 || branch.MaximumFurtherHpGain < 0)
+            throw new ArgumentOutOfRangeException(nameof(branch));
+        long deficit = (long)branch.StartingHp - branch.Hp;
+        return branch.MaximumFurtherHpGain is { } gain && deficit > gain ? deficit - gain : 0;
+    }
+    public static LocalWinningBound? Better(LocalWinningBound? current, LocalWinningBound? proposed)
+    {
+        if (proposed == null) return current;
+        if (current == null) return proposed;
+        if (current.Root != proposed.Root || current.StartingHp != proposed.StartingHp) return current;
+        return proposed.NetHpLoss < current.NetHpLoss || proposed.NetHpLoss == current.NetHpLoss &&
+            proposed.PotionsUsed < current.PotionsUsed ? proposed : current;
+    }
+
+    public static bool CannotImprove(LocalHealthEnvelope branch, LocalWinningBound? incumbent, LocalCardGoals? cardGoals = null)
     {
         if (branch.PotionsUsed < 0 || branch.MaximumFurtherHpGain < 0)
             throw new ArgumentOutOfRangeException(nameof(branch));
@@ -23,8 +39,16 @@ public static class LocalHealthBound
             return false;
         // Unknown recovery can restore all HP. Do not cap by today's MaxHp: a
         // generated card, relic or Mod can increase it during the continuation.
-        long deficit = (long)branch.StartingHp - branch.Hp;
-        long lowerLoss = branch.MaximumFurtherHpGain is { } gain && deficit > gain ? deficit - gain : 0;
+        long lowerLoss = MinimumNetHpLoss(branch);
+        if (cardGoals?.Enabled == true)
+        {
+            // No upper bound exists for plays/finishing blows, especially for Mods.
+            // Preserve every branch able to reach the allowed HP tier, even with
+            // more potion use or less HP than the current optional-goal incumbent.
+            if (cardGoals.HpLossThreshold is { } limit && incumbent.NetHpLoss < limit)
+                return lowerLoss >= limit;
+            return lowerLoss > incumbent.NetHpLoss;
+        }
         if (lowerLoss > incumbent.NetHpLoss) return true;
         // Used-potion count is a monotone expense in the current objective.
         // Strict inequality preserves HP, gold, max-HP and shorter-route ties.

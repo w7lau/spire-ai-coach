@@ -1,0 +1,126 @@
+{
+  "ModVersion": "0.7.43",
+  "ModSha256": "3A4A8EFEDB3811511C338CC5BF7A067D8733F59D86B4030D0F9B27ADFBC747E4",
+  "NativeModule": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
+  "MetadataChecks": 23,
+  "ExternalGlobalEffectsRemainUnknown": true,
+  "Models": [
+    {
+      "HealthProperty": "CurrentHp",
+      "WritesBeforeCallback": true
+    },
+    {
+      "HealthProperty": "MaxHp",
+      "WritesBeforeCallback": true
+    },
+    {
+      "ExternalCallback": "Neutral",
+      "Unknown": null,
+      "Executed": false
+    },
+    {
+      "ExternalCallback": "Healing",
+      "Unknown": "战中、重复或动态回复的上界未知",
+      "Executed": false
+    },
+    {
+      "ExternalCallback": "Dynamic",
+      "Unknown": "存在动态或外部效果调用",
+      "Executed": false
+    },
+    {
+      "ExternalCallback": "RegisterHealingEvent",
+      "Unknown": "战中、重复或动态回复的上界未知",
+      "Executed": false
+    },
+    {
+      "ExternalCallback": "RegisterUnknownVirtualEvent",
+      "Unknown": "动态虚方法回调的目标未知",
+      "Executed": false
+    },
+    {
+      "Model": "Cards.StrikeIronclad",
+      "Unknown": null,
+      "VictoryHealCalls": 0,
+      "References": []
+    },
+    {
+      "Model": "Cards.DefendIronclad",
+      "Unknown": null,
+      "VictoryHealCalls": 0,
+      "References": []
+    },
+    {
+      "Model": "Cards.Armaments",
+      "Unknown": null,
+      "VictoryHealCalls": 0,
+      "References": []
+    },
+    {
+      "Model": "Cards.TrueGrit",
+      "Unknown": null,
+      "VictoryHealCalls": 0,
+      "References": []
+    },
+    {
+      "Model": "Cards.Barricade",
+      "Unknown": null,
+      "VictoryHealCalls": 0,
+      "References": [
+        "BarricadePower"
+      ]
+    },
+    {
+      "Model": "Cards.BodySlam",
+      "Unknown": null,
+      "VictoryHealCalls": 0,
+      "References": []
+    },
+    {
+      "Model": "Cards.Discovery",
+      "Unknown": "可能从模型池生成新的回复效果",
+      "VictoryHealCalls": 0,
+      "References": []
+    },
+    {
+      "Model": "Cards.Feed",
+      "Unknown": "存在回复或生命上限变化",
+      "VictoryHealCalls": 0,
+      "References": []
+    },
+    {
+      "Model": "Relics.BurningBlood",
+      "Unknown": null,
+      "VictoryHealCalls": 1,
+      "References": []
+    },
+    {
+      "Model": "Relics.BlackBlood",
+      "Unknown": null,
+      "VictoryHealCalls": 1,
+      "References": []
+    },
+    {
+      "Model": "MegaCrit.Sts2.Core.Models.Powers.IllusionPower",
+      "Unknown": "无法证明模型效果的完整调用"
+    },
+    {
+      "Model": "MegaCrit.Sts2.Core.Models.Powers.ReattachPower",
+      "Unknown": "原生效果边界的回复上界尚未认证"
+    },
+    {
+      "Model": "MegaCrit.Sts2.Core.Models.Powers.RegenPower",
+      "Unknown": "战中、重复或动态回复的上界未知"
+    },
+    {
+      "Model": "MegaCrit.Sts2.Core.Models.Powers.Mocks.MockPreventDeathPower",
+      "Unknown": "战中、重复或动态回复的上界未知"
+    },
+    {
+      "Model": "MegaCrit.Sts2.Core.Models.Powers.Mocks.MockRevivePower",
+      "Unknown": "战中、重复或动态回复的上界未知"
+    }
+  ],
+  "NativeBattleExecuted": false,
+  "SpeedBenchmarkExecuted": false
+}

@@ -4,7 +4,8 @@ namespace SpireAiCoach.Core;
 
 // Outcome-guided tree search. Nodes represent exact action histories, not merged visible states.
 // Nothing here predicts card mechanics: only native, settled rollouts supply rewards.
-public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOrder order = LocalSearchOrder.MonteCarlo)
+public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOrder order = LocalSearchOrder.MonteCarlo,
+    LocalCardGoals? cardGoals = null)
 {
     private readonly Random _random = new(seed);
     private readonly Node _root = new();
@@ -28,6 +29,7 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOr
         public double Total, Best;
         public bool Closed;
         public string[]? LegalKeys;
+        public bool CompleteLegal;
     }
 
     public sealed class Trial
@@ -52,12 +54,12 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOr
     // Exhaustion is a scheduling result, not a failed native simulation. A forced
     // proposal can revisit a closed subtree while other exact histories stay open.
     public bool TrySelect(Trial trial, IReadOnlyList<LocalAction> legal, [NotNullWhen(true)] out LocalAction? selected,
-        LocalAction? preferred = null, bool greedy = false, Func<LocalAction, int>? priority = null)
+        LocalAction? preferred = null, bool greedy = false, Func<LocalAction, int>? priority = null, bool completeLegal = true)
     {
         selected = null;
         if (trial.Root != _root) throw new InvalidOperationException("Trial belongs to a different search");
         if (_discrepancy != null) return _discrepancy.TrySelect(trial.Discrepancy ??
-            throw new InvalidOperationException("Trial belongs to a different search"), legal, out selected, preferred);
+            throw new InvalidOperationException("Trial belongs to a different search"), legal, out selected, preferred, completeLegal);
         if (trial.Finished) throw new InvalidOperationException("Trial has already finished");
         if (legal.Count == 0) throw new InvalidOperationException("No legal action");
         if (preferred != null && !legal.Contains(preferred)) throw new InvalidOperationException("Preferred action is not legal");
@@ -67,7 +69,8 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOr
         if (parent == null) action = preferred ?? Explore(legal, priority);
         else
         {
-            parent.LegalKeys = legal.Select(Key).Distinct(StringComparer.Ordinal).ToArray();
+            parent.LegalKeys = (parent.LegalKeys ?? []).Concat(legal.Select(Key)).Distinct(StringComparer.Ordinal).ToArray();
+            parent.CompleteLegal |= completeLegal;
             var remaining = legal.Where(a => !parent.Children.TryGetValue(Key(a), out var n) || !n.Closed).ToArray();
             if (remaining.Length == 0 || preferred != null && parent.Children.TryGetValue(Key(preferred), out var prior) && prior.Closed)
             {
@@ -115,14 +118,14 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOr
         }
         if (trial.Finished) throw new InvalidOperationException("Trial has already finished");
         trial.Finished = true;
-        var reward = Reward(result, initialEnemyHp);
+        var reward = Reward(result, initialEnemyHp, cardGoals);
         if (closeExactPrefix && trial.Current != null) trial.Current.Closed = true;
         // Only actions actually executed receive this outcome. Untried alternatives get no credit.
         for (int i = trial.Path.Count - 1; i >= 0; i--)
         {
             var node = trial.Path[i];
             node.Visits++; node.Total += reward; node.Best = Math.Max(node.Best, reward);
-            if (node.LegalKeys is { Length: > 0 } keys && keys.All(k => node.Children.TryGetValue(k, out var n) && n.Closed))
+            if (node.CompleteLegal && node.LegalKeys is { Length: > 0 } keys && keys.All(k => node.Children.TryGetValue(k, out var n) && n.Closed))
                 node.Closed = true;
         }
     }
@@ -146,18 +149,19 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOr
         return actions[^1];
     }
 
-    public static double Reward(LocalCandidate result, int initialEnemyHp)
+    public static double Reward(LocalCandidate result, int initialEnemyHp, LocalCardGoals? cardGoals = null)
     {
         if (result.Dead) return 0;
         var health = Math.Clamp((double)result.Hp / Math.Max(1, result.MaxHp), 0, 1);
-        var progress = Math.Clamp(1d - (double)result.EnemyHp / Math.Max(1, initialEnemyHp), 0, 1);
-        var loss = Math.Clamp((double)(result.NetHpLoss ?? Math.Max(0, result.MaxHp - result.Hp)) / Math.Max(1, result.MaxHp), 0, 1);
         var expense = .04 * Math.Min(1, result.Actions.Count(a => a.PotionSlot.HasValue) / 5d) +
             .001 * Math.Min(1, result.Actions.Length / 200d);
         // Disjoint ranges: even a low-HP victory outranks any unfinished horizon.
         var damageQuality = Math.Exp(-(result.NetHpLoss ?? Math.Max(0, result.MaxHp - result.Hp)) / 25d);
+        if (result.Won && cardGoals?.Enabled == true)
+            return cardGoals.WithinThreshold(result) ? .9 + .07 * cardGoals.Quality(result) + .005 * damageQuality :
+                .7 + .18 * damageQuality + .001 * cardGoals.Quality(result);
         return result.Won ? .8 + .18 * damageQuality + .001 * health - expense :
-            .1 + .2 * progress + .1 * health - .025 * loss - expense;
+            .1 + .4 * LocalSearchPolicy.UnfinishedQuality(result, initialEnemyHp) - expense;
     }
 
     private static string Key(LocalAction a) =>

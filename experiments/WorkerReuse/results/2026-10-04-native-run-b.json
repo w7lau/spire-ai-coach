@@ -1,0 +1,277 @@
+{
+  "baseline": "2237d798829d61bee3c7ce733b98693dedbe67f9",
+  "implementation_commit": "5a1c85d136d4e94b908d6ae2f259d476a0cb763f",
+  "kind": "real single-worker native acceptance using frozen replay, no answer seeds",
+  "run": {
+    "passed": true,
+    "max_owned_workers": 1,
+    "unseeded_goal": {
+      "rounds": 6,
+      "net_loss": 0,
+      "potions": 0,
+      "known_enemy_damage": 0,
+      "independent_replay": true
+    },
+    "records": [
+      {
+        "stage": "cold_prepare",
+        "prepare_ms": 17779,
+        "identity": {
+          "pid": 51020,
+          "started_utc": "2026-10-04T02:01:25.3122158Z",
+          "generation": "79ccb87f65bf4a0d9df8fb8f5483f64a",
+          "private_memory_bytes": 1303072768
+        }
+      },
+      {
+        "stage": "hot_prepare",
+        "prepare_ms": 0,
+        "identity": {
+          "pid": 51020,
+          "started_utc": "2026-10-04T02:01:25.3122158Z",
+          "generation": "79ccb87f65bf4a0d9df8fb8f5483f64a",
+          "private_memory_bytes": 1303072768
+        }
+      },
+      {
+        "stage": "first_unseeded_six_round_goal",
+        "wall_ms": 4957,
+        "Status": "done",
+        "Evaluated": 1,
+        "Rejected": 0,
+        "StoppedEarly": true,
+        "Workers": 1,
+        "WorkerLimit": 1,
+        "ElapsedMs": 4934,
+        "Timing": {
+          "RestoreMs": 797,
+          "ActionMs": 478,
+          "DecisionMs": 170,
+          "VerificationMs": 2574,
+          "StartupMs": 0,
+          "Actions": 18,
+          "Restores": 1,
+          "Verifications": 1
+        },
+        "Won": true,
+        "StartingHp": 80,
+        "Hp": 80,
+        "HpLost": 10,
+        "NetHpLoss": 0,
+        "Rounds": 5,
+        "damage_sources": {
+          "Enemy": 0,
+          "Self": 10,
+          "Unknown": 0,
+          "Unattributed": 0,
+          "AccountingMatches": true,
+          "Complete": true
+        },
+        "potion_uses": 0,
+        "verified_steps": 18,
+        "unseeded": true,
+        "goal_passed": true,
+        "identity": {
+          "pid": 51020,
+          "started_utc": "2026-10-04T02:01:25.3122158Z",
+          "generation": "79ccb87f65bf4a0d9df8fb8f5483f64a",
+          "private_memory_bytes": 1449574400
+        }
+      },
+      {
+        "stage": "goal_then_research",
+        "wall_ms": 1807,
+        "Status": "done",
+        "Evaluated": 1,
+        "Rejected": 0,
+        "StoppedEarly": true,
+        "Workers": 1,
+        "WorkerLimit": 1,
+        "ElapsedMs": 1807,
+        "Timing": {
+          "RestoreMs": 37,
+          "ActionMs": 60,
+          "DecisionMs": 109,
+          "VerificationMs": 927,
+          "StartupMs": 0,
+          "Actions": 18,
+          "Restores": 1,
+          "Verifications": 1
+        },
+        "Won": true,
+        "StartingHp": 80,
+        "Hp": 80,
+        "HpLost": 10,
+        "NetHpLoss": 0,
+        "Rounds": 5,
+        "damage_sources": {
+          "Enemy": 0,
+          "Self": 10,
+          "Unknown": 0,
+          "Unattributed": 0,
+          "AccountingMatches": true,
+          "Complete": true
+        },
+        "potion_uses": 0,
+        "verified_steps": 18,
+        "unseeded": true,
+        "goal_passed": true,
+        "identity": {
+          "pid": 51020,
+          "started_utc": "2026-10-04T02:01:25.3122158Z",
+          "generation": "79ccb87f65bf4a0d9df8fb8f5483f64a",
+          "private_memory_bytes": 1575350272
+        }
+      },
+      {
+        "stage": "cancel_search",
+        "cancellation_ms": 63.7578,
+        "trigger_sequence": 2,
+        "trigger_events": 3,
+        "cleanup_acknowledged": true,
+        "identity": {
+          "pid": 51020,
+          "started_utc": "2026-10-04T02:01:25.3122158Z",
+          "generation": "79ccb87f65bf4a0d9df8fb8f5483f64a",
+          "private_memory_bytes": 1481523200
+        }
+      },
+      {
+        "stage": "cancel_then_research",
+        "wall_ms": 1556,
+        "Status": "done",
+        "Evaluated": 1,
+        "Rejected": 0,
+        "StoppedEarly": true,
+        "Workers": 1,
+        "WorkerLimit": 1,
+        "ElapsedMs": 1556,
+        "Timing": {
+          "RestoreMs": 35,
+          "ActionMs": 54,
+          "DecisionMs": 100,
+          "VerificationMs": 886,
+          "StartupMs": 0,
+          "Actions": 18,
+          "Restores": 1,
+          "Verifications": 1
+        },
+        "Won": true,
+        "StartingHp": 80,
+        "Hp": 80,
+        "HpLost": 10,
+        "NetHpLoss": 0,
+        "Rounds": 5,
+        "damage_sources": {
+          "Enemy": 0,
+          "Self": 10,
+          "Unknown": 0,
+          "Unattributed": 0,
+          "AccountingMatches": true,
+          "Complete": true
+        },
+        "potion_uses": 0,
+        "verified_steps": 18,
+        "unseeded": true,
+        "goal_passed": true,
+        "identity": {
+          "pid": 51020,
+          "started_utc": "2026-10-04T02:01:25.3122158Z",
+          "generation": "79ccb87f65bf4a0d9df8fb8f5483f64a",
+          "private_memory_bytes": 1568743424
+        }
+      },
+      {
+        "stage": "cancel_verification",
+        "cancellation_ms": 132.456,
+        "trigger_sequence": 2000002,
+        "trigger_events": 1,
+        "cleanup_acknowledged": true,
+        "identity": {
+          "pid": 51020,
+          "started_utc": "2026-10-04T02:01:25.3122158Z",
+          "generation": "79ccb87f65bf4a0d9df8fb8f5483f64a",
+          "private_memory_bytes": 1518313472
+        }
+      },
+      {
+        "stage": "verification_cancel_then_research",
+        "wall_ms": 1806,
+        "Status": "done",
+        "Evaluated": 1,
+        "Rejected": 0,
+        "StoppedEarly": true,
+        "Workers": 1,
+        "WorkerLimit": 1,
+        "ElapsedMs": 1806,
+        "Timing": {
+          "RestoreMs": 34,
+          "ActionMs": 59,
+          "DecisionMs": 119,
+          "VerificationMs": 892,
+          "StartupMs": 0,
+          "Actions": 18,
+          "Restores": 1,
+          "Verifications": 1
+        },
+        "Won": true,
+        "StartingHp": 80,
+        "Hp": 80,
+        "HpLost": 10,
+        "NetHpLoss": 0,
+        "Rounds": 5,
+        "damage_sources": {
+          "Enemy": 0,
+          "Self": 10,
+          "Unknown": 0,
+          "Unattributed": 0,
+          "AccountingMatches": true,
+          "Complete": true
+        },
+        "potion_uses": 0,
+        "verified_steps": 18,
+        "unseeded": true,
+        "goal_passed": true,
+        "identity": {
+          "pid": 51020,
+          "started_utc": "2026-10-04T02:01:25.3122158Z",
+          "generation": "79ccb87f65bf4a0d9df8fb8f5483f64a",
+          "private_memory_bytes": 1531035648
+        }
+      },
+      {
+        "stage": "dispose",
+        "owned_child_exited": true,
+        "owned_lock_released": true,
+        "observed_launches": 1,
+        "observed_rebuilds": 0
+      }
+    ]
+  },
+  "verification": {
+    "passed": true,
+    "unchanged_source_asset_count": 245,
+    "installed_coach_sha256_before": "34f616e5a0ac53910a19025584c836620195d700ddf77f78baa934f39612e270",
+    "installed_coach_sha256_after": "34f616e5a0ac53910a19025584c836620195d700ddf77f78baa934f39612e270",
+    "private_coach_sha256": "b79cd6781e7aed4da8150340a81800936787e1eddd8dad18bbd2229dbfc76b07",
+    "frozen_request_sha256": "7f07f40969f62aa5f3777e8636358f1c1d65cd84bb852e49b0bafec1b76ff0c5",
+    "game_log_sha256": "89235f11768629f2591e150ffe12819b3d6f50f3925957e9510131fb528c0d90",
+    "runtime_error_filter_matches": 0,
+    "fatal_files": 0,
+    "engine_error_lines": [
+      "ERROR: Failed to read the root certificate store.",
+      "ERROR: Invalid Task ID",
+      "ERROR: Invalid Task ID"
+    ],
+    "existing_process_query": false,
+    "real_save_access": false,
+    "real_installation_write": false,
+    "provider_calls": false
+  },
+  "limits": [
+    "No foreground UI/menu or real save loading",
+    "One native worker; parallel preparation/peer-stop paths covered by synthetic production-pool tests",
+    "Shared-machine CPU/memory contention not controlled; these are observations, not a paired speedup benchmark",
+    "Windows only; unknown Mod private state compatibility not established"
+  ]
+}

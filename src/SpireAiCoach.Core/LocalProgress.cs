@@ -5,10 +5,16 @@ public sealed record LocalSimEnemy(uint? Id, string Name, int Hp, int MaxHp, int
 public sealed record LocalSimState(int Round, int Hp, int MaxHp, int Block, decimal Energy, string Powers,
     string[] Hand, int Potions, LocalSimEnemy[] Enemies);
 public sealed record LocalSimEvent(int Step, int Round, string Action, string Changes);
+// A small measured victory summary; no action graph, native objects or extra
+// simulation is sent for presentation. This is a candidate, not verification.
+public sealed record LocalProgressBest(int Route, int Hp, int MaxHp, int? StartingHp, int Rounds, int Potions)
+{
+    public int? NetHpLoss => StartingHp.HasValue ? Math.Max(0, StartingHp.Value - Hp) : null;
+}
 public sealed record LocalProgress(string Id, string SnapshotId, int Worker, int Workers, long Sequence,
     int Route, int Evaluated, int MaxNodes, int Victories, long ElapsedMs, int BudgetSeconds,
     string Phase, LocalSimState? State, LocalSimEvent[] Events, string Status = "running", int TurnProbes = 0, int BoundPruned = 0,
-    int RootBranches = 0);
+    int RootBranches = 0, LocalProgressBest? Best = null);
 
 public sealed class LocalProgressBook(string id, string snapshotId)
 {

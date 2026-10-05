@@ -7,12 +7,21 @@ using SpireAiCoach.Core;
 
 namespace SpireAiCoach.Mod;
 
+public sealed record LocalPoolResources(int Ready, int Preparing, int Starts, string LastChange);
+
 public sealed class LocalWorkerPool(string directory) : IDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly Worker[] _workers = Enumerable.Range(0, 16).Select(_ => new Worker()).ToArray();
     private bool _disposed;
     private LocalTrace? _lastPreparation;
+
+    public LocalPoolResources Resources()
+    {
+        var states = _workers.Select(w => w.ResourceState()).ToArray();
+        return new(states.Count(w => w.Ready), states.Count(w => w.Preparing), states.Sum(w => w.Starts),
+            states.OrderByDescending(w => w.Changed).First().Detail);
+    }
 
     private int Count(int configured, bool adaptive = true)
     {
@@ -27,16 +36,21 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
     public async Task Prepare(LocalInstallation installation, int configured, CancellationToken token)
     {
         var timeline = new LocalTimeline(capacity: 65536);
+        Task[] preparation;
         await _gate.WaitAsync(token);
         try
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            // Prewarm only the first instance. The setting caps later admissions;
-            // it must not create eight cold heaps before any branch is available.
-            try { await _workers[0].Ensure(directory, 0, installation, token, timeline); }
-            catch { _workers[0].Stop(); throw; }
+            // Manual concurrency is already an explicit resource choice. Start
+            // those preparations together; automatic mode still warms only one.
+            preparation = Enumerable.Range(0, LocalConcurrency.PrewarmCount(configured))
+                .Select(index => _workers[index].Ensure(directory, index, installation, token, timeline)).ToArray();
         }
-        finally { _lastPreparation = timeline.Snapshot(); _gate.Release(); }
+        finally { _gate.Release(); }
+        // Ensure owns and reuses a lane's in-flight preparation. A calculation
+        // may join it immediately instead of queuing behind the entire warmup.
+        try { await Task.WhenAll(preparation); }
+        finally { _lastPreparation = timeline.Snapshot(); }
     }
 
     public async Task<LocalSearchResult> Analyze(LocalSearchRequest request, LocalInstallation installation,
@@ -51,8 +65,15 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             // execution instead of removing that card or weakening replay validation.
             // Final verification already retries the same candidate normally;
             // a verification failure must not restart all full-budget searches.
-            progress("首次计算未完成，正在重新计算…");
             origin.Import(ex.Data["local_trace"] as LocalTrace);
+            var failures = ex.Data["local_failures"] as LocalSimulationFailure[] ?? [];
+            if (failures.FirstOrDefault(f => f.Category == "local_event_entry") is { } entryFailure)
+            {
+                var error = new CoachException("local_event_entry", entryFailure.Message);
+                foreach (var key in ex.Data.Keys) error.Data[key] = ex.Data[key];
+                throw error;
+            }
+            progress("首次计算未完成，正在重新计算…");
             origin.Add(new(-1, "main", "fallback", ex.Category + ": " + ex.Message, origin.ElapsedMs, 0));
             var regular = request with { Id = request.Id + "-regular", DataOnlyCombat = false, DataOnlyRun = false,
                 ExperimentalNativeData = false, InitialTrace = origin.Snapshot() };
@@ -60,7 +81,9 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 // A compatibility pass restarts each worker's sequence; keep it above
                 // the first pass's search/refinement/verification offsets in the UI.
                 simulationProgress == null ? null : p => simulationProgress(p with { Id = request.Id, Sequence = p.Sequence + 4_000_000 }));
-            return result with { Id = request.Id, Message = "常规执行完成。" + result.Message };
+            var evidence = result.Evidence?.WithFailedPass(result.Best, failures.Length);
+            return result with { Id = request.Id, Message = "常规执行完成。" + result.Message, Evidence = evidence,
+                RecoveredFailures = failures.Concat(result.RecoveredFailures ?? []).ToArray() };
         }
     }
 
@@ -72,30 +95,56 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
         request = request with { TimelineOrigin = timeline.Origin, InitialTrace = null };
         double queueStart = timeline.ElapsedMs;
         using (timeline.Measure(-1, "main", "queue")) await _gate.WaitAsync(cancellation);
-        // Include only the portion of prewarming that really blocked this click.
-        timeline.Import(_lastPreparation, queueStart, timeline.ElapsedMs);
         try
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             int count = Count(request.Workers, request.AdaptiveWorkers);
-            foreach (var idle in _workers.Skip(count)) idle.Stop();
+            var boundPublishers = new Dictionary<string, LocalSharedHealthBound>();
+            var boundPublishGate = new object();
+            foreach (var idle in _workers.Skip(count)) idle.Stop("并发上限或可用内存减少", timeline, Array.IndexOf(_workers, idle));
             using var goalReached = new CancellationTokenSource();
             int goalWorker = -1;
+            int goalMinimumLoss = 0;
+            int consumableGoalReached = 0;
+            LocalSearchResult? finishedWinner = null;
+            int finishedWinnerWorker = -1;
+            using var minimumLoss = request.StopOnZeroLoss && !request.StopOnFirstWin && !LocalSearchPolicy.HasSpecificGoal(request) &&
+                request.ExcludedModels is not { Length: > 0 } ? new LocalMinimumLossBroker(request, count) : null;
             var rootBranches = new int[count];
             var starting = new int[count];
             bool shared = request.ShareSearchWork && count > 1 &&
                 request.SearchOrder is LocalSearchOrder.MonteCarlo or LocalSearchOrder.TurnFrontier;
             using var turnWork = shared && request.SearchOrder == LocalSearchOrder.TurnFrontier ? new LocalTurnWork(request, count) : null;
-            request = request with { TurnWorkPipe = turnWork?.PipeName };
+            using var searchWork = shared && request.SearchOrder == LocalSearchOrder.MonteCarlo && request.MemorySearchWork
+                ? new LocalSearchWorkBroker(request, count) : null;
+            request = request with { TurnWorkPipe = turnWork?.PipeName, SearchWorkPipe = searchWork?.PipeName,
+                MinimumLossPipe = minimumLoss?.PipeName };
             LocalSearchWork? schedulingWork = null;
             int launched = 0;
             progress("准备计算…");
-            var results = (await LocalConcurrency.Run(count, request.AdaptiveWorkers, shared, Launch, Demand,
-                () => goalReached.IsCancellationRequested, cancellation)).ToList();
+            var results = (await LocalConcurrency.Run(count, LocalConcurrency.AdaptiveAdmission(request.Workers, request.AdaptiveWorkers), shared, Launch, Demand,
+                () => goalReached.IsCancellationRequested,
+                r => LocalSearchRecovery.AbortPass(request, r), cancellation)).ToList();
             int used = results.Count;
+            // The warmup gate does not wait for engine startup. Import its
+            // completed startup spans now, clipped to this calculation only.
+            timeline.Import(_lastPreparation, queueStart, timeline.ElapsedMs);
             cancellation.ThrowIfCancellationRequested();
-            if (request.DataOnlyCombat && !goalReached.IsCancellationRequested && results.Any(r => r.Status is "failed" or "unsupported" or "partial"))
-                throw new CoachException("local_data_unavailable", string.Join("\n", results.Select(r => r.Message).Distinct()));
+            if (System.Environment.GetEnvironmentVariable("SPIRE_COACH_RECOVERY_AUDIT") == "1" &&
+                results.Count == 1 && results[0].Status == "audited")
+                throw new CoachException("local_audit_complete", "所属实例已完成只读回复检查；没有可执行方案。");
+            if (request.DataOnlyCombat && (!goalReached.IsCancellationRequested || goalMinimumLoss > 0 && Volatile.Read(ref consumableGoalReached) == 0) &&
+                LocalSearchRecovery.NeedsCompatibilityPass(request, results))
+            {
+                var failure = new CoachException("local_data_unavailable", string.Join("\n", results.Select(r => r.Message).Distinct()));
+                failure.Data["local_failures"] = results.Where(r => r.Failure != null).Select(r => r.Failure!).ToArray();
+                throw failure;
+            }
+            bool positiveWorkerStop = results.Any(r => r.StoppedEarly && r.Best?.NetHpLoss is > 0 &&
+                r.MinimumLoss?.Certificate?.MinimumNetHpLoss is > 0);
+            if ((goalReached.IsCancellationRequested && goalMinimumLoss > 0 && Volatile.Read(ref consumableGoalReached) == 0 || positiveWorkerStop) &&
+                minimumLoss?.Status is not { Confirmed: true, Certificate: not null })
+                throw new CoachException("local_data_unavailable", "最低损失的证明未通过全部计算实例的收尾校验，不能按最优结果返回。");
             // Pending native selectors own callbacks. Retire their processes; never reset underneath them.
             // If every lane failed before producing a route, spend only the remaining search budget on
             // one fresh lane excluding the reported actions. This is an explicitly incomplete fallback.
@@ -106,11 +155,13 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             {
                 progress("部分动作无法完成，正在计算其他路线…");
                 var fallback = request with { Partition = 0, Partitions = 1, BudgetSeconds = remainingSeconds, DeferVerification = true,
-                    TurnWorkPipe = null,
+                    TurnWorkPipe = null, SearchWorkPipe = null, MinimumLossPipe = null,
                     ExcludedModels = (request.ExcludedModels ?? []).Concat(blocked.Select(a => a.ModelId)).Distinct().ToArray() };
                 results.Add(await Task.Run(() => Run(_workers[0], 0, fallback), cancellation));
             }
             var valid = results.Where(r => r.Status is "searched" or "done" or "partial" && r.Best != null).ToArray();
+            if (Volatile.Read(ref consumableGoalReached) != 0)
+                valid = valid.Where(r => LocalSearchPolicy.CanStopOnCardGoals(r.Best, request)).ToArray();
             if (valid.Length == 0)
                 throw new CoachException("local_failed", string.Join("\n", results.Select(r => r.Message).Distinct()));
             // Every lane has now completed or acknowledged the goal stop. Only the
@@ -128,7 +179,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 var proposed = valid.Aggregate((a, b) => LocalSearchPolicy.BetterForGoal(b.Best!, a.Best, request) ? b : a);
                 int index = Math.Clamp(results.IndexOf(proposed), 0, used - 1);
                 var verify = request with { Id = request.Id + "-verify-" + verificationResults.Count,
-                    Partition = index, Partitions = count, DeferVerification = false, VerifyCandidate = proposed.Best, TurnWorkPipe = null };
+                    Partition = index, Partitions = count, DeferVerification = false, VerifyCandidate = proposed.Best,
+                    TurnWorkPipe = null, SearchWorkPipe = null, MinimumLossPipe = null };
                 progress("正在复核最终路线…");
                 var check = await Task.Run(() => Run(_workers[index], index, verify), cancellation);
                 verificationResults.Add(check);
@@ -138,21 +190,24 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             }
             if (selectedBest == null) throw new CoachException("local_verify_failed",
                 string.Join("\n", verificationResults.Select(r => r.Message).Distinct()));
-            if (goalReached.IsCancellationRequested && !LocalSearchPolicy.MeetsGoal(selectedBest.Best, request))
-                throw new CoachException("local_verify_failed", "无伤候选未通过复核，不能按提前停止的结果返回。");
+            if (goalReached.IsCancellationRequested && !LocalSearchPolicy.CanStopAfterVictory(selectedBest.Best, request,
+                minimumLoss?.Status is { Confirmed: true } proof ? proof.Certificate : null))
+                throw new CoachException("local_verify_failed", "达标候选未通过复核，不能按提前停止的结果返回。");
             var best = selectedBest;
             var allRuns = results.Concat(verificationResults).ToArray();
             LocalWorkStats? workStats = null;
             if (request.ShareSearchWork && request.SearchOrder == LocalSearchOrder.MonteCarlo && count > 1)
             {
                 using var scheduling = timeline.Measure(-1, "main", "schedule", "释放已结束的分支提案", depth: 1);
-                var work = new LocalSearchWork(Path.GetDirectoryName(_workers[goalWorker >= 0 ? goalWorker : 0].Root)!, request);
-                workStats = work.Stats();
-                try { work.ReleasePlans(); }
+                using var work = searchWork == null ? new LocalSearchWork(Path.GetDirectoryName(_workers[goalWorker >= 0 ? goalWorker : 0].Root)!, request) : null;
+                workStats = searchWork?.Stats ?? work!.Stats();
+                try { work?.ReleasePlans(); }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                 { /* Completed native result remains valid if private diagnostic cleanup is busy. */ }
             }
-            return best with { Evaluated = results.Sum(r => r.Evaluated), Rejected = results.Sum(r => r.Rejected),
+            var evidence = LocalSearchEvidence.Merge(request, best, results,
+                turnWork?.Pending ?? workStats?.Pending ?? (count == 1 ? best.TurnSearch?.Pending : null));
+            return best with { Evidence = evidence, Evaluated = results.Sum(r => r.Evaluated), Rejected = results.Sum(r => r.Rejected),
                 Duplicates = results.Sum(r => r.Duplicates), BudgetPruned = results.Sum(r => r.BudgetPruned),
                 Victories = valid.Sum(r => r.Victories), Workers = used, WorkerLimit = count, RootBranches = Volatile.Read(ref rootBranches[0]),
                 ElapsedMs = (long)timeline.ElapsedMs, Trace = timeline.Snapshot(), SearchElapsedMs = results.Take(used).Max(r => r.ElapsedMs) +
@@ -161,8 +216,19 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 IncludePotions = request.IncludePotions,
                 VerificationSkipped = request.SkipFinalVerification,
                 StoppedEarly = goalReached.IsCancellationRequested,
+                StoppedOnFirstWin = request.StopOnFirstWin && goalReached.IsCancellationRequested,
+                StoppedOnCardGoals = Volatile.Read(ref consumableGoalReached) != 0,
+                MinimumLoss = minimumLoss?.Status,
                 Id = request.Id,
                 Trials = results.SelectMany(r => r.Trials ?? []).OrderBy(t => t.FinishedMs).ToArray(),
+                RecoveredFailures = results.Where(r => r.Status is "failed" or "unsupported" or "partial")
+                    .Where(r => r.Failure != null).Select(r => r.Failure!)
+                    .Concat(results.SelectMany(r => r.RecoveredFailures ?? [])).ToArray(),
+                HealthBounds = new(results.Sum(r => r.HealthBounds?.Pruned ?? 0),
+                    results.Sum(r => r.HealthBounds?.KnownRecoveryChecks ?? 0),
+                    results.Sum(r => r.HealthBounds?.UnknownRecoveryChecks ?? 0),
+                    results.Sum(r => r.HealthBounds?.SharedIncumbentUpdates ?? 0),
+                    string.Join("；", results.Select(r => r.HealthBounds?.UnknownReason).Where(r => !string.IsNullOrEmpty(r)).Distinct())),
                 Work = workStats,
                 TurnSearch = request.SearchOrder != LocalSearchOrder.TurnFrontier ? null : new(
                     results.Sum(r => r.TurnSearch?.Probes ?? 0), results.Sum(r => r.TurnSearch?.BoundPruned ?? 0),
@@ -176,30 +242,53 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                         .GroupBy(p => p.Key).ToDictionary(g => g.Key, g => g.Sum(p => p.Value)),
                     results.SelectMany(r => r.TurnSearch?.RolloutStyles ?? new Dictionary<string, int>())
                         .GroupBy(p => p.Key).ToDictionary(g => g.Key, g => g.Sum(p => p.Value)),
-                    results.SelectMany(r => r.TurnSearch?.Outcomes ?? []).OrderBy(o => o.CompletedMs).ToArray()),
+                    results.SelectMany(r => r.TurnSearch?.Outcomes ?? []).OrderBy(o => o.CompletedMs).ToArray(),
+                    results.Sum(r => r.TurnSearch?.LossProofProbes ?? 0)),
                 Timing = new(allRuns.Sum(r => r.Timing?.RestoreMs ?? 0), allRuns.Sum(r => r.Timing?.ActionMs ?? 0),
                     allRuns.Sum(r => r.Timing?.DecisionMs ?? 0), allRuns.Sum(r => r.Timing?.VerificationMs ?? 0),
                     allRuns.Sum(r => r.Timing?.StartupMs ?? 0), allRuns.Sum(r => r.Timing?.Actions ?? 0), allRuns.Sum(r => r.Timing?.Restores ?? 0),
                     allRuns.Sum(r => r.Timing?.Verifications ?? 0)),
                 Status = goalReached.IsCancellationRequested || results.All(r => r.Status is "searched" or "done") && verificationResults.All(r => r.Status == "done") ? "done" : "partial",
-                Message = goalReached.IsCancellationRequested ? "已找到战后无伤获胜路线，已停止全部后续搜索。" +
+                Message = goalReached.IsCancellationRequested ? (request.StopOnFirstWin ?
+                    "已找到获胜路线，已停止全部后续搜索；未继续优化损失或用药。" : Volatile.Read(ref consumableGoalReached) != 0 ?
+                    "当前消耗出牌及补刀目标已完成，战斗获胜且损血符合设置，已停止全部后续搜索。" : goalMinimumLoss > 0 ?
+                    $"已达到最低净损失 {best.Best!.NetHpLoss}（含回血），同等损失下用药也已达下界，已停止后续搜索。" :
+                    "已找到战后无伤获胜路线，已停止全部后续搜索。") +
                     (request.SkipFinalVerification ? "已跳过最终复核，执行时逐步核对模拟记录。" : "路线已通过复核。") :
                     "本地整场计算完成。" + (request.SkipFinalVerification ? "已跳过最终复核，执行时逐步核对模拟记录。" : "") +
                     (results.Any(r => r.Status is not ("searched" or "done")) || verificationResults.Any(r => r.Status != "done") ?
                         request.SkipFinalVerification ? "部分搜索未完成，显示已取得的模拟路线。" : "部分搜索未完成，显示已复核的可用路线。" : "") +
                     (results.Count > used ? "本次补充搜索未纳入：" + string.Join("、", blocked.Select(a => a.CardName)) + "。" : "") +
-                    "按战后净生命损失选路，同等净损失优先保留药水；预算内候选，未证明全局最优。" };
+                    (request.CardGoals?.Enabled == true ?
+                        "按可选出牌目标选路；预算内候选，未证明目标最优。" :
+                        "按战后净生命损失选路，同等净损失优先保留药水；预算内候选，未证明全局最优。") };
 
-            Task<LocalSearchResult> Launch(int index)
+            Task<LocalSearchResult> Launch(int index, CancellationToken passFailure)
             {
                 Volatile.Write(ref launched, index + 1);
                 Volatile.Write(ref starting[index], 1);
                 using (timeline.Measure(index, "main", "admit_worker", $"计算 {index + 1}；上限 {count}")) { }
                 return Task.Run(async () =>
                 {
-                    try { return await Run(_workers[index], index); }
+                    try { return await Run(_workers[index], index, passFailure: passFailure); }
                     finally { Volatile.Write(ref starting[index], 0); }
                 }, cancellation);
+            }
+
+            void TryStopUsingFinishedWinner()
+            {
+                LocalSearchResult? winner; int index;
+                lock (boundPublishGate) { winner = finishedWinner; index = finishedWinnerWorker; }
+                if (winner == null || goalReached.IsCancellationRequested ||
+                    !LocalSearchPolicy.CanStopAfterVictory(winner.Best, request, minimumLoss?.Status.Certificate) ||
+                    Interlocked.CompareExchange(ref goalWorker, index, -1) != -1) return;
+                Volatile.Write(ref goalMinimumLoss, request.StopOnFirstWin ? 0 : winner.Best!.NetHpLoss!.Value);
+                Volatile.Write(ref consumableGoalReached, LocalSearchPolicy.CanStopOnCardGoals(winner.Best, request) ? 1 : 0);
+                goalReached.Cancel();
+                progress(request.StopOnFirstWin ? "已找到获胜路线，正在停止其余搜索并确认路线…" :
+                    Volatile.Read(ref consumableGoalReached) != 0 ? "消耗目标已完成且获胜，正在停止其余搜索并确认路线…" :
+                    goalMinimumLoss > 0 ? $"已达到最低净损失 {goalMinimumLoss}，正在停止其余搜索并确认路线…" :
+                    "已找到无伤获胜路线，正在停止其余搜索并复核…");
             }
 
             LocalWorkerDemand Demand(int admitted)
@@ -207,6 +296,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 int roots = Volatile.Read(ref rootBranches[0]);
                 int pending = 0;
                 if (turnWork != null) pending = turnWork.Pending;
+                else if (searchWork != null) pending = searchWork.Stats.Pending;
                 else if (shared && roots > 0 && _workers[0].Root.Length > 0)
                 {
                     schedulingWork ??= new LocalSearchWork(Path.GetDirectoryName(_workers[0].Root)!, request);
@@ -218,29 +308,48 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 return new(pending, Enumerable.Range(0, admitted).Count(i => Volatile.Read(ref starting[i]) != 0), roots, allowed);
             }
 
-            async Task<LocalSearchResult> Run(Worker worker, int index, LocalSearchRequest? fallback = null)
+            async Task<LocalSearchResult> Run(Worker worker, int index, LocalSearchRequest? fallback = null,
+                CancellationToken passFailure = default)
             {
                 var command = fallback ?? request with { Partition = index, Partitions = count, DeferVerification = true };
                 bool verifying = command.VerifyCandidate != null;
+                bool requestDispatched = false;
                 LocalSearchResult? lastResult = null;
                 LocalSearchResult Stopped() => (lastResult ?? new(command.Id, request.SnapshotId, "searched", "", 0, 0, 0, null)) with
                     { Status = "searched", Best = null, StoppedEarly = true, Message = "已停止其余搜索。" };
                 try
                 {
+                    passFailure.ThrowIfCancellationRequested();
                     if (!verifying && goalReached.IsCancellationRequested) return Stopped();
                     simulationProgress?.Invoke(new(request.Id, request.SnapshotId, index, count, 0, 0, 0, request.MaxNodes, 0,
                         0, request.BudgetSeconds, "准备计算", null, []));
                     var preparation = Stopwatch.StartNew();
-                    // Stop any still-starting lane too, without cancelling final verification.
+                    // Cancel this wait, not the worker's tracked preparation. A peer
+                    // can reach its goal while an admitted instance is still booting.
                     using var preparing = CancellationTokenSource.CreateLinkedTokenSource(cancellation,
-                        verifying ? CancellationToken.None : goalReached.Token);
+                        verifying ? CancellationToken.None : goalReached.Token, passFailure);
                     await worker.Ensure(directory, index, installation, preparing.Token, timeline);
                     preparation.Stop();
+                    cancellation.ThrowIfCancellationRequested();
+                    passFailure.ThrowIfCancellationRequested();
                     if (!verifying && goalReached.IsCancellationRequested) return Stopped();
                     progress("正在计算…");
                     File.Delete(Path.Combine(worker.Root, "stop-search.json"));
+                    File.Delete(Path.Combine(worker.Root, "idle.json"));
+                    File.Delete(Path.Combine(worker.Root, "result.json"));
+                    File.Delete(Path.Combine(worker.Root, "progress.json"));
+                    LocalProgressTransport? channel = null;
+                    if (command.MemoryProgress && command.AsyncProgressOutput)
+                    {
+                        try { channel = new LocalProgressTransport(command); }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+                        { timeline.Add(new(index, verifying ? "verify" : "search", "progress_fallback", ex.Message, timeline.ElapsedMs, 0)); }
+                    }
+                    using var telemetry = channel;
+                    command = command with { ProgressPipe = telemetry?.PipeName };
                     using (timeline.Measure(index, verifying ? "verify" : "search", "ipc", depth: 1))
                         LocalWire.Write(Path.Combine(worker.Root, "request.json"), command);
+                    requestDispatched = true;
                     double dispatched = timeline.ElapsedMs;
                     var timer = Stopwatch.StartNew();
                     long seenSequence = 0;
@@ -250,17 +359,25 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     while (timer.Elapsed.TotalSeconds < timeoutSeconds)
                     {
                         cancellation.ThrowIfCancellationRequested();
+                        passFailure.ThrowIfCancellationRequested();
+                        if (!verifying) TryStopUsingFinishedWinner();
                         if (!verifying && goalReached.IsCancellationRequested && stopping == null)
                         {
                             using var stopScope = timeline.Measure(index, "search", "stop_search", "停止其余搜索", depth: 1);
                             LocalWire.Write(Path.Combine(worker.Root, "stop-search.json"),
-                                new LocalSearchStop(command.Id, command.SnapshotId, command.NativeHash));
+                                new LocalSearchStop(command.Id, command.SnapshotId, command.NativeHash,
+                                    CardGoalsCompleted: Volatile.Read(ref consumableGoalReached) != 0));
                             stopping = Stopwatch.StartNew();
                         }
+                        var preview = telemetry?.Latest;
                         var previewPath = Path.Combine(worker.Root, "progress.json");
                         if (File.Exists(previewPath))
                         {
-                            var preview = LocalWire.Read<LocalProgress>(previewPath);
+                            var filePreview = LocalWire.Read<LocalProgress>(previewPath);
+                            if (preview == null || filePreview.Sequence > preview.Sequence) preview = filePreview;
+                        }
+                        if (preview != null)
+                        {
                             if (preview.Id == command.Id && preview.SnapshotId == request.SnapshotId && preview.Worker == index &&
                                 preview.Workers == command.Partitions && preview.Sequence > seenSequence)
                             { seenSequence = preview.Sequence;
@@ -280,6 +397,12 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                                 { Volatile.Write(ref rootBranches[index], result.RootBranches); Volatile.Write(ref starting[index], 0); }
                                 if (result.Status != "running")
                                 {
+                                    // Results precede native finally/retirement. Do not
+                                    // reuse the process or close its broker until it is idle.
+                                    if (result.Status is "searched" or "done" && !await worker.WaitIdle(command, timeline, index))
+                                        throw new IOException("Worker did not finish request cleanup");
+                                    cancellation.ThrowIfCancellationRequested();
+                                    passFailure.ThrowIfCancellationRequested();
                                     if (result.Trace?.Spans is { Length: > 0 } spans)
                                     {
                                         double received = spans.Min(s => s.StartMs);
@@ -296,26 +419,36 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                                     { worker.Process.Refresh(); result = result with { WorkerMemoryBytes = worker.Process.PrivateMemorySize64 }; }
                                     if (worker.GameErrors())
                                     {
-                                        if (command.DataOnlyCombat)
-                                        {
-                                            LocalWire.Write(Path.Combine(worker.Root, "last-data-failure.json"), result);
-                                            File.Copy(Path.Combine(worker.Root, "game.log"), Path.Combine(worker.Root, "last-data-failure.log"), true);
-                                        }
-                                        worker.Stop();
+                                        if (!verifying) minimumLoss?.RejectOwner(index);
+                                        RememberFailure(result);
+                                        worker.Stop("模拟报告运行错误", timeline, index);
                                         return result with { Status = "failed", Best = null, Message = "后台游戏报告运行错误，未采用该进程的结果。" };
                                     }
                                     if (result.Status is not ("done" or "searched"))
                                     {
-                                        if (command.DataOnlyCombat) LocalWire.Write(Path.Combine(worker.Root, "last-data-failure.json"), result);
-                                        worker.Stop();
+                                        if (!verifying) minimumLoss?.RejectOwner(index);
+                                        RememberFailure(result);
+                                        worker.Stop("上次模拟未完成：" + result.Message, timeline, index);
                                     }
-                                    if (!verifying && result.Status is "searched" or "done" &&
-                                        request.StopOnZeroLoss && LocalSearchPolicy.MeetsGoal(result.Best, request) &&
-                                        Interlocked.CompareExchange(ref goalWorker, index, -1) == -1)
+                                    if (!verifying && result.Status is "searched" or "done")
                                     {
-                                        goalReached.Cancel();
-                                        progress("已找到无伤获胜路线，正在停止其余搜索并复核…");
+                                        if (result.MinimumLoss?.InvalidReason.Length > 0) minimumLoss?.RejectOwner(index);
+                                        else minimumLoss?.ConfirmOwner(index);
+                                        // Publish only after complete native execution and the
+                                        // parent's game-error gate. Never certify a running seed.
+                                        lock (boundPublishGate)
+                                        {
+                                            string parent = Path.GetDirectoryName(worker.Root)!;
+                                            string key = parent + "\n" + command.Id;
+                                            if (!boundPublishers.TryGetValue(key, out var exchange))
+                                                boundPublishers.Add(key, exchange = new(parent, command));
+                                            exchange.PublishFinished(result);
+                                            if (result.Best is { Won: true, Dead: false } candidate &&
+                                                LocalSearchPolicy.BetterForGoal(candidate, finishedWinner?.Best, request))
+                                            { finishedWinner = result; finishedWinnerWorker = index; }
+                                        }
                                     }
+                                    if (!verifying) TryStopUsingFinishedWinner();
                                     return result;
                                 }
                                 if (!goalReached.IsCancellationRequested) progress($"正在计算 · 已启用 {Volatile.Read(ref launched)}/{count} 路 · 当前实例已评估 {result.Evaluated} 条路线");
@@ -324,21 +457,44 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                         // Normally the native action settles and acknowledges within one poll.
                         // A stuck callback must not hold the goal route until the search budget.
                         if (stopping?.Elapsed.TotalSeconds >= 2)
-                        { worker.Stop(); return Stopped(); }
+                        { minimumLoss?.RejectOwner(index); worker.Stop("停止搜索后未能确认安全清理", timeline, index); return Stopped(); }
                         if (worker.Process?.HasExited != false)
                             throw new CoachException("local_exit", "本次计算意外中断，请重试。");
                         await Task.Delay(250, cancellation);
                     }
                     throw new CoachException("local_timeout", "计算超时，已停止；可以重试或使用 AI 分析。");
                 }
+                catch (OperationCanceledException) when (passFailure.IsCancellationRequested && !cancellation.IsCancellationRequested)
+                {
+                    using var stopping = timeline.Measure(index, "search", "stop_failed_pass", "同组数值计算失败，停止本路", depth: 1);
+                    if (requestDispatched) await worker.CancelRequest(command, timeline, index);
+                    // Unlike a user/goal stop, fallback changes bootstrap mode.
+                    // Retire this owned preparation instead of letting it keep booting.
+                    worker.Stop("同组数值计算失败，释放实例以切换执行方式", timeline, index);
+                    await worker.DrainPreparation();
+                    return Stopped() with { Message = "同组数值计算失败，本路已停止。" };
+                }
                 catch (OperationCanceledException) when (!verifying && goalReached.IsCancellationRequested && !cancellation.IsCancellationRequested)
-                { worker.Stop(); return Stopped(); }
-                catch (OperationCanceledException) { worker.Stop(); throw; }
+                { if (requestDispatched) await worker.CancelRequest(command, timeline, index); return Stopped(); }
+                catch (OperationCanceledException)
+                { if (requestDispatched) await worker.CancelRequest(command, timeline, index); throw; }
                 catch (Exception ex)
                 {
-                    worker.Stop();
+                    if (!verifying) minimumLoss?.RejectOwner(index);
+                    worker.Stop("模拟中断：" + ex.Message, timeline, index);
                     return new(request.Id, request.SnapshotId, "failed", ex is CoachException ? ex.Message :
-                        $"本地进程准备失败（{ex.GetType().Name}）：{ex.Message}", 0, 0, 0, null);
+                        $"本地进程准备失败（{ex.GetType().Name}）：{ex.Message}", 0, 0, 0, null,
+                        Failure: LocalSimulationFailure.Capture(ex, index, verifying ? "verify" : "search"));
+                }
+
+                void RememberFailure(LocalSearchResult failed)
+                {
+                    if (!command.DataOnlyCombat) return;
+                    LocalWire.Write(Path.Combine(worker.Root, "last-data-failure.json"), failed);
+                    // Keep the failing frozen input, not a later request overwriting request.json.
+                    LocalWire.Write(Path.Combine(worker.Root, "last-data-failure-request.json"), command);
+                    var log = Path.Combine(worker.Root, "game.log");
+                    if (File.Exists(log)) File.Copy(log, Path.Combine(worker.Root, "last-data-failure.log"), true);
                 }
             }
         }
@@ -349,7 +505,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
     public void Dispose()
     {
         _disposed = true;
-        foreach (var worker in _workers) worker.Stop();
+        foreach (var worker in _workers) worker.Dispose();
     }
 
     [StructLayout(LayoutKind.Sequential)]
@@ -364,8 +520,13 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GlobalMemoryStatusEx([In, Out] MemoryStatus status);
 
-    private sealed class Worker
+    internal sealed class Worker : IDisposable
     {
+        private readonly object _lifecycle = new();
+        private CancellationTokenSource? _generation;
+        private Task? _preparation;
+        private bool _disposed;
+        public string Generation { get; private set; } = "";
         public string Root { get; private set; } = "";
         public Process? Process { get; private set; }
         public long MemoryBytes
@@ -387,22 +548,81 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
         private FileStream? _lock;
         private string? _configuration;
         private long _logPosition;
+        private int _starts;
+        private long _changed;
+        private string _detail = "尚未准备";
+        private string _retirement = "实例已退出";
+
+        internal (bool Ready, bool Preparing, int Starts, long Changed, string Detail) ResourceState()
+        {
+            lock (_lifecycle)
+            {
+                bool alive = Process?.HasExited == false && _generation != null;
+                return (alive && _preparation?.IsCompletedSuccessfully == true,
+                    _generation != null && _preparation is { IsCompleted: false }, _starts, _changed, _detail);
+            }
+        }
 
         public async Task Ensure(string directory, int index, LocalInstallation installation, CancellationToken token, LocalTimeline? timeline = null)
         {
-            var signature = typeof(LocalWorker).Assembly.ManifestModule.ModuleVersionId + "|" +
+            var signature = typeof(LocalWorkerPool).Assembly.ManifestModule.ModuleVersionId + "|" +
                 installation.GameDirectory + "|" + Path.GetFullPath(directory) + "|" + string.Join("|", installation.ModDirectories) + "|" + installation.MinimalWorkerBootstrap;
             var configuration = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(signature)))[..16];
-            if (Process?.HasExited == false && _configuration == configuration)
+            Task preparation;
+            bool reuse;
+            lock (_lifecycle)
             {
-                using var reuse = timeline?.Measure(index, "prepare", "reuse");
-                return;
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                token.ThrowIfCancellationRequested();
+                reuse = _configuration == configuration && _generation != null &&
+                    _preparation is { IsFaulted: false, IsCanceled: false } &&
+                    (!_preparation.IsCompletedSuccessfully || Process?.HasExited == false);
+                if (!reuse)
+                {
+                    var reason = _configuration != null && _configuration != configuration ? "配置或运行模式改变" : _retirement;
+                    StopLocked(reason);
+                    _detail = _starts == 0 ? "首次准备" : "重新准备：" + reason;
+                    _changed = LocalTimeline.Timestamp;
+                    if (timeline != null) timeline.Add(new(index, "prepare", _starts == 0 ? "cold_start" : "rebuild",
+                        _detail, timeline.ElapsedMs, 0));
+                    var previous = _preparation;
+                    var generation = new CancellationTokenSource();
+                    var preparationToken = generation.Token;
+                    _generation = generation;
+                    Generation = Guid.NewGuid().ToString("N");
+                    var identity = Generation;
+                    _configuration = configuration;
+                    _preparation = Task.Run(async () =>
+                    {
+                        // A retired preparation may still be unwinding file work.
+                        // Drain it before touching this lane's installation again.
+                        if (previous != null) try { await previous; } catch (Exception) { }
+                        try { await Prepare(directory, index, installation, configuration, identity, preparationToken, timeline); }
+                        catch
+                        {
+                            lock (_lifecycle) if (ReferenceEquals(_generation, generation)) StopLocked("准备失败");
+                            throw;
+                        }
+                    });
+                    // A cancelled caller can leave no waiter. Still observe faults;
+                    // the preparation itself owns its failure cleanup.
+                    _ = _preparation.ContinueWith(t => { _ = t.Exception; }, CancellationToken.None,
+                        TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                }
+                preparation = _preparation!;
             }
+            using var waiting = reuse ? timeline?.Measure(index, "prepare", preparation.IsCompletedSuccessfully ? "reuse" : "await_ready") : null;
+            await preparation.WaitAsync(token);
+            token.ThrowIfCancellationRequested();
+        }
+
+        private async Task Prepare(string directory, int index, LocalInstallation installation, string configuration,
+            string identity, CancellationToken token, LocalTimeline? timeline)
+        {
+            token.ThrowIfCancellationRequested();
             using var preparation = timeline?.Measure(index, "prepare", "prepare");
             using var files = timeline?.Measure(index, "prepare", "files", depth: 1);
-            Stop();
             _logPosition = 0;
-            _configuration = configuration;
             // NTFS hardlinks require one volume. Keep tiny launch trees beside the installation, never in it.
             var sharedRoot = Path.Combine(Directory.GetParent(installation.GameDirectory)!.FullName, ".spire-ai-coach-workers");
             Root = Path.GetFullPath(Path.Combine(sharedRoot, configuration, "worker-" + index));
@@ -411,7 +631,11 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             if (Directory.Exists(Root) && Directory.EnumerateFileSystemEntries(Root).Any() && !File.Exists(Path.Combine(Root, ".coach-worker")))
                 throw new IOException("Refusing an unowned worker directory");
             Directory.CreateDirectory(Root);
-            _lock = new FileStream(Path.Combine(Root, ".lock"), FileMode.OpenOrCreate, System.IO.FileAccess.ReadWrite, FileShare.None);
+            lock (_lifecycle)
+            {
+                token.ThrowIfCancellationRequested();
+                _lock = new FileStream(Path.Combine(Root, ".lock"), FileMode.OpenOrCreate, System.IO.FileAccess.ReadWrite, FileShare.None);
+            }
             File.WriteAllText(Path.Combine(Root, ".coach-worker"), "SpireAiCoach shared local worker v2");
             var game = Path.Combine(Root, "game");
             Directory.CreateDirectory(game);
@@ -427,20 +651,32 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             var settings = Path.Combine(roaming, "SlayTheSpire2", "default", "1");
             Directory.CreateDirectory(settings); Directory.CreateDirectory(local);
             File.WriteAllText(Path.Combine(settings, "settings.save"), "{\"volume_master\":0,\"volume_bgm\":0,\"volume_sfx\":0,\"volume_ambience\":0,\"skip_intro_logo\":true,\"mod_settings\":{\"mods_enabled\":true,\"mod_list\":[]}}");
-            var saves = Path.Combine(settings, "modded", "profile1", "saves"); Directory.CreateDirectory(saves);
-            File.WriteAllText(Path.Combine(saves, "progress.save"), "{\"schema_version\":24,\"enable_ftues\":false,\"ftue_completed\":[\"combat_rules_ftue\"]}");
-            foreach (var name in new[] { "ready", "fatal.txt", "result.json", "request.json", "progress.json", "audio.json" }) File.Delete(Path.Combine(Root, name));
+            // Read-only mods need not mark a run as gameplay-modded. The native
+            // save manager selects the corresponding profile at runtime.
+            foreach (var profile in new[] { Path.Combine(settings, "modded", "profile1"), Path.Combine(settings, "profile1") })
+            {
+                var saves = Path.Combine(profile, "saves"); Directory.CreateDirectory(saves);
+                File.WriteAllText(Path.Combine(saves, "progress.save"), "{\"schema_version\":24,\"enable_ftues\":false,\"ftue_completed\":[\"combat_rules_ftue\"]}");
+            }
+            foreach (var name in new[] { "ready", "fatal.txt", "result.json", "request.json", "progress.json", "audio.json", "idle.json", "stop-search.json" }) File.Delete(Path.Combine(Root, name));
             var start = new ProcessStartInfo(Path.Combine(game, "SlayTheSpire2.exe"))
             { WorkingDirectory = game, UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden };
             foreach (var arg in new[] { "--headless", "--audio-driver", "Dummy", "--disable-vsync", "--max-fps", "120", "--force-steam=off", "--log-file", Path.Combine(Root, "game.log") }) start.ArgumentList.Add(arg);
             start.Environment["APPDATA"] = roaming; start.Environment["LOCALAPPDATA"] = local;
             start.Environment["SPIRE_COACH_WORKER"] = Root;
+            start.Environment["SPIRE_COACH_WORKER_GENERATION"] = identity;
             LocalWorkerOwner.Attach(start);
             start.Environment["SPIRE_COACH_MINIMAL_BOOTSTRAP"] = installation.MinimalWorkerBootstrap ? "1" : "0";
             start.Environment.Remove("SPIRE_NATIVE_PROBE_ROOT");
             token.ThrowIfCancellationRequested();
             files?.Dispose();
-            using (timeline?.Measure(index, "prepare", "launch", depth: 1)) Process = IsolatedProcess.Start(start);
+            lock (_lifecycle)
+            {
+                // Dispose/Stop can race file preparation, but never a new launch.
+                token.ThrowIfCancellationRequested();
+                using (timeline?.Measure(index, "prepare", "launch", depth: 1)) Process = IsolatedProcess.Start(start);
+                _starts++; _changed = LocalTimeline.Timestamp;
+            }
             var timer = Stopwatch.StartNew();
             using var engine = timeline?.Measure(index, "prepare", "engine", depth: 1);
             while (!File.Exists(Path.Combine(Root, "ready")))
@@ -449,6 +685,30 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 if (Process.HasExited || timer.Elapsed.TotalSeconds > 90) throw new IOException("Worker startup failed or timed out");
                 await Task.Delay(250, token);
             }
+        }
+
+        public async Task<bool> WaitIdle(LocalSearchRequest command, LocalTimeline? timeline = null, int index = 0)
+        {
+            using var cleanup = timeline?.Measure(index, "main", "await_idle", depth: 1);
+            return await LocalWorkerSession.WaitForIdle(Root, command, Generation, Alive, TimeSpan.FromSeconds(2));
+        }
+
+        private bool Alive()
+        {
+            lock (_lifecycle) return Process?.HasExited == false;
+        }
+
+        public async Task CancelRequest(LocalSearchRequest command, LocalTimeline? timeline = null, int index = 0)
+        {
+            try
+            {
+                using var stopping = timeline?.Measure(index, "main", "cancel_request", depth: 1);
+                LocalWire.Write(Path.Combine(Root, "stop-search.json"),
+                    new LocalSearchStop(command.Id, command.SnapshotId, command.NativeHash, Cancel: true));
+                if (await WaitIdle(command, timeline, index) && !GameErrors() && !File.Exists(Path.Combine(Root, "fatal.txt"))) return;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or JsonException) { }
+            Stop("取消后未能确认安全清理", timeline, index);
         }
 
         public bool GameErrors()
@@ -498,8 +758,34 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 CopyTree(child, Path.Combine(target, Path.GetFileName(child)), token);
             }
         }
-        public void Stop()
+        public void Stop(string reason = "释放计算资源", LocalTimeline? timeline = null, int index = 0)
         {
+            lock (_lifecycle)
+            {
+                if (_generation != null && timeline != null)
+                    timeline.Add(new(index, "prepare", "retire", reason, timeline.ElapsedMs, 0));
+                StopLocked(reason);
+            }
+        }
+
+        public void Dispose()
+        {
+            lock (_lifecycle) { _disposed = true; StopLocked(); }
+        }
+
+        internal async Task DrainPreparation()
+        {
+            Task? pending;
+            lock (_lifecycle) pending = _preparation;
+            if (pending != null) try { await pending; } catch (Exception) { }
+        }
+
+        private void StopLocked(string reason = "释放计算资源")
+        {
+            if (_generation != null || Process != null)
+            { _retirement = reason; _detail = reason; _changed = LocalTimeline.Timestamp; }
+            _generation?.Cancel(); _generation?.Dispose(); _generation = null;
+            Generation = "";
             try
             {
                 if (Process?.HasExited == false) { Process.Kill(entireProcessTree: true); Process.WaitForExit(5000); }

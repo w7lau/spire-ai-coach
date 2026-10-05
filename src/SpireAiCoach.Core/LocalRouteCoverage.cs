@@ -12,6 +12,7 @@ public sealed class LocalRouteCoverage
         public readonly Dictionary<string, Node> Children = new(StringComparer.Ordinal);
         public readonly HashSet<string> Legal = new(StringComparer.Ordinal);
         public bool Closed;
+        public bool CompleteLegal;
     }
 
     public sealed class Trial
@@ -35,12 +36,13 @@ public sealed class LocalRouteCoverage
     public int Completed { get; private set; }
     public Trial Begin() => new(_root);
 
-    public LocalAction[] Open(Trial trial, IReadOnlyList<LocalAction> legal)
+    public LocalAction[] Open(Trial trial, IReadOnlyList<LocalAction> legal, bool completeLegal = true)
     {
         var current = trial.Current;
         // Union protects against a narrower, later policy filter closing untried
         // moves. Call with the complete worker-owned legal offer before ranking.
         foreach (var action in legal) current.Legal.Add(ActionKey(action));
+        current.CompleteLegal |= completeLegal;
         var open = legal.Where(a => !current.Children.TryGetValue(ActionKey(a), out var child) || !child.Closed).ToArray();
         Avoided += legal.Count - open.Length;
         return open;
@@ -56,7 +58,7 @@ public sealed class LocalRouteCoverage
         for (int i = trial.Path.Count - 2; i >= 0; i--)
         {
             var node = trial.Path[i];
-            if (node.Legal.Count == 0 || !node.Legal.All(k => node.Children.TryGetValue(k, out var child) && child.Closed)) break;
+            if (!node.CompleteLegal || node.Legal.Count == 0 || !node.Legal.All(k => node.Children.TryGetValue(k, out var child) && child.Closed)) break;
             node.Closed = true;
         }
     }
