@@ -19,6 +19,7 @@ using MegaCrit.Sts2.Core.Nodes.Rooms;
 using MegaCrit.Sts2.Core.Nodes.Screens.CardSelection;
 using MegaCrit.Sts2.Core.Nodes.Screens.Overlays;
 using MegaCrit.Sts2.Core.Nodes.Vfx;
+using MegaCrit.Sts2.Core.Nodes.Vfx.Forms;
 using MegaCrit.Sts2.Core.Helpers;
 using MegaCrit.Sts2.Core.Runs;
 using MegaCrit.Sts2.Core.Saves;
@@ -64,6 +65,18 @@ internal static class LocalWorkerDataMode
         Prefix(typeof(NGame), nameof(NGame.ScreenShake), nameof(PresentationVoid));
         foreach (var factory in typeof(NDamageNumVfx).GetMethods().Where(m => m.Name == nameof(NDamageNumVfx.Create)))
             harmony.Patch(factory, prefix: new(AccessTools.Method(typeof(LocalWorkerDataMode), nameof(DamageVisual))));
+        // Native persistent-form factories only attach optional presentation nodes.
+        // They already return null in TestMode and their power callers accept it.
+        // Keep the power application, counters and every hook; omit these factories
+        // when the owned data worker deliberately has no combat scene.
+        foreach (var form in new[] { typeof(NDemonFormVfx), typeof(NEchoFormVfx), typeof(NReaperFormVfx),
+                     typeof(NSerpentFormVfx), typeof(NVoidFormVfx) })
+        {
+            var factory = AccessTools.Method(form, "Create", [typeof(Creature)]);
+            if (factory == null || !factory.IsStatic || factory.ReturnType != form)
+                throw new InvalidOperationException("Native form presentation factory changed: " + form.Name);
+            harmony.Patch(factory, prefix: new(AccessTools.Method(typeof(LocalWorkerDataMode), nameof(PresentationVoid))));
+        }
         Prefix(typeof(PlayerHurtVignetteHelper), nameof(PlayerHurtVignetteHelper.Play), nameof(PresentationVoid));
         // The native death callback removes its subscription before obtaining
         // an optional animation node. Keep that cleanup and every death hook;
