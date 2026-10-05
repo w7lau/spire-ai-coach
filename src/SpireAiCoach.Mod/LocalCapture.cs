@@ -144,6 +144,7 @@ public static class LocalCapture
         if (replay == null)
             throw new CoachException("local_replay", "这场战斗没有可用的原生重放记录，请在下一场战斗重试。");
         var before = Fingerprint();
+        var eventEntry = LocalEventReplay.Capture(player);
         var packet = new PacketWriter();
         replay.Serialize(packet);
         if (before != Fingerprint()) throw new CoachException("local_changed", "采集期间战斗发生变化，请重试。");
@@ -153,7 +154,7 @@ public static class LocalCapture
             TargetLabels: state.Enemies.Where(e => e.IsAlive && e.CombatId.HasValue)
                 .OrderBy(e => e.GetCreatureNode()?.GlobalPosition.X ?? float.MaxValue)
                 .Select((e, index) => new { Id = e.CombatId!.Value, Label = $"从左到右第 {index + 1} 个敌人「{e.Name}」" })
-                .ToDictionary(e => e.Id, e => e.Label), History: History());
+                .ToDictionary(e => e.Id, e => e.Label), History: History(), EventEntry: eventEntry);
     }
 
     public static LocalInstallation Installation() => new(

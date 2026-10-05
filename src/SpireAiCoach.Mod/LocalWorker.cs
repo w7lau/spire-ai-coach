@@ -1339,10 +1339,22 @@ public static class LocalWorker
                 await Frame(); await Frame();
             }
             await manager.GenerateMap();
-            if (request.DebugEncounter is { } encounter)
-                await manager.EnterRoomDebug(RoomType.Monster, MapPointType.Monster,
-                    ModelDb.AllEncounters.Single(e => e.Id.Entry == encounter).ToMutable(), false);
-            else await manager.LoadIntoLatestMapCoord(null);
+            var originalFastMode = SaveManager.Instance.PrefsSave.FastMode;
+            // Some native events start repeating, effect-free scene animations.
+            // Instant waits make those loops synchronous before recorded choices
+            // can cancel them. Scene-free restoration has no animation receiver;
+            // regular restoration retains native pacing only during event entry.
+            if (request.EventEntry != null && !LocalWorkerDataMode.Active)
+                SaveManager.Instance.PrefsSave.FastMode = FastModeType.Normal;
+            try
+            {
+                if (request.DebugEncounter is { } encounter)
+                    await manager.EnterRoomDebug(RoomType.Monster, MapPointType.Monster,
+                        ModelDb.AllEncounters.Single(e => e.Id.Entry == encounter).ToMutable(), false);
+                else await manager.LoadIntoLatestMapCoord(null);
+                using (Trace("event_entry", "进入事件战斗", depth: 3)) await LocalEventReplay.Restore(request.EventEntry, run);
+            }
+            finally { SaveManager.Instance.PrefsSave.FastMode = originalFastMode; }
             var player = LocalContext.GetMe(run)!;
             await StableOrTerminal(player);
             scene?.Dispose();
