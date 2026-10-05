@@ -6,6 +6,8 @@ using MegaCrit.Sts2.Core.Models;
 using SpireAiCoach.Core;
 using SpireAiCoach.Mod;
 
+if (args is ["--presentation-audit", var presentationPath]) return PresentationAudit.Run(presentationPath);
+
 // Read metadata/IL only. Do not instantiate models or execute hooks outside Godot.
 var assembly = typeof(CardModel).Assembly;
 var models = assembly.GetTypes().Where(t => !t.IsAbstract && new[] {

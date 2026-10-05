@@ -78,7 +78,12 @@ parser.add_argument('--discard-test', action='store_true', help='Short native di
 parser.add_argument('--summon-presentation-test', action='store_true', help='Only the frozen incident first enemy turn; compare ordinary and scene-free native states')
 parser.add_argument('--event-entry-test', action='store_true', help='Recreate a frozen event-combat root and verify generic native entry-history replay')
 parser.add_argument('--model-display-test', action='store_true', help='Short native optional display comparison; base/upgraded card and exact state/RNG/history')
+parser.add_argument('--resume-search-test', action='store_true', help='Native two-batch continuation probe with pending work and no executable route')
+
+parser.add_argument('--animation-presentation-test', action='store_true', help='Measured death/summon prefix; compare native presentation modes, not full search')
 args = parser.parse_args()
+if args.animation_presentation_test and (not args.replay or not args.seed_result or args.recorded_replay):
+    parser.error('--animation-presentation-test requires frozen --replay and measured --seed-result')
 if args.finisher_retention_test and (not args.replay or args.seed_result or args.recorded_replay):
     parser.error('--finisher-retention-test requires a frozen --replay without an extra answer seed or recorded replay')
 if args.event_entry_test and (not args.replay or args.seed_result or args.recorded_replay):
@@ -177,6 +182,13 @@ with worker_lock(root):
         (root / name).unlink(missing_ok=True)
     if args.finisher_targets_test:
         (root / 'integration-finisher-targets-summary.json').unlink(missing_ok=True)
+    if args.resume_search_test:
+        for name in ['integration-resume-search-summary.json', 'integration-resume-search-source-before-private.json',
+                     *[f'integration-resume-search-source-after-{order}-private.json'
+                       for order in ('MonteCarlo', 'TurnFrontier')],
+                     *[f'integration-resume-search-{order}-{batch}-private.json'
+                       for order in ('MonteCarlo', 'TurnFrontier') for batch in ('first', 'second')]]:
+            (root / name).unlink(missing_ok=True)
     if args.recent_search_test:
         for name in ['integration-recent-search-summary.json', 'integration-recent-search-private.json']:
             (root / name).unlink(missing_ok=True)
@@ -192,6 +204,8 @@ with worker_lock(root):
         (root / 'integration-summon-summary.json').unlink(missing_ok=True)
     if args.event_entry_test:
         (root / 'integration-event-summary.json').unlink(missing_ok=True)
+    if args.animation_presentation_test:
+        (root / 'integration-animation-summary.json').unlink(missing_ok=True)
     if args.survival_test:
         for name in ['integration-survival-summary.json', 'integration-survival-private.json']:
             (root / name).unlink(missing_ok=True)
@@ -229,6 +243,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_DISCARD_TEST'] = '1' if args.discard_test else '0'
     env['SPIRE_LOCAL_SUMMON_PRESENTATION_TEST'] = '1' if args.summon_presentation_test else '0'
     env['SPIRE_LOCAL_EVENT_ENTRY_TEST'] = '1' if args.event_entry_test else '0'
+    env['SPIRE_LOCAL_ANIMATION_PRESENTATION_TEST'] = '1' if args.animation_presentation_test else '0'
     env['SPIRE_LOCAL_SELECTION_PAGING_TEST'] = '1' if args.selection_paging_test else '0'
     env['SPIRE_LOCAL_CARD_GOALS_TEST'] = '1' if args.card_goals_test else '0'
     env['SPIRE_LOCAL_FINISHER_TARGETS_TEST'] = '1' if args.finisher_targets_test else '0'
@@ -289,6 +304,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_SCENE_OVERHEAD_TEST'] = '1' if args.scene_overhead_test else '0'
     env['SPIRE_LOCAL_VISUAL_FACTORY_TEST'] = '1' if args.visual_factory_test else '0'
     env['SPIRE_LOCAL_MODEL_DISPLAY_TEST'] = '1' if args.model_display_test else '0'
+    env['SPIRE_LOCAL_RESUME_SEARCH_TEST'] = '1' if args.resume_search_test else '0'
     env['SPIRE_LOCAL_ROUTE_FEEDBACK_TEST'] = '1' if args.route_feedback_test else '0'
     env['SPIRE_LOCAL_ROUTE_FEEDBACK_FOCUSED_ONLY'] = '1' if args.route_feedback_focused_only else '0'
     env['SPIRE_LOCAL_RECENT_SEARCH_TEST'] = '1' if args.recent_search_test else '0'
@@ -367,6 +383,11 @@ with worker_lock(root):
         if args.model_display_test:
             names = ['integration-model-display-summary.json', *[f'integration-model-display-private-{i}.json' for i in range(6)],
                      'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.resume_search_test:
+            names = ['integration-resume-search-summary.json',
+                     *[f'integration-resume-search-{order}-{batch}-private.json'
+                       for order in ('MonteCarlo', 'TurnFrontier') for batch in ('first', 'second')],
+                     'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
         if args.route_feedback_test:
             names = ['integration-route-feedback-summary.json',
                      *[f'integration-route-feedback-private-{order}-{mode}.json'
@@ -399,6 +420,10 @@ with worker_lock(root):
             names = ['integration-event-summary.json', 'integration-event-capture-private.json',
                      'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log',
                      *[f'integration-event-result-private-{i}.json' for i in range(5)]]
+        if args.animation_presentation_test:
+            names = ['integration-animation-summary.json', 'integration-success', 'integration-error.txt',
+                     'integration-stdout.log', 'integration-game.log',
+                     *[f'integration-animation-private-{i}.json' for i in range(4)]]
         for name in names:
             if (root / name).is_file():
                 shutil.copy2(root / name, args.results_dir / name)

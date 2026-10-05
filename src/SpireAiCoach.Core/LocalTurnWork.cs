@@ -20,9 +20,9 @@ public sealed class LocalTurnWork : IDisposable
 
     private readonly object _gate = new();
     private readonly LocalTurnSearch _frontier;
+    private readonly LocalTurnWorkState _state;
     private readonly Dictionary<int, LocalTurnTask> _active = new();
-    private readonly HashSet<string> _terminals = new(StringComparer.Ordinal);
-    private int _repeated;
+    private readonly HashSet<string> _terminals;
     private readonly CancellationTokenSource _stop = new();
     private readonly ConcurrentDictionary<NamedPipeServerStream, byte> _pipes = new();
     private readonly List<Task> _sessions = [];
@@ -32,24 +32,23 @@ public sealed class LocalTurnWork : IDisposable
     private readonly bool _ownedWinningFocus;
     private readonly LocalAction[]? _initialPlan;
     private readonly string _nativeRoot;
-    private int _taken;
-    private int _rollouts;
-    private bool _rootReady;
     public string PipeName { get; } = "SpireAiCoach-turn-" + Guid.NewGuid().ToString("N");
     public int Pending { get { lock (_gate) return _frontier.Count; } }
     public int Offered { get { lock (_gate) return _frontier.Offered; } }
     public int DuplicateOffers { get { lock (_gate) return _frontier.DuplicateOffers; } }
-    public int CompletedHistories { get { lock (_gate) return _terminals.Count + _repeated; } }
-    public int RepeatedHistories { get { lock (_gate) return _repeated; } }
+    public int CompletedHistories { get { lock (_gate) return _terminals.Count + _state.Repeated; } }
+    public int RepeatedHistories { get { lock (_gate) return _state.Repeated; } }
     public IReadOnlyDictionary<int, int> ClaimedByRound { get { lock (_gate) return _frontier.ClaimedByRound; } }
 
-    public LocalTurnWork(LocalSearchRequest request, int maximum)
+    public LocalTurnWork(LocalSearchRequest request, int maximum, LocalTurnWorkState? state = null)
     {
         if (maximum is < 1 or > 16) throw new ArgumentOutOfRangeException(nameof(maximum));
         _maximum = maximum; _scope = Scope(request); _ownedWinningFocus = request.OwnedWinningFocus;
         _initialPlan = request.InitialPlan?.ToArray();
         _nativeRoot = request.NativeHash;
-        _frontier = new(1729, request.SnapshotId + ":" + request.NativeHash, request.CardGoals);
+        if (state != null && state.Key != LocalSearchSession.Key(request))
+            throw new InvalidDataException("Retained turn frontier does not match its frozen root and search domain");
+        _state = state ?? new(request); _frontier = _state.Frontier; _terminals = _state.Terminals;
         _listener = Task.Run(Listen);
     }
 
@@ -126,22 +125,22 @@ public sealed class LocalTurnWork : IDisposable
     }
 
     private Reply Snapshot(LocalTurnTask? task = null, int affected = 0, string? error = null) =>
-        new(task, _frontier.Count, _active.Count, _frontier.Offered, _frontier.DuplicateOffers, affected, error, _rootReady);
+        new(task, _frontier.Count, _active.Count, _frontier.Offered, _frontier.DuplicateOffers, affected, error, _state.RootReady);
 
     private Reply Apply(Command command)
     {
         if (command.Operation == "seed")
         {
-            if (command.Owner != 0 || _rootReady || command.Offers is { Length: > 0 } || command.Task?.Prefix.Length != 0 ||
+            if (command.Owner != 0 || _state.RootReady || command.Offers is { Length: > 0 } || command.Task?.Prefix.Length != 0 ||
                 _initialPlan is not { Length: > 0 } || _initialPlan[0].BeforeHash != _nativeRoot || command.Actions == null ||
                 command.Actions.Length != _initialPlan.Length || !LocalSearchWork.MatchesPrefix(command.Actions, _initialPlan))
                 throw new InvalidDataException("Initial route does not match the frozen producer request");
             _frontier.SeedRoot(_initialPlan, command.Task.SearchRound,
                 command.Hint ?? throw new InvalidDataException("Missing initial native root hint"));
-            _rootReady = true; return Snapshot();
+            _state.RootReady = true; return Snapshot();
         }
         foreach (var offer in command.Offers ?? []) _frontier.Offer(offer.Prefix, offer.SearchRound, offer.Hint);
-        if (command.Offers is { Length: > 0 }) _rootReady = true;
+        if (command.Offers is { Length: > 0 }) _state.RootReady = true;
         switch (command.Operation)
         {
             case "offer": return Snapshot();
@@ -151,10 +150,10 @@ public sealed class LocalTurnWork : IDisposable
                 if (_active.ContainsKey(command.Owner)) throw new InvalidOperationException("Worker already owns a turn task");
                 if (!_frontier.TryTake(out var task, command.Owner)) return Snapshot();
                 bool guidedRollout = task.FullRollout;
-                task = task with { FullRollout = !task.LossProof && (LocalTurnSearch.IsFullRollout(_taken++) || task.FullRollout || task.Prefix.Length == 1),
+                task = task with { FullRollout = !task.LossProof && (LocalTurnSearch.IsFullRollout(_state.Taken++) || task.FullRollout || task.Prefix.Length == 1),
                     Lane = _frontier.LastLane, Focused = _frontier.LastFocused };
                 if (task.FullRollout && !guidedRollout) task = task with { Style = task.Prefix.Length <= 1 ?
-                    LocalRolloutStyle.Preparation : (LocalRolloutStyle)(_rollouts++ % 4) };
+                    LocalRolloutStyle.Preparation : (LocalRolloutStyle)(_state.Rollouts++ % 4) };
                 _active.Add(command.Owner, task); return Snapshot(task);
             case "focus":
                 var focused = RequireOwner(command);
@@ -176,7 +175,7 @@ public sealed class LocalTurnWork : IDisposable
                 _frontier.PromoteWinning(incumbent, _ownedWinningFocus ? command.Owner : null); return Snapshot();
             case "finish":
                 RequireOwner(command); _active.Remove(command.Owner);
-                if (command.TerminalDigest is { } digest && !_terminals.Add(digest)) _repeated++;
+                if (command.TerminalDigest is { } digest && !_terminals.Add(digest)) _state.Repeated++;
                 return Snapshot();
             case "return":
                 var interrupted = RequireOwner(command); _active.Remove(command.Owner);
@@ -201,7 +200,7 @@ public sealed class LocalTurnWork : IDisposable
         _frontier.ReleaseWinningOwner(owner);
         // A failed root producer cannot leave the remaining clients waiting
         // forever for a task that will never be published.
-        if (owner == 0) _rootReady = true;
+        if (owner == 0) _state.RootReady = true;
         if (!_active.Remove(owner, out var task)) return;
         // A disconnected/interrupted process does not close a native subtree.
         _frontier.ReturnInterrupted(task, task.Hint ?? throw new InvalidDataException("Turn task lost its observed hint"));

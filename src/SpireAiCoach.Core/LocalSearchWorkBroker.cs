@@ -21,15 +21,20 @@ public sealed class LocalSearchWorkBroker : IDisposable
     private readonly List<Task> _sessions = [];
     private readonly Task _listener;
     private readonly string _scope;
+    private readonly bool _retainQueue;
     private readonly int _maximum;
     public string PipeName { get; } = "SpireAiCoach-search-" + Guid.NewGuid().ToString("N");
     public LocalWorkStats Stats => _queue.Stats();
 
-    public LocalSearchWorkBroker(LocalSearchRequest request, int maximum, int capacity = 512)
+    public LocalSearchWorkBroker(LocalSearchRequest request, int maximum, int capacity = 512, LocalSearchWork? retainedQueue = null)
     {
         if (maximum is < 1 or > 16) throw new ArgumentOutOfRangeException(nameof(maximum));
+        if (retainedQueue != null && !retainedQueue.Matches(request))
+            throw new InvalidDataException("Retained search queue does not match its frozen root and search domain");
         _maximum = maximum; _scope = LocalTurnWork.Scope(request);
-        _queue = new("", request with { SearchWorkPipe = null }, capacity, inMemory: true);
+        _retainQueue = retainedQueue != null;
+        _queue = retainedQueue ?? new("", request with { SearchWorkPipe = null }, capacity, inMemory: true);
+        if (retainedQueue != null) _queue.Resume();
         _listener = Task.Run(Listen);
     }
 
@@ -132,7 +137,8 @@ public sealed class LocalSearchWorkBroker : IDisposable
         foreach (var pipe in _pipes.Keys) pipe.Dispose();
         _listener.GetAwaiter().GetResult();
         Task.WhenAll(_sessions).GetAwaiter().GetResult();
-        _queue.ReleasePlans(); _queue.Dispose(); _stop.Dispose();
+        if (!_retainQueue) { _queue.ReleasePlans(); _queue.Dispose(); }
+        _stop.Dispose();
     }
 }
 

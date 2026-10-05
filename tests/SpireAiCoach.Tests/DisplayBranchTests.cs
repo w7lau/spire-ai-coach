@@ -18,6 +18,8 @@ internal static class DisplayBranchTests
     private static void Sync() { Effect(); if (Enabled) Render(); Effect(); }
     private static void Return() { if (Enabled) { Render(); return; } Effect(); }
     private static void Unguarded() => Render();
+    private static async Task Deferred() { await Task.Delay(1); if (Enabled) Render(); Effect(); }
+    private static void Multiple() { if (Enabled) Render(); Effect(); if (Enabled) Render(); }
     private static bool Match(string name)
     {
         const BindingFlags flags = BindingFlags.NonPublic | BindingFlags.Static;
@@ -39,6 +41,8 @@ internal static class DisplayBranchTests
         test("optional display audit rejects a visual temporary used outside the guard", () => Check(!Match(nameof(Leaks))));
         test("optional display audit rejects a guard controlling an effect return", () => Check(!Match(nameof(Return))));
         test("optional display audit rejects unguarded display operations", () => Check(!Match(nameof(Unguarded))));
+        test("optional display audit handles a static deferred visual after an earlier await", () => Check(Match(nameof(Deferred))));
+        test("optional display audit recognizes separate visual blocks without removing intervening effects", () => Check(Match(nameof(Multiple))));
 
         var request = new LocalSearchRequest("recovery", "snapshot", [], "root", 0, [], false);
         var failed = new LocalSearchResult(request.Id, request.SnapshotId, "failed", "route error", 2, 0, 4, null, RootBranches: 6);

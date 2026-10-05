@@ -261,7 +261,7 @@ public static class LocalWorker
         LocalCandidate? refinementSeed = null;
         // Turn work uses an exact shared frontier, separate from the old soft
         // improvement proposals. Every claimed history is replayed in its owner.
-        LocalSearchWork? work = !systematic && request.ShareSearchWork && request.Partitions > 1 && request.VerifyCandidate == null
+        LocalSearchWork? work = !systematic && request.ShareSearchWork && (request.Partitions > 1 || request.SearchWorkPipe != null) && request.VerifyCandidate == null
             ? new(Path.GetDirectoryName(_root)!, request) : null;
         int refinements = 0;
         LocalWorkerResources.Retain = true;
@@ -497,7 +497,7 @@ public static class LocalWorker
             var roots = first.Where((_, i) => i % partitions == request.Partition).ToArray();
             // More workers than first moves explore different continuations of the same first move.
             if (roots.Length == 0) roots = [first[request.Partition % first.Length]];
-            if (work != null && request.Partition == 0)
+            if (work != null && request.Partition == 0 && !request.ResumingFrontier)
             {
                 using var scheduling = Trace("schedule");
                 work.Offer("expand", first.OrderByDescending(a => a.Preference).Select(a => new[] { a }), initializeRoot: true);
@@ -511,7 +511,7 @@ public static class LocalWorker
             if (turns != null)
             {
                 var rootPlayer = LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!;
-                if (sharedTurns == null || request.Partition == 0)
+                if (!request.ResumingFrontier && (sharedTurns == null || request.Partition == 0))
                 {
                     int round = CombatManager.Instance.DebugOnlyGetState()!.RoundNumber;
                     var hint = TurnHint(rootPlayer, rootPlayer.Creature.CurrentHp, []);

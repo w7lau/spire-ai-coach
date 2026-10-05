@@ -1,0 +1,273 @@
+{
+  "version": "0.7.54",
+  "sourceBase": "826dc43",
+  "coreTests": {
+    "passed": 367,
+    "total": 367
+  },
+  "native": {
+    "version": "0.7.54",
+    "passed": true,
+    "scope": "Two batches of native search for both parent queues; losing first result with pending work; one worker",
+    "productLimitsUnchanged": true,
+    "completedPrefixDeduplicationSeparatelyTested": true,
+    "samples": [
+      {
+        "order": "MonteCarlo",
+        "Evaluated": 4,
+        "firstPending": 85,
+        "secondEvaluated": 3,
+        "resumed": true,
+        "Batch": 2,
+        "TotalEvaluated": 7,
+        "Pending": 134,
+        "firstElapsedMs": 18252,
+        "secondElapsedMs": 800,
+        "freshNativeCaptureMatched": true,
+        "deadCandidateCanResume": true,
+        "deadCandidateCanExecute": false,
+        "nativeContinueButtonEnabled": true,
+        "nativeExecuteButtonDisabled": true,
+        "nativeChangedGoalDisabled": true,
+        "failures": 0,
+        "sourceCombatUnchanged": true,
+        "firstWork": {
+          "Submitted": 89,
+          "Claimed": 4,
+          "Completed": 4,
+          "DuplicateOffers": 116,
+          "Pending": 85,
+          "Active": 0,
+          "CoveredJobs": 0,
+          "RootReady": true
+        },
+        "secondWork": {
+          "Submitted": 141,
+          "Claimed": 7,
+          "Completed": 7,
+          "DuplicateOffers": 205,
+          "Pending": 134,
+          "Active": 0,
+          "CoveredJobs": 0,
+          "RootReady": true
+        },
+        "firstTurns": null,
+        "secondTurns": null
+      },
+      {
+        "order": "TurnFrontier",
+        "Evaluated": 4,
+        "firstPending": 84,
+        "secondEvaluated": 3,
+        "resumed": true,
+        "Batch": 2,
+        "TotalEvaluated": 7,
+        "Pending": 123,
+        "firstElapsedMs": 1315,
+        "secondElapsedMs": 1084,
+        "freshNativeCaptureMatched": true,
+        "deadCandidateCanResume": true,
+        "deadCandidateCanExecute": false,
+        "nativeContinueButtonEnabled": true,
+        "nativeExecuteButtonDisabled": true,
+        "nativeChangedGoalDisabled": true,
+        "failures": 0,
+        "sourceCombatUnchanged": true,
+        "firstWork": null,
+        "secondWork": null,
+        "firstTurns": {
+          "Probes": 0,
+          "BoundPruned": 0,
+          "Offered": 88,
+          "DuplicateOffers": 0,
+          "Pending": 84,
+          "UnknownRecoveryChecks": 0,
+          "CoveredPrefixes": 0,
+          "CompletedHistories": 4,
+          "RepeatedHistories": 0,
+          "ClaimedByRound": {
+            "1": 4
+          },
+          "RolloutStyles": {
+            "Preparation": 3,
+            "Balanced": 1
+          },
+          "Outcomes": [
+            {
+              "Worker": 0,
+              "Attempt": 1,
+              "CompletedMs": 250.8439,
+              "Won": false,
+              "Hp": 0,
+              "GrossLoss": 1,
+              "Rounds": 1,
+              "Potions": 0,
+              "Style": 1,
+              "DamageSources": {
+                "Enemy": 1,
+                "Self": 0,
+                "Unknown": 0,
+                "Unattributed": 0,
+                "AccountingMatches": true,
+                "Complete": true
+              }
+            },
+            {
+              "Worker": 0,
+              "Attempt": 2,
+              "CompletedMs": 322.8885,
+              "Won": false,
+              "Hp": 0,
+              "GrossLoss": 1,
+              "Rounds": 1,
+              "Potions": 0,
+              "Style": 1,
+              "DamageSources": {
+                "Enemy": 1,
+                "Self": 0,
+                "Unknown": 0,
+                "Unattributed": 0,
+                "AccountingMatches": true,
+                "Complete": true
+              }
+            },
+            {
+              "Worker": 0,
+              "Attempt": 3,
+              "CompletedMs": 358.8325,
+              "Won": false,
+              "Hp": 0,
+              "GrossLoss": 1,
+              "Rounds": 1,
+              "Potions": 0,
+              "Style": 0,
+              "DamageSources": {
+                "Enemy": 1,
+                "Self": 0,
+                "Unknown": 0,
+                "Unattributed": 0,
+                "AccountingMatches": true,
+                "Complete": true
+              }
+            },
+            {
+              "Worker": 0,
+              "Attempt": 4,
+              "CompletedMs": 407.287,
+              "Won": false,
+              "Hp": 0,
+              "GrossLoss": 1,
+              "Rounds": 1,
+              "Potions": 0,
+              "Style": 1,
+              "DamageSources": {
+                "Enemy": 1,
+                "Self": 0,
+                "Unknown": 0,
+                "Unattributed": 0,
+                "AccountingMatches": true,
+                "Complete": true
+              }
+            }
+          ],
+          "LossProofProbes": 0
+        },
+        "secondTurns": {
+          "Probes": 0,
+          "BoundPruned": 0,
+          "Offered": 130,
+          "DuplicateOffers": 0,
+          "Pending": 123,
+          "UnknownRecoveryChecks": 0,
+          "CoveredPrefixes": 0,
+          "CompletedHistories": 7,
+          "RepeatedHistories": 0,
+          "ClaimedByRound": {
+            "1": 7
+          },
+          "RolloutStyles": {
+            "Preparation": 2
+          },
+          "Outcomes": [
+            {
+              "Worker": 0,
+              "Attempt": 1,
+              "CompletedMs": 160.936,
+              "Won": false,
+              "Hp": 0,
+              "GrossLoss": 1,
+              "Rounds": 1,
+              "Potions": 0,
+              "Style": 1,
+              "DamageSources": {
+                "Enemy": 1,
+                "Self": 0,
+                "Unknown": 0,
+                "Unattributed": 0,
+                "AccountingMatches": true,
+                "Complete": true
+              }
+            },
+            {
+              "Worker": 0,
+              "Attempt": 2,
+              "CompletedMs": 207.9501,
+              "Won": false,
+              "Hp": 0,
+              "GrossLoss": 1,
+              "Rounds": 1,
+              "Potions": 0,
+              "Style": 1,
+              "DamageSources": {
+                "Enemy": 1,
+                "Self": 0,
+                "Unknown": 0,
+                "Unattributed": 0,
+                "AccountingMatches": true,
+                "Complete": true
+              }
+            },
+            {
+              "Worker": 0,
+              "Attempt": 3,
+              "CompletedMs": 243.155,
+              "Won": false,
+              "Hp": 0,
+              "GrossLoss": 1,
+              "Rounds": 1,
+              "Potions": 0,
+              "Style": 0,
+              "DamageSources": {
+                "Enemy": 1,
+                "Self": 0,
+                "Unknown": 0,
+                "Unattributed": 0,
+                "AccountingMatches": true,
+                "Complete": true
+              }
+            }
+          ],
+          "LossProofProbes": 0
+        }
+      }
+    ]
+  },
+  "nativeTestDllSha256": "66f09e89ee791fe8bc62bf08162b30525eac95dddb871e7bbd0e167c28d0e21f",
+  "packageDllIdentical": true,
+  "scope": "Fixed synthetic losing search root; queue continuation and native UI availability; no full-battle speed or optimality benchmark",
+  "oldReleasedQueueRecoverable": false,
+  "nativeTestsTouchedPlayerGame": false,
+  "installation": {
+    "version": "0.7.54",
+    "time": "2026-10-05T21:31:20.375263+08:00",
+    "previous_version": "0.7.53",
+    "previous_dll_sha256": "280fceef0b684a007582a989e671f2f8070489533b0d8710e52c562106a1dc19",
+    "installed_dll_sha256": "66f09e89ee791fe8bc62bf08162b30525eac95dddb871e7bbd0e167c28d0e21f",
+    "zip_sha256": "f8358d166ab1139fee7cf4ef9fbe31320163a25e42b3b3f6674f8152608443c6",
+    "native_test_dll_identical": true,
+    "protected_files": 536,
+    "protected_files_unchanged": true,
+    "cache_cleanup": false,
+    "started_player": false
+  }
+}

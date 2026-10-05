@@ -24,7 +24,7 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     bool ReuseDecisionFingerprint = true, bool AsyncProgressOutput = true, bool MemorySearchWork = true,
     bool MemoryProgress = true, string? ProgressPipe = null, bool ReuseFingerprintBuffer = true,
     LocalCardGoals? CardGoals = null, string? MinimumLossPipe = null, bool StopOnFirstWin = false,
-    LocalEventEntry? EventEntry = null);
+    LocalEventEntry? EventEntry = null, bool ResumingFrontier = false);
 
 // A stop belongs to one frozen request. Goal stops exclude verification;
 // explicit caller cancellation also applies during verification or with goals off.
@@ -88,7 +88,7 @@ public sealed record LocalSearchResult(string Id, string SnapshotId, string Stat
     LocalHealthBoundStats? HealthBounds = null, LocalSimulationFailure? Failure = null,
     LocalSimulationFailure[]? RecoveredFailures = null, LocalCardGoals? CardGoals = null,
     LocalMinimumLossStatus? MinimumLoss = null, LocalSearchEvidence? Evidence = null,
-    bool StoppedOnFirstWin = false, bool StoppedOnCardGoals = false);
+    bool StoppedOnFirstWin = false, bool StoppedOnCardGoals = false, LocalSearchProgress? SearchProgress = null);
 
 public static class LocalSearchPolicy
 {
@@ -237,6 +237,9 @@ public static class LocalSearchPolicy
             lines.Add($"原生终局：获胜 {evidence.TerminalWins}，死亡 {evidence.TerminalLosses}；回合上限 {evidence.RoundLimitHits}，操作上限 {evidence.ActionLimitHits}，时间中断 {evidence.TimeLimitHits}。" +
                 $"分页选牌观察 {evidence.PagedChoiceObservations} 次，重放中补交 {evidence.PagedReplayBranches} 个选牌前缀（提交数含去重前重复，不代表已完成搜索）。");
         }
+        if (result.SearchProgress is { } saved)
+            lines.Insert(1, $"{(saved.Resumed ? "已接着上次进度搜索" : "搜索进度已保留")} · 第 {saved.Batch} 批，累计评估 {saved.TotalEvaluated} 条路线、获胜 {saved.TotalVictories} 条。" +
+                (saved.CanContinue ? $"剩余 {saved.Pending} 个待探索前缀，可点击「继续搜索」。" : "当前已发现的待探索队列为空。"));
         if (result.VerificationSkipped)
             lines.Insert(1, HasExecutionPoints(result) ?
                 "已跳过最终复核：可点击执行方案，执行时逐步核对首次模拟记录，偏离即停止。" :
