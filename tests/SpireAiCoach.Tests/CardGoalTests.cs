@@ -19,6 +19,44 @@ static class CardGoalTests
 
     public static void Register(Action<string, Action> test)
     {
+        test("goal exploration keeps an achieved goal outside the strict HP allowance without returning it", () =>
+        {
+            var goals = Goals(5);
+            var healthy = Win(50, 0, 0);
+            var achieved = Win(45, 0, 1);
+            Check(!LocalSearchPolicy.Better(achieved, healthy, goals), "Returned loss 5 under a strict less-than-5 allowance");
+            Check(LocalCardGoalTactics.BetterExplorationSeed(achieved, healthy, goals),
+                "Discarded the achieved goal before refining its HP cost");
+            Check(!LocalCardGoalTactics.BetterExplorationSeed(healthy, achieved, goals),
+                "Goal-free incumbent took over the goal refinement lane");
+            var improved = Win(46, 0, 1);
+            Check(LocalCardGoalTactics.BetterExplorationSeed(improved, achieved, goals) &&
+                LocalSearchPolicy.Better(improved, healthy, goals), "A refined loss-4 goal did not enter final selection");
+            Check(!LocalCardGoalTactics.BetterExplorationSeed(achieved with { Won = false }, null, goals) &&
+                !LocalCardGoalTactics.BetterExplorationSeed(achieved with { Dead = true }, null, goals),
+                "Incomplete or dead goal became a winning search seed");
+            Check(!LocalCardGoalTactics.BetterExplorationSeed(achieved, healthy, null),
+                "Changed health exploration when optional goals were disabled");
+        });
+        test("turn goal feedback refines a measured finishing win while retaining the full native frontier", () =>
+        {
+            var goals = Goals(5); var search = new LocalTurnSearch(1, cardGoals: goals);
+            var hint = new LocalTurnHint(50, 50, 100, 100);
+            LocalAction Move(uint id, string hash = "root") => new(0, "mod:card", null, "", "", hash,
+                1, CombatCardIndex: id);
+            for (uint i = 10; i < 30; i++) search.Offer([Move(i)], 1, hint);
+            var root = Move(0); var hit = Move(1, "later"); var alternate = Move(2, "later");
+            var point = new LocalDecision(1, [hit, alternate]);
+            search.OfferAlternatives([root, hit], point, hint);
+            search.ObserveOutcome(Win(50, 0, 0));
+            var measuredGoal = Win(45, 0, 1) with { Actions = [root, hit], Decisions = [point] };
+            search.ObserveOutcome(measuredGoal);
+            Check(search.TryTake(out _) && search.TryTake(out var guided) &&
+                guided.Prefix.Length == 2 && guided.Prefix[1].CombatCardIndex == 2 &&
+                guided.Continuation is { Length: 1 } && guided.Continuation[0].CombatCardIndex == 1,
+                "Achieved-goal feedback was buried by the healthier goal-free win");
+            Check(search.Count == 19, "Goal feedback removed unrelated exact branches");
+        });
         test("finisher goals can improve soft winning tails without rewriting exact prefixes or potion setup", () =>
         {
             var hunt = new LocalAction(0, "mod:finisher", 1, "", "", "root", CombatCardIndex: 12);

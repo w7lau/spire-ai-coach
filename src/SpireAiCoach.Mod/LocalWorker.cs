@@ -254,6 +254,8 @@ public static class LocalWorker
                 turns.ClaimedByRound, rolloutStyles, turnOutcomes.ToArray(), lossProofProbes);
         var search = noPotionSearch;
         var refiner = new LocalRouteRefiner();
+        var goalRefiner = request.CardGoals?.Enabled == true ? new LocalRouteRefiner() : null;
+        LocalCandidate? goalSeed = null;
         var policy = turnMode || request.CorrelatedRollouts && !systematic ? new LocalRolloutPolicy(314159 + request.Partition, request.CardGoals) : null;
         LocalCandidate? refinementSeed = null;
         // Turn work uses an exact shared frontier, separate from the old soft
@@ -548,6 +550,8 @@ public static class LocalWorker
                 var proposalSeed = work == null ? refinementSeed : best;
                 if (!systematic && proposalSeed != null) refiner.Offer(proposalSeed, work == null ? request.Partition : 0,
                     work == null ? request.Partitions : 1);
+                if (!systematic && goalSeed != null) goalRefiner!.Offer(goalSeed,
+                    work == null ? request.Partition : 0, work == null ? request.Partitions : 1);
                 LocalAction[]? planned = null;
                 LocalTurnTask? turnTask = null;
                 bool fullRollout = !turnMode || LocalTurnSearch.IsFullRollout(attempts);
@@ -576,7 +580,11 @@ public static class LocalWorker
                 {
                     using var scheduling = Trace("schedule");
                     var proposals = new List<LocalAction[]>();
-                    while (refiner.TryTake(out var proposal)) proposals.Add(proposal);
+                    while (refiner.Count > 0 || goalRefiner?.Count > 0)
+                    {
+                        if (goalRefiner != null && goalRefiner.TryTake(out var goalProposal)) proposals.Add(goalProposal);
+                        if (refiner.TryTake(out var proposal)) proposals.Add(proposal);
+                    }
                     work.Offer("improve", proposals);
                     bool improving = evaluated % 2 == 1 || evaluated == 0 && request.InitialPlan is { Length: > 0 };
                     sharedTask = work.Take(improving ? "improve" : "expand", request.Partition,
@@ -601,8 +609,12 @@ public static class LocalWorker
                 else
                 {
                     if (evaluated == 0 && request.InitialPlan is { Length: > 0 }) planned = request.InitialPlan;
-                    if (!systematic && (evaluated % 2 == 1 || search.Exhausted) && refiner.TryTake(out var proposal))
-                    { planned = proposal; refinements++; }
+                    if (!systematic && (evaluated % 2 == 1 || search.Exhausted))
+                    {
+                        if (evaluated % 4 == 1 && goalRefiner != null && goalRefiner.TryTake(out var goalProposal))
+                        { planned = goalProposal; refinements++; }
+                        else if (refiner.TryTake(out var proposal)) { planned = proposal; refinements++; }
+                    }
                 }
                 route = ++attempts;
                 _rolloutStyle = turnMode && fullRollout ? sharedTurns != null || turnTask!.FullRollout ? turnTask!.Style :
@@ -1018,15 +1030,20 @@ public static class LocalWorker
                     else if (completeAttempt) evaluated++;
                     if (won) victories++;
                     Progress(won ? "路线获胜" : candidate.StopReason, Observe(player), true);
-                    if (completeAttempt && LocalSearchPolicy.BetterForGoal(candidate, best, request))
+                    bool improvesBest = completeAttempt && LocalSearchPolicy.BetterForGoal(candidate, best, request);
+                    bool improvesGoalSeed = completeAttempt && request.CardGoals is { Enabled: true } selectedGoals &&
+                        selectedGoals.Counts(candidate) != (0, 0) &&
+                        LocalCardGoalTactics.BetterExplorationSeed(candidate, goalSeed, selectedGoals);
+                    if (improvesGoalSeed) goalSeed = candidate;
+                    if ((improvesBest || improvesGoalSeed) && turns != null && request.GuideWinningRoutes)
                     {
-                        if (turns != null && request.GuideWinningRoutes)
-                        {
-                            // One broker message carries both measured feedback
-                            // and affinity; avoid sending the same native route twice.
-                            turns.ObserveOutcome(candidate);
-                            if (sharedTurns == null) turns.PromoteWinning(candidate);
-                        }
+                        // Actual achieved goals also guide lowering their HP cost.
+                        // One message preserves owned-prefix checks and affinity.
+                        turns.ObserveOutcome(candidate);
+                        if (sharedTurns == null) turns.PromoteWinning(candidate);
+                    }
+                    if (improvesBest)
+                    {
                         best = candidate; bestRoute = route;
                         LocalWire.Write(Path.Combine(_root, "search-seed.json"),
                             new LocalSearchSeed(request.Id, request.SnapshotId, request.NativeHash,
