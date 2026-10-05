@@ -87,6 +87,7 @@ public static class LocalWorker
         LocalWorkerVisuals.Install(harmony);
         LocalWorkerBootstrap.Install(harmony);
         LocalWorkerDataMode.Install(harmony);
+        LocalModelDisplay.Install();
         LocalWorkerLogic.Install();
         LocalHpAccounting.Install();
         LocalWorkerOverhead.Install();
@@ -327,7 +328,7 @@ public static class LocalWorker
             using var measuring = MeasureMethod("LocalWorker.Publish");
             lastResult = timer.ElapsedMilliseconds; lastPublishedBest = best;
             if (status != "running") LocalWire.Write(Path.Combine(_root, "runtime.json"), new
-                { status, mode = LocalWorkerDataMode.MinimalRun ? "native-model" : LocalWorkerDataMode.Active ? "no-combat-scene" : "regular-scene",
+                { status, model_display = LocalModelDisplay.Status(), mode = LocalWorkerDataMode.MinimalRun ? "native-model" : LocalWorkerDataMode.Active ? "no-combat-scene" : "regular-scene",
                     max_fps = Engine.MaxFps, observed_fps = Engine.GetFramesPerSecond(), numerical = LocalWorkerLogic.Counters(),
                     overhead = LocalWorkerOverhead.Status(), verification = LocalWorkerVerification.Status(), preload_enabled = PreloadManager.Enabled,
                     progress_transport = new { pipe = progressSender?.Connected == true, fallback = progressSender?.Fallback } });
@@ -1012,7 +1013,8 @@ public static class LocalWorker
                             turns.PrioritizeLossProof(minimumStatus.Focus ?? []);
                         }
                     }
-                    bool completeAttempt = !turnProbed && !cut && !covered && (fullRollout || IsTerminal(player));
+                    bool completeAttempt = LocalSearchRecovery.CompleteTrial(turnProbed, cut, covered,
+                        fullRollout, IsTerminal(player), stop == "达到时间预算");
                     if (turnMode && completeAttempt)
                         turnOutcomes.Add(new(request.Partition, route, _timeline!.ElapsedMs, won, candidate.Hp, health.HpLost,
                             candidate.Rounds, actions.Count(a => a.PotionSlot.HasValue), _rolloutStyle, candidate.DamageSources));

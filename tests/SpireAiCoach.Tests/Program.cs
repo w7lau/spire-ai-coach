@@ -23,6 +23,7 @@ CardGoalTests.Register(Test);
 FollowupTests.Register(Test);
 DiscardEffectsTests.Register(Test);
 SummonPresentationTests.Register(Test);
+DisplayBranchTests.Register(Test, AsyncTest);
 EventEntryTests.Register(Test);
 NativeOverheadTests.Register(Test, AsyncTest);
 ProgressTransportTests.Register(Test, AsyncTest);

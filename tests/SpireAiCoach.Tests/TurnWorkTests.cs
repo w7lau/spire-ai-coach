@@ -11,6 +11,25 @@ static class TurnWorkTests
 
     public static void Register(Action<string, Action> test, Action<string, Func<Task>> asyncTest)
     {
+        test("budget-returned turn task neither publishes an incomplete outcome nor closes its returned prefix", () =>
+        {
+            var captured = Request(); using var broker = new LocalTurnWork(captured, 2);
+            using var owner = new LocalTurnWorkClient(captured with { TurnWorkPipe = broker.PipeName });
+            var start = Move(0); owner.Offer([start], 1, Hint());
+            Check(owner.TryTake(out var task), "Missing native task");
+            owner.ReturnInterrupted(task, Hint());
+            var partial = new LocalCandidate([start], 50, 0, 100, 0, 50, false, false, false, StopReason: "达到时间预算");
+            bool complete = LocalSearchRecovery.CompleteTrial(false, false, false, true, false, true);
+            Check(!complete, "Budget partial was certified as complete");
+            if (complete) owner.ObserveOutcome(partial);
+            owner.Finish(task);
+            Check(owner.TryTake(out var resumed) && resumed.Prefix.SequenceEqual(task.Prefix), "Returned task was lost or closed");
+            owner.ObserveOutcome(partial with { Won = true, EnemyHp = 0, StopReason = "won" });
+            owner.Finish(resumed);
+            bool rejected = false;
+            try { owner.ObserveOutcome(partial); } catch (InvalidOperationException) { rejected = true; }
+            Check(rejected, "Unowned outcomes bypassed the ownership gate");
+        });
         test("shared turn work closed broker still releases client resources", () =>
         {
             var captured = Request(); var broker = new LocalTurnWork(captured, 2);

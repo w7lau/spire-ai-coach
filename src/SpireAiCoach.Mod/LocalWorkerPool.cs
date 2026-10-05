@@ -124,7 +124,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             progress("准备计算…");
             var results = (await LocalConcurrency.Run(count, LocalConcurrency.AdaptiveAdmission(request.Workers, request.AdaptiveWorkers), shared, Launch, Demand,
                 () => goalReached.IsCancellationRequested,
-                r => request.DataOnlyCombat && r.Status is "failed" or "unsupported" or "partial", cancellation)).ToList();
+                r => LocalSearchRecovery.AbortPass(request, r), cancellation)).ToList();
             int used = results.Count;
             // The warmup gate does not wait for engine startup. Import its
             // completed startup spans now, clipped to this calculation only.
@@ -134,7 +134,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 results.Count == 1 && results[0].Status == "audited")
                 throw new CoachException("local_audit_complete", "所属实例已完成只读回复检查；没有可执行方案。");
             if (request.DataOnlyCombat && (!goalReached.IsCancellationRequested || goalMinimumLoss > 0 && Volatile.Read(ref consumableGoalReached) == 0) &&
-                results.Any(r => r.Status is "failed" or "unsupported" or "partial"))
+                LocalSearchRecovery.NeedsCompatibilityPass(request, results))
             {
                 var failure = new CoachException("local_data_unavailable", string.Join("\n", results.Select(r => r.Message).Distinct()));
                 failure.Data["local_failures"] = results.Where(r => r.Failure != null).Select(r => r.Failure!).ToArray();
@@ -221,6 +221,9 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 MinimumLoss = minimumLoss?.Status,
                 Id = request.Id,
                 Trials = results.SelectMany(r => r.Trials ?? []).OrderBy(t => t.FinishedMs).ToArray(),
+                RecoveredFailures = results.Where(r => r.Status is "failed" or "unsupported" or "partial")
+                    .Where(r => r.Failure != null).Select(r => r.Failure!)
+                    .Concat(results.SelectMany(r => r.RecoveredFailures ?? [])).ToArray(),
                 HealthBounds = new(results.Sum(r => r.HealthBounds?.Pruned ?? 0),
                     results.Sum(r => r.HealthBounds?.KnownRecoveryChecks ?? 0),
                     results.Sum(r => r.HealthBounds?.UnknownRecoveryChecks ?? 0),
