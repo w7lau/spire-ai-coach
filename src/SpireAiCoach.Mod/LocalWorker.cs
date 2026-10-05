@@ -688,7 +688,7 @@ public static class LocalWorker
                         }
                         decisionStarted = Stopwatch.GetTimestamp();
                         using var deciding = Trace("decision");
-                        var legal = EnumerateActions();
+                        var legal = EnumerateActions(out var finisherHints);
                         var proofLegal = proofSteps == null ? null : legal;
                         bool proofComplete = _includePotions == request.IncludePotions;
                         if (partition != null) legal = partition.Assign(legal);
@@ -763,6 +763,15 @@ public static class LocalWorker
                         }
                         else if (!systematic && preferred == null && evaluated == 0 && actions.Count == 0)
                             preferred = roots.OrderByDescending(a => a.Preference).First();
+                        // Reused winning tails are proposals, not replay assertions.
+                        // After measuring the baseline, allow the current goal to
+                        // improve a soft tail instead of blindly spending its finite
+                        // finisher again. Exact expansion prefixes remain untouched.
+                        bool adaptGoalTail = evaluated > 0 && !exactAction &&
+                            (turnMode || work == null || sharedTask?.Kind == "improve");
+                        var adapted = LocalCardGoalTactics.AdaptSoftContinuation(preferred,
+                            finisherHints.Where(h => legal.Contains(h.Action)).ToArray(), adaptGoalTail);
+                        if (adapted != preferred) { preferred = adapted; plannedAction = null; }
                         // Explore explicit branch proposals, then continue most trials coherently.
                         // Randomizing every card in a long rollout almost never preserves a combo.
                         // Monte Carlo retains stochastic trials. The turn frontier
@@ -998,9 +1007,11 @@ public static class LocalWorker
                     if (!turnProbed && !cut && trials.Count < 129)
                         trials.Add(new(request.Partition, route, _timeline!.ElapsedMs, candidate.Won, candidate.Hp,
                             candidate.NetHpLoss, candidate.Rounds, actions.Count(a => a.PotionSlot.HasValue), completeAttempt,
-                            sharedTask?.Kind == "expand" ? LocalSearchWork.MatchesPrefix(actions, sharedTask.Plan) : null));
+                            sharedTask?.Kind == "expand" ? LocalSearchWork.MatchesPrefix(actions, sharedTask.Plan) : null,
+                            candidate.CardGoalOutcome?.Plays, candidate.CardGoalOutcome?.Kills));
                     using (Trace("trial-result", $"won={won};hp={candidate.Hp};loss={candidate.NetHpLoss};gross={candidate.HpLost};potions={actions.Count(a => a.PotionSlot.HasValue)};" +
-                        $"rounds={candidate.Rounds};complete={completeAttempt};probe={turnProbed};cut={cut};limited={stop == "达到时间预算"}")) { }
+                        $"rounds={candidate.Rounds};plays={candidate.CardGoalOutcome?.Plays};finishers={candidate.CardGoalOutcome?.Kills};" +
+                        $"complete={completeAttempt};probe={turnProbed};cut={cut};limited={stop == "达到时间预算"}")) { }
                     if (turnTask != null && stop != "达到时间预算" && !cut)
                         turns!.FocusNext(turnTask, actions, decisions);
                     if (turnProbed) { probes++; if (turnTask?.LossProof == true) lossProofProbes++; }
@@ -1414,13 +1425,16 @@ public static class LocalWorker
         finally { _restoreDepth = 0; }
     }
 
-    private static LocalAction[] EnumerateActions()
+    private static LocalAction[] EnumerateActions() => EnumerateActions(out _);
+
+    private static LocalAction[] EnumerateActions(out LocalFinisherHint[] finisherHints)
     {
         var state = CombatManager.Instance.DebugOnlyGetState()!;
         var player = LocalContext.GetMe(state)!;
         DecisionFingerprint.Clear();
         const string hash = "";
         var result = new List<LocalAction>();
+        var finiteHints = new List<(int Index, int Priority)>();
         var hand = player.PlayerCombatState!.Hand.Cards;
         // CanPlay walks the hook chain. Query once per card and reuse within this settled
         // decision, instead of recomputing the full hand for every card/target preview.
@@ -1460,6 +1474,9 @@ public static class LocalWorker
                 var target = state.Creatures.FirstOrDefault(c => c.CombatId == action.TargetId);
                 result[i] = action with { Preference = action.Preference +
                     tactics.CardGoalPriority(hand[action.HandIndex], target, goals) };
+                var card = hand[action.HandIndex];
+                if (card.Id.ToString() == goals.FinisherModelId && card.Keywords.Contains(CardKeyword.Exhaust))
+                    finiteHints.Add((i, tactics.FinisherPriority(card, target)));
             }
         if (_includePotions)
         {
@@ -1481,7 +1498,9 @@ public static class LocalWorker
         if (_activeRequest?.ReuseDecisionFingerprint == true && _traceStage == "search" &&
             LocalWorkerLogic.Enabled && LocalWorkerLogic.Available && LocalWorkerDataMode.MinimalRun && DecisionSettled())
             DecisionFingerprint.Remember(state, fingerprint, LocalWorkerLogic.Revision, _frameVersion);
-        return result.Select(a => a with { BeforeHash = fingerprint }).ToArray();
+        var actions = result.Select(a => a with { BeforeHash = fingerprint }).ToArray();
+        finisherHints = finiteHints.Select(h => new LocalFinisherHint(actions[h.Index], h.Priority)).ToArray();
+        return actions;
     }
 
     private static async Task<LocalAction> Play(LocalAction action, Func<LocalCardChoice[], LocalCardChoice>? choose = null,

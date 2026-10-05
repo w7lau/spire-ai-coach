@@ -39,6 +39,46 @@ public sealed record LocalCardGoals(string? PlayModelId = null, string? Finisher
 // Steps permit subtraction when only the remaining suffix is displayed/reused.
 public sealed record LocalCardGoalStep(int Plays = 0, int Kills = 0);
 
+// A currently legal finite finishing opportunity, observed in this decision.
+// Priority is a preview hint, never evidence of an actual kill.
+public sealed record LocalFinisherHint(LocalAction Action, int Priority);
+
+// Ordering hints only. Native effects decide kills, and every legal sibling
+// remains available, including sacrificing a goal card to survive.
+public static class LocalCardGoalTactics
+{
+    public static LocalAction? AdaptSoftContinuation(LocalAction? proposed,
+        IReadOnlyList<LocalFinisherHint> hints, bool canAdapt)
+    {
+        if (!canAdapt || proposed == null || proposed.PotionSlot.HasValue) return proposed;
+        var ready = hints.Where(h => h.Priority > 0)
+            .OrderByDescending(h => h.Action.TargetId == proposed.TargetId)
+            .ThenByDescending(h => h.Action.Preference).FirstOrDefault();
+        if (ready != null) return ready.Action;
+        // Defer this old proposal; the complete legal set still contains it.
+        return hints.Any(h => h.Action == proposed && h.Priority < 0) ? null : proposed;
+    }
+
+    public static int FinisherPriority(bool consumable, double? damage, double hp, double block = 0)
+    {
+        if (!Known(damage, hp, block)) return 0;
+        return damage >= hp + block ? 120 : consumable ? -180 : 0;
+    }
+
+    public static int SetupPriority(double? damage, double hp, double block, double? finisherDamage)
+    {
+        if (!Known(damage, hp, block) || !double.IsFinite(finisherDamage ?? double.NaN) || finisherDamage <= 0)
+            return 0;
+        // A damage-only setup leaves the enemy alive but in the reserved card's
+        // preview range. This is not credit for a kill or a legality assertion.
+        return damage > 0 && damage < hp + block && hp + block - damage <= finisherDamage ? 50 : 0;
+    }
+
+    private static bool Known(double? damage, double hp, double block) => damage is { } value &&
+        double.IsFinite(value) && value >= 0 && double.IsFinite(hp) && hp > 0 &&
+        double.IsFinite(block) && block >= 0;
+}
+
 // A product stopping target, not an upper bound on arbitrary Mod-generated,
 // recovered or repeated plays. CompletedCopies counts distinct successful root
 // copies. Victory closes their opportunities even when cleanup omits exhaustion.

@@ -112,28 +112,47 @@ internal sealed class LocalTacticalPreview(Player player, bool efficient = false
         return vars;
     }
 
-    private double PreviewDamage(CardModel card, Creature? target)
+    private double PreviewDamage(CardModel card, Creature? target) => DamageHint(card, target) ?? 0;
+
+    private double? DamageHint(CardModel card, Creature? target)
     {
         try
         {
-            if (!card.DynamicVars.Keys.Any(k => k is "Damage" or "CalculatedDamage")) return 0;
+            if (!card.DynamicVars.Keys.Any(k => k is "Damage" or "CalculatedDamage")) return null;
             var vars = Preview(card, target);
             double Value(string key) => vars.TryGetValue(key, out var v) ? Math.Max(0, (double)v.PreviewValue) : 0;
             return Math.Max(Value("Damage"), Value("CalculatedDamage")) * Math.Max(1, Value("Repeat"));
         }
-        catch { return 0; } // An opaque sibling preview must not erase known defense hints.
+        catch { return null; } // Unknown effects remain neutral, never impossible.
     }
 
     public int CardGoalPriority(CardModel card, Creature? target, LocalCardGoals goals)
     {
         int hint = card.Id.ToString() == goals.PlayModelId ? 30 : 0;
-        if (target?.IsEnemy != true || PreviewDamage(card, target) < target.CurrentHp + target.Block) return hint;
-        if (card.Id.ToString() == goals.FinisherModelId) return hint + 120;
+        if (target?.IsEnemy != true) return hint;
+        var damage = DamageHint(card, target);
+        if (card.Id.ToString() == goals.FinisherModelId)
+            return hint + FinisherPriority(card, target);
         // Reserve a potential finishing blow only if that model is actually playable.
         // Unknown effects remain native candidates; this is never a legality filter.
-        if (_playable.Any(c => c.Id.ToString() == goals.FinisherModelId)) hint -= 60;
+        var finishers = _playable.Where(c => c.Id.ToString() == goals.FinisherModelId).ToArray();
+        if (damage >= target.CurrentHp + target.Block && finishers.Length > 0) hint -= 60;
+        else foreach (var finisher in finishers)
+        {
+            if (card.EnergyCost.CostsX || card.HasStarCostX || finisher.EnergyCost.CostsX || finisher.HasStarCostX)
+                continue;
+            if (card.EnergyCost.GetAmountToSpend() + finisher.EnergyCost.GetAmountToSpend() > player.PlayerCombatState!.Energy ||
+                card.GetStarCostWithModifiers() + finisher.GetStarCostWithModifiers() > player.PlayerCombatState.Stars)
+                continue;
+            if (LocalCardGoalTactics.SetupPriority(damage, target.CurrentHp, target.Block, DamageHint(finisher, target)) > 0)
+            { hint += 50; break; }
+        }
         return hint;
     }
+
+    internal int FinisherPriority(CardModel card, Creature? target) => target?.IsEnemy == true
+        ? LocalCardGoalTactics.FinisherPriority(card.Keywords.Contains(CardKeyword.Exhaust),
+            DamageHint(card, target), target.CurrentHp, target.Block) : 0;
 
     internal LocalFollowupCard Followup(CardModel card, LocalRolloutStyle style, Func<CardModel, int, int> learned)
     {

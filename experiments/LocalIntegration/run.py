@@ -68,6 +68,7 @@ parser.add_argument('--route-feedback-focused-only', action='store_true')
 parser.add_argument('--recent-search-test', action='store_true', help='Frozen unseeded incident; preserve its trial/time/turn limits and report incomplete search honestly')
 parser.add_argument('--selection-paging-test', action='store_true')
 parser.add_argument('--card-goals-test', action='store_true')
+parser.add_argument('--finisher-retention-test', action='store_true', help='Selected-finisher frozen incident, including previous route, with original budget and independent final verification')
 parser.add_argument('--followup-test', action='store_true', help='Short synthetic native return-to-hand/topdeck ordering probe; no full search')
 parser.add_argument('--recovery-audit', action='store_true', help='Inspect one frozen root and its actual loaded Mod callbacks; no route search or play')
 parser.add_argument('--health-audit', action='store_true', help='Also check low-level HP writes and nested healing in the owned worker')
@@ -76,6 +77,8 @@ parser.add_argument('--discard-test', action='store_true', help='Short native di
 parser.add_argument('--summon-presentation-test', action='store_true', help='Only the frozen incident first enemy turn; compare ordinary and scene-free native states')
 parser.add_argument('--event-entry-test', action='store_true', help='Recreate a frozen event-combat root and verify generic native entry-history replay')
 args = parser.parse_args()
+if args.finisher_retention_test and (not args.replay or args.seed_result or args.recorded_replay):
+    parser.error('--finisher-retention-test requires a frozen --replay without an extra answer seed or recorded replay')
 if args.event_entry_test and (not args.replay or args.seed_result or args.recorded_replay):
     parser.error('--event-entry-test requires an unseeded frozen --replay')
 if args.summon_presentation_test and (not args.replay or args.seed_result or args.recorded_replay):
@@ -148,6 +151,12 @@ if not (root / '.spire-native-probe-owner').is_file() or not (root / 'fixture.js
     raise ValueError('Prepare an owned synthetic NativeProbe workspace first')
 with worker_lock(root):
     repo = here.parent.parent
+    if args.finisher_retention_test:
+        if not args.game or not (args.game / 'release_info.json').is_file():
+            raise ValueError('Frozen Mod regression requires the actual game release metadata')
+        # Version-selecting Mod loaders need the same native release metadata.
+        # Copy it into this owned host, never invent a version or relax model checks.
+        shutil.copy2(args.game / 'release_info.json', root / 'game/release_info.json')
     coach = root / 'game/mods/SpireAiCoach'
     coach.mkdir(exist_ok=True)
     shutil.copy2(repo / 'src/SpireAiCoach.Mod/bin/Release/net9.0/SpireAiCoach.dll', coach)
@@ -166,6 +175,10 @@ with worker_lock(root):
         (root / name).unlink(missing_ok=True)
     if args.recent_search_test:
         for name in ['integration-recent-search-summary.json', 'integration-recent-search-private.json']:
+            (root / name).unlink(missing_ok=True)
+    if args.finisher_retention_test:
+        for name in ['integration-finisher-retention-summary.json',
+                     *[f'integration-finisher-retention-{order}-private.json' for order in ('MonteCarlo', 'TurnFrontier')]]:
             (root / name).unlink(missing_ok=True)
     if args.followup_test:
         (root / 'integration-followup-summary.json').unlink(missing_ok=True)
@@ -230,6 +243,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_REPLAY'] = str(args.replay.resolve()) if args.replay else ''
     env['SPIRE_LOCAL_REPLAY_GAME'] = str(args.game.resolve()) if args.game else ''
     env['SPIRE_LOCAL_REPLAY_MODS'] = str(args.mods.resolve()) if args.mods else ''
+    env['SPIRE_LOCAL_FINISHER_RETENTION_TEST'] = '1' if args.finisher_retention_test else '0'
     env['SPIRE_LOCAL_SEED_RESULT'] = str(args.seed_result.resolve()) if args.seed_result else ''
     env['SPIRE_LOCAL_SPEED_BENCHMARK'] = '1' if args.speed_benchmark else '0'
     env['SPIRE_LOCAL_VISUAL_BENCHMARK'] = '1' if args.visual_benchmark else '0'
@@ -350,6 +364,10 @@ with worker_lock(root):
                      'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
         if args.recent_search_test:
             names = ['integration-recent-search-summary.json', 'integration-recent-search-private.json',
+                     'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.finisher_retention_test:
+            names = ['integration-finisher-retention-summary.json',
+                     *[f'integration-finisher-retention-{order}-private.json' for order in ('MonteCarlo', 'TurnFrontier')],
                      'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
         if args.search_cases:
             names = ['integration-self-search-summary.json', *[f'integration-self-search-private-{i}.json' for i in range(4)],

@@ -19,6 +19,78 @@ static class CardGoalTests
 
     public static void Register(Action<string, Action> test)
     {
+        test("finisher goals can improve soft winning tails without rewriting exact prefixes or potion setup", () =>
+        {
+            var hunt = new LocalAction(0, "mod:finisher", 1, "", "", "root", CombatCardIndex: 12);
+            var strike = new LocalAction(1, "strike", 1, "", "", "root", CombatCardIndex: 13);
+            var end = new LocalAction(-1, "", null, "", "", "root", EndTurn: true);
+            var nonlethal = new[] { new LocalFinisherHint(hunt, -180) };
+            Check(LocalCardGoalTactics.AdaptSoftContinuation(hunt, nonlethal, false) == hunt,
+                "Rewrote an exact prefix or the original baseline");
+            Check(LocalCardGoalTactics.AdaptSoftContinuation(hunt, nonlethal, true) == null,
+                "Old tail forced a spent nonlethal finisher despite the current goal");
+            var lethal = new[] { new LocalFinisherHint(hunt, 120) };
+            Check(LocalCardGoalTactics.AdaptSoftContinuation(strike, lethal, true) == hunt &&
+                LocalCardGoalTactics.AdaptSoftContinuation(end, lethal, true) == hunt,
+                "Soft tail killed or ended the turn before the available finisher");
+            Check(LocalCardGoalTactics.AdaptSoftContinuation(strike, lethal, false) == strike,
+                "Changed an exact sibling instead of measuring it");
+            var potion = new LocalAction(-1, "potion", 1, "", "", "root", PotionSlot: 0);
+            Check(LocalCardGoalTactics.AdaptSoftContinuation(potion, lethal, true) == potion,
+                "Discarded the route's proposed potion setup");
+        });
+        test("soft finisher guidance remains neutral for unknown effects and binds current copies and targets", () =>
+        {
+            var first = new LocalAction(0, "mod:finisher", 1, "", "", "root", CombatCardIndex: 12);
+            var other = first with { TargetId = 2 };
+            var copy = first with { CombatCardIndex = 13 };
+            Check(LocalCardGoalTactics.AdaptSoftContinuation(first, [new(first, 0)], true) == first,
+                "Unknown preview rejected a legal proposal");
+            Check(LocalCardGoalTactics.AdaptSoftContinuation(copy, [new(first, -180)], true) == copy,
+                "Reserved a different native copy");
+            Check(LocalCardGoalTactics.AdaptSoftContinuation(first,
+                [new(other, 120), new(first, 120)], true) == first,
+                "Changed the target despite a ready matching finisher");
+            Check(LocalCardGoalTactics.AdaptSoftContinuation(first, [], true) == first,
+                "Invented a finishing opportunity absent from native legal actions");
+        });
+        test("finisher search holds consumable nonlethal damage and sets up a later native finishing blow", () =>
+        {
+            var hunt = new LocalAction(0, "mod:finisher", 1, "", "", "root", Preference:
+                15 + LocalCardGoalTactics.FinisherPriority(true, 15, 80));
+            var defend = new LocalAction(1, "defend", null, "", "", "root", Preference: 10);
+            var end = new LocalAction(-1, "", null, "", "", "root", EndTurn: true, Preference: -15);
+            var legal = new[] { hunt, defend, end };
+            var turns = new LocalTurnSearch(1);
+            Check(turns.Choose(legal) == defend && turns.Choose([hunt, end]) == end,
+                "Spent the finite finishing opportunity on the ordinary damage baseline");
+            var strike = new LocalAction(2, "strike", 1, "", "", "root", Preference:
+                6 + LocalCardGoalTactics.SetupPriority(6, 21, 0, 15));
+            Check(turns.Choose([hunt, strike, defend]) == strike, "Ignored affordable damage that prepares the finisher");
+            var lethal = hunt with { Preference = 15 + LocalCardGoalTactics.FinisherPriority(true, 15, 15) };
+            Check(turns.Choose([lethal, strike, defend]) == lethal, "Kept reserving the now-lethal finisher");
+            var ordinary = new LocalSearchTree(1);
+            var trial = ordinary.Begin();
+            Check(ordinary.TrySelect(trial, legal, out var first, greedy: true) && first == defend,
+                "Ordinary algorithm missed the same prior");
+            Check(legal.Length == 3 && legal.Contains(hunt), "Removed the survival fallback action");
+        });
+        test("finisher hints distinguish known nonlethal damage from repeatable or opaque effects", () =>
+        {
+            Check(LocalCardGoalTactics.FinisherPriority(false, 15, 80) == 0,
+                "Repeatable card was reserved as a finite copy");
+            Check(LocalCardGoalTactics.FinisherPriority(true, null, 80) == 0 &&
+                LocalCardGoalTactics.FinisherPriority(true, double.NaN, 80) == 0,
+                "Unknown Mod effect became a nonlethal certainty");
+            Check(LocalCardGoalTactics.FinisherPriority(true, 1, 5) < 0 &&
+                LocalCardGoalTactics.FinisherPriority(true, 15, 10, 6) < 0 &&
+                LocalCardGoalTactics.FinisherPriority(true, 15, 10, 5) > 0,
+                "Preview reduction or shield boundary ignored");
+            Check(LocalCardGoalTactics.SetupPriority(20, 20, 0, 15) == 0 &&
+                LocalCardGoalTactics.SetupPriority(6, 30, 0, 15) == 0 &&
+                LocalCardGoalTactics.SetupPriority(6, 21, 0, null) == 0,
+                "Other kill or unknown followup received setup credit");
+        });
         test("card goals preserve health first and prefer native goal counts before potion ties", () =>
         {
             Check(!LocalSearchPolicy.Better(Win(49, 100, 5), Win(50, 0, 0), Goals()), "Sacrificed HP without permission");

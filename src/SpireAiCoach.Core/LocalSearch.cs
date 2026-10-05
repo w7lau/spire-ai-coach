@@ -71,7 +71,8 @@ public sealed record LocalDecision(int BeforeStep, LocalAction[] Legal, LocalCho
 public sealed record LocalChoiceDecision(int AtChoice, LocalCardChoice[] Legal);
 // Bounded per-trial metrics survive truncation of detailed native event traces.
 public sealed record LocalSearchTrial(int Worker, int Attempt, double FinishedMs, bool Won,
-    int Hp, int? NetHpLoss, int Rounds, int PotionsUsed, bool Complete, bool? ClaimedPrefixMatched = null);
+    int Hp, int? NetHpLoss, int Rounds, int PotionsUsed, bool Complete, bool? ClaimedPrefixMatched = null,
+    int? GoalPlays = null, int? FinisherKills = null);
 
 // A peer's measured route is an exploration proposal. Keep diagnostic traces
 // out of the scheduling protocol; it does not certify a result or an HP bound.
