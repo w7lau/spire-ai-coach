@@ -29,6 +29,7 @@ internal sealed class LocalCardGoalAccounting : IDisposable
     private bool _won;
     private readonly List<LocalCardGoalStep> _steps = [];
     private readonly HashSet<CardModel>? _playCopies, _finisherCopies;
+    private readonly HashSet<CardModel>? _playGoalCopies, _finisherGoalCopies;
     private readonly int _eligibleLivingEnemies;
     private readonly HashSet<CardModel> _playedCopies = new(ReferenceEqualityComparer.Instance),
         _killingCopies = new(ReferenceEqualityComparer.Instance), _exhaustedCopies = new(ReferenceEqualityComparer.Instance);
@@ -41,6 +42,8 @@ internal sealed class LocalCardGoalAccounting : IDisposable
             player.Creature.CombatState?.Enemies.Count(e => e.IsAlive && LocalFinisherEligibility.AllowsFatal(e)) ?? 0;
         _playCopies = CurrentConsumableCopies(goals?.PlayModelId);
         _finisherCopies = CurrentConsumableCopies(goals?.FinisherModelId);
+        _playGoalCopies = CurrentGoalCopies(goals?.PlayModelId);
+        _finisherGoalCopies = CurrentGoalCopies(goals?.FinisherModelId);
         if (goals?.Enabled == true)
         {
             if (_current != null) throw new InvalidOperationException("Native goal accounting already active");
@@ -148,6 +151,35 @@ internal sealed class LocalCardGoalAccounting : IDisposable
     public LocalCardGoalOutcome? Snapshot() => _goals?.Enabled == true ?
         new(_goals.PlayModelId, _goals.FinisherModelId, _plays, _kills, _steps.ToArray(),
             new(Progress(_playCopies, _playedCopies), Progress(_finisherCopies, _killingCopies, _eligibleLivingEnemies))) : null;
+
+    public LocalGoalOpportunity? Opportunity()
+    {
+        if (_goals?.Enabled != true) return null;
+        bool terminal = _won || _player.Creature.IsDead;
+        if (_player.PlayerCombatState == null && !terminal) return null;
+        // Current membership matters: exhausted cards may be recovered. Historical
+        // exhaust events alone must not make a returned copy permanently unavailable.
+        var available = new HashSet<CardModel>(terminal ? [] : _player.PlayerCombatState!.AllPiles
+            .Where(p => p.Type != PileType.Exhaust).SelectMany(p => p.Cards), ReferenceEqualityComparer.Instance);
+        int living = terminal ? 0 : _player.Creature.CombatState?.Enemies.Count(e => e.IsAlive && LocalFinisherEligibility.AllowsFatal(e)) ?? 0;
+        LocalGoalStock? Stock(HashSet<CardModel>? copies, HashSet<CardModel> completed, string? model, int? enemies = null) =>
+            copies == null ? null : new(enemies.HasValue ? Math.Min(copies.Count, enemies.Value) : copies.Count,
+                copies.Count(completed.Contains), Math.Min(enemies.HasValue ? living : int.MaxValue,
+                    copies.Count(c => !completed.Contains(c) && available.Contains(c) && c.Id.ToString() == model)));
+        return new(_goals.PlayModelId, _goals.FinisherModelId,
+            Stock(_playGoalCopies, _playedCopies, _goals.PlayModelId),
+            Stock(_finisherGoalCopies, _killingCopies, _goals.FinisherModelId, _eligibleLivingEnemies));
+    }
+
+    private HashSet<CardModel>? CurrentGoalCopies(string? model) => string.IsNullOrEmpty(model) || _player.PlayerCombatState == null ? null :
+        new(_player.PlayerCombatState!.AllPiles.Where(p => p.Type != PileType.Exhaust).SelectMany(p => p.Cards)
+            .Where(c => c.Id.ToString() == model), ReferenceEqualityComparer.Instance);
+
+    internal static int ExhaustSelectionPenalty(CardModel card) => _current is { } ledger &&
+        (ledger._playGoalCopies?.Contains(card) == true && !ledger._playedCopies.Contains(card) &&
+             ledger._playGoalCopies.Count(ledger._playedCopies.Contains) < ledger._playGoalCopies.Count ||
+         ledger._finisherGoalCopies?.Contains(card) == true && !ledger._killingCopies.Contains(card) &&
+             ledger._finisherGoalCopies.Count(ledger._killingCopies.Contains) < Math.Min(ledger._finisherGoalCopies.Count, ledger._eligibleLivingEnemies)) ? 180 : 0;
 
     private HashSet<CardModel>? CurrentConsumableCopies(string? model)
     {

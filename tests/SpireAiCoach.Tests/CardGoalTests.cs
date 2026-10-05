@@ -19,6 +19,88 @@ static class CardGoalTests
 
     public static void Register(Action<string, Action> test)
     {
+        LocalGoalOpportunity Stock(int available = 1, int completed = 0, int target = 1) =>
+            new("mod:play", "mod:finish", null, new(target, completed, available));
+        test("goal opportunity distinguishes unfulfilled consumption from successful use and spare copies", () =>
+        {
+            Check(LocalGoalOpportunity.LossPenalty(Stock(), Stock(0), Goals(100)) == 180,
+                "An indirectly consumed goal copy had no opportunity cost");
+            Check(LocalGoalOpportunity.LossPenalty(Stock(), Stock(0, 1), Goals(100)) == 0,
+                "Successful finishing consumption was penalized");
+            Check(LocalGoalOpportunity.LossPenalty(Stock(2), Stock(1), Goals()) == 0,
+                "Spending a spare copy made the one-copy target impossible");
+            Check(LocalGoalOpportunity.LossPenalty(Stock(), Stock(), Goals()) == 0 &&
+                LocalGoalOpportunity.LossPenalty(Stock(0), Stock(), Goals()) == 0,
+                "Discard, draw-pile movement or actual recovery was treated as lost availability");
+            Check(LocalGoalOpportunity.LossPenalty(Stock(), Stock(0), null) == 0 &&
+                LocalGoalOpportunity.LossPenalty(Stock(), Stock(0) with { FinisherModelId = "other" }, Goals()) == 0,
+                "Disabled or mismatched goals contributed opportunity evidence");
+        });
+        test("native goal loss learning covers any action and stays bound to the exact history and choices", () =>
+        {
+            var learning = new LocalGoalLossLearning(Goals(100));
+            var before = new LocalAction(0, "mod:setup", null, "", "", "root", 1, CombatCardIndex: 1);
+            var loss = new LocalAction(-1, "mod:opaque-effect", null, "", "", "later", 1, EndTurn: true);
+            learning.Begin(); learning.CompleteStep(before, Stock(), Stock());
+            learning.CompleteStep(loss, Stock(), Stock(0));
+            learning.Begin();
+            Check(learning.Penalty(loss) == 0, "An ancestor shared another history's effect");
+            learning.CompleteStep(before, Stock(), Stock());
+            Check(learning.Penalty(loss) == 180 && learning.Penalty(loss with { BeforeHash = "different" }) == 0,
+                "Native effect evidence lost its exact state binding");
+            learning.Begin(); learning.CompleteStep(before with { CombatCardIndex = 2 }, Stock(), Stock());
+            Check(learning.Penalty(loss) == 0, "A different native copy shared hidden action history");
+            var choice = new LocalCardChoice("offer", 0, "goal", "", Kind: "hand");
+            learning.Begin(); learning.CompleteStep(before with { Choices = [choice] }, Stock(), Stock(0));
+            learning.Begin();
+            Check(learning.Penalty(before) == 0 && learning.Penalty(before with { Choices = [choice] }) == 180 &&
+                learning.Penalty(before with { Choices = [choice with { Index = 1 }] }) == 0,
+                "One exhausting choice contaminated all legal selections");
+            Check(LocalCardGoalTactics.AdaptSoftContinuation(loss, [], true, 180) == null &&
+                LocalCardGoalTactics.AdaptSoftContinuation(loss, [], false, 180) == loss,
+                "Learned loss either forced soft replay or rewrote an exact prefix");
+        });
+        test("observed source-instance consumption guides changed soft tails while goals remain exposed", () =>
+        {
+            var learning = new LocalGoalLossLearning(Goals(100));
+            var source = new LocalAction(0, "opaque:source", null, "same title", "", "observed", 1, CombatCardIndex: 12);
+            learning.Begin(); learning.CompleteStep(source, Stock(2, target: 2), Stock(0, target: 2));
+            learning.Begin();
+            var changed = source with { BeforeHash = "changed", HandIndex = 9 };
+            Check(learning.Penalty(changed) == 0 && learning.Penalty(changed, Stock()) == 180,
+                "Changing setup erased the source's advisory consumption history or loosened exact evidence");
+            Check(learning.Penalty(changed with { CombatCardIndex = 13 }, Stock()) == 0 &&
+                learning.Penalty(changed with { ModelId = "another" }, Stock()) == 0 &&
+                learning.Penalty(changed with { Round = 3 }, Stock()) == 0,
+                "Other copies, models or combat phases inherited source-instance consumption");
+            Check(learning.Penalty(changed, Stock(0, completed: 1)) == 0 &&
+                learning.Penalty(changed, Stock(0)) == 0 && learning.Penalty(changed, Stock(3)) == 0,
+                "Fulfilled, already unavailable or sufficient spare copies remained penalized");
+            Check(learning.Penalty(changed, Stock(), finisherReady: true) == 0,
+                "Past consumption overrode the current native finishing preview");
+            var selected = source with { Choices = [new("offer", 0, "goal", "", Kind: "hand")] };
+            var choices = new LocalGoalLossLearning(Goals()); choices.Begin();
+            choices.CompleteStep(selected, Stock(), Stock(0)); choices.Begin();
+            Check(choices.Penalty(source with { BeforeHash = "different" }, Stock()) == 0,
+                "One selected sacrifice became a rule about all selections of its source");
+        });
+        test("turn frontier revisits legal siblings before any observed goal loss while retaining unrelated work", () =>
+        {
+            var search = new LocalTurnSearch(1, cardGoals: Goals(100));
+            var hint = new LocalTurnHint(50, 50, 100, 100);
+            LocalAction Move(uint id, string hash = "root") => new(0, "mod:any", null, "", "", hash, 1, CombatCardIndex: id);
+            for (uint i = 10; i < 30; i++) search.Offer([Move(i)], 1, hint);
+            var setup = Move(0); var sacrifice = Move(1, "later"); var keep = Move(2, "later");
+            var decision = new LocalDecision(1, [sacrifice, keep], GoalsBefore: Stock(), GoalsAfter: Stock(0));
+            search.OfferAlternatives([setup, sacrifice], decision, hint);
+            search.FocusNext(new(100, [setup], 1, Hint: hint), [setup, sacrifice], [decision]);
+            search.TryTake(out _); search.TryTake(out _);
+            Check(search.TryTake(out var preserved) && preserved.Prefix.Length == 2 && preserved.Prefix[1].CombatCardIndex == 2,
+                "High-health shallow work buried the measured goal-preserving fork");
+            Check(preserved.GoalLossFocus && preserved.FullRollout && preserved.Continuation == null,
+                "A goal-preserving sibling reused the failed goal's old winning tail or stopped at a probe");
+            Check(search.Count == 18, "Goal loss removed unrelated native branches");
+        });
         test("goal exploration keeps an achieved goal outside the strict HP allowance without returning it", () =>
         {
             var goals = Goals(5);

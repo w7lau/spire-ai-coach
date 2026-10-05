@@ -96,6 +96,7 @@ public sealed class LocalChoices
         int Priority(CardModel card, int index)
         {
             int score = 0;
+            if (exhausts) score -= LocalCardGoalAccounting.ExhaustSelectionPenalty(card);
             // Discard is temporary movement, not permanent removal. A harmless
             // status must not outrank a useful free play just because it is a status.
             if (exhausts && card.Type is CardType.Status or CardType.Curse) score += 40;

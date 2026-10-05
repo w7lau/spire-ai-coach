@@ -6,7 +6,8 @@ public sealed record LocalTurnHint(int Hp, int StartingHp, int EnemyHp, int Init
     int Block = 0, int PotionsUsed = 0, long? MaximumFurtherHpGain = null);
 public sealed record LocalTurnTask(int Id, LocalAction[] Prefix, int SearchRound,
     bool FullRollout = false, int Lane = 0, bool Focused = false, LocalTurnHint? Hint = null,
-    LocalRolloutStyle Style = LocalRolloutStyle.Balanced, LocalAction[]? Continuation = null, bool LossProof = false);
+    LocalRolloutStyle Style = LocalRolloutStyle.Balanced, LocalAction[]? Continuation = null, bool LossProof = false,
+    bool GoalLossFocus = false);
 public sealed record LocalTurnOutcome(int Worker, int Attempt, double CompletedMs, bool Won,
     int Hp, int GrossLoss, int Rounds, int Potions, LocalRolloutStyle Style, LocalDamageSources? DamageSources);
 public sealed record LocalTurnSearchStats(int Probes = 0, int BoundPruned = 0, int Offered = 0,
@@ -98,6 +99,9 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
     private readonly Queue<int> _lossProof = new();
     private readonly Stack<int[]> _focus = new();
     private readonly Stack<int[]> _descent = new();
+    private readonly Queue<int[]> _goalLoss = new();
+    private readonly HashSet<int> _goalLossQueued = [];
+    private int _goalLossTakes;
     private readonly Queue<(int Id, LocalAction[] Tail)> _winner = new();
     private LocalAction[]? _lastContinuation;
     private LocalRolloutStyle? _lastStyle;
@@ -214,12 +218,14 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         _lastStyle = null;
         int id;
         bool guided = false;
-        bool proof = false;
+        bool proof = false, goalFocus = false;
         bool winningAllowed = _winningOwner == null || owner == _winningOwner;
         // Native learning affinity must not replace health, round and FIFO
         // coverage. Alternate it only inside the dedicated focused lane.
         bool ownerTurn = lane == 2 && _winningOwner.HasValue && owner == _winningOwner && _ownerGuidedTakes++ % 2 == 1;
         if (lane % 2 == 0 && TryLossProof(out id)) { proof = true; }
+        else if (lane == 2 && _goalLossTakes++ % 2 == 0 && TryGoalLoss(out id))
+        { goalFocus = true; FocusedTakes++; LastFocused = true; }
         else if (ownerTurn && TryStack(_winning, out id)) { guided = true; FocusedTakes++; LastFocused = true; }
         else if (lane == 2 && TryGuidedFocus(out id, out guided, winningAllowed)) { FocusedTakes++; LastFocused = true; }
         else if (lane == 1 && winningAllowed && TryWinner(out id)) { guided = true; }
@@ -237,6 +243,8 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         task = _pending[id].Task with { FullRollout = !proof && (guided || _pending[id].Task.FullRollout), LossProof = proof,
             Style = _lastStyle ?? (guided ? _guidedIncumbent?.RolloutStyle ?? LocalRolloutStyle.Balanced : _pending[id].Task.Style),
             Continuation = _lastContinuation ?? (guided ? _winningTails.GetValueOrDefault(id) : null) ?? _pending[id].Task.Continuation };
+        if (goalFocus) task = task with { FullRollout = true, Style = LocalRolloutStyle.Preparation,
+            Continuation = null, GoalLossFocus = true };
         _pending.Remove(id);
         _roundClaims[task.SearchRound] = _roundClaims.GetValueOrDefault(task.SearchRound) + 1;
         return true;
@@ -387,6 +395,20 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         id = -1; return false;
     }
 
+    private bool TryGoalLoss(out int id)
+    {
+        while (_goalLoss.TryDequeue(out var siblings))
+        {
+            int next = Array.FindIndex(siblings, _pending.ContainsKey);
+            foreach (int stale in siblings.Take(next < 0 ? siblings.Length : next)) _goalLossQueued.Remove(stale);
+            if (next < 0) continue;
+            id = siblings[next]; _goalLossQueued.Remove(id);
+            if (next + 1 < siblings.Length) _goalLoss.Enqueue(siblings[(next + 1)..]);
+            return true;
+        }
+        id = -1; return false;
+    }
+
     // The action at the frontier is a native decision already executed in this
     // trial. Its legal siblings are proposals, not transferred outcomes. Change
     // one more decision under that exact prefix rather than repeatedly changing
@@ -398,6 +420,18 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
     public void FocusNext(LocalTurnTask task, IReadOnlyList<LocalAction> actions,
         IReadOnlyList<LocalDecision> decisions, bool focused)
     {
+        // Any native operation can lose a selected copy: an action, its choices,
+        // an automatic play, a turn-end trigger, or another Mod's effect. Prioritize
+        // already-offered exact siblings before that measured loss; never ban it.
+        foreach (var observed in decisions)
+        {
+            if (LocalGoalOpportunity.LossPenalty(observed.GoalsBefore, observed.GoalsAfter, _cardGoals) == 0) continue;
+            var hint = task.Hint ?? new LocalTurnHint(1, 1, 1, 1);
+            var idsAtLoss = Alternatives(actions, observed, hint, task)
+                .Select(offer => _seen.GetValueOrDefault((offer.SearchRound, PrefixId(offer.Prefix, false)), -1))
+                .Where(id => _pending.ContainsKey(id) && _goalLossQueued.Add(id)).ToArray();
+            if (idsAtLoss.Length > 0) _goalLoss.Enqueue(idsAtLoss);
+        }
         int step = task.Prefix.Length;
         if (step >= actions.Count || actions[step].Round != task.SearchRound) return;
         var decision = decisions.SingleOrDefault(d => d.BeforeStep == step);

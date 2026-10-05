@@ -63,9 +63,11 @@ public static class LocalCardGoalTactics
     }
 
     public static LocalAction? AdaptSoftContinuation(LocalAction? proposed,
-        IReadOnlyList<LocalFinisherHint> hints, bool canAdapt)
+        IReadOnlyList<LocalFinisherHint> hints, bool canAdapt, int observedLossPenalty = 0)
     {
-        if (!canAdapt || proposed == null || proposed.PotionSlot.HasValue) return proposed;
+        if (!canAdapt || proposed == null) return proposed;
+        if (observedLossPenalty > 0) return null;
+        if (proposed.PotionSlot.HasValue) return proposed;
         var ready = hints.Where(h => h.Priority > 0)
             .OrderByDescending(h => h.Action.TargetId == proposed.TargetId)
             .ThenByDescending(h => h.Action.Preference).FirstOrDefault();

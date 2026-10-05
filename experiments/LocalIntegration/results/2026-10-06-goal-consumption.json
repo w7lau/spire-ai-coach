@@ -1,0 +1,698 @@
+{
+  "version": "0.7.61",
+  "date": "2026-10-06",
+  "game_version": "0.111.0",
+  "mod_sha256": "006bcae164275a444544c4c3940758abadc7a21aec084bb6ecf9c7be9e0207ed",
+  "core_checks": {
+    "final_passed": 385,
+    "final_total": 385,
+    "scope": "Core/protocol checks, distinct from native game proof"
+  },
+  "native_cases": {
+    "scope": "Owned synthetic native actions and actual native piles. No live actions or save changes. No arbitrary private Mod guarantee.",
+    "runtime_errors": [],
+    "finisher_eligibility": [
+      {
+        "kind": "ordinary",
+        "eligibleLivingEnemies": 3,
+        "target": 2,
+        "lethalFeed": 120,
+        "lethalOther": -30,
+        "finite": 120,
+        "setupFeed": -180,
+        "setupOther": 80,
+        "nativePlayPerformed": true,
+        "nativeKilled": true,
+        "firstKills": 1,
+        "firstMaxHpGain": 4,
+        "removedAfterDeath": false,
+        "Kills": 1,
+        "Steps": [
+          {
+            "Plays": 0,
+            "Kills": 1
+          }
+        ],
+        "consumable": {
+          "Copies": 2,
+          "CompletedCopies": 1,
+          "ExhaustedCopies": 1,
+          "LivingEnemies": 3,
+          "BattleEnded": false,
+          "Target": 2,
+          "Complete": false
+        }
+      },
+      {
+        "kind": "native-last-eligible-enemy-consumed",
+        "beforeOtherKill": {
+          "PlayModelId": "CARD.ANGER",
+          "FinisherModelId": "CARD.FEED",
+          "Play": {
+            "Target": 1,
+            "Completed": 0,
+            "Available": 1,
+            "Missing": 0
+          },
+          "Finisher": {
+            "Target": 1,
+            "Completed": 0,
+            "Available": 1,
+            "Missing": 0
+          }
+        },
+        "afterOtherKill": {
+          "PlayModelId": "CARD.ANGER",
+          "FinisherModelId": "CARD.FEED",
+          "Play": {
+            "Target": 1,
+            "Completed": 1,
+            "Available": 0,
+            "Missing": 0
+          },
+          "Finisher": {
+            "Target": 1,
+            "Completed": 0,
+            "Available": 0,
+            "Missing": 1
+          }
+        }
+      },
+      {
+        "kind": "minion",
+        "eligibleLivingEnemies": 1,
+        "target": 1,
+        "lethalFeed": -180,
+        "lethalOther": 30,
+        "finite": -180,
+        "setupFeed": -180,
+        "setupOther": 30,
+        "nativePlayPerformed": true,
+        "nativeKilled": true,
+        "firstKills": 0,
+        "firstMaxHpGain": 0,
+        "removedAfterDeath": false,
+        "Kills": 0,
+        "Steps": [
+          {
+            "Plays": 0,
+            "Kills": 0
+          },
+          {
+            "Plays": 1,
+            "Kills": 0
+          }
+        ],
+        "consumable": {
+          "Copies": 2,
+          "CompletedCopies": 0,
+          "ExhaustedCopies": 1,
+          "LivingEnemies": 1,
+          "BattleEnded": true,
+          "Target": 1,
+          "Complete": false
+        }
+      },
+      {
+        "kind": "mod-fatal-denied",
+        "eligibleLivingEnemies": 1,
+        "target": 1,
+        "lethalFeed": -180,
+        "lethalOther": 30,
+        "finite": -180,
+        "setupFeed": -180,
+        "setupOther": 30,
+        "nativePlayPerformed": true,
+        "nativeKilled": true,
+        "firstKills": 0,
+        "firstMaxHpGain": 0,
+        "removedAfterDeath": true,
+        "Kills": 0,
+        "Steps": [
+          {
+            "Plays": 0,
+            "Kills": 0
+          }
+        ],
+        "consumable": {
+          "Copies": 2,
+          "CompletedCopies": 0,
+          "ExhaustedCopies": 1,
+          "LivingEnemies": 1,
+          "BattleEnded": false,
+          "Target": 1,
+          "Complete": false
+        }
+      },
+      {
+        "kind": "mixed-final-hit",
+        "eligibleLivingEnemies": 1,
+        "target": 1,
+        "lethalFeed": -180,
+        "lethalOther": 30,
+        "finite": -180,
+        "setupFeed": -180,
+        "setupOther": 30,
+        "nativePlayPerformed": true,
+        "nativeKilled": true,
+        "firstKills": 0,
+        "firstMaxHpGain": 0,
+        "removedAfterDeath": false,
+        "Kills": 1,
+        "Steps": [
+          {
+            "Plays": 0,
+            "Kills": 0
+          },
+          {
+            "Plays": 0,
+            "Kills": 1
+          }
+        ],
+        "consumable": {
+          "Copies": 2,
+          "CompletedCopies": 1,
+          "ExhaustedCopies": 1,
+          "LivingEnemies": 1,
+          "BattleEnded": true,
+          "Target": 1,
+          "Complete": true
+        }
+      },
+      {
+        "kind": "no-eligible",
+        "eligibleLivingEnemies": 0,
+        "target": 0,
+        "lethalFeed": 0,
+        "lethalOther": 30,
+        "finite": 0,
+        "setupFeed": 0,
+        "setupOther": 30,
+        "nativePlayPerformed": false,
+        "Kills": 0,
+        "consumable": {
+          "Copies": 2,
+          "CompletedCopies": 0,
+          "ExhaustedCopies": 0,
+          "LivingEnemies": 0,
+          "BattleEnded": false,
+          "Target": 0,
+          "Complete": false
+        }
+      }
+    ],
+    "opportunity_loss": [
+      {
+        "kind": "native-pile-movement-and-recovery",
+        "initial": {
+          "PlayModelId": "CARD.FEED",
+          "FinisherModelId": "CARD.FEED",
+          "Play": {
+            "Target": 2,
+            "Completed": 0,
+            "Available": 2,
+            "Missing": 0
+          },
+          "Finisher": {
+            "Target": 2,
+            "Completed": 0,
+            "Available": 2,
+            "Missing": 0
+          }
+        },
+        "discarded": {
+          "PlayModelId": "CARD.FEED",
+          "FinisherModelId": "CARD.FEED",
+          "Play": {
+            "Target": 2,
+            "Completed": 0,
+            "Available": 2,
+            "Missing": 0
+          },
+          "Finisher": {
+            "Target": 2,
+            "Completed": 0,
+            "Available": 2,
+            "Missing": 0
+          }
+        },
+        "drawn": {
+          "PlayModelId": "CARD.FEED",
+          "FinisherModelId": "CARD.FEED",
+          "Play": {
+            "Target": 2,
+            "Completed": 0,
+            "Available": 2,
+            "Missing": 0
+          },
+          "Finisher": {
+            "Target": 2,
+            "Completed": 0,
+            "Available": 2,
+            "Missing": 0
+          }
+        },
+        "externallyExhausted": {
+          "PlayModelId": "CARD.FEED",
+          "FinisherModelId": "CARD.FEED",
+          "Play": {
+            "Target": 2,
+            "Completed": 0,
+            "Available": 1,
+            "Missing": 1
+          },
+          "Finisher": {
+            "Target": 2,
+            "Completed": 0,
+            "Available": 1,
+            "Missing": 1
+          }
+        },
+        "recovered": {
+          "PlayModelId": "CARD.FEED",
+          "FinisherModelId": "CARD.FEED",
+          "Play": {
+            "Target": 2,
+            "Completed": 0,
+            "Available": 2,
+            "Missing": 0
+          },
+          "Finisher": {
+            "Target": 2,
+            "Completed": 0,
+            "Available": 2,
+            "Missing": 0
+          }
+        }
+      },
+      {
+        "kind": "native-successful-play-consumption",
+        "beforeUse": {
+          "PlayModelId": "CARD.FEED",
+          "FinisherModelId": null,
+          "Play": {
+            "Target": 2,
+            "Completed": 0,
+            "Available": 2,
+            "Missing": 0
+          },
+          "Finisher": null
+        },
+        "afterUse": {
+          "PlayModelId": "CARD.FEED",
+          "FinisherModelId": null,
+          "Play": {
+            "Target": 2,
+            "Completed": 1,
+            "Available": 1,
+            "Missing": 0
+          },
+          "Finisher": null
+        }
+      },
+      {
+        "kind": "native-non-finishing-self-exhaustion",
+        "beforeSelf": {
+          "PlayModelId": "CARD.FEED",
+          "FinisherModelId": "CARD.FEED",
+          "Play": {
+            "Target": 2,
+            "Completed": 0,
+            "Available": 2,
+            "Missing": 0
+          },
+          "Finisher": {
+            "Target": 2,
+            "Completed": 0,
+            "Available": 2,
+            "Missing": 0
+          }
+        },
+        "afterSelf": {
+          "PlayModelId": "CARD.FEED",
+          "FinisherModelId": "CARD.FEED",
+          "Play": {
+            "Target": 2,
+            "Completed": 1,
+            "Available": 1,
+            "Missing": 0
+          },
+          "Finisher": {
+            "Target": 2,
+            "Completed": 0,
+            "Available": 1,
+            "Missing": 1
+          }
+        },
+        "recovered": {
+          "PlayModelId": "CARD.FEED",
+          "FinisherModelId": "CARD.FEED",
+          "Play": {
+            "Target": 2,
+            "Completed": 1,
+            "Available": 1,
+            "Missing": 0
+          },
+          "Finisher": {
+            "Target": 2,
+            "Completed": 0,
+            "Available": 2,
+            "Missing": 0
+          }
+        }
+      },
+      {
+        "kind": "native-selected-exhaustion",
+        "beforeChoice": {
+          "PlayModelId": "CARD.FEED",
+          "FinisherModelId": "CARD.FEED",
+          "Play": {
+            "Target": 2,
+            "Completed": 1,
+            "Available": 1,
+            "Missing": 0
+          },
+          "Finisher": {
+            "Target": 2,
+            "Completed": 0,
+            "Available": 2,
+            "Missing": 0
+          }
+        },
+        "afterChoice": {
+          "PlayModelId": "CARD.FEED",
+          "FinisherModelId": "CARD.FEED",
+          "Play": {
+            "Target": 2,
+            "Completed": 1,
+            "Available": 0,
+            "Missing": 1
+          },
+          "Finisher": {
+            "Target": 2,
+            "Completed": 0,
+            "Available": 1,
+            "Missing": 1
+          }
+        },
+        "recovered": {
+          "PlayModelId": "CARD.FEED",
+          "FinisherModelId": "CARD.FEED",
+          "Play": {
+            "Target": 2,
+            "Completed": 1,
+            "Available": 1,
+            "Missing": 0
+          },
+          "Finisher": {
+            "Target": 2,
+            "Completed": 0,
+            "Available": 2,
+            "Missing": 0
+          }
+        }
+      },
+      {
+        "kind": "native-mass-exhaustion",
+        "beforeMass": {
+          "PlayModelId": "CARD.FEED",
+          "FinisherModelId": "CARD.FEED",
+          "Play": {
+            "Target": 2,
+            "Completed": 1,
+            "Available": 1,
+            "Missing": 0
+          },
+          "Finisher": {
+            "Target": 2,
+            "Completed": 0,
+            "Available": 2,
+            "Missing": 0
+          }
+        },
+        "afterMass": {
+          "PlayModelId": "CARD.FEED",
+          "FinisherModelId": "CARD.FEED",
+          "Play": {
+            "Target": 2,
+            "Completed": 1,
+            "Available": 0,
+            "Missing": 1
+          },
+          "Finisher": {
+            "Target": 2,
+            "Completed": 0,
+            "Available": 0,
+            "Missing": 2
+          }
+        }
+      }
+    ]
+  },
+  "historical_baseline": {
+    "version": "0.7.59",
+    "algorithm": "TurnFrontier",
+    "complete_wins": 512,
+    "finisher_wins": 0
+  },
+  "development_frozen_attempts": [
+    {
+      "phase": "exact-history-feedback",
+      "version": "0.7.60",
+      "threshold": 100,
+      "records": [
+        {
+          "algorithm": 0,
+          "Evaluated": 512,
+          "Victories": 512,
+          "measuredFinisherWins": 0,
+          "measuredFinisherWinsWithinThreshold": 0,
+          "selectionCorrect": true,
+          "extra_final_verification": true,
+          "best": {
+            "Won": true,
+            "Dead": false,
+            "StartingHp": 599,
+            "Hp": 598,
+            "MaxHp": 633,
+            "NetHpLoss": 1,
+            "Rounds": 3,
+            "steps": 16,
+            "first": "POTION.POWER_POTION",
+            "finisherRound": null,
+            "kills": 0,
+            "consumable": {
+              "Copies": 1,
+              "CompletedCopies": 0,
+              "ExhaustedCopies": 1,
+              "LivingEnemies": 1,
+              "BattleEnded": true,
+              "Target": 1,
+              "Complete": false
+            }
+          }
+        },
+        {
+          "algorithm": 4,
+          "Evaluated": 512,
+          "Victories": 512,
+          "measuredFinisherWins": 0,
+          "measuredFinisherWinsWithinThreshold": 0,
+          "selectionCorrect": true,
+          "extra_final_verification": true,
+          "best": {
+            "Won": true,
+            "Dead": false,
+            "StartingHp": 599,
+            "Hp": 600,
+            "MaxHp": 633,
+            "NetHpLoss": 0,
+            "Rounds": 3,
+            "steps": 14,
+            "first": "POTION.POWER_POTION",
+            "finisherRound": 2,
+            "kills": 0,
+            "consumable": {
+              "Copies": 1,
+              "CompletedCopies": 0,
+              "ExhaustedCopies": 1,
+              "LivingEnemies": 1,
+              "BattleEnded": true,
+              "Target": 1,
+              "Complete": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "phase": "source-feedback",
+      "version": "0.7.60",
+      "threshold": 100,
+      "records": [
+        {
+          "algorithm": 0,
+          "Evaluated": 512,
+          "Victories": 512,
+          "measuredFinisherWins": 0,
+          "measuredFinisherWinsWithinThreshold": 0,
+          "selectionCorrect": true,
+          "extra_final_verification": true,
+          "best": {
+            "Won": true,
+            "Dead": false,
+            "StartingHp": 599,
+            "Hp": 598,
+            "MaxHp": 633,
+            "NetHpLoss": 1,
+            "Rounds": 3,
+            "steps": 16,
+            "first": "POTION.POWER_POTION",
+            "finisherRound": null,
+            "kills": 0,
+            "consumable": {
+              "Copies": 1,
+              "CompletedCopies": 0,
+              "ExhaustedCopies": 1,
+              "LivingEnemies": 1,
+              "BattleEnded": true,
+              "Target": 1,
+              "Complete": false
+            }
+          }
+        },
+        {
+          "algorithm": 4,
+          "Evaluated": 512,
+          "Victories": 512,
+          "measuredFinisherWins": 0,
+          "measuredFinisherWinsWithinThreshold": 0,
+          "selectionCorrect": true,
+          "extra_final_verification": true,
+          "best": {
+            "Won": true,
+            "Dead": false,
+            "StartingHp": 599,
+            "Hp": 598,
+            "MaxHp": 633,
+            "NetHpLoss": 1,
+            "Rounds": 3,
+            "steps": 14,
+            "first": "POTION.POWER_POTION",
+            "finisherRound": null,
+            "kills": 0,
+            "consumable": {
+              "Copies": 1,
+              "CompletedCopies": 0,
+              "ExhaustedCopies": 1,
+              "LivingEnemies": 1,
+              "BattleEnded": true,
+              "Target": 1,
+              "Complete": false
+            }
+          }
+        }
+      ]
+    },
+    {
+      "phase": "goal-full-rollout",
+      "version": "0.7.60",
+      "threshold": 100,
+      "records": [
+        {
+          "algorithm": 4,
+          "Evaluated": 509,
+          "Victories": 509,
+          "measuredFinisherWins": 0,
+          "measuredFinisherWinsWithinThreshold": 0,
+          "selectionCorrect": true,
+          "extra_final_verification": true,
+          "best": {
+            "Won": true,
+            "Dead": false,
+            "StartingHp": 599,
+            "Hp": 600,
+            "MaxHp": 633,
+            "NetHpLoss": 0,
+            "Rounds": 3,
+            "steps": 15,
+            "first": "POTION.POWER_POTION",
+            "finisherRound": null,
+            "kills": 0,
+            "consumable": {
+              "Copies": 1,
+              "CompletedCopies": 0,
+              "ExhaustedCopies": 1,
+              "LivingEnemies": 1,
+              "BattleEnded": true,
+              "Target": 1,
+              "Complete": false
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "final_fresh_search_diagnostic": {
+    "status": "goal-discovery-check-failed",
+    "scope": "Same frozen battle, Mod set and budgets; previous route deliberately removed. This is a different search-start condition, not a paired improvement claim.",
+    "version": "0.7.61",
+    "threshold": 100,
+    "records": [
+      {
+        "algorithm": 4,
+        "Status": "done",
+        "Evaluated": 512,
+        "Victories": 512,
+        "Rejected": 0,
+        "ElapsedMs": 101464,
+        "StoppedOnCardGoals": false,
+        "recoveredFailures": 0,
+        "MaxNodes": 64,
+        "BudgetSeconds": 60,
+        "MaxRounds": 64,
+        "MaxDepth": 24,
+        "requestedWorkers": 8,
+        "Workers": 8,
+        "previousRouteSteps": 0,
+        "successful_answer_supplied": false,
+        "measuredFinisherWins": 0,
+        "measuredFinisherWinsWithinThreshold": 0,
+        "selectionCorrect": true,
+        "extra_final_verification": true,
+        "best": {
+          "Won": true,
+          "Dead": false,
+          "StartingHp": 599,
+          "Hp": 594,
+          "MaxHp": 633,
+          "NetHpLoss": 5,
+          "Rounds": 3,
+          "steps": 12,
+          "first": "CARD.CRUELTY",
+          "finisherRound": null,
+          "kills": 0,
+          "consumable": {
+            "Copies": 1,
+            "CompletedCopies": 0,
+            "ExhaustedCopies": 1,
+            "LivingEnemies": 1,
+            "BattleEnded": true,
+            "Target": 1,
+            "Complete": false
+          }
+        }
+      }
+    ],
+    "assertion": "Expected at least one measured finisher win within threshold; observed zero. Native search, strict selection and independent verification succeeded, goal discovery did not."
+  },
+  "installation": {
+    "version": "0.7.61",
+    "previous_version": "0.7.60",
+    "entrypoint": "Update.ps1 -InstallOnly",
+    "same_native_validated_dll": true,
+    "dll_sha256": "006bcae164275a444544c4c3940758abadc7a21aec084bb6ecf9c7be9e0207ed",
+    "zip_sha256": "40e9705b3bb9ce3578a411e9d3a3956d90fd8c207e9bdedee0939cfc828993da",
+    "player_restart_observed": false
+  }
+}

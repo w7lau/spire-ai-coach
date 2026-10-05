@@ -276,6 +276,7 @@ public static class LocalWorker
         var refiner = new LocalRouteRefiner();
         var goalRefiner = request.CardGoals?.Enabled == true ? new LocalRouteRefiner() : null;
         LocalCandidate? goalSeed = null;
+        var goalLossLearning = new LocalGoalLossLearning(request.CardGoals);
         var policy = turnMode || request.CorrelatedRollouts && !systematic ? new LocalRolloutPolicy(314159 + request.Partition, request.CardGoals) : null;
         LocalCandidate? refinementSeed = null;
         // Turn work uses an exact shared frontier, separate from the old soft
@@ -681,6 +682,7 @@ public static class LocalWorker
                 var decisions = new List<LocalDecision>();
                 var partition = systematic && sharedTurns == null ? new LocalBranchPartition(request.Partition, partitions) : null;
                 var trial = search.Begin();
+                goalLossLearning.Begin();
                 var activePolicy = turns == null || fullRollout && _rolloutStyle == LocalRolloutStyle.Correlated ? policy : null;
                 activePolicy?.Begin();
                 LocalAction ChooseTurn(IReadOnlyList<LocalAction> options, bool coherent) =>
@@ -691,7 +693,8 @@ public static class LocalWorker
                 // Interleave measured winning-tail proposals with fresh native
                 // continuations. Borrowing a slower winner every time prevents
                 // changed setup from replacing its old defensive ordering.
-                var continuation = turnMode && fullRollout && (attempts / 4) % 4 == 0 && refinementSeed?.Won == true
+                var continuation = turnMode && fullRollout && turnTask?.GoalLossFocus != true &&
+                    (attempts / 4) % 4 == 0 && refinementSeed?.Won == true
                     ? refinementSeed.Actions : null;
                 int continuationIndex = 0;
                 int planIndex = 0;
@@ -723,6 +726,11 @@ public static class LocalWorker
                         decisionStarted = Stopwatch.GetTimestamp();
                         using var deciding = Trace("decision");
                         var legal = EnumerateActions(out var finisherHints);
+                        var goalsBefore = cardGoalCounts.Opportunity();
+                        int GoalLossHint(LocalAction action) => goalLossLearning.Penalty(action, goalsBefore,
+                            finisherHints.Any(h => h.Priority > 0 && LocalTurnSearch.SameAction(h.Action, action)));
+                        if (request.CardGoals?.Enabled == true)
+                            legal = legal.Select(a => a with { Preference = a.Preference - GoalLossHint(a) }).ToArray();
                         var proofLegal = proofSteps == null ? null : legal;
                         bool proofComplete = _includePotions == request.IncludePotions;
                         if (partition != null) legal = partition.Assign(legal);
@@ -795,7 +803,9 @@ public static class LocalWorker
                         bool adaptGoalTail = evaluated > 0 && !exactAction &&
                             (turnMode || work == null || sharedTask?.Kind == "improve");
                         var adapted = LocalCardGoalTactics.AdaptSoftContinuation(preferred,
-                            finisherHints.Where(h => legal.Contains(h.Action)).ToArray(), adaptGoalTail);
+                            finisherHints.Select(h => h with { Action = legal.SingleOrDefault(a => LocalTurnSearch.SameAction(a, h.Action))! })
+                                .Where(h => h.Action != null).ToArray(), adaptGoalTail,
+                            preferred == null ? 0 : GoalLossHint(preferred));
                         if (adapted != preferred) { preferred = adapted; plannedAction = null; }
                         // Explore explicit branch proposals, then continue most trials coherently.
                         // Randomizing every card in a long rollout almost never preserves a combo.
@@ -881,6 +891,8 @@ public static class LocalWorker
                         finally { actionMs += (long)Stopwatch.GetElapsedTime(actionStarted).TotalMilliseconds; executed++; }
                         actions.Add(next);
                         cardGoalCounts.CompleteStep();
+                        var goalsAfter = cardGoalCounts.Opportunity();
+                        goalLossLearning.CompleteStep(next, goalsBefore, goalsAfter);
                         if (covered) break;
                         if (exactAction && plannedAction != null)
                         {
@@ -891,7 +903,8 @@ public static class LocalWorker
                         _nativeLearning?.After(learned, player);
                         if (next.EndTurn) _nativeLearning?.SettleBuffs(player);
                         decisions[^1] = decisions[^1] with { Choices = choiceDecisions.ToArray(),
-                            HpBefore = previousHp, HpAfter = player.Creature.CurrentHp };
+                            HpBefore = previousHp, HpAfter = player.Creature.CurrentHp,
+                            GoalsBefore = goalsBefore, GoalsAfter = goalsAfter };
                         if (turns != null && actions.Count >= planned!.Length)
                         {
                             using var offering = MeasureMethod("LocalTurnFrontier.OfferAlternatives");

@@ -121,8 +121,12 @@ internal static class FinisherTargetIntegration
                 ledgerType.GetMethod("CompleteStep")!.Invoke(ledger, null);
             }
             int maxBefore = player.Creature.MaxHp;
+            var opportunityBefore = (LocalGoalOpportunity)ledgerType.GetMethod("Opportunity")!.Invoke(ledger, null)!;
             await PlayFeed(target);
             var first = Counts();
+            var opportunityAfter = (LocalGoalOpportunity?)ledgerType.GetMethod("Opportunity")!.Invoke(ledger, null);
+            if (kind == "ordinary" && LocalGoalOpportunity.LossPenalty(opportunityBefore, opportunityAfter, goals) != 0)
+                throw new InvalidOperationException("Successful native finishing consumption was penalized");
             int gain = player.Creature.MaxHp - maxBefore;
             if (!target.IsDead || first.Kills != (denied ? 0 : 1) || first.ConsumableGoals!.Finisher!.CompletedCopies != first.Kills ||
                 first.ConsumableGoals.Finisher.Complete || (denied ? gain != 0 : gain <= 0))
@@ -139,6 +143,24 @@ internal static class FinisherTargetIntegration
                 await PlayFeed(enemies[^1]);
                 if (!CombatManager.Instance.IsOverOrEnding || Counts() is not { Kills: 1, ConsumableGoals.Finisher.Complete: true })
                     throw new InvalidOperationException("Final non-minion kill did not close the one eligible finishing opportunity");
+            }
+            if (kind == "minion")
+            {
+                // Retaining the card is insufficient if another action spends
+                // the final eligible enemy. Observe that real native terminal.
+                var last = enemies[^1]; last.SetCurrentHpInternal(1);
+                var beforeOtherKill = (LocalGoalOpportunity)ledgerType.GetMethod("Opportunity")!.Invoke(ledger, null)!;
+                if (!anger.CanPlay() || !anger.IsValidTarget(last))
+                    throw new InvalidOperationException("Synthetic non-finishing attack was not legal");
+                RunManager.Instance.ActionQueueSet.EnqueueWithoutSynchronizing(new PlayCardAction(anger, last));
+                await Frame(); await RunManager.Instance.ActionQueueSet.BecameEmpty();
+                while (CombatManager.Instance.IsInProgress && !CombatManager.Instance.IsOverOrEnding && !LocalCapture.Stable()) await Frame();
+                ledgerType.GetMethod("CompleteStep")!.Invoke(ledger, null);
+                var afterOtherKill = (LocalGoalOpportunity)ledgerType.GetMethod("Opportunity")!.Invoke(ledger, null)!;
+                if (!last.IsDead || Counts().Kills != 0 || afterOtherKill.Finisher?.Missing != 1 ||
+                    LocalGoalOpportunity.LossPenalty(beforeOtherKill, afterOtherKill, goals) <= 0)
+                    throw new InvalidOperationException("Native final enemy consumption lost no finishing opportunity");
+                records.Add(new { kind = "native-last-eligible-enemy-consumed", beforeOtherKill, afterOtherKill });
             }
             var final = Counts();
             if (final.Steps.Sum(s => s.Kills) != final.Kills || !((bool)ledgerType.GetMethod("Matches")!.Invoke(ledger, [final])!))
