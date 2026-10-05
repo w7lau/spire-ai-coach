@@ -11,6 +11,7 @@ using MegaCrit.Sts2.Core.Context;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Models.Encounters;
 using MegaCrit.Sts2.Core.Models.Monsters;
 using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Nodes.Cards;
@@ -39,6 +40,7 @@ internal static class LocalWorkerDataMode
     private static NOverlayStack? _emptyOverlays;
     private static readonly Dictionary<Node, Func<IEnumerable<CardModel>>> Selections = new(ReferenceEqualityComparer.Instance);
     private static readonly Dictionary<Node, Func<IEnumerable<IReadOnlyList<CardModel>>>> Bundles = new(ReferenceEqualityComparer.Instance);
+    public static string[] SummonPresentationBoundaries { get; private set; } = [];
     public static void Install(Harmony _)
     {
         var harmony = new Harmony("SpireAiCoach.owned-worker.data");
@@ -78,6 +80,7 @@ internal static class LocalWorkerDataMode
         // only guard the missing presentation receiver in scene-free workers.
         harmony.Patch(AccessTools.Method(typeof(SoulNexus), "AfterDeath", [typeof(Creature)]),
             transpiler: new(AccessTools.Method(typeof(LocalWorkerDataMode), nameof(DeathCreatureVisual))));
+        InstallSummonPresentation(harmony);
         Prefix(typeof(CardCmd), "PreviewInternal", nameof(Preview));
         Prefix(typeof(ForgeCmd), "PreviewSovereignBlade", nameof(PresentationVoid));
         var transform = typeof(CardCmd).GetMethods().Single(m => m.Name == nameof(CardCmd.Transform) &&
@@ -118,6 +121,69 @@ internal static class LocalWorkerDataMode
     {
         foreach (var node in Selections.Keys.Concat(Bundles.Keys)) if (GodotObject.IsInstanceValid(node)) node.Free();
         Selections.Clear(); Bundles.Clear();
+    }
+    private static void InstallSummonPresentation(Harmony harmony)
+    {
+        var enabled = AccessTools.PropertyGetter(typeof(TestMode), nameof(TestMode.IsOff));
+        // This native helper changes only a scene node's fall position. Match
+        // its complete optional room/node lookup block, independent of monster
+        // names. Base initialization and subsequent effects remain original.
+        var calls = SummonVisualCalls();
+        var boundaries = new List<string>();
+        foreach (var type in typeof(MonsterModel).Assembly.GetTypes().Where(t => typeof(MonsterModel).IsAssignableFrom(t)))
+        {
+            var callback = type.GetMethod(nameof(MonsterModel.AfterAddedToRoom), BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+            var machine = callback?.GetCustomAttribute<AsyncStateMachineAttribute>()?.StateMachineType;
+            var method = machine == null ? callback : AccessTools.Method(machine, "MoveNext");
+            if (method == null || !LocalPresentationGuard.OptionalGuardedCalls(method, enabled, calls)) continue;
+            harmony.Patch(method, transpiler: new(AccessTools.Method(typeof(LocalWorkerDataMode), nameof(SummonPresentation))));
+            boundaries.Add(type.FullName!);
+        }
+        SummonPresentationBoundaries = boundaries.ToArray();
+        if (boundaries.Count == 0) throw new InvalidOperationException("Native optional summon presentation block changed");
+    }
+    private static MethodInfo[] SummonVisualCalls() => [AccessTools.PropertyGetter(typeof(NCombatRoom), nameof(NCombatRoom.Instance)),
+        AccessTools.PropertyGetter(typeof(MonsterModel), nameof(MonsterModel.Creature)),
+        AccessTools.Method(typeof(NCombatRoom), nameof(NCombatRoom.GetCreatureNode), [typeof(Creature)]),
+        AccessTools.Method(typeof(FabricatorNormal), nameof(FabricatorNormal.SetBotFallPosition))];
+    private static bool SummonPresentationEnabled()
+    {
+        if (Active) LocalWorker.SkipMethod("Summon.OptionalNodeInitialization");
+        return !Active && TestMode.IsOff;
+    }
+    private static IEnumerable<CodeInstruction> SummonPresentation(IEnumerable<CodeInstruction> instructions)
+    {
+        var code = instructions.ToArray();
+        int Offset(System.Reflection.Emit.Label label)
+        {
+            int target = Array.FindIndex(code, c => c.labels.Contains(label));
+            if (target < 0) throw new InvalidOperationException("Unresolved native summon branch");
+            while (target < code.Length && code[target].opcode == OpCodes.Nop) target++;
+            return target;
+        }
+        object? Operand(object? operand) => operand switch
+        {
+            System.Reflection.Emit.Label label => Offset(label),
+            System.Reflection.Emit.Label[] labels => labels.Select(Offset).ToArray(),
+            LocalBuilder local => local.LocalIndex,
+            _ => operand
+        };
+        var enabled = AccessTools.PropertyGetter(typeof(TestMode), nameof(TestMode.IsOff));
+        // Validate the actual Harmony input too. If another Mod inserts rules
+        // into this display block, retain compatibility rather than skipping them.
+        if (!LocalPresentationGuard.OptionalGuardedCalls(code.Select((c, i) => new LocalInstruction(i, c.opcode, Operand(c.operand))), enabled, SummonVisualCalls()))
+            throw new InvalidOperationException("Modified native summon block contains more than optional presentation");
+        int count = 0;
+        foreach (var instruction in code)
+        {
+            if (instruction.Calls(enabled))
+            {
+                count++;
+                yield return new CodeInstruction(instruction) { operand = AccessTools.Method(typeof(LocalWorkerDataMode), nameof(SummonPresentationEnabled)) };
+            }
+            else yield return instruction;
+        }
+        if (count != 1) throw new InvalidOperationException("Native optional summon presentation gate changed");
     }
     public static void Reset()
     {
