@@ -33,6 +33,7 @@ EventEntryTests.Register(Test);
 NativeOverheadTests.Register(Test, AsyncTest);
 ProgressTransportTests.Register(Test, AsyncTest);
 WorkerReuseTests.Register(Test, AsyncTest);
+ReplayFailureTests.Register(Test, AsyncTest);
 AsyncTest("worker isolation prevents inherited save locks and preserves environment and arguments", WorkerIsolationTests.Run);
 AsyncTest("shared file identity preserves locked hardlinks and replaces equal-metadata copies", WorkerSharingTests.Run);
 void Check(bool condition, string message = "Assertion failed") { if (!condition) throw new Exception(message); }

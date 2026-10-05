@@ -5,8 +5,10 @@ using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.Context;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Entities.Multiplayer;
+using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Runs;
 using SpireAiCoach.Core;
 using SpireAiCoach.Mod;
 
@@ -53,6 +55,38 @@ internal sealed class ExecutionDivergenceProbe : IDisposable
         }
         _step++;
         Events.Add(new { phase = _phase, kind = "before-action", state = State(player) });
+        if (_actions[_step - 1].ModelId == "CARD.HIDDEN_GEM") ObserveModSelection(player, _actions[_step - 1]);
+    }
+
+    private static void ObserveModSelection(Player player, LocalAction action)
+    {
+        var rune = player.Relics.Single(r => r.GetType().FullName == "HextechRunes.HiddenGemUpgradeRune");
+        var runeType = rune.GetType();
+        var stable = runeType.Assembly.GetType("HextechRunes.HextechStableRandom")!;
+        const BindingFlags flags = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+        var eligible = runeType.GetMethod("IsEligibleReplayTarget", flags)!;
+        var pool = player.PlayerCombatState!.DrawPile.Cards.ToArray();
+        var targets = pool.Where(c => (bool)eligible.Invoke(null, [c])!).ToArray();
+        var playableTypes = targets.Where(c => c.Type is CardType.Attack or CardType.Skill or CardType.Power).ToArray();
+        if (playableTypes.Length > 0) targets = playableTypes;
+        var source = player.PlayerCombatState.Hand.Cards[action.HandIndex];
+        var key = (Func<CardModel, string>)stable.GetMethod("CardKey", flags)!.CreateDelegate(typeof(Func<CardModel, string>));
+        var playerKey = (string)stable.GetMethod("PlayerKey", flags)!.Invoke(null, [player])!;
+        var poolKey = (string)stable.GetMethod("CardPileKey", flags)!.Invoke(null, [pool])!;
+        var pick = stable.GetMethods(flags).Single(m => m.Name == "Pick" && m.IsGenericMethodDefinition)
+            .MakeGenericMethod(typeof(CardModel));
+        string before = LocalCapture.Fingerprint();
+        var predictions = Enumerable.Range(0, 3).Select(ordinal =>
+        {
+            string[] salt = ["hidden-gem-upgrade-play", playerKey, player.Creature.CombatState!.RoundNumber.ToString(),
+                ordinal.ToString(), key(source), poolKey];
+            var selected = (CardModel)pick.Invoke(null, [targets, (RunState)player.RunState, key, salt])!;
+            return new { ordinal, id = selected.Id.ToString(), instance = NetCombatCard.FromModel(selected).CombatCardIndex };
+        }).ToArray();
+        if (before != LocalCapture.Fingerprint()) throw new InvalidOperationException("Read-only Mod selection query mutated native state");
+        Events.Add(new { phase = _phase, kind = "mod-selection-projection", native_state_unchanged = true,
+            actual_ordinal = runeType.GetField("_localUpgradedPlayOrdinal", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(rune),
+            predictions });
     }
 
     public void SetActions(LocalAction[] actions) => _actions = actions;

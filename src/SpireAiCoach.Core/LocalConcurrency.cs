@@ -39,7 +39,7 @@ public static class LocalConcurrency
 
     public static async Task<T[]> Run<T>(int maximum, bool adaptive, bool shared,
         Func<int, Task<T>> launch, Func<int, LocalWorkerDemand> demand, Func<bool> stopped,
-        CancellationToken cancellation, int pollMs = 250)
+        CancellationToken cancellation, int pollMs = 250, bool waitForRoot = false)
     {
         if (maximum is < 1 or > 16 || pollMs < 1) throw new ArgumentOutOfRangeException(nameof(maximum));
         if (!adaptive)
@@ -50,6 +50,19 @@ public static class LocalConcurrency
                 for (int index = 0; index < maximum && !stopped(); index++)
                 {
                     cancellation.ThrowIfCancellationRequested();
+                    if (index == 1 && waitForRoot)
+                    {
+                        // Validate one native root before admitting its peers.
+                        // Once it is valid, preserve the chosen manual count and
+                        // launch the remaining lanes together, with their own budgets.
+                        while (!admitted[0].IsCompleted && !stopped() && demand(1).RootBranches <= 0)
+                        {
+                            cancellation.ThrowIfCancellationRequested();
+                            await Task.WhenAny(admitted[0], Task.Delay(pollMs, cancellation));
+                        }
+                        cancellation.ThrowIfCancellationRequested();
+                        if (stopped() || admitted[0].IsFaulted || admitted[0].IsCanceled || demand(1).RootBranches <= 0) break;
+                    }
                     admitted.Add(launch(index));
                 }
             }
@@ -86,7 +99,8 @@ public static class LocalConcurrency
     // join their cleanup before the caller changes execution mode or ownership.
     public static async Task<T[]> Run<T>(int maximum, bool adaptive, bool shared,
         Func<int, CancellationToken, Task<T>> launch, Func<int, LocalWorkerDemand> demand,
-        Func<bool> stopped, Func<T, bool> failed, CancellationToken cancellation, int pollMs = 250)
+        Func<bool> stopped, Func<T, bool> failed, CancellationToken cancellation, int pollMs = 250,
+        bool waitForRoot = false)
     {
         using var failure = new CancellationTokenSource();
         async Task<T> Observe(int index)
@@ -104,6 +118,6 @@ public static class LocalConcurrency
             }
         }
         return await Run(maximum, adaptive, shared, Observe, demand,
-            () => failure.IsCancellationRequested || stopped(), cancellation, pollMs);
+            () => failure.IsCancellationRequested || stopped(), cancellation, pollMs, waitForRoot);
     }
 }

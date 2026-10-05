@@ -24,7 +24,8 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     bool ReuseDecisionFingerprint = true, bool AsyncProgressOutput = true, bool MemorySearchWork = true,
     bool MemoryProgress = true, string? ProgressPipe = null, bool ReuseFingerprintBuffer = true,
     LocalCardGoals? CardGoals = null, string? MinimumLossPipe = null, bool StopOnFirstWin = false,
-    LocalEventEntry? EventEntry = null, bool ResumingFrontier = false, bool ReuseSnapshotMetadata = false);
+    LocalEventEntry? EventEntry = null, bool ResumingFrontier = false, bool ReuseSnapshotMetadata = false,
+    bool ReplayRootOnly = false);
 
 // A stop belongs to one frozen request. Goal stops exclude verification;
 // explicit caller cancellation also applies during verification or with goals off.

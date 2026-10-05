@@ -168,10 +168,15 @@ internal static class WorkerReuseTests
             if (!OperatingSystem.IsWindows()) return;
             await using var f = new Fixture(); var lanes = Workers(f.Pool);
             await f.Pool.Prepare(f.Installation, 0, CancellationToken.None);
+            // Root admission can now finish a goal without launching a peer.
+            // An independently owned prewarm must still survive that goal.
+            var peerWarmup = lanes[1].Ensure(Path.Combine(f.Root, "pool"), 1, f.Installation, CancellationToken.None);
+            await Until(() => lanes[1].Process != null, "Cold peer prewarm was not launched");
             var result = await f.Pool.Analyze(Request("goal") with { StopOnZeroLoss = true }, f.Installation, _ => { }, CancellationToken.None);
             Check(result.StoppedEarly && result.Timing?.Verifications == 1, "Goal route was not verified");
             Check(lanes[1].Process != null, "Cold peer was terminated by the goal");
             int peer = lanes[1].Process!.Id;
+            await peerWarmup;
             await lanes[1].Ensure(Path.Combine(f.Root, "pool"), 1, f.Installation, CancellationToken.None);
             Check(lanes[1].Process!.Id == peer && File.Exists(Path.Combine(lanes[1].Root, "ready")), "Alive-but-unready lane was reconstructed or reused prematurely");
             result = await f.Pool.Analyze(Request(), f.Installation, _ => { }, CancellationToken.None);
@@ -326,7 +331,8 @@ internal static class WorkerReuseTests
                     result.Best is { Won: true, Dead: false, Hp: 8, Rounds: 10 } && result.Best.Actions.Count(a => a.PotionSlot.HasValue) == 1,
                     "Costly victory waited for minimum-loss or the optional zero-loss target");
                 Check(result.MinimumLoss == null && result.Timing?.Verifications == (lossStop ? 0 : 1) &&
-                    result.Trace!.Spans.Any(s => s.Phase == "stop_search") && watch.Elapsed < TimeSpan.FromSeconds(8),
+                    (!Received(Workers(f.Pool)[1], r, false) || result.Trace!.Spans.Any(s => s.Phase == "stop_search")) &&
+                    watch.Elapsed < TimeSpan.FromSeconds(8),
                     "Proof tracking, repeated verification or full peer budget delayed the result");
                 Check(LocalSearchPolicy.HasExecutionPoints(result), "First-win result lost its execution checkpoints");
                 Console.WriteLine($"  first-win protocol evidence: algorithm={algorithm}; loss_stop={lossStop}; skip_verify={lossStop}; elapsed_ms={watch.ElapsedMilliseconds}; loss=42; potions=1; rounds=10; verifications={result.Timing!.Verifications}; peer_budget_ms=10000; native_game=false");
@@ -413,7 +419,8 @@ internal static class WorkerReuseTests
                     result.Best is { Won: true, NetHpLoss: 4, CardGoalOutcome.Kills: 1 }, "Consumable goal waited for zero loss or minimum proof");
                 Check(result.MinimumLoss == null && !LocalSearchPolicy.HasMinimumProof(result) &&
                     result.Timing?.Verifications == (skip ? 0 : 1) && LocalSearchPolicy.HasExecutionPoints(result) &&
-                    result.Trace!.Spans.Any(s => s.Phase == "stop_search") && watch.Elapsed < TimeSpan.FromSeconds(8),
+                    (!Received(Workers(f.Pool)[1], r, false) || result.Trace!.Spans.Any(s => s.Phase == "stop_search")) &&
+                    watch.Elapsed < TimeSpan.FromSeconds(8),
                     "Peers ran their full budget, goal scope was lost or final route verification repeated");
                 Console.WriteLine($"  consumable-goal protocol evidence: algorithm={algorithm}; skip_verify={skip}; elapsed_ms={watch.ElapsedMilliseconds}; loss=4<5; kills=1; peers=2; verifications={result.Timing!.Verifications}; peer_budget_ms=10000; native_game=false");
             }
@@ -533,6 +540,10 @@ internal static class WorkerReuseTests
                     foreach (var marker in new[] { "search-received", "verify-received" }) File.Delete(Path.Combine(root, marker));
                     File.WriteAllText(Path.Combine(root, request.VerifyCandidate == null ? "search-received" : "verify-received"), request.Id);
                     if (request.DebugEncounter == "exit") return 71;
+                    // The synthetic root is ready before its simulated search.
+                    // Native admission listens to this same scoped progress/result.
+                    LocalWire.Write(Path.Combine(root, "result.json"), new LocalSearchResult(request.Id, request.SnapshotId,
+                        "running", "synthetic root ready", 0, 0, 0, null, RootBranches: 2));
                     using var client = request.TurnWorkPipe == null ? null : new LocalTurnWorkClient(request);
                     using var loss = request.MinimumLossPipe == null ? null : new LocalMinimumLossClient(request);
                     bool minimum = request.DebugEncounter?.StartsWith("minimum-", StringComparison.Ordinal) == true && request.VerifyCandidate == null;
@@ -557,6 +568,8 @@ internal static class WorkerReuseTests
                     if (minimum) delay = request.Partition == 0 ? 600 : 10000;
                     if (request.DebugEncounter == "full-health-race" && request.VerifyCandidate == null)
                         delay = request.Partition == 0 ? 250 : 60;
+                    if (request.DebugEncounter is "goal" or "peer-slow" && request.Partition == 0 && request.VerifyCandidate == null)
+                        delay = 600;
                     if (request.DebugEncounter?.StartsWith("first-win", StringComparison.Ordinal) == true && request.VerifyCandidate == null)
                         delay = request.Partition == 0 ? 600 : 10000;
                     if (request.DebugEncounter?.StartsWith("card-goal", StringComparison.Ordinal) == true && request.VerifyCandidate == null)
