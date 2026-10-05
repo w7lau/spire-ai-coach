@@ -20,7 +20,7 @@ try {
     foreach ($name in @('README.en.md', 'LICENSE', 'ACKNOWLEDGEMENTS.md', 'CONTRIBUTING.md')) {
         Copy-Item -LiteralPath $name -Destination (Join-Path $package $name)
     }
-    $version = (Get-Content -LiteralPath 'SpireAiCoach.json' -Raw | ConvertFrom-Json).version
+    $version = (Get-Content -LiteralPath 'SpireAiCoach.json' -Raw -Encoding UTF8 | ConvertFrom-Json).version
     $zipPath = Join-Path $root "dist/SpireAiCoach-$version.zip"
     Compress-Archive -LiteralPath $package -DestinationPath $zipPath -Force
     $sha = [System.Security.Cryptography.SHA256]::Create()

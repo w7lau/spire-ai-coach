@@ -64,6 +64,12 @@ public static class Entry
                 File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
                 return;
             }
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_RESUME_SEARCH_TEST") == "1")
+            {
+                await ResumeSearchIntegration.Run(root, tree, pool, save);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_MODEL_DISPLAY_TEST") == "1")
             {
                 await ModelDisplayIntegration.Run(root, tree, pool, save);

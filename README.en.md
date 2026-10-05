@@ -28,7 +28,8 @@ Both use native rules for damage, block, draw, discard, exhaust, selections, pow
 - Stop on minimum loss returns after a zero-loss win or a sufficiently proven loss bound. Unknown bounds continue searching. Stop on first win is useful for final bosses.
 - Configure concurrency, attempts per worker, search seconds and the turn limit. Defaults: 64 attempts, 60 search seconds per worker and a 64-turn horizon. Zero workers means automatic sizing; the manual cap is 16. Preparation and optional final verification take additional time.
 - Optional goals encourage playing a selected card more often or using it for a finisher, within a chosen HP-loss tolerance. Finishers count targets eligible for the game's native Fatal rewards, respecting minion and mod restrictions.
-- Inspect progress, explored routes and timing, or continue optimizing an existing candidate. Final independent verification is skipped by default and can be enabled.
+- Inspect progress, explored routes and timing. After an attempt or time limit, click “继续搜索” to resume retained pending prefixes, even without a winning plan; completed jobs remain deduplicated. Final independent verification is skipped by default and can be enabled.
+- Attempts, time and concurrency may change between batches. Playing a card, changing potions or goals, or changing the turn horizon requires a fresh calculation. Progress stays in the current game process and is lost on restart.
 - Execution starts only after clicking the button, in singleplayer combat. Each step checks the native state, action history and mod environment and stops on divergence. AI text is never executed automatically.
 
 A winning plan, the best discovered candidate, and a proven minimum-loss result are distinct claims. Reaching an attempt, time or turn limit does not mean the search was exhaustive. Incomplete routes are not returned as winning plans.

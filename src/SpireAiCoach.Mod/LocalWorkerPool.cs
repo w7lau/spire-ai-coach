@@ -15,6 +15,25 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
     private readonly Worker[] _workers = Enumerable.Range(0, 16).Select(_ => new Worker()).ToArray();
     private bool _disposed;
     private LocalTrace? _lastPreparation;
+    private readonly object _resumeGate = new();
+    private LocalSearchSession? _pausedSearch;
+    private long _resumeGeneration;
+
+    public bool CanResume(LocalSearchRequest request)
+    { lock (_resumeGate) return _pausedSearch is { Pending: > 0 } saved && saved.Matches(request); }
+
+    public void DiscardSearch()
+    {
+        LocalSearchSession? old;
+        lock (_resumeGate) { _resumeGeneration++; old = _pausedSearch; _pausedSearch = null; }
+        old?.Dispose();
+    }
+
+    private LocalSearchResult WithProgress(LocalSearchResult result)
+    {
+        lock (_resumeGate) return _pausedSearch is { } saved && saved.LastId == result.Id ?
+            result with { SearchProgress = saved.Progress(saved.Batches > 1, result.Evaluated) } : result;
+    }
 
     public LocalPoolResources Resources()
     {
@@ -58,7 +77,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
     {
         var origin = new LocalTimeline(request.TimelineOrigin);
         request = request with { TimelineOrigin = origin.Origin };
-        try { return await AnalyzePass(request, installation, progress, cancellation, simulationProgress); }
+        try { return WithProgress(await AnalyzePass(request, installation, progress, cancellation, simulationProgress)); }
         catch (CoachException ex) when (request.DataOnlyCombat && ex.Category is "local_data_unavailable" or "local_failed")
         {
             // A Mod can depend on an actual UI node. Repeat through the regular native
@@ -82,7 +101,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 // the first pass's search/refinement/verification offsets in the UI.
                 simulationProgress == null ? null : p => simulationProgress(p with { Id = request.Id, Sequence = p.Sequence + 4_000_000 }));
             var evidence = result.Evidence?.WithFailedPass(result.Best, failures.Length);
-            return result with { Id = request.Id, Message = "常规执行完成。" + result.Message, Evidence = evidence,
+            return WithProgress(result) with { Id = request.Id, Message = "常规执行完成。" + result.Message, Evidence = evidence,
                 RecoveredFailures = failures.Concat(result.RecoveredFailures ?? []).ToArray() };
         }
     }
@@ -95,9 +114,24 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
         request = request with { TimelineOrigin = timeline.Origin, InitialTrace = null };
         double queueStart = timeline.ElapsedMs;
         using (timeline.Measure(-1, "main", "queue")) await _gate.WaitAsync(cancellation);
+        LocalSearchSession? session = null;
+        long sessionGeneration = 0;
+        bool retainSession = false;
         try
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
+            LocalSearchSession? obsolete;
+            lock (_resumeGate)
+            {
+                sessionGeneration = ++_resumeGeneration;
+                session = request.ContinueOptimization && _pausedSearch is { Pending: > 0 } saved && saved.Matches(request)
+                    ? saved : LocalSearchSession.Supported(request) ? new LocalSearchSession(request) : null;
+                obsolete = ReferenceEquals(session, _pausedSearch) ? null : _pausedSearch;
+                _pausedSearch = null;
+            }
+            obsolete?.Dispose();
+            request = request with { ResumingFrontier = session?.Batches > 0 };
+            if (request.ResumingFrontier) { request = request with { InitialPlan = null }; progress("继续搜索剩余分支…"); }
             int count = Count(request.Workers, request.AdaptiveWorkers);
             var boundPublishers = new Dictionary<string, LocalSharedHealthBound>();
             var boundPublishGate = new object();
@@ -112,11 +146,11 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 request.ExcludedModels is not { Length: > 0 } ? new LocalMinimumLossBroker(request, count) : null;
             var rootBranches = new int[count];
             var starting = new int[count];
-            bool shared = request.ShareSearchWork && count > 1 &&
+            bool shared = request.ShareSearchWork && (count > 1 || session != null) &&
                 request.SearchOrder is LocalSearchOrder.MonteCarlo or LocalSearchOrder.TurnFrontier;
-            using var turnWork = shared && request.SearchOrder == LocalSearchOrder.TurnFrontier ? new LocalTurnWork(request, count) : null;
+            using var turnWork = shared && request.SearchOrder == LocalSearchOrder.TurnFrontier ? new LocalTurnWork(request, count, session?.Turns) : null;
             using var searchWork = shared && request.SearchOrder == LocalSearchOrder.MonteCarlo && request.MemorySearchWork
-                ? new LocalSearchWorkBroker(request, count) : null;
+                ? new LocalSearchWorkBroker(request, count, retainedQueue: session?.Work) : null;
             request = request with { TurnWorkPipe = turnWork?.PipeName, SearchWorkPipe = searchWork?.PipeName,
                 MinimumLossPipe = minimumLoss?.PipeName };
             LocalSearchWork? schedulingWork = null;
@@ -134,7 +168,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 results.Count == 1 && results[0].Status == "audited")
                 throw new CoachException("local_audit_complete", "所属实例已完成只读回复检查；没有可执行方案。");
             if (request.DataOnlyCombat && (!goalReached.IsCancellationRequested || goalMinimumLoss > 0 && Volatile.Read(ref consumableGoalReached) == 0) &&
-                LocalSearchRecovery.NeedsCompatibilityPass(request, results))
+                LocalSearchRecovery.NeedsCompatibilityPass(request, results) &&
+                !(session?.Baseline?.Best != null && results.Any(r => r.RootBranches > 0 && r.Failure == null)))
             {
                 var failure = new CoachException("local_data_unavailable", string.Join("\n", results.Select(r => r.Message).Distinct()));
                 failure.Data["local_failures"] = results.Where(r => r.Failure != null).Select(r => r.Failure!).ToArray();
@@ -160,6 +195,9 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 results.Add(await Task.Run(() => Run(_workers[0], 0, fallback), cancellation));
             }
             var valid = results.Where(r => r.Status is "searched" or "done" or "partial" && r.Best != null).ToArray();
+            if (session?.Baseline is { Best: { } } previous && results.Any(r => r.RootBranches > 0 && r.Failure == null))
+                valid = valid.Append(previous with { Id = request.Id, MinimumLoss = null, HealthBounds = null,
+                    StoppedEarly = false, StoppedOnFirstWin = false, StoppedOnCardGoals = false }).ToArray();
             if (Volatile.Read(ref consumableGoalReached) != 0)
                 valid = valid.Where(r => LocalSearchPolicy.CanStopOnCardGoals(r.Best, request)).ToArray();
             if (valid.Length == 0)
@@ -196,7 +234,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             var best = selectedBest;
             var allRuns = results.Concat(verificationResults).ToArray();
             LocalWorkStats? workStats = null;
-            if (request.ShareSearchWork && request.SearchOrder == LocalSearchOrder.MonteCarlo && count > 1)
+            if (request.ShareSearchWork && request.SearchOrder == LocalSearchOrder.MonteCarlo && (count > 1 || searchWork != null))
             {
                 using var scheduling = timeline.Measure(-1, "main", "schedule", "释放已结束的分支提案", depth: 1);
                 using var work = searchWork == null ? new LocalSearchWork(Path.GetDirectoryName(_workers[goalWorker >= 0 ? goalWorker : 0].Root)!, request) : null;
@@ -207,9 +245,9 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             }
             var evidence = LocalSearchEvidence.Merge(request, best, results,
                 turnWork?.Pending ?? workStats?.Pending ?? (count == 1 ? best.TurnSearch?.Pending : null));
-            return best with { Evidence = evidence, Evaluated = results.Sum(r => r.Evaluated), Rejected = results.Sum(r => r.Rejected),
+            var merged = best with { Evidence = evidence, Evaluated = results.Sum(r => r.Evaluated), Rejected = results.Sum(r => r.Rejected),
                 Duplicates = results.Sum(r => r.Duplicates), BudgetPruned = results.Sum(r => r.BudgetPruned),
-                Victories = valid.Sum(r => r.Victories), Workers = used, WorkerLimit = count, RootBranches = Volatile.Read(ref rootBranches[0]),
+                Victories = results.Where(r => r.Best != null).Sum(r => r.Victories), Workers = used, WorkerLimit = count, RootBranches = Volatile.Read(ref rootBranches[0]),
                 ElapsedMs = (long)timeline.ElapsedMs, Trace = timeline.Snapshot(), SearchElapsedMs = results.Take(used).Max(r => r.ElapsedMs) +
                     (results.Count > used ? results[^1].ElapsedMs : 0),
                 WorkerMemoryBytes = (results.Count > used ? results.Skip(1) : results).Sum(r => r.WorkerMemoryBytes),
@@ -262,6 +300,9 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     (request.CardGoals?.Enabled == true ?
                         "按可选出牌目标选路；预算内候选，未证明目标最优。" :
                         "按战后净生命损失选路，同等净损失优先保留药水；预算内候选，未证明全局最优。") };
+
+            session?.Complete(merged); retainSession = true;
+            return merged;
 
             Task<LocalSearchResult> Launch(int index, CancellationToken passFailure)
             {
@@ -499,12 +540,26 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             }
         }
         catch (CoachException ex) { ex.Data["local_trace"] = timeline.Snapshot(); throw; }
-        finally { _gate.Release(); }
+        finally
+        {
+            if (session != null)
+            {
+                // All brokers have closed. Return incomplete claims before
+                // computing resumability, including a batch with no unclaimed jobs.
+                if (retainSession) session.Work?.Resume();
+                lock (_resumeGate)
+                    if (retainSession && sessionGeneration == _resumeGeneration)
+                    { _pausedSearch = session; session = null; }
+                session?.Dispose();
+            }
+            _gate.Release();
+        }
     }
 
     public void Dispose()
     {
         _disposed = true;
+        DiscardSearch();
         foreach (var worker in _workers) worker.Dispose();
     }
 

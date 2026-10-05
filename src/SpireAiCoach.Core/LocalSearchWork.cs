@@ -14,6 +14,7 @@ public sealed record LocalWorkStats(int Submitted, int Claimed, int Completed, i
 public sealed class LocalSearchWork : IDisposable
 {
     private readonly string _directory;
+    private readonly string _domainKey;
     private readonly int _capacityPerKind;
     private readonly object _memoryGate = new();
     private Index? _memory;
@@ -21,6 +22,7 @@ public sealed class LocalSearchWork : IDisposable
     private readonly LocalSearchWorkClient? _remote;
     public LocalSearchWork(string parent, LocalSearchRequest request, int capacity = 512, bool inMemory = false)
     {
+        _domainKey = LocalSearchSession.Key(request);
         var scope = Hash(request.Id + "\n" + request.SnapshotId + "\n" + request.NativeHash + "\n" +
             request.ModelHash + "\n" + string.Join("\n", request.LoadedMods));
         _directory = Path.Combine(parent, "search-work", scope);
@@ -30,6 +32,8 @@ public sealed class LocalSearchWork : IDisposable
         else if (inMemory) _memory = new();
         else Directory.CreateDirectory(_directory);
     }
+
+    public bool Matches(LocalSearchRequest request) => _domainKey == LocalSearchSession.Key(request);
 
     private sealed class Entry
     {
@@ -205,6 +209,20 @@ public sealed class LocalSearchWork : IDisposable
         using var gate = Lock();
         var index = Read();
         if (index.RetiredOwners.Add(owner)) Save(index);
+    }
+
+    // Called only after the old broker and its clients have fully stopped.
+    // Completed identities stay closed; interrupted claims become pending again.
+    public void Resume()
+    {
+        if (_remote != null || _memory == null) throw new InvalidOperationException("Only a retained parent queue resumes");
+        using var gate = Lock();
+        foreach (var entry in _memory.Entries)
+        {
+            if (!entry.Completed && !entry.Covered) entry.Owner = null;
+            else _plans.Remove(entry.Key);
+        }
+        _memory.RetiredOwners.Clear(); _memory.Descents.Clear();
     }
 
     // Only the pool calls this after all search/verification lanes have finished.

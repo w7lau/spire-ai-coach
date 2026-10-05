@@ -46,6 +46,7 @@ public sealed class CoachOverlay
     private Button _continueOptimize = null!;
     private LocalWorkerPool _localPool = null!;
     private bool _localAnalyzing;
+    private LocalSearchRequest? _lastSearchRequest;
     private CheckBox _localStopOnZeroLoss = null!;
     private CheckBox _localStopOnFirstWin = null!;
     private SpinBox _localTargetVictoryRounds = null!;
@@ -310,7 +311,8 @@ public sealed class CoachOverlay
         var resultSection = CoachTheme.Section(body, "推荐路线");
         _freshness = Wrapped(""); _freshness.AddThemeColorOverride("font_color", CoachTheme.Muted); resultSection.AddChild(_freshness);
         var executionRow = new GridContainer { Columns = 3 }; shell.AddChild(executionRow);
-        _continueOptimize = new Button { Text = "继续优化", Disabled = true }; resultSection.AddChild(_continueOptimize);
+        _continueOptimize = new Button { Text = "继续搜索", Disabled = true,
+            TooltipText = "从尚未探索的分支继续；没有获胜路线也可继续。次数、时间和并发可调整，改变战斗状态或搜索目标需重新计算。" }; resultSection.AddChild(_continueOptimize);
         _continueOptimize.Pressed += () => AnalyzeLocal(_lastLocalOrder, true);
         _execute = new Button { Text = "执行方案", Disabled = true, SizeFlagsHorizontal = Control.SizeFlags.ExpandFill }; executionRow.AddChild(_execute);
         CoachTheme.Accent(_execute);
@@ -442,6 +444,7 @@ public sealed class CoachOverlay
             var changed = hash != _snapshotHash;
             if (changed)
             {
+                _lastSearchRequest = null; _localPool.DiscardSearch();
                 _snapshot = snapshot; _snapshotHash = hash;
                 if (_request != null) Cancel("战斗状态已变化，请重新分析。");
                 _pendingLocalProgress.Clear(); _localProgress.Finish("战斗状态已变化，过程记录已过期。", true);
@@ -459,7 +462,9 @@ public sealed class CoachOverlay
             _localCardGoalLoss.Editable = !_executing && _localCardGoalThreshold.ButtonPressed;
             _execute.Disabled = _analyze.Disabled || _continuation == null || _continuation.Invalid ||
                 !LocalCapture.Stable() || !LocalCapture.ExecutionSettled();
-            _continueOptimize.Disabled = _execute.Disabled;
+            _continueOptimize.Disabled = _analyze.Disabled || !LocalCapture.Stable() || !LocalCapture.ExecutionSettled() ||
+                _lastSearchRequest == null || _lastSearchRequest.SnapshotId != _snapshotHash ||
+                !_localPool.CanResume(ConfigureLocalRequest(_lastSearchRequest, _lastLocalOrder));
             _stopExecution.Disabled = !_executing;
             var resources = _localPool.Resources();
             _resources.Text = $"计算资源 · {resources.Ready} 路可复用" +
@@ -771,6 +776,8 @@ public sealed class CoachOverlay
         try
         {
             request = ConfigureLocalRequest(LocalCapture.Capture(_snapshotHash!, continueOptimization), order);
+            if (continueOptimization && !_localPool.CanResume(request))
+            { _status.Text = "当前状态或计算条件已变化，或没有待探索分支，请重新计算。"; return; }
             // Reuse only the suffix matching this combat, mods, native state and complete history.
             // It is an exploration seed; the worker re-executes and verifies it, never copies its score.
             if (_continuation != null && request.History != null)
@@ -824,6 +831,7 @@ public sealed class CoachOverlay
                             $"已达到 {target} 回合内获胜、净损失 0、无药且敌方伤害 0 的目标。" :
                             $"未达到 {target} 回合目标，显示预算内已取得的可用路线。") + "\n" + result.Message };
                     ShowLocalAdvice(result);
+                    _lastSearchRequest = request;
                     if (request.TargetVictoryRounds is { } requestedTarget && !LocalSearchPolicy.MeetsGoal(result.Best, request))
                         _advice.Text = $"尚未达成 {requestedTarget} 回合目标。\n" + _advice.Text;
                     _localTiming.Text = LocalTimeline.Format(result);
@@ -844,7 +852,7 @@ public sealed class CoachOverlay
                                 turn_search = result.TurnSearch is { } turns ? new { turns.Probes, turns.BoundPruned,
                                     turns.Offered, turns.DuplicateOffers, turns.Pending, turns.UnknownRecoveryChecks, turns.LossProofProbes,
                                     turns.CoveredPrefixes, turns.CompletedHistories, turns.RepeatedHistories } : null,
-                                result.Status, result.Best, result.MinimumLoss,
+                                result.Status, result.Best, result.MinimumLoss, result.SearchProgress,
                                 round_losses = result.Best is { } candidate ? LocalRouteFeedback.RoundLosses(candidate) : null,
                                 result.Timing, result.Trace });
                         }
@@ -889,6 +897,7 @@ public sealed class CoachOverlay
 
     private void Cancel(string status)
     {
+        _lastSearchRequest = null; _localPool.DiscardSearch();
         _execution?.Cancel();
         _continuation = null; _continuationPending = false;
         _execute.Disabled = true;
