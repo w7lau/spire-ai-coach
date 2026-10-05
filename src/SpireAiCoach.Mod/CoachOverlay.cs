@@ -808,7 +808,7 @@ public sealed class CoachOverlay
                                 request.CardGoals,
                                 result.Evaluated, result.Victories, result.HealthBounds, result.RecoveredFailures,
                                 turn_search = result.TurnSearch is { } turns ? new { turns.Probes, turns.BoundPruned,
-                                    turns.Offered, turns.DuplicateOffers, turns.Pending, turns.UnknownRecoveryChecks,
+                                    turns.Offered, turns.DuplicateOffers, turns.Pending, turns.UnknownRecoveryChecks, turns.LossProofProbes,
                                     turns.CoveredPrefixes, turns.CompletedHistories, turns.RepeatedHistories } : null,
                                 result.Status, result.Best, result.MinimumLoss,
                                 round_losses = result.Best is { } candidate ? LocalRouteFeedback.RoundLosses(candidate) : null,

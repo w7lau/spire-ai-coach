@@ -56,6 +56,23 @@ public static class ReplayIntegration
         // Frozen execution controls retain the same startup; bootstrap has its own paired
         // cold measurements. Ordinary integration fixtures use the product's default.
         var installation = new LocalInstallation(game, directories, MinimalWorkerBootstrap: false);
+        if (System.Environment.GetEnvironmentVariable("SPIRE_COACH_RECOVERY_AUDIT") == "1")
+        {
+            installation = installation with { GameDirectory = Path.Combine(root, "game") };
+            request = request with { Workers = 1, AdaptiveWorkers = false };
+            try { await Task.Run(() => pool.Analyze(request, installation, _ => { }, CancellationToken.None)); }
+            catch (CoachException ex) when (ex.Category == "local_audit_complete")
+            { /* An audit is deliberately not a usable combat result. */ }
+            var auditFiles = Directory.EnumerateFiles(Path.Combine(root, ".spire-ai-coach-workers"),
+                "recovery-audit.json", SearchOption.AllDirectories).Where(p =>
+                {
+                    using var doc = JsonDocument.Parse(File.ReadAllText(p));
+                    return doc.RootElement.GetProperty("Id").GetString() == request.Id;
+                }).ToArray();
+            if (auditFiles.Length != 1) throw new InvalidOperationException("One current native recovery audit was not produced");
+            File.Copy(auditFiles[0], Path.Combine(root, "integration-recovery-audit.json"), true);
+            return;
+        }
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_RECENT_SEARCH_TEST") == "1")
         {
             await RecentSearchIntegration.Run(root, pool, original, request, installation);

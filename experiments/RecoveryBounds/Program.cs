@@ -1,6 +1,8 @@
 using System.Reflection;
 using System.Text.Json;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Commands;
+using MegaCrit.Sts2.Core.Entities.Creatures;
 using SpireAiCoach.Core;
 using SpireAiCoach.Mod;
 
@@ -11,6 +13,30 @@ var request = new LocalSearchRequest("metadata-audit", "root", [], "native", 1, 
 var estimator = Activator.CreateInstance(estimatorType, request)!;
 var describe = estimatorType.GetMethod("Describe", BindingFlags.NonPublic | BindingFlags.Instance)!;
 var output = new List<object>();
+foreach (var (property, field) in new[] { ("CurrentHp", "_currentHp"), ("MaxHp", "_maxHp") })
+{
+    var setter = typeof(Creature).GetProperty(property)!.GetSetMethod(true)!;
+    var code = LocalMethodBody.Read(setter)!;
+    int write = Array.FindIndex(code, i => i.Code == System.Reflection.Emit.OpCodes.Stfld &&
+        i.Operand is FieldInfo f && f.Name == field && f.DeclaringType == typeof(Creature));
+    int callback = Array.FindIndex(code, i => i.Operand is MethodInfo m && m.Name == "Invoke");
+    if (write < 0 || callback <= write) throw new InvalidOperationException("Native HP write/callback boundary changed");
+    output.Add(new { HealthProperty = property, WritesBeforeCallback = true });
+}
+var readEffects = estimatorType.GetMethod("ReadEffects", BindingFlags.NonPublic | BindingFlags.Instance)!;
+foreach (var (name, expectedUnknown) in new[] {
+    (nameof(ExternalRecoveryFixture.Neutral), false),
+    (nameof(ExternalRecoveryFixture.Healing), true),
+    (nameof(ExternalRecoveryFixture.Dynamic), true),
+    (nameof(ExternalRecoveryFixture.RegisterHealingEvent), true),
+    (nameof(ExternalRecoveryFixture.RegisterUnknownVirtualEvent), true) })
+{
+    var method = typeof(ExternalRecoveryFixture).GetMethod(name)!;
+    var proof = readEffects.Invoke(estimator, [null, new[] { (Method: (MethodBase)method, Victory: false, Direct: false) }])!;
+    var reason = proof.GetType().GetProperty("Unknown")!.GetValue(proof) as string;
+    if ((reason != null) != expectedUnknown) throw new InvalidOperationException("Wrong external callback proof: " + name + ": " + reason);
+    output.Add(new { ExternalCallback = name, Unknown = reason, Executed = false });
+}
 foreach (var (id, expectedHeals, expectedUnknown) in new (string, int, bool)[]
 {
     ("Cards.StrikeIronclad", 0, false), ("Cards.DefendIronclad", 0, false),
@@ -64,3 +90,19 @@ var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteInd
 if (args is [var destination]) File.WriteAllText(destination, json);
 else if (args.Length != 0) throw new ArgumentException("Pass an optional report path");
 Console.WriteLine(json);
+
+// Deliberately external to the game/coach assemblies. Only IL is read; these
+// callbacks are NEVER invoked. A delegate event's body must enter the closure.
+public static class ExternalRecoveryFixture
+{
+    private static int _count;
+    public static event Action? Tick;
+    public static void Neutral() { _count++; }
+    public static Task Healing() => CreatureCmd.Heal(null!, 1, true);
+    public static void Dynamic() => typeof(ExternalRecoveryFixture).GetMethod(nameof(Healing))!.Invoke(null, null);
+    public static void RegisterHealingEvent() { Tick += HealingEvent; }
+    public static void RegisterUnknownVirtualEvent(ExternalVirtualCallback callback) { Tick += callback.Run; }
+    public static void Raise() => Tick?.Invoke();
+    private static void HealingEvent() { _ = Healing(); }
+}
+public class ExternalVirtualCallback { public virtual void Run() { } }

@@ -88,6 +88,7 @@ public static class LocalWorker
         LocalWorkerBootstrap.Install(harmony);
         LocalWorkerDataMode.Install(harmony);
         LocalWorkerLogic.Install();
+        LocalHpAccounting.Install();
         LocalWorkerOverhead.Install();
         LocalWorkerVerification.Install();
         Callable.From(Run).CallDeferred();
@@ -178,6 +179,7 @@ public static class LocalWorker
         LocalCandidate? best = null;
         int evaluated = 0, rejected = 0, victories = 0, attempts = 0, probes = 0, boundPruned = 0, unknownRecoveryChecks = 0;
         int knownRecoveryChecks = 0, sharedIncumbentUpdates = 0;
+        int lossProofProbes = 0;
         string unknownRecoveryReason = "";
         var recovery = new LocalRecoveryEstimator(request);
         bool trackMinimum = request.StopOnZeroLoss && !request.StopOnFirstWin && request.VerifyCandidate == null &&
@@ -248,7 +250,7 @@ public static class LocalWorker
         LocalTurnSearchStats? TurnStats() => turns == null ? null :
             new(probes, boundPruned, turns.Offered, turns.DuplicateOffers, turns.Count, unknownRecoveryChecks,
                 coveredTasks + (coverage?.Avoided ?? 0), terminalHistories.Count + repeatedHistories, repeatedHistories,
-                turns.ClaimedByRound, rolloutStyles, turnOutcomes.ToArray());
+                turns.ClaimedByRound, rolloutStyles, turnOutcomes.ToArray(), lossProofProbes);
         var search = noPotionSearch;
         var refiner = new LocalRouteRefiner();
         var policy = turnMode || request.CorrelatedRollouts && !systematic ? new LocalRolloutPolicy(314159 + request.Partition, request.CardGoals) : null;
@@ -375,17 +377,17 @@ public static class LocalWorker
             }
             if (request.RecordedReplayProbe is { } recorded)
             {
-                int startHp = 0, lost = 0;
+                int startHp = 0;
                 var recordedActions = new List<LocalAction>();
                 Player? recordedPlayer = null;
                 LocalDamageAccounting? recordedDamage = null;
-                void HpChanged(int oldHp, int newHp) => lost += Math.Max(0, oldHp - newHp);
+                LocalHpAccounting? recordedHealth = null;
                 try
                 {
                     var bound = LocalRecordedProbe.Bind(recorded, request.Replay);
                     await LocalWorkerLogic.Run(() => Restore(request with { Replay = bound.Replay }, true, player =>
                     { recordedPlayer = player; startHp = player.Creature.CurrentHp;
-                        recordedDamage = new(player); player.Creature.CurrentHpChanged += HpChanged; },
+                        recordedDamage = new(player); recordedHealth = new(player); },
                     (action, player) =>
                     {
                         if (action is ReadyToBeginEnemyTurnAction) return;
@@ -400,11 +402,12 @@ public static class LocalWorker
                         _traceStep = recordedActions.Count;
                     }, bound.PrefixEvents), () => _choices?.Tick(), Frame, 60);
                     var player = recordedPlayer ?? throw new InvalidOperationException("Recorded root was not validated");
-                    best = new(recordedActions.ToArray(), player.Creature.CurrentHp, lost,
+                    var health = recordedHealth!.Snapshot();
+                    best = new(recordedActions.ToArray(), player.Creature.CurrentHp, health.HpLost,
                         CombatManager.Instance.DebugOnlyGetState()!.Enemies.Sum(e => Math.Max(0, e.CurrentHp)), player.Gold,
                         player.Creature.MaxHp, _combatWon && !player.Creature.IsDead, player.Creature.IsDead, false,
                         Rounds: recordedActions.Select(a => a.Round).Distinct().Count(), StartingHp: startHp,
-                        DamageSources: recordedDamage!.Snapshot(lost));
+                        DamageSources: recordedDamage!.Snapshot(health.HpLost), HealthChanges: health);
                     // Experimental terminal status is deliberately excluded from the product pool's
                     // acceptable results; this cannot become a displayed/executable empty plan.
                     await Cleanup();
@@ -415,7 +418,7 @@ public static class LocalWorker
                 finally
                 {
                     recordedDamage?.Dispose();
-                    if (recordedPlayer != null) recordedPlayer.Creature.CurrentHpChanged -= HpChanged;
+                    recordedHealth?.Dispose();
                 }
             }
             if (request.VerifyCandidate is { } proposed)
@@ -449,6 +452,33 @@ public static class LocalWorker
             if (turnMode) _includePotions = request.IncludePotions;
             Progress("恢复当前战斗", force: true);
             await RestoreMeasured();
+            // Owned diagnostic process only. Read one restored root; never
+            // search, play cards or return an executable empty candidate.
+            if (System.Environment.GetEnvironmentVariable("SPIRE_COACH_RECOVERY_AUDIT") == "1")
+            {
+                var auditPlayer = LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!;
+                var beforeAudit = LocalCapture.Fingerprint();
+                var auditClock = Stopwatch.StartNew();
+                var allowance = recovery.Estimate(auditPlayer);
+                auditClock.Stop();
+                var afterAudit = LocalCapture.Fingerprint();
+                if (beforeAudit != afterAudit) throw new InvalidOperationException("Recovery audit mutated its native root");
+                LocalHealthChanges[]? healthAudit = null;
+                if (System.Environment.GetEnvironmentVariable("SPIRE_COACH_HP_AUDIT") == "1")
+                {
+                    healthAudit = LocalHpAccounting.Audit(auditPlayer);
+                    await RestoreMeasured();
+                    if (beforeAudit != LocalCapture.Fingerprint())
+                        throw new InvalidOperationException("Health audit did not restore its frozen root");
+                }
+                LocalWire.Write(Path.Combine(_root, "recovery-audit.json"), new { request.Id, allowance,
+                    ElapsedMs = auditClock.Elapsed.TotalMilliseconds, RootUnchanged = true,
+                    HealthWritesHooked = LocalHpAccounting.WritesHooked, HealthAudit = healthAudit,
+                    version = typeof(LocalWorker).Assembly.GetName().Version!.ToString(3),
+                    module = typeof(LocalWorker).Assembly.ManifestModule.ModuleVersionId });
+                await Cleanup(); session?.Dispose(); Publish("audited", "回复代码检查完成；没有搜索或出牌。");
+                return true;
+            }
             // Cold asset loading and root restoration are preparation, not tactical exploration.
             // Otherwise a small budget can expire before the first complete combat rollout.
             budget.Start();
@@ -534,8 +564,8 @@ public static class LocalWorker
                         }
                         sharedExhausted = sharedTurns != null; break;
                     }
-                    fullRollout = sharedTurns != null ? turnTask.FullRollout : fullRollout || turnTask.FullRollout;
-                    if (turnTask.Prefix.Length == 1) fullRollout = true;
+                    fullRollout = !turnTask.LossProof && (sharedTurns != null ? turnTask.FullRollout : fullRollout || turnTask.FullRollout);
+                    if (turnTask.Prefix.Length == 1 && !turnTask.LossProof) fullRollout = true;
                     planned = turnTask.Prefix;
                     // Skip already completed subtrees before restoring their prefix.
                     if (coverage!.IsClosedPrefix(planned)) { coveredTasks++; sharedTurns?.Finish(turnTask); continue; }
@@ -630,12 +660,10 @@ public static class LocalWorker
                 int continuationIndex = 0;
                 int planIndex = 0;
                 int tailIndex = 0;
-                int lost = 0;
                 string? terminalDigest = null;
                 using var damageSources = new LocalDamageAccounting(player);
                 using var cardGoalCounts = new LocalCardGoalAccounting(player, request.CardGoals);
-                void HpChanged(int oldHp, int newHp) => lost += Math.Max(0, oldHp - newHp);
-                player.Creature.CurrentHpChanged += HpChanged;
+                using var healthAccounting = new LocalHpAccounting(player);
                 try
                 {
                     Progress("开始试走", Observe(player), true);
@@ -758,7 +786,7 @@ public static class LocalWorker
                         var learned = !next.EndTurn && next.PotionSlot == null
                             ? _nativeLearning?.Before(player.PlayerCombatState!.Hand.Cards[next.HandIndex], player) : null;
                         Progress("执行：" + LocalSearchPolicy.Describe(next), before);
-                        var priorLost = lost;
+                        var priorLost = healthAccounting.HpLost;
                         var actionStarted = Stopwatch.GetTimestamp();
                         pendingAction = next;
                         _traceStep = actions.Count + 1;
@@ -770,7 +798,7 @@ public static class LocalWorker
                                 // recording adds no frame wait or independent state replay.
                                 var history = LocalCapture.History();
                                 if (actions.Count == 0 && history != request.History) continuationPoints = null;
-                                else continuationPoints.Add(new(actions.Count, next.BeforeHash, history, lost, player.Creature.CurrentHp));
+                                else continuationPoints.Add(new(actions.Count, next.BeforeHash, history, healthAccounting.HpLost, player.Creature.CurrentHp));
                             }
                             catch (InvalidOperationException) { continuationPoints = null; }
                         }
@@ -864,7 +892,7 @@ public static class LocalWorker
                         pendingAction = null;
                         var after = Observe(player);
                         var changes = before != null && after != null ? LocalProgressBook.Changes(before, after) : "动作已结算；状态预览暂不可用。";
-                        if (lost > priorLost) changes += $"；期间实际失去生命 {lost - priorLost}";
+                        if (healthAccounting.HpLost > priorLost) changes += $"；期间实际失去生命 {healthAccounting.HpLost - priorLost}";
                         events.Enqueue(new(actions.Count, next.Round, LocalSearchPolicy.Describe(next), changes));
                         while (events.Count > 12) events.Dequeue();
                         Progress("试走路线", after);
@@ -875,7 +903,19 @@ public static class LocalWorker
                             (next.EndTurn || next.PotionSlot.HasValue || player.Creature.CurrentHp != previousHp ||
                              CombatManager.Instance.DebugOnlyGetState()!.RoundNumber > round)
                             ? Envelope(player, startingHp, actions) : null;
-                        proofSteps?.Add(new(next, proofLegal!, proofChoices!.ToArray(), stepEnvelope, proofComplete));
+                        var settledState = CombatManager.Instance.DebugOnlyGetState();
+                        var afterHint = turns != null && stepEnvelope != null ? new LocalTurnHint(player.Creature.CurrentHp,
+                            startingHp, settledState?.Enemies.Sum(e => Math.Max(0, e.CurrentHp)) ?? 0, initialEnemyHp,
+                            player.Creature.Block, stepEnvelope.PotionsUsed, stepEnvelope.MaximumFurtherHpGain) : null;
+                        proofSteps?.Add(new(next, proofLegal!, proofChoices!.ToArray(), stepEnvelope, proofComplete,
+                            beforeHint, afterHint, settledState?.RoundNumber));
+                        if (turnTask?.LossProof == true && stepEnvelope != null && minimumStatus is { InvalidReason.Length: 0, Target: { } target } &&
+                            (LocalHealthBound.MinimumNetHpLoss(stepEnvelope) > target.NetHpLoss ||
+                             LocalHealthBound.MinimumNetHpLoss(stepEnvelope) == target.NetHpLoss &&
+                             stepEnvelope.PotionsUsed >= target.PotionsUsed))
+                        {
+                            turnProbed = true; stop = "本分支已达到现有获胜路线的损失下界"; break;
+                        }
                         if (!IsTerminal(player) &&
                             (next.PotionSlot.HasValue || player.Creature.CurrentHp < previousHp ||
                              CombatManager.Instance.DebugOnlyGetState()!.RoundNumber > round))
@@ -923,7 +963,8 @@ public static class LocalWorker
                     var state = CombatManager.Instance.DebugOnlyGetState();
                     var won = _combatWon && !player.Creature.IsDead;
                     var endTurnRisk = !IsTerminal(player) ? LocalTacticalPreview.Capture(player, []).EndTurnHpLossHint : (double?)null;
-                    var candidate = new LocalCandidate(actions.ToArray(), player.Creature.CurrentHp, lost,
+                    var health = healthAccounting.Snapshot();
+                    var candidate = new LocalCandidate(actions.ToArray(), player.Creature.CurrentHp, health.HpLost,
                         state?.Enemies.Sum(e => Math.Max(0, e.CurrentHp)) ?? 0,
                         player.Gold, player.Creature.MaxHp, won, player.Creature.IsDead,
                         // Extra rewards remain unknown; the explicit zero-loss switch does not depend on them.
@@ -932,17 +973,26 @@ public static class LocalWorker
                         StopReason: won ? "胜利结算完成" : player.Creature.IsDead ? "玩家死亡" :
                             string.IsNullOrEmpty(stop) ? "战斗结束但未确认胜利" : stop, Decisions: decisions.ToArray(), StartingHp: startingHp,
                         Continuation: continuationPoints?.ToArray(), ContinuationFromSearch: continuationPoints != null,
-                        DamageSources: damageSources.Snapshot(lost), RolloutStyle: _rolloutStyle,
-                        InitialEnemyHp: initialEnemyHp, EndTurnHpLossHint: endTurnRisk, CardGoalOutcome: cardGoalCounts.Snapshot());
+                        DamageSources: damageSources.Snapshot(health.HpLost), RolloutStyle: _rolloutStyle,
+                        InitialEnemyHp: initialEnemyHp, EndTurnHpLossHint: endTurnRisk, CardGoalOutcome: cardGoalCounts.Snapshot(),
+                        HealthChanges: health);
                     audit.Outcome(candidate, IsTerminal(player));
                     if (turnTask != null && stop == "达到时间预算")
                         turns!.ReturnInterrupted(turnTask, TurnHint(player, startingHp, actions));
                     if (turnMode && IsTerminal(player) && planIndex < planned!.Length)
                         throw new InvalidOperationException("Exact native search prefix terminated early");
-                    if (proofSteps != null) ObserveMinimum(new(startingHp, proofSteps.ToArray(), candidate.Hp, candidate.Won, candidate.Dead));
+                    if (proofSteps != null)
+                    {
+                        ObserveMinimum(new(startingHp, proofSteps.ToArray(), candidate.Hp, candidate.Won, candidate.Dead));
+                        if (turns != null && minimumStatus != null)
+                        {
+                            using var prioritizing = MeasureMethod("LocalMinimumLoss.PrioritizePrefixes");
+                            turns.PrioritizeLossProof(minimumStatus.Focus ?? []);
+                        }
+                    }
                     bool completeAttempt = !turnProbed && !cut && !covered && (fullRollout || IsTerminal(player));
                     if (turnMode && completeAttempt)
-                        turnOutcomes.Add(new(request.Partition, route, _timeline!.ElapsedMs, won, candidate.Hp, lost,
+                        turnOutcomes.Add(new(request.Partition, route, _timeline!.ElapsedMs, won, candidate.Hp, health.HpLost,
                             candidate.Rounds, actions.Count(a => a.PotionSlot.HasValue), _rolloutStyle, candidate.DamageSources));
                     if (!turnProbed && !cut && trials.Count < 129)
                         trials.Add(new(request.Partition, route, _timeline!.ElapsedMs, candidate.Won, candidate.Hp,
@@ -952,7 +1002,7 @@ public static class LocalWorker
                         $"rounds={candidate.Rounds};complete={completeAttempt};probe={turnProbed};cut={cut};limited={stop == "达到时间预算"}")) { }
                     if (turnTask != null && stop != "达到时间预算" && !cut)
                         turns!.FocusNext(turnTask, actions, decisions);
-                    if (turnProbed) probes++;
+                    if (turnProbed) { probes++; if (turnTask?.LossProof == true) lossProofProbes++; }
                     else if (completeAttempt) evaluated++;
                     if (won) victories++;
                     Progress(won ? "路线获胜" : candidate.StopReason, Observe(player), true);
@@ -1011,7 +1061,6 @@ public static class LocalWorker
                 }
                 finally
                 {
-                    player.Creature.CurrentHpChanged -= HpChanged;
                     if (turnTask != null)
                     {
                         using var finishing = MeasureMethod("LocalTurnFrontier.Finish");
@@ -1188,20 +1237,17 @@ public static class LocalWorker
         _includePotions = request.IncludePotions;
         if (candidate.StartingHp is { } expectedHp && player.Creature.CurrentHp != expectedHp)
             throw new InvalidOperationException("候选起点生命不一致，未发布该路线。");
-        int lost = 0;
         var points = new List<LocalContinuationPoint>();
         bool canContinue = request.History != null && request.History == LocalCapture.History();
         using var damageSources = new LocalDamageAccounting(player);
         using var cardGoalCounts = new LocalCardGoalAccounting(player, request.CardGoals);
-        void HpChanged(int oldHp, int newHp) => lost += Math.Max(0, oldHp - newHp);
-        player.Creature.CurrentHpChanged += HpChanged;
-        try
+        using var healthAccounting = new LocalHpAccounting(player);
         {
             int step = 0;
             foreach (var action in candidate.Actions)
             {
                 CheckCancellation();
-                if (canContinue) points.Add(new(step, action.BeforeHash, LocalCapture.History(), lost, player.Creature.CurrentHp));
+                if (canContinue) points.Add(new(step, action.BeforeHash, LocalCapture.History(), healthAccounting.HpLost, player.Creature.CurrentHp));
                 var before = Observe(player);
                 _traceStep = step + 1;
                 await Play(action);
@@ -1211,15 +1257,16 @@ public static class LocalWorker
             await StableOrTerminal(player);
             CheckCancellation();
             var enemyHp = CombatManager.Instance.DebugOnlyGetState()?.Enemies.Sum(e => Math.Max(0, e.CurrentHp)) ?? 0;
+            var health = healthAccounting.Snapshot();
             if ((_combatWon && !player.Creature.IsDead) != candidate.Won || player.Creature.IsDead != candidate.Dead ||
-                player.Creature.CurrentHp != candidate.Hp || lost != candidate.HpLost || enemyHp != candidate.EnemyHp ||
+                player.Creature.CurrentHp != candidate.Hp || health.HpLost != candidate.HpLost || enemyHp != candidate.EnemyHp ||
                 player.Gold != candidate.Gold || player.Creature.MaxHp != candidate.MaxHp ||
-                candidate.DamageSources != null && damageSources.Snapshot(lost) != candidate.DamageSources ||
+                candidate.DamageSources != null && damageSources.Snapshot(health.HpLost) != candidate.DamageSources ||
+                candidate.HealthChanges != null && candidate.HealthChanges != health ||
                 !cardGoalCounts.Matches(candidate.CardGoalOutcome))
                 throw new InvalidOperationException("最佳路线重新执行后的结算不一致，未发布该进程的建议。");
             return (Observe(player), points.ToArray());
         }
-        finally { player.Creature.CurrentHpChanged -= HpChanged; }
     }
 
     private static async Task Cleanup(int depth = 1)

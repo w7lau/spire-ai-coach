@@ -6,7 +6,7 @@ public sealed record LocalTurnHint(int Hp, int StartingHp, int EnemyHp, int Init
     int Block = 0, int PotionsUsed = 0, long? MaximumFurtherHpGain = null);
 public sealed record LocalTurnTask(int Id, LocalAction[] Prefix, int SearchRound,
     bool FullRollout = false, int Lane = 0, bool Focused = false, LocalTurnHint? Hint = null,
-    LocalRolloutStyle Style = LocalRolloutStyle.Balanced, LocalAction[]? Continuation = null);
+    LocalRolloutStyle Style = LocalRolloutStyle.Balanced, LocalAction[]? Continuation = null, bool LossProof = false);
 public sealed record LocalTurnOutcome(int Worker, int Attempt, double CompletedMs, bool Won,
     int Hp, int GrossLoss, int Rounds, int Potions, LocalRolloutStyle Style, LocalDamageSources? DamageSources);
 public sealed record LocalTurnSearchStats(int Probes = 0, int BoundPruned = 0, int Offered = 0,
@@ -14,7 +14,7 @@ public sealed record LocalTurnSearchStats(int Probes = 0, int BoundPruned = 0, i
     int CompletedHistories = 0, int RepeatedHistories = 0,
     IReadOnlyDictionary<int, int>? ClaimedByRound = null,
     IReadOnlyDictionary<string, int>? RolloutStyles = null,
-    LocalTurnOutcome[]? Outcomes = null);
+    LocalTurnOutcome[]? Outcomes = null, int LossProofProbes = 0);
 
 // Exact native histories only. A turn probe executes through enemy settlement,
 // records the resulting next turn, then returns to the scheduler. Scores order
@@ -32,6 +32,7 @@ public interface ILocalTurnFrontier
     void FocusNext(LocalTurnTask task, IReadOnlyList<LocalAction> actions, IReadOnlyList<LocalDecision> decisions);
     void ObserveOutcome(LocalCandidate candidate);
     void PromoteWinning(LocalCandidate candidate);
+    void PrioritizeLossProof(LocalLossProofFocus[] focus);
     void ReturnInterrupted(LocalTurnTask task, LocalTurnHint hint);
     int DiscardDescendants(IReadOnlyList<LocalAction> prefix);
     int DiscardProvenExpenses(LocalWinningBound? incumbent);
@@ -94,6 +95,7 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
     private readonly PriorityQueue<int, (double, int)> _health = new();
     private readonly PriorityQueue<int, (double, int)> _damage = new();
     private readonly Queue<int> _fair = new();
+    private readonly Queue<int> _lossProof = new();
     private readonly Stack<int[]> _focus = new();
     private readonly Stack<int[]> _descent = new();
     private readonly Queue<(int Id, LocalAction[] Tail)> _winner = new();
@@ -212,11 +214,13 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         _lastStyle = null;
         int id;
         bool guided = false;
+        bool proof = false;
         bool winningAllowed = _winningOwner == null || owner == _winningOwner;
         // Native learning affinity must not replace health, round and FIFO
         // coverage. Alternate it only inside the dedicated focused lane.
         bool ownerTurn = lane == 2 && _winningOwner.HasValue && owner == _winningOwner && _ownerGuidedTakes++ % 2 == 1;
-        if (ownerTurn && TryStack(_winning, out id)) { guided = true; FocusedTakes++; LastFocused = true; }
+        if (lane % 2 == 0 && TryLossProof(out id)) { proof = true; }
+        else if (ownerTurn && TryStack(_winning, out id)) { guided = true; FocusedTakes++; LastFocused = true; }
         else if (lane == 2 && TryGuidedFocus(out id, out guided, winningAllowed)) { FocusedTakes++; LastFocused = true; }
         else if (lane == 1 && winningAllowed && TryWinner(out id)) { guided = true; }
         else if (lane == 1 && TryRound(ref _damageRound, true, out id)) { }
@@ -230,12 +234,30 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
             var queue = lane == 1 ? _damage : _health;
             do { id = queue.Dequeue(); } while (!_pending.ContainsKey(id));
         }
-        task = _pending[id].Task with { FullRollout = guided || _pending[id].Task.FullRollout,
+        task = _pending[id].Task with { FullRollout = !proof && (guided || _pending[id].Task.FullRollout), LossProof = proof,
             Style = _lastStyle ?? (guided ? _guidedIncumbent?.RolloutStyle ?? LocalRolloutStyle.Balanced : _pending[id].Task.Style),
             Continuation = _lastContinuation ?? (guided ? _winningTails.GetValueOrDefault(id) : null) ?? _pending[id].Task.Continuation };
         _pending.Remove(id);
         _roundClaims[task.SearchRound] = _roundClaims.GetValueOrDefault(task.SearchRound) + 1;
         return true;
+    }
+
+    public void PrioritizeLossProof(LocalLossProofFocus[] focus)
+    {
+        _lossProof.Clear();
+        foreach (var item in focus)
+        {
+            Offer(item.Prefix, item.SearchRound, item.Hint);
+            int prefix = PrefixId(item.Prefix, false);
+            if (_seen.TryGetValue((item.SearchRound, prefix), out int id) && _pending.ContainsKey(id))
+                _lossProof.Enqueue(id);
+        }
+    }
+
+    private bool TryLossProof(out int id)
+    {
+        while (_lossProof.TryDequeue(out id)) if (_pending.ContainsKey(id)) return true;
+        id = -1; return false;
     }
 
     private bool TryRound(ref int cursor, bool ranked, out int id)

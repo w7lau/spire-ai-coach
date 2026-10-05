@@ -1,0 +1,46 @@
+{
+  "Version": "0.7.42",
+  "ModSha256": "6f06407c7ba227d80f16efecdf15d01a30c8e290e1660bcf376db978390e2123",
+  "ModModule": "adee0b0f-26c7-41d1-be0e-d630f6a6e4ab",
+  "NativeModule": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
+  "CoreChecksPassed": 305,
+  "MetadataChecksPassed": 23,
+  "NativeHealthChecksPassed": 3,
+  "RootRestoredUnchanged": true,
+  "RecoveryMaximumFurtherHpGain": null,
+  "RecoveryUnknownReason": "外部 IL 补丁的回复效果尚未证明：MegaCrit.Sts2.Core.Entities.Cards.PileTypeExtensions.GetTargetPosition",
+  "RecoveryAuditElapsedMs": 118.1513,
+  "ActualFrozenModListMatched": true,
+  "HealthCases": [
+    {
+      "Case": "nested-external-healing-callback",
+      "HpLost": 2,
+      "HpGained": 1,
+      "MaxHpGained": 0,
+      "MaxHpLost": 0,
+      "UnobservedChanges": 0,
+      "FullyObserved": true
+    },
+    {
+      "Case": "maximum-hp-and-clipping",
+      "HpLost": 1,
+      "HpGained": 1,
+      "MaxHpGained": 2,
+      "MaxHpLost": 2,
+      "UnobservedChanges": 0,
+      "FullyObserved": true
+    },
+    {
+      "Case": "unnotified-field-write",
+      "HpLost": 2,
+      "HpGained": 1,
+      "MaxHpGained": 2,
+      "MaxHpLost": 2,
+      "UnobservedChanges": 1,
+      "FullyObserved": false
+    }
+  ],
+  "RouteSearchExecuted": false,
+  "SpeedBenchmarkExecuted": false,
+  "LiveGameModified": false
+}
