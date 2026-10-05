@@ -757,10 +757,9 @@ public static class LocalWorker
                                 continuationIndex++;
                                 preferred = LocalRouteRefiner.Resolve(plannedAction, legal);
                             }
-                            // Newly drawn cards or additional energy can make the old
-                            // end-turn proposal premature; retain the actual legal prior.
-                            if (preferred?.EndTurn == true && legal.Any(a => !a.EndTurn && a.Preference > preferred.Preference))
-                            { preferred = null; plannedAction = null; }
+                            // Preserve this proposed line, including deliberate holding.
+                            // Other legal plays are already published as exact siblings;
+                            // a heuristic must not rewrite its end turn before measuring it.
                         }
                         else if (!systematic && preferred == null && evaluated == 0 && actions.Count == 0)
                             preferred = roots.OrderByDescending(a => a.Preference).First();

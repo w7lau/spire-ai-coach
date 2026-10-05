@@ -133,7 +133,14 @@ internal static class CardGoalIntegration
                 // and independent recount on its frozen root. This is seeded
                 // acceptance, not an unseeded optimizer quality/speed benchmark.
                 var plan = new List<LocalAction>();
-                request = request with { CardGoals = new(null, "CARD.FEED", 1000), MaxRounds = 12, BudgetSeconds = 20 };
+                request = request with { CardGoals = new(null, "CARD.FEED", 1000), MaxRounds = 12, BudgetSeconds = 20,
+                    ShareSearchWork = false };
+                LocalWire.Write(Path.Combine(root, "integration-card-goal-root-private.json"), request);
+                var previewType = typeof(LocalWorker).Assembly.GetType("SpireAiCoach.Mod.LocalTacticalPreview", true)!;
+                var damagePreview = previewType.GetMethod("PreviewDamage", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!;
+                var reservedFeed = player.PlayerCombatState!.AllPiles.SelectMany(p => p.Cards).First(c => c.Id.Entry == "FEED");
+                var accountingType = typeof(LocalWorker).Assembly.GetType("SpireAiCoach.Mod.LocalCardGoalAccounting", true)!;
+                using var manualLedger = (IDisposable)Activator.CreateInstance(accountingType, player, request.CardGoals)!;
                 int moves = 0;
                 while (!CombatManager.Instance.IsOverOrEnding && !player.Creature.IsDead)
                 {
@@ -142,10 +149,12 @@ internal static class CardGoalIntegration
                     var alive = player.Creature.CombatState!.Enemies.Where(e => e.IsAlive).ToArray();
                     var enemy = alive[0];
                     var legal = player.PlayerCombatState!.Hand.Cards.Where(c => c.CanPlay()).ToArray();
+                    var preview = previewType.GetMethod("Capture")!.Invoke(null, [player, legal, true])!;
+                    double feedDamage = (double)damagePreview.Invoke(preview, [reservedFeed, enemy])!;
                     bool fed = plan.Any(a => a.ModelId == "CARD.FEED");
-                    var card = legal.FirstOrDefault(c => c.Id.Entry == "FEED" && enemy.CurrentHp + enemy.Block <= 13) ??
+                    var card = legal.FirstOrDefault(c => c.Id.Entry == "FEED" && enemy.CurrentHp + enemy.Block <= feedDamage) ??
                         legal.FirstOrDefault(c => c.Id.Entry == "DEFEND_IRONCLAD") ??
-                        legal.FirstOrDefault(c => c.Id.Entry == "ANGER" && (fed || enemy.CurrentHp + enemy.Block > 13));
+                        legal.FirstOrDefault(c => c.Id.Entry == "ANGER" && (fed || enemy.CurrentHp + enemy.Block > feedDamage));
                     if (card != null)
                     {
                         plan.Add(new(player.PlayerCombatState.Hand.Cards.ToList().IndexOf(card), card.Id.ToString(),
@@ -165,10 +174,13 @@ internal static class CardGoalIntegration
                     }
                     while (!CombatManager.Instance.IsOverOrEnding && !player.Creature.IsDead && !LocalCapture.Stable()) await Frame();
                     await Frame(); await Frame();
+                    accountingType.GetMethod("CompleteStep")!.Invoke(manualLedger, null);
                 }
-                if (player.Creature.IsDead || !plan.Any(a => a.ModelId == "CARD.FEED"))
+                var manualCounts = (LocalCardGoalOutcome)accountingType.GetMethod("Snapshot")!.Invoke(manualLedger, null)!;
+                if (player.Creature.IsDead || manualCounts.Kills != 1)
                     throw new InvalidOperationException("Synthetic seeded plan did not win after using Feed: hp=" + player.Creature.CurrentHp);
                 int hostHp = player.Creature.CurrentHp, hostMaxHp = player.Creature.MaxHp, hostGold = player.Gold;
+                LocalWire.Write(Path.Combine(root, "integration-card-goal-plan-private.json"), plan);
                 foreach (var order in new[] { LocalSearchOrder.MonteCarlo, LocalSearchOrder.TurnFrontier })
                 {
                     var stopped = await Task.Run(() => pool.Analyze(request with { Id = Guid.NewGuid().ToString("N"),
@@ -178,7 +190,9 @@ internal static class CardGoalIntegration
                         stopped.Evaluated != 1 || stopped.Best is not { Won: true, CardGoalOutcome.Kills: 1 } ||
                         stopped.Timing?.Verifications != 1 || !LocalSearchPolicy.HasExecutionPoints(stopped) ||
                         player.Creature.CurrentHp != hostHp || player.Creature.MaxHp != hostMaxHp || player.Gold != hostGold)
-                        throw new InvalidOperationException(order + ": seeded native goal stop/verification failed: " + stopped.Message);
+                        throw new InvalidOperationException(order + ": seeded native goal stop/verification failed: " +
+                            System.Text.Json.JsonSerializer.Serialize(new { stopped.Message, stopped.Evaluated, stopped.StoppedEarly,
+                                stopped.StoppedOnCardGoals, stopped.Best?.CardGoalOutcome }));
                     records.Add(new { kind = "goal-stop-" + order, stopped.Status, stopped.Evaluated, stopped.ElapsedMs,
                         stopped.StoppedOnCardGoals, stopped.Best.Hp, stopped.Best.NetHpLoss, stopped.Best.CardGoalOutcome,
                         verifications = stopped.Timing.Verifications, seeded = true, hostUnchanged = true });
