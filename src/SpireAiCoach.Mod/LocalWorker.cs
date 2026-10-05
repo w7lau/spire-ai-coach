@@ -90,6 +90,7 @@ public static class LocalWorker
         LocalWorkerLogic.Install();
         LocalWorkerOverhead.Install();
         LocalWorkerVerification.Install();
+        LocalDiscardObservation.Install();
         Callable.From(Run).CallDeferred();
         return true;
     }
@@ -1437,10 +1438,11 @@ public static class LocalWorker
         // Search-only ordering. Guarded live execution/replay has no chooser
         // and must resolve exactly the recorded native offer/rank instead.
         var learner = choose != null ? _nativeLearning : null;
+        using var observing = LocalDiscardObservation.Use(learner?.Selections.Discards, player);
         var session = new LocalChoices(selectionIntent ?? action.Choices, choose, _selectionCursor)
         {
-            SelectionPriority = source == null || learner == null ? null : (kind, cards, prefs, ordinal) =>
-                learner.Selections.Rank(source, player, kind, cards, prefs, ordinal, _rolloutStyle, _efficientTactics, learner.Priority)
+            SelectionPriority = source == null || learner == null ? null : (kind, cards, prefs, ordinal, gold) =>
+                learner.Selections.Rank(source, player, kind, cards, prefs, ordinal, _rolloutStyle, _efficientTactics, learner.Priority, gold)
         };
         _choices = session;
         try

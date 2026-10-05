@@ -20,6 +20,7 @@ SearchEvidenceTests.Register(Test);
 
 CardGoalTests.Register(Test);
 FollowupTests.Register(Test);
+DiscardEffectsTests.Register(Test);
 NativeOverheadTests.Register(Test, AsyncTest);
 ProgressTransportTests.Register(Test, AsyncTest);
 WorkerReuseTests.Register(Test, AsyncTest);
