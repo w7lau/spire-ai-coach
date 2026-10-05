@@ -47,9 +47,10 @@
 需要 .NET 9 SDK；编译 Mod 需要本机安装的游戏。
 
 ```powershell
-dotnet run --project tests/SpireAiCoach.Tests -c Release
-./scripts/Build.ps1 -GameDir 'D:\SteamLibrary\steamapps\common\Slay the Spire 2'
+./scripts/Update.ps1 -GameDir 'D:\SteamLibrary\steamapps\common\Slay the Spire 2'
 ```
+
+这一个入口完成核心检查、打包和安装；相同源码与 SDK 复用已通过的检查，相同包核对哈希后复用。首次成功后记住本机游戏路径，之后直接运行 `./scripts/Update.ps1`。游戏运行时保留已准备的包，退出后可用 `-InstallOnly` 直接安装；每个阶段都会记录耗时。需要原生验收时先用 `-BuildOnly` 准备，详见[更新流程](docs/local-update.md)。
 
 [架构](docs/architecture.md) · [搜索策略](docs/local-search-policy.md) · [性能](docs/local-simulation-performance.md) · [验证记录](docs/validation.md)
 

@@ -47,9 +47,10 @@ Issues and PRs are welcome. Help find complete winning routes with the lowest da
 Use the .NET 9 SDK. Building the mod requires a local game installation.
 
 ```powershell
-dotnet run --project tests/SpireAiCoach.Tests -c Release
-./scripts/Build.ps1 -GameDir 'D:\SteamLibrary\steamapps\common\Slay the Spire 2'
+./scripts/Update.ps1 -GameDir 'D:\SteamLibrary\steamapps\common\Slay the Spire 2'
 ```
+
+This entry point validates, packages and installs. Passed checks are reused only for identical source and SDK inputs; matching packages are verified by hash before reuse. A successful run remembers the local game path, so later runs need only `./scripts/Update.ps1`. If the game is running, the prepared package is retained; use `-InstallOnly` after exiting. Each stage records its duration. Use `-BuildOnly` before any necessary native validation. See the [update workflow](docs/local-update.md).
 
 [Architecture](docs/architecture.md) · [Search policy](docs/local-search-policy.md) · [Performance](docs/local-simulation-performance.md) · [Validation](docs/validation.md)
 
