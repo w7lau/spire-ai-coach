@@ -84,7 +84,10 @@ parser.add_argument('--full-health-test', action='store_true', help='Short seede
 
 parser.add_argument('--animation-presentation-test', action='store_true', help='Measured death/summon prefix; compare native presentation modes, not full search')
 parser.add_argument('--passive-factory-test', action='store_true', help='Measured ground-fire prefix and idle/search FPS isolation; no full search')
+parser.add_argument('--snapshot-metadata-test', action='store_true', help='Same native route with immutable metadata reuse on/off; no algorithm comparison')
 args = parser.parse_args()
+if args.snapshot_metadata_test and (not args.replay or not args.seed_result or args.recorded_replay):
+    parser.error('--snapshot-metadata-test requires a frozen --replay and --seed-result')
 if args.passive_factory_test and (not args.replay or not args.seed_result or args.recorded_replay):
     parser.error('--passive-factory-test requires frozen --replay and measured --seed-result')
 if args.animation_presentation_test and (not args.replay or not args.seed_result or args.recorded_replay):
@@ -221,6 +224,8 @@ with worker_lock(root):
         (root / 'integration-animation-summary.json').unlink(missing_ok=True)
     if args.passive_factory_test:
         (root / 'integration-passive-summary.json').unlink(missing_ok=True)
+    if args.snapshot_metadata_test:
+        (root / 'integration-snapshot-metadata-summary.json').unlink(missing_ok=True)
     if args.survival_test:
         for name in ['integration-survival-summary.json', 'integration-survival-private.json']:
             (root / name).unlink(missing_ok=True)
@@ -260,6 +265,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_EVENT_ENTRY_TEST'] = '1' if args.event_entry_test else '0'
     env['SPIRE_LOCAL_ANIMATION_PRESENTATION_TEST'] = '1' if args.animation_presentation_test else '0'
     env['SPIRE_LOCAL_PASSIVE_FACTORY_TEST'] = '1' if args.passive_factory_test else '0'
+    env['SPIRE_LOCAL_SNAPSHOT_METADATA_TEST'] = '1' if args.snapshot_metadata_test else '0'
     env['SPIRE_LOCAL_SELECTION_PAGING_TEST'] = '1' if args.selection_paging_test else '0'
     env['SPIRE_LOCAL_CARD_GOALS_TEST'] = '1' if args.card_goals_test else '0'
     env['SPIRE_LOCAL_FINISHER_TARGETS_TEST'] = '1' if args.finisher_targets_test else '0'
@@ -364,6 +370,11 @@ with worker_lock(root):
         # Preserve this run while the workspace lock is still held. Other local
         # experiments may reuse the host immediately after it exits.
         args.results_dir.mkdir(parents=True, exist_ok=True)
+        if args.snapshot_metadata_test:
+            for name in ['integration-snapshot-metadata-summary.json', 'integration-snapshot-metadata-verification-private.json',
+                         *[f'integration-snapshot-metadata-private-{i}.json' for i in range(10)]]:
+                if (root / name).is_file():
+                    shutil.copy2(root / name, args.results_dir / name)
         names = ['integration-replay-private.json', 'integration-replay-summary.json',
                      'integration-finisher-targets-summary.json', 'integration-goal-consumption-summary.json',
                      'integration-card-goals-summary.json', 'integration-card-goals-MonteCarlo-private.json',

@@ -8,6 +8,7 @@ using SpireAiCoach.Mod;
 
 if (args is ["--presentation-audit", var presentationPath]) return PresentationAudit.Run(presentationPath);
 if (args is ["--vfx-factory-audit", var factoryPath]) return PassiveFactoryAudit.Run(factoryPath);
+if (args is ["--snapshot-metadata-audit", var metadataPath]) return SnapshotMetadataAudit.Run(metadataPath);
 
 // Read metadata/IL only. Do not instantiate models or execute hooks outside Godot.
 var assembly = typeof(CardModel).Assembly;

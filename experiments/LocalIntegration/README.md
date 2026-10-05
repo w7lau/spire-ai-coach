@@ -13,6 +13,8 @@ python experiments/LocalIntegration/run.py --workspace C:\path\owned-native-work
 
 定向用例：
 
+- `--snapshot-metadata-test --replay <private-request.json> --seed-result <private-result.json> --game <installed-game> --mods <matching-frozen-mods>`：同一个所属常驻实例交替开启/关闭原生快照元数据复用，两次预热后八次测量相同15步已知路线；比较完整状态、RNG、操作/选牌历史、逐步生命与结算，再独立常规复核。检查反射读取和关键词数组复制实际减少，没有更换算法或测量自主搜索质量。原始记录留在忽略目录；结果需去除真实输入、身份、路线和本机路径再公开。
+
 - `--finisher-targets-test`：普通敌人、原生爪牙、外部Power禁止Fatal、混合敌人的最后一击和没有符合资格目标的五类原生检查。前四类实际出牌核对补刀奖励、计数及合法伤害分支；最后一类检查当前排序与账本，因为全是爪牙的原生战斗可能直接结束。此检查不运行整场搜索，也不作为任意Mod私有奖励兼容证明。
 
 - `--selection-paging-test`：336 个原生有序选牌组合跨分页重放及两路并行预热/复用；带 `--replay` 时改为该冻结输入的一次搜索，保留原回合、时间和次数选项，检查没有因选牌分页切换执行方式。此病例是正确性与启动调度验证，不是八路等配置质量/速度对比。
