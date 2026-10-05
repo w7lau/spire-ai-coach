@@ -370,7 +370,7 @@ with worker_lock(root):
         if args.event_entry_test:
             names = ['integration-event-summary.json', 'integration-event-capture-private.json',
                      'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log',
-                     *[f'integration-event-result-private-{i}.json' for i in range(4)]]
+                     *[f'integration-event-result-private-{i}.json' for i in range(5)]]
         for name in names:
             if (root / name).is_file():
                 shutil.copy2(root / name, args.results_dir / name)

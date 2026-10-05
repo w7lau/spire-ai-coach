@@ -67,8 +67,12 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             // a verification failure must not restart all full-budget searches.
             origin.Import(ex.Data["local_trace"] as LocalTrace);
             var failures = ex.Data["local_failures"] as LocalSimulationFailure[] ?? [];
-            if (failures.Any(f => f.Category == "local_event_entry"))
-                throw new CoachException("local_event_entry", "进入战斗的事件记录无法重放。" + ex.Message);
+            if (failures.FirstOrDefault(f => f.Category == "local_event_entry") is { } entryFailure)
+            {
+                var error = new CoachException("local_event_entry", entryFailure.Message);
+                foreach (var key in ex.Data.Keys) error.Data[key] = ex.Data[key];
+                throw error;
+            }
             progress("首次计算未完成，正在重新计算…");
             origin.Add(new(-1, "main", "fallback", ex.Category + ": " + ex.Message, origin.ElapsedMs, 0));
             var regular = request with { Id = request.Id + "-regular", DataOnlyCombat = false, DataOnlyRun = false,

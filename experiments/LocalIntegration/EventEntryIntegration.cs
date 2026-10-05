@@ -73,7 +73,9 @@ internal static class EventEntryIntegration
         SaveManager.Instance.PrefsSave.FastMode = FastModeType.Instant;
         NGame.Instance.RootSceneContainer.SetCurrentScene(new Control());
         await Frame(); await Frame();
+        var preparation = Stopwatch.StartNew();
         await Task.Run(() => pool.Prepare(installation with { MinimalWorkerBootstrap = true }, 1, CancellationToken.None));
+        long preparationMs = preparation.ElapsedMilliseconds;
         var worker = ((Array)typeof(LocalWorkerPool).GetField("_workers", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(pool)!).GetValue(0)!;
         var workerRoot = (string)worker.GetType().GetProperty("Root")!.GetValue(worker)!;
         int pid = ((Process)worker.GetType().GetProperty("Process")!.GetValue(worker)!).Id;
@@ -87,18 +89,24 @@ internal static class EventEntryIntegration
             ShareSearchWork = false, SearchWorkPipe = null, TurnWorkPipe = null, MinimumLossPipe = null, ProgressPipe = null };
         LocalCandidate? control = null;
         var samples = new List<object>();
-        foreach (var numerical in new[] { false, true, true })
+        foreach (var (numerical, algorithm) in new[] { (true, LocalSearchOrder.MonteCarlo), (false, LocalSearchOrder.MonteCarlo),
+            (true, LocalSearchOrder.MonteCarlo), (true, LocalSearchOrder.TurnFrontier) })
         {
             var result = await Submit(command with { Id = Guid.NewGuid().ToString("N"), DataOnlyCombat = numerical,
-                DataOnlyRun = numerical, NumericalExecution = numerical });
+                DataOnlyRun = numerical, NumericalExecution = numerical, SearchOrder = algorithm });
             var best = result.Best ?? throw new InvalidOperationException(result.Message);
             if (result.Status != "searched" || result.Evaluated != 1 || result.Rejected != 0 ||
                 best.Actions.Length != 1 || !best.Actions[0].EndTurn || best.Continuation?.Length != 1)
                 throw new InvalidOperationException("Event combat did not restore and settle its first enemy turn");
             control ??= best;
-            if (JsonSerializer.Serialize(best) != JsonSerializer.Serialize(control))
+            if (JsonSerializer.Serialize(best.Actions) != JsonSerializer.Serialize(control.Actions) ||
+                JsonSerializer.Serialize(best.Continuation) != JsonSerializer.Serialize(control.Continuation) ||
+                (best.Hp, best.HpLost, best.EnemyHp, best.Gold, best.MaxHp, best.Won, best.Dead,
+                    best.StartingHp, best.DamageSources, best.HealthChanges, best.CardGoalOutcome) !=
+                (control.Hp, control.HpLost, control.EnemyHp, control.Gold, control.MaxHp, control.Won, control.Dead,
+                    control.StartingHp, control.DamageSources, control.HealthChanges, control.CardGoalOutcome))
                 throw new InvalidOperationException("Event restoration changed native decisions/history/settlement");
-            samples.Add(new { numerical, result.ElapsedMs, result.Timing, exactRootAndHistory = true,
+            samples.Add(new { numerical, algorithm = algorithm.ToString(), result.ElapsedMs, result.Timing, exactRootAndHistory = true,
                 completeNativeCheckpoints = true, sameNativeOutcome = true, reusedWorker = samples.Count > 0 });
         }
         var rejected = await Submit(command with { Id = Guid.NewGuid().ToString("N"), EventEntry = null });
@@ -107,6 +115,7 @@ internal static class EventEntryIntegration
         LocalWire.Write(Path.Combine(root, "integration-event-summary.json"), new {
             version = typeof(LocalWorker).Assembly.GetName().Version!.ToString(3),
             nativeModule = typeof(CombatManager).Assembly.ManifestModule.ModuleVersionId,
+            preparationMs, preparationIncludedInSamples = false,
             exactFrozenRootRecreated = true, capturedNativeEntryChoices = captured.EventEntry.Choices.Length,
             samples, missingEntry = new { rejected.ElapsedMs, rejected.Timing, rejected.Status, rejected.Failure!.Category },
             fullSearchBenchmark = false, productionBudgetsUnchanged = true, passed = true });
