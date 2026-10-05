@@ -8,7 +8,7 @@ A **Slay the Spire 2** battle assistant with **AI advice for the current turn**,
 
 1. Subscribe through the Workshop, launch the game and enable the mod. Alternatively, place the release's `SpireAiCoach` folder in the game's `mods` directory. Choose one installation method.
 2. Press **F8** to open or close the panel.
-3. Choose “路线采样” (Rollout Sampling) or “分支扩展” (Branch Expansion). Follow the plan manually or click “执行方案” (Execute plan). **Esc stops execution**.
+3. Under “本地整场计算” (Local whole-battle planning), choose “路线采样算法” (Rollout Sampling) or “分支扩展算法” (Branch Expansion). Follow the plan manually or click “执行方案” (Execute plan). **Esc stops execution**.
 4. For AI advice, enter a Chat Completions compatible URL, model and API key under “AI 指导与设置”, save, and click “AI 分析”.
 
 ## Local battle planning
@@ -17,8 +17,8 @@ Both algorithms plan the whole battle from the current state without an API.
 
 | Algorithm | Search approach |
 | --- | --- |
-| **Rollout Sampling / 路线采样** | Tries complete routes and uses results to guide further exploration |
-| **Branch Expansion / 分支扩展** | Organizes branches by turn and extends them into later turns |
+| **Rollout Sampling / 路线采样** | Repeatedly simulates whole-battle routes, adjusts play order, targets and choices, and compares outcomes |
+| **Branch Expansion / 分支扩展** | Expands alternative action branches, schedules exploration by turn, and compares whole-battle outcomes |
 
 - Prioritizes net HP loss after combat, including healing during and after battle. Equal-loss routes prefer preserving potions.
 - Configure concurrency, attempts, search time, turn limits, stopping conditions, potion use and card goals.

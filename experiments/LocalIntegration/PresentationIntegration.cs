@@ -118,9 +118,22 @@ internal static class PresentationIntegration
         entrySetting.ButtonPressed = false;
         if (toggle.Visible || interfaceStore.Load().Settings.ShowOverlayButton)
             throw new InvalidOperationException("Hidden entry preference was not saved");
-        foreach (var (node, order) in new[] { ("LocalBattleSearch", LocalSearchOrder.MonteCarlo), ("LocalTurnSearch", LocalSearchOrder.TurnFrontier) })
-            if (((Button)layer.FindChild(node, true, false)!).Text != LocalCalculation.Name(order))
-                throw new InvalidOperationException("Search button name differs from result name");
+        if (layer.FindChild("LocalAlgorithmHeading", true, false) is not Label { Text: "本地整场计算 · 选择搜索算法" })
+            throw new InvalidOperationException("Local algorithms have no shared whole-battle heading");
+        foreach (var (node, order) in new[] {
+            ("LocalBattleSearch", LocalSearchOrder.MonteCarlo),
+            ("LocalTurnSearch", LocalSearchOrder.TurnFrontier) })
+        {
+            var button = (Button)layer.FindChild(node, true, false)!;
+            if (!button.Text.StartsWith(LocalCalculation.Name(order) + "算法\n", StringComparison.Ordinal) ||
+                button.Text.Split('\n').Length != 2 || string.IsNullOrWhiteSpace(button.TooltipText))
+                throw new InvalidOperationException("Search button does not identify and explain its algorithm");
+        }
+        var algorithmButtons = new[] { "LocalBattleSearch", "LocalTurnSearch" }.Select(node =>
+        {
+            var button = (Button)layer.FindChild(node, true, false)!;
+            return new { node, text = button.Text, tooltip = button.TooltipText };
+        }).ToArray();
         toggle.EmitSignal(Button.SignalName.Pressed);
         for (int i = 0; i < 4; i++) await tree.ToSignal(tree, SceneTree.SignalName.ProcessFrame);
         CheckVisibility("manual outside-combat open survives frame and snapshot updates", true);
@@ -312,7 +325,8 @@ internal static class PresentationIntegration
             manual_worker_limit_preserved = 8, visibility_checks = visibilityChecks,
             visibility_contexts_are_ui_only = true
             , entry_default_hidden = true, entry_opt_in_persisted = true, only_f8_global_shortcut = true,
-            previous_f9_f10_have_no_action = true, algorithm_names_match_results = true
+            previous_f9_f10_have_no_action = true, algorithm_names_match_results = true,
+            algorithm_buttons = algorithmButtons
             , combat_popup_default_enabled = true, manual_only_mode_persisted = true,
             entry_and_popup_are_independent = true
             , skip_final_verification_defaults_checked = true, checkbox_options_persisted = true,

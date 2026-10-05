@@ -1,0 +1,56 @@
+{
+  "passed": true,
+  "version": "0.7.57",
+  "algorithm_buttons": [
+    {
+      "node": "LocalBattleSearch",
+      "text": "路线采样算法\n试算整场路线，调整打法",
+      "tooltip": "反复模拟整场战斗路线，尝试不同出牌顺序、目标与选牌。\n比较完整战斗的结局，并尝试调整已有路线。"
+    },
+    {
+      "node": "LocalTurnSearch",
+      "text": "分支扩展算法\n展开操作分支，推演后续",
+      "tooltip": "展开不同出牌与选牌分支，按回合安排后续探索。\n从候选分支推演整场结局，再比较战斗方案。"
+    }
+  ],
+  "both_algorithm_requests_checked": true,
+  "layouts": [
+    {
+      "width": 1280,
+      "height": 720,
+      "measured_width": 560,
+      "measured_height": 1200,
+      "controls": 34,
+      "horizontal_overflow": 0,
+      "primary_actions_fixed": true,
+      "expanded_sections_checked": 3,
+      "visualization_workers": 16,
+      "visualization_rendered": true,
+      "hidden_and_finished_animation_stops": true,
+      "route_sixteen_selectable": true
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "measured_width": 560,
+      "measured_height": 1840,
+      "controls": 34,
+      "horizontal_overflow": 0,
+      "primary_actions_fixed": true,
+      "expanded_sections_checked": 3,
+      "visualization_workers": 16,
+      "visualization_rendered": true,
+      "hidden_and_finished_animation_stops": true,
+      "route_sixteen_selectable": true
+    }
+  ],
+  "no_combat_scene": true,
+  "no_worker_started": true,
+  "installed_dll_unchanged": true,
+  "only_f8_global_shortcut": true,
+  "combat_popup_default_enabled": true,
+  "manual_only_mode_persisted": true,
+  "elapsed_seconds": 36.157,
+  "dll_sha256": "fc9d19221c38567e394f5551d7d3e381fa371318cff9477a28e4d135515f2f9b",
+  "scope": "Native UI controls and layout; no battle search or API call"
+}

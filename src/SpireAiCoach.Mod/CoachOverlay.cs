@@ -136,13 +136,17 @@ public sealed class CoachOverlay
         config.Pressed += () => { _aiOptions.Show(); _settingsPanel.Visible = !_settingsPanel.Visible; };
         var hide = new Button { Text = "收起" }; heading.AddChild(hide);
         hide.Pressed += () => SetPanelVisible(false);
+        var localHeading = new Label { Name = "LocalAlgorithmHeading", Text = "本地整场计算 · 选择搜索算法" };
+        localHeading.AddThemeColorOverride("font_color", CoachTheme.Gold);
+        shell.AddChild(localHeading);
         var localRow = new GridContainer { Columns = 2 }; shell.AddChild(localRow);
-        _localAnalyze = new Button { Name = "LocalBattleSearch", Text = LocalCalculation.Name(LocalSearchOrder.MonteCarlo), Disabled = true,
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, TooltipText = "整场战斗 · 以完整战斗路线组织探索。两种算法共用搜索设置；每路达到尝试次数或时间上限即结束，准备和复核另计。" }; localRow.AddChild(_localAnalyze);
+        _localAnalyze = new Button { Name = "LocalBattleSearch", Text = LocalCalculation.Name(LocalSearchOrder.MonteCarlo) + "算法\n试算整场路线，调整打法", Disabled = true,
+            CustomMinimumSize = new Vector2(0, 72), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            TooltipText = "反复模拟整场战斗路线，尝试不同出牌顺序、目标与选牌。\n比较完整战斗的结局，并尝试调整已有路线。" }; localRow.AddChild(_localAnalyze);
         _localAnalyze.Pressed += () => AnalyzeLocal(LocalSearchOrder.MonteCarlo);
-        _turnAnalyze = new Button { Name = "LocalTurnSearch", Text = LocalCalculation.Name(LocalSearchOrder.TurnFrontier), Disabled = true,
-            SizeFlagsHorizontal = Control.SizeFlags.ExpandFill, TooltipText = "整场战斗 · 按回合组织搜索。预算与本地计算一致，共用原生模拟和执行保护。" }; localRow.AddChild(_turnAnalyze);
-        CoachTheme.Accent(_turnAnalyze);
+        _turnAnalyze = new Button { Name = "LocalTurnSearch", Text = LocalCalculation.Name(LocalSearchOrder.TurnFrontier) + "算法\n展开操作分支，推演后续", Disabled = true,
+            CustomMinimumSize = new Vector2(0, 72), SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
+            TooltipText = "展开不同出牌与选牌分支，按回合安排后续探索。\n从候选分支推演整场结局，再比较战斗方案。" }; localRow.AddChild(_turnAnalyze);
         _turnAnalyze.Pressed += () => AnalyzeLocal(LocalSearchOrder.TurnFrontier);
         var options = CoachTheme.Section(body, "计算选项");
         var advanced = new VBoxContainer { Name = "LocalAdvancedOptions", Visible = false };
