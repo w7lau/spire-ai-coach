@@ -286,6 +286,7 @@ with worker_lock(root):
         names = ['integration-replay-private.json', 'integration-replay-summary.json',
                      'integration-card-goals-summary.json', 'integration-card-goals-MonteCarlo-private.json',
                      'integration-card-goals-TurnFrontier-private.json',
+                     'integration-card-goal-stop-MonteCarlo-private.json', 'integration-card-goal-stop-TurnFrontier-private.json',
                      'integration-algorithm-private.json', 'integration-algorithm-summary.json',
                      'integration-algorithm-goal-summary.json', 'integration-algorithm-goal-private-0.json', 'integration-algorithm-goal-private-1.json',
                      'integration-concurrency-summary.json', 'integration-concurrency-MonteCarlo-private.json',

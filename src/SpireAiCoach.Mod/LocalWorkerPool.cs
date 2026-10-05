@@ -99,6 +99,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             using var goalReached = new CancellationTokenSource();
             int goalWorker = -1;
             int goalMinimumLoss = 0;
+            int consumableGoalReached = 0;
             LocalSearchResult? finishedWinner = null;
             int finishedWinnerWorker = -1;
             using var minimumLoss = request.StopOnZeroLoss && !request.StopOnFirstWin && !LocalSearchPolicy.HasSpecificGoal(request) &&
@@ -123,7 +124,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             // completed startup spans now, clipped to this calculation only.
             timeline.Import(_lastPreparation, queueStart, timeline.ElapsedMs);
             cancellation.ThrowIfCancellationRequested();
-            if (request.DataOnlyCombat && (!goalReached.IsCancellationRequested || goalMinimumLoss > 0) &&
+            if (request.DataOnlyCombat && (!goalReached.IsCancellationRequested || goalMinimumLoss > 0 && Volatile.Read(ref consumableGoalReached) == 0) &&
                 results.Any(r => r.Status is "failed" or "unsupported" or "partial"))
             {
                 var failure = new CoachException("local_data_unavailable", string.Join("\n", results.Select(r => r.Message).Distinct()));
@@ -132,7 +133,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             }
             bool positiveWorkerStop = results.Any(r => r.StoppedEarly && r.Best?.NetHpLoss is > 0 &&
                 r.MinimumLoss?.Certificate?.MinimumNetHpLoss is > 0);
-            if ((goalReached.IsCancellationRequested && goalMinimumLoss > 0 || positiveWorkerStop) &&
+            if ((goalReached.IsCancellationRequested && goalMinimumLoss > 0 && Volatile.Read(ref consumableGoalReached) == 0 || positiveWorkerStop) &&
                 minimumLoss?.Status is not { Confirmed: true, Certificate: not null })
                 throw new CoachException("local_data_unavailable", "最低损失的证明未通过全部计算实例的收尾校验，不能按最优结果返回。");
             // Pending native selectors own callbacks. Retire their processes; never reset underneath them.
@@ -150,6 +151,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 results.Add(await Task.Run(() => Run(_workers[0], 0, fallback), cancellation));
             }
             var valid = results.Where(r => r.Status is "searched" or "done" or "partial" && r.Best != null).ToArray();
+            if (Volatile.Read(ref consumableGoalReached) != 0)
+                valid = valid.Where(r => LocalSearchPolicy.CanStopOnCardGoals(r.Best, request)).ToArray();
             if (valid.Length == 0)
                 throw new CoachException("local_failed", string.Join("\n", results.Select(r => r.Message).Distinct()));
             // Every lane has now completed or acknowledged the goal stop. Only the
@@ -205,6 +208,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 VerificationSkipped = request.SkipFinalVerification,
                 StoppedEarly = goalReached.IsCancellationRequested,
                 StoppedOnFirstWin = request.StopOnFirstWin && goalReached.IsCancellationRequested,
+                StoppedOnCardGoals = Volatile.Read(ref consumableGoalReached) != 0,
                 MinimumLoss = minimumLoss?.Status,
                 Id = request.Id,
                 Trials = results.SelectMany(r => r.Trials ?? []).OrderBy(t => t.FinishedMs).ToArray(),
@@ -233,7 +237,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     allRuns.Sum(r => r.Timing?.Verifications ?? 0)),
                 Status = goalReached.IsCancellationRequested || results.All(r => r.Status is "searched" or "done") && verificationResults.All(r => r.Status == "done") ? "done" : "partial",
                 Message = goalReached.IsCancellationRequested ? (request.StopOnFirstWin ?
-                    "已找到获胜路线，已停止全部后续搜索；未继续优化损失或用药。" : goalMinimumLoss > 0 ?
+                    "已找到获胜路线，已停止全部后续搜索；未继续优化损失或用药。" : Volatile.Read(ref consumableGoalReached) != 0 ?
+                    "当前消耗出牌及补刀目标已完成，战斗获胜且损血符合设置，已停止全部后续搜索。" : goalMinimumLoss > 0 ?
                     $"已达到最低净损失 {best.Best!.NetHpLoss}（含回血），同等损失下用药也已达下界，已停止后续搜索。" :
                     "已找到战后无伤获胜路线，已停止全部后续搜索。") +
                     (request.SkipFinalVerification ? "已跳过最终复核，执行时逐步核对模拟记录。" : "路线已通过复核。") :
@@ -265,8 +270,10 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     !LocalSearchPolicy.CanStopAfterVictory(winner.Best, request, minimumLoss?.Status.Certificate) ||
                     Interlocked.CompareExchange(ref goalWorker, index, -1) != -1) return;
                 Volatile.Write(ref goalMinimumLoss, request.StopOnFirstWin ? 0 : winner.Best!.NetHpLoss!.Value);
+                Volatile.Write(ref consumableGoalReached, LocalSearchPolicy.CanStopOnCardGoals(winner.Best, request) ? 1 : 0);
                 goalReached.Cancel();
                 progress(request.StopOnFirstWin ? "已找到获胜路线，正在停止其余搜索并确认路线…" :
+                    Volatile.Read(ref consumableGoalReached) != 0 ? "消耗目标已完成且获胜，正在停止其余搜索并确认路线…" :
                     goalMinimumLoss > 0 ? $"已达到最低净损失 {goalMinimumLoss}，正在停止其余搜索并确认路线…" :
                     "已找到无伤获胜路线，正在停止其余搜索并复核…");
             }
@@ -345,7 +352,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                         {
                             using var stopScope = timeline.Measure(index, "search", "stop_search", "停止其余搜索", depth: 1);
                             LocalWire.Write(Path.Combine(worker.Root, "stop-search.json"),
-                                new LocalSearchStop(command.Id, command.SnapshotId, command.NativeHash));
+                                new LocalSearchStop(command.Id, command.SnapshotId, command.NativeHash,
+                                    CardGoalsCompleted: Volatile.Read(ref consumableGoalReached) != 0));
                             stopping = Stopwatch.StartNew();
                         }
                         var preview = telemetry?.Latest;

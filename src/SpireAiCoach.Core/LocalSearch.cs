@@ -27,10 +27,12 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
 
 // A stop belongs to one frozen request. Goal stops exclude verification;
 // explicit caller cancellation also applies during verification or with goals off.
-public sealed record LocalSearchStop(string Id, string SnapshotId, string NativeHash, bool Cancel = false)
+public sealed record LocalSearchStop(string Id, string SnapshotId, string NativeHash, bool Cancel = false,
+    bool CardGoalsCompleted = false)
 {
     public bool Matches(LocalSearchRequest request) =>
-        (Cancel || (request.StopOnFirstWin || request.StopOnZeroLoss && request.CardGoals?.Enabled != true) &&
+        (Cancel || (request.StopOnFirstWin || request.StopOnZeroLoss &&
+            (request.CardGoals?.Enabled == true ? CardGoalsCompleted : !CardGoalsCompleted)) &&
             request.VerifyCandidate == null) &&
         Id == request.Id && SnapshotId == request.SnapshotId && NativeHash == request.NativeHash;
 }
@@ -83,7 +85,7 @@ public sealed record LocalSearchResult(string Id, string SnapshotId, string Stat
     LocalHealthBoundStats? HealthBounds = null, LocalSimulationFailure? Failure = null,
     LocalSimulationFailure[]? RecoveredFailures = null, LocalCardGoals? CardGoals = null,
     LocalMinimumLossStatus? MinimumLoss = null, LocalSearchEvidence? Evidence = null,
-    bool StoppedOnFirstWin = false);
+    bool StoppedOnFirstWin = false, bool StoppedOnCardGoals = false);
 
 public static class LocalSearchPolicy
 {
@@ -116,7 +118,17 @@ public static class LocalSearchPolicy
         candidate.Actions[0].BeforeHash == request.NativeHash;
     public static bool CanStopAfterVictory(LocalCandidate? candidate, LocalSearchRequest request,
         LocalMinimumLossCertificate? certificate = null) => request.VerifyCandidate == null &&
-        (CanStop(candidate, request) || CanStopAtMinimum(candidate, request, certificate));
+        (CanStop(candidate, request) || CanStopOnCardGoals(candidate, request) || CanStopAtMinimum(candidate, request, certificate));
+    public static bool CanStopOnCardGoals(LocalCandidate? candidate, LocalSearchRequest request) =>
+        request.StopOnZeroLoss && !request.StopOnFirstWin && request.VerifyCandidate == null &&
+        request.CardGoals is { Enabled: true } goals &&
+        candidate is { Won: true, Dead: false, Hp: > 0, Actions.Length: > 0,
+            CardGoalOutcome: { ConsumableGoals: { } consumable } outcome } &&
+        candidate.Actions[0].BeforeHash == request.NativeHash && consumable.Complete(goals, outcome) &&
+        (goals.HpLossThreshold.HasValue ? goals.WithinThreshold(candidate) : candidate.NetHpLoss == 0) &&
+        (!request.TargetVictoryRounds.HasValue || candidate.Rounds <= request.TargetVictoryRounds.Value) &&
+        (!request.TargetPotionUses.HasValue || candidate.Actions.Count(a => a.PotionSlot.HasValue) <= request.TargetPotionUses.Value) &&
+        (!request.RequireKnownZeroEnemyDamage || candidate.DamageSources is { Complete: true, Enemy: 0 });
     public static bool HasSpecificGoal(LocalSearchRequest request) => !request.StopOnFirstWin &&
         (request.TargetVictoryRounds.HasValue || request.TargetPotionUses.HasValue || request.RequireKnownZeroEnemyDamage ||
             request.CardGoals?.Enabled == true);
@@ -302,7 +314,9 @@ public static class LocalSearchPolicy
         if (goals.HpLossThreshold is { } limit)
             yield return goals.WithinThreshold(best) ? $"净损血小于 {limit}，已优先比较补刀及使用次数。" :
                 $"尚未找到净损血小于 {limit} 的获胜路线，显示目前损血较少的方案。";
-        yield return "可选目标尚未证明最优；启用时继续搜索，不触发无伤提前返回。";
+        yield return result.StoppedOnCardGoals ?
+            "当前消耗出牌及补刀目标已完成，损血符合设置，已停止搜索；补刀目标以当前活敌人数为上限，未继续寻找回收、复制或额外生成后的次数。" :
+            "可选目标尚未证明最优；仅无伤或耗尽目标牌不会提前返回。";
     }
 
     public static string Describe(LocalAction action) => Describe(action, includeNativeTarget: true);

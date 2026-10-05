@@ -291,6 +291,38 @@ internal static class WorkerReuseTests
                 Console.WriteLine($"  first-win protocol evidence: algorithm={algorithm}; loss_stop={lossStop}; skip_verify={lossStop}; elapsed_ms={watch.ElapsedMilliseconds}; loss=42; potions=1; rounds=10; verifications={result.Timing!.Verifications}; peer_budget_ms=10000; native_game=false");
             }
         });
+        asyncTest("both algorithms stop all peers at fulfilled consumable goals inside the permitted loss range", async () =>
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            await using var f = new Fixture();
+            foreach (var algorithm in new[] { LocalSearchOrder.MonteCarlo, LocalSearchOrder.TurnFrontier })
+            foreach (var skip in new[] { false, true })
+            {
+                var r = Request("card-goal-stop") with { SearchOrder = algorithm, StopOnZeroLoss = true,
+                    DataOnlyCombat = true, SkipFinalVerification = skip, CardGoals = new(null, "mod:finish", 5) };
+                var watch = Stopwatch.StartNew();
+                var result = await f.Pool.Analyze(r, f.Installation, _ => { }, CancellationToken.None);
+                Check(result.Status == "done" && result.StoppedEarly && result.StoppedOnCardGoals && !result.StoppedOnFirstWin &&
+                    result.Best is { Won: true, NetHpLoss: 4, CardGoalOutcome.Kills: 1 }, "Consumable goal waited for zero loss or minimum proof");
+                Check(result.MinimumLoss == null && !LocalSearchPolicy.HasMinimumProof(result) &&
+                    result.Timing?.Verifications == (skip ? 0 : 1) && LocalSearchPolicy.HasExecutionPoints(result) &&
+                    result.Trace!.Spans.Any(s => s.Phase == "stop_search") && watch.Elapsed < TimeSpan.FromSeconds(8),
+                    "Peers ran their full budget, goal scope was lost or final route verification repeated");
+                Console.WriteLine($"  consumable-goal protocol evidence: algorithm={algorithm}; skip_verify={skip}; elapsed_ms={watch.ElapsedMilliseconds}; loss=4<5; kills=1; peers=2; verifications={result.Timing!.Verifications}; peer_budget_ms=10000; native_game=false");
+            }
+        });
+        asyncTest("consumable goal stop rejects final verification that loses the real finishing blow", async () =>
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            await using var f = new Fixture();
+            try
+            {
+                await f.Pool.Analyze(Request("card-goal-mismatch") with { Workers = 1, StopOnZeroLoss = true,
+                    DataOnlyCombat = true, CardGoals = new(null, "mod:finish", 5) }, f.Installation, _ => { }, CancellationToken.None);
+                throw new Exception("Verification removed the kill but the completed goal returned");
+            }
+            catch (CoachException ex) when (ex.Category == "local_verify_failed") { }
+        });
         asyncTest("first-win result still rejects a failed final victory verification", async () =>
         {
             if (!OperatingSystem.IsWindows()) return;
@@ -351,6 +383,12 @@ internal static class WorkerReuseTests
                 Actions = [candidate.Actions[0] with { PotionSlot = 0, Round = 10 }] };
         if (request.VerifyCandidate != null && request.DebugEncounter == "first-win-verify-mismatch")
             candidate = candidate with { Won = false, EnemyHp = 10 };
+        if (request.VerifyCandidate == null && request.DebugEncounter?.StartsWith("card-goal", StringComparison.Ordinal) == true)
+            candidate = candidate with { Hp = 46, HpLost = 4, CardGoalOutcome = new(null, "mod:finish", 0, 1,
+                [new(0, 1)], new(null, new(1, 1, 1))) };
+        if (request.VerifyCandidate != null && request.DebugEncounter == "card-goal-mismatch")
+            candidate = candidate with { CardGoalOutcome = candidate.CardGoalOutcome! with { Kills = 0,
+                ConsumableGoals = new(null, new(1, 0, 1)) } };
         return candidate with { Continuation = [new(0, request.NativeHash, new(0, "synthetic"), 0, 50)],
             ContinuationFromSearch = request.SkipFinalVerification && request.VerifyCandidate == null };
     }
@@ -395,6 +433,8 @@ internal static class WorkerReuseTests
                         request.DebugEncounter == "peer-slow" && request.Partition == 1 && request.VerifyCandidate == null ? 10000 : 60;
                     if (minimum) delay = request.Partition == 0 ? 600 : 10000;
                     if (request.DebugEncounter?.StartsWith("first-win", StringComparison.Ordinal) == true && request.VerifyCandidate == null)
+                        delay = request.Partition == 0 ? 600 : 10000;
+                    if (request.DebugEncounter?.StartsWith("card-goal", StringComparison.Ordinal) == true && request.VerifyCandidate == null)
                         delay = request.Partition == 0 ? 600 : 10000;
                     var timer = Stopwatch.StartNew(); bool cancelled = false, goal = false;
                     while (timer.ElapsedMilliseconds < delay)

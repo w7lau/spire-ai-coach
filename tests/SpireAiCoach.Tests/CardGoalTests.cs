@@ -11,6 +11,11 @@ static class CardGoalTests
         Enumerable.Range(0, potions).Select(i => new LocalAction(-1, "potion", null, "药水", "", "root", PotionSlot: i)).ToArray(),
         hp, Math.Max(0, 50 - hp), 0, 0, 80, true, false, false, StartingHp: 50,
         CardGoalOutcome: new("mod:play", "mod:finish", plays, kills, [new(plays, kills)]));
+    static LocalCandidate Fulfilled(int hp = 50) => Win(hp, 2, 1) with
+    {
+        Actions = [new(0, "mod:finish", null, "", "", "root", 1)],
+        CardGoalOutcome = new("mod:play", "mod:finish", 2, 1, [new(2, 1)], new(new(1, 1, 1), new(1, 1, 1)))
+    };
 
     public static void Register(Action<string, Action> test)
     {
@@ -70,6 +75,113 @@ static class CardGoalTests
             Check(!LocalSearchPolicy.HasMinimumProof(proven with { CardGoals = selected.CardGoals }), "Card-goal route claimed proved optimality");
             var disabled = ordinary with { CardGoals = new(null, null) };
             Check(LocalSearchPolicy.CanStopAtMinimum(candidate, disabled, Certificate(disabled)), "Disabled selections prevented certified stopping");
+        });
+        test("consumable card goals stop only after native victory with settled health and all targets fulfilled", () =>
+        {
+            var request = new LocalSearchRequest("request", "snapshot", [], "root", 1, [], false, CardGoals: Goals());
+            var good = Fulfilled();
+            Check(LocalSearchPolicy.CanStopAfterVictory(good, request), "Completed consumable targets kept searching");
+            Check(!LocalSearchPolicy.CanStopAfterVictory(good with { Won = false }, request), "Spent cards ended an ongoing battle");
+            Check(!LocalSearchPolicy.CanStopAfterVictory(good with { Dead = true }, request), "Dead player supplied a goal stop");
+            Check(!LocalSearchPolicy.CanStopAfterVictory(good with { Hp = 49 }, request), "HP sacrificed without an allowance");
+            Check(!LocalSearchPolicy.CanStopAfterVictory(good with { StartingHp = null }, request), "Unknown final loss passed");
+            Check(!LocalSearchPolicy.CanStopAfterVictory(good with { Actions = [good.Actions[0] with { BeforeHash = "other" }] }, request), "Other frozen battle stopped this search");
+            Check(!LocalSearchPolicy.CanStopAfterVictory(good, request with { StopOnZeroLoss = false }), "Disabled stop option ignored");
+            Check(!LocalSearchPolicy.CanStopAfterVictory(good, request with { VerifyCandidate = good }), "Verification interrupted by a goal");
+        });
+        test("consumable card goals preserve strict affordable losses even after a zero loss incumbent", () =>
+        {
+            var request = new LocalSearchRequest("request", "snapshot", [], "root", 1, [], false, CardGoals: Goals(5));
+            var zeroWithoutKills = Fulfilled() with { CardGoalOutcome = Fulfilled().CardGoalOutcome! with { Kills = 0,
+                Steps = [new(2)], ConsumableGoals = new(new(1, 1, 1), new(1, 0, 1)) } };
+            Check(!LocalSearchPolicy.CanStopAfterVictory(zeroWithoutKills, request), "No-loss incumbent stopped before the goal");
+            Check(LocalSearchPolicy.BetterForGoal(Fulfilled(46), zeroWithoutKills, request), "Allowed goal improvement rejected");
+            Check(LocalSearchPolicy.CanStopAfterVictory(Fulfilled(46), request), "Loss four did not qualify under five");
+            Check(!LocalSearchPolicy.CanStopAfterVictory(Fulfilled(45), request), "Loss five qualified under five");
+            Check(!LocalHealthBound.CannotImprove(new("root", 50, 46, 0, 0), new("root", 50, 0, 0), request.CardGoals),
+                "Zero-loss route pruned a permissible goal world line");
+        });
+        test("consumable targets require successful distinct source copies and real exhaustion", () =>
+        {
+            var request = new LocalSearchRequest("request", "snapshot", [], "root", 1, [], false, CardGoals: Goals(5));
+            var good = Fulfilled();
+            bool Stop(LocalConsumableCardGoals? evidence, int kills = 1) => LocalSearchPolicy.CanStopAfterVictory(good with
+                { CardGoalOutcome = good.CardGoalOutcome! with { ConsumableGoals = evidence, Kills = kills } }, request);
+            Check(!Stop(new(new(1, 1, 1), new(1, 0, 1))), "Exhaust without a finishing blow counted as success");
+            Check(!Stop(new(new(1, 1, 1), new(1, 1, 0))), "Unspent target card assumed exhausted");
+            Check(!Stop(new(new(1, 1, 1), new(2, 1, 1)), 20), "Repeated kills by one copy covered another unused copy");
+            Check(!Stop(new(null, new(1, 1, 1))), "Repeatable play goal treated as finitely complete");
+            Check(!Stop(new(new(0, 0, 0), new(1, 1, 1))), "Absent root card invented a completion bound");
+            Check(!Stop(new(new(1, 1, 1), new(1, 1, 1), "other-scope")), "Other stopping scope accepted");
+            Check(!Stop(null), "Legacy counts certified consumable completion");
+            Check(!Stop(new(new(1, 1, 1), new(1, 1, 1)), 0), "Consumable metadata displaced real native kills");
+            Check(!LocalSearchPolicy.CanStopAfterVictory(good with { CardGoalOutcome = good.CardGoalOutcome! with { FinisherModelId = "other" } }, request),
+                "Different selected model completed this goal");
+        });
+        test("consumable card goals preserve explicit round potion and enemy damage gates", () =>
+        {
+            var request = new LocalSearchRequest("request", "snapshot", [], "root", 1, [], false, CardGoals: Goals(5),
+                TargetVictoryRounds: 2, TargetPotionUses: 0, RequireKnownZeroEnemyDamage: true);
+            var good = Fulfilled() with { Rounds = 2, DamageSources = new(0, 0, 0, 0, true) };
+            Check(LocalSearchPolicy.CanStopAfterVictory(good, request), "Combined valid gates did not stop");
+            Check(!LocalSearchPolicy.CanStopAfterVictory(good with { Rounds = 3 }, request), "Round gate ignored");
+            Check(!LocalSearchPolicy.CanStopAfterVictory(good with { Actions = [good.Actions[0] with { PotionSlot = 0 }] }, request), "Potion gate ignored");
+            Check(!LocalSearchPolicy.CanStopAfterVictory(good with { DamageSources = new(1, 0, 0, 0, true) }, request), "Enemy damage gate ignored");
+        });
+        test("consumable peer stops are typed frozen scoped and never interrupt verification", () =>
+        {
+            var request = new LocalSearchRequest("request", "snapshot", [], "root", 1, [], false, CardGoals: Goals(5));
+            var stop = new LocalSearchStop("request", "snapshot", "root", CardGoalsCompleted: true);
+            Check(stop.Matches(request), "Goal-qualified stop not delivered to peers");
+            Check(!new LocalSearchStop("request", "snapshot", "root").Matches(request), "Generic zero-loss stop interrupted goals");
+            Check(!stop.Matches(request with { StopOnZeroLoss = false }), "Disabled goal stop accepted");
+            Check(!stop.Matches(request with { VerifyCandidate = Fulfilled() }), "Goal signal stopped verification");
+            Check(!stop.Matches(request with { Id = "other" }) && !stop.Matches(request with { SnapshotId = "other" }) &&
+                !stop.Matches(request with { NativeHash = "other" }), "Old request supplied a peer stop");
+            Check(!stop.Matches(request with { CardGoals = null }), "Card-goal signal stopped ordinary search");
+            var restored = JsonSerializer.Deserialize<LocalSearchStop>(JsonSerializer.Serialize(stop));
+            Check(restored!.Matches(request), "IPC lost the goal stop type");
+        });
+        test("consumable goal display and continuation do not claim arbitrary mod maximums or carry old root evidence", () =>
+        {
+            var good = Fulfilled(46);
+            var result = new LocalSearchResult("request", "snapshot", "done", "", 1, 0, 1, good,
+                CardGoals: Goals(5), StoppedEarly: true, StoppedOnCardGoals: true);
+            var advice = LocalSearchPolicy.FormatAdvice(result);
+            Check(advice.Contains("已停止搜索") && advice.Contains("回收、复制") && !LocalSearchPolicy.HasMinimumProof(result),
+                "Scoped goal stop claimed a global loss or arbitrary-Mod proof");
+            Check(good.CardGoalOutcome!.Remaining(0).ConsumableGoals != null && good.CardGoalOutcome.Remaining(1).ConsumableGoals == null,
+                "Original root completion evidence survived an advanced root");
+            Check(JsonSerializer.Deserialize<LocalCandidate>(JsonSerializer.Serialize(good))?.CardGoalOutcome?.ConsumableGoals ==
+                good.CardGoalOutcome.ConsumableGoals, "IPC lost distinct current copy counters");
+        });
+        test("consumable finishers cannot demand more finishing blows than the current living enemy count", () =>
+        {
+            var request = new LocalSearchRequest("request", "snapshot", [], "root", 1, [], false,
+                CardGoals: new(null, "mod:finish", 5));
+            var winner = Fulfilled() with { CardGoalOutcome = new(null, "mod:finish", 0, 1, [new(0, 1)],
+                new(null, new(2, 1, 1, LivingEnemies: 1))) };
+            Check(LocalSearchPolicy.CanStopAfterVictory(winner, request), "One defeated enemy required two finishing blows");
+            Check(!LocalSearchPolicy.CanStopAfterVictory(winner with { Won = false }, request), "Enemy-count cap ended a continuing battle");
+            Check(!LocalSearchPolicy.CanStopAfterVictory(winner with { CardGoalOutcome = winner.CardGoalOutcome! with
+                { ConsumableGoals = new(null, new(2, 1, 1, LivingEnemies: 2)) } }, request), "Another available enemy was ignored");
+            Check(!LocalSearchPolicy.CanStopAfterVictory(winner with { CardGoalOutcome = winner.CardGoalOutcome! with
+                { ConsumableGoals = new(null, new(2, 1, 1, LivingEnemies: 0)) } }, request), "No living root enemies invented a finishing goal");
+            var play = Fulfilled() with { CardGoalOutcome = Fulfilled().CardGoalOutcome! with
+                { ConsumableGoals = new(new(2, 1, 1, LivingEnemies: 1), new(1, 1, 1)) } };
+            Check(!LocalSearchPolicy.CanStopAfterVictory(play, request with { CardGoals = Goals(5) }), "Enemy count capped the unrelated play goal");
+        });
+        test("native victory closes a successful final card even when post combat cleanup omits exhaustion", () =>
+        {
+            var request = new LocalSearchRequest("request", "snapshot", [], "root", 1, [], false,
+                CardGoals: new(null, "mod:finish", 5));
+            var winner = Fulfilled() with { CardGoalOutcome = new(null, "mod:finish", 0, 1, [new(0, 1)],
+                new(null, new(2, 1, 0, LivingEnemies: 1, BattleEnded: true))) };
+            Check(LocalSearchPolicy.CanStopAfterVictory(winner, request), "Successful final card required a discarded terminal history event");
+            Check(!LocalSearchPolicy.CanStopAfterVictory(winner with { Won = false }, request), "Completion flag invented a native victory");
+            Check(!LocalSearchPolicy.CanStopAfterVictory(winner with { CardGoalOutcome = winner.CardGoalOutcome! with
+                { Kills = 0, ConsumableGoals = new(null, new(2, 0, 0, LivingEnemies: 1, BattleEnded: true)) } }, request),
+                "Victory substituted for a real finishing blow");
         });
         test("card goals preserve affordable goal branches in both health bound modes", () =>
         {

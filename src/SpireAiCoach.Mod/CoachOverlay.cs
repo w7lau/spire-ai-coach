@@ -183,6 +183,7 @@ public sealed class CoachOverlay
         {
             _settings = _settings with { LocalStopOnZeroLoss = enabled };
             if (_localAnalyzing) Cancel("停止条件已改变，请重新计算。");
+            UpdateCardGoalNotice();
             try { SaveLocalSettings(); }
             catch (Exception ex) { _status.Text = "选项本次已生效，保存失败：" + ex.GetType().Name; }
         };
@@ -604,6 +605,11 @@ public sealed class CoachOverlay
 
     private void UpdateCardGoalNotice()
     {
+        bool hasGoals = CurrentCardGoals() is { Enabled: true };
+        _localStopOnZeroLoss.Text = hasGoals ? "完成消耗目标即返回" : "达到最低损失即返回";
+        _localStopOnZeroLoss.TooltipText = hasGoals ?
+            "当前消耗目标牌成功使用并实际消耗；补刀次数取当前可用目标牌张数与活敌人数的较小值。战斗获胜且损血符合设置时停止所有搜索，不继续查找回收、复制或额外生成后的次数。可反复使用的目标牌仍继续原定搜索。" :
+            "战后无伤，或路线达到已证明的最低净损失且无需多喝药水，就停止搜索。回复上限未知或操作尚未覆盖时，不按正数下界停止。关闭后继续优化；最终复核由下方开关决定。";
         if (_localStopOnFirstWin.ButtonPressed)
         {
             _localCardGoalLoss.Editable = false;
@@ -614,7 +620,9 @@ public sealed class CoachOverlay
         _localCardGoalNotice.Text = CurrentCardGoals() is not { Enabled: true } ? "未启用可选目标，按原生命与药水策略选路。" :
             (_localCardGoalThreshold.ButtonPressed ? "在所填净损血范围内优先补刀及多打牌；没有符合路线时优先少损血。" :
                 "优先保住战后生命，同血量时优先补刀及多打牌。") +
-            "\n启用可选目标后不会在无伤或最低损失时立即返回，会继续搜索到原定上限。";
+            (_localStopOnZeroLoss.ButtonPressed ?
+                "\n当前消耗目标完成、获胜且损血符合设置就返回；补刀次数最多按当前活敌人数计算。可反复使用的目标牌继续搜索。" :
+                "\n已关闭提前返回，继续比较目标次数直到原定搜索上限。");
     }
 
     private void ShowLocalAdvice(LocalSearchResult result)
@@ -803,7 +811,7 @@ public sealed class CoachOverlay
                                 request.Id, request.SnapshotId, request.NativeHash, completed_at = DateTimeOffset.UtcNow,
                                 version = typeof(ModEntry).Assembly.GetName().Version!.ToString(3), request.SearchOrder, request.MaxNodes, request.MaxRounds, request.BudgetSeconds,
                                 ConfiguredWorkers = request.Workers, result.WorkerLimit,
-                                request.SkipFinalVerification, request.StopOnZeroLoss, request.StopOnFirstWin, result.StoppedOnFirstWin, request.TargetVictoryRounds,
+                                request.SkipFinalVerification, request.StopOnZeroLoss, request.StopOnFirstWin, result.StoppedOnFirstWin, result.StoppedOnCardGoals, request.TargetVictoryRounds,
                                 request.TargetPotionUses, request.RequireKnownZeroEnemyDamage, result.VerificationSkipped, result.ElapsedMs, result.Workers,
                                 request.CardGoals,
                                 result.Evaluated, result.Victories, result.HealthBounds, result.RecoveredFailures,
@@ -818,6 +826,7 @@ public sealed class CoachOverlay
                     });
                     _adviceHash = request.SnapshotId;
                     string optimality = result.StoppedOnFirstWin ? "已找到获胜路线，未继续优化损失。" :
+                        result.StoppedOnCardGoals ? "已完成当前消耗目标，损血符合设置。" :
                         LocalSearchPolicy.HasMinimumProof(result) ? "已达到最低净损失。" : "候选路线尚未证明最优。";
                     _freshness.Text = result.VerificationSkipped ? LocalSearchPolicy.HasExecutionPoints(result) ?
                         "可执行方案，偏离时自动停止。" + optimality :

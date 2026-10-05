@@ -335,6 +335,7 @@ public static class LocalWorker
                 HealthBounds: HealthStats(), Failure: failure,
                 Trials: status == "running" ? null : trials.ToArray(), CardGoals: request.CardGoals, MinimumLoss: minimumStatus,
                 StoppedOnFirstWin: stoppedEarly && LocalSearchPolicy.CanStopAtFirstWin(best, request),
+                StoppedOnCardGoals: stoppedEarly && LocalSearchPolicy.CanStopOnCardGoals(best, request),
                 Evidence: status == "running" ? null : audit.Snapshot(request, best, coverage?.Exhausted == true,
                     turns?.Count, evaluated, searchFinished ? searchTimeReached : budget.Elapsed.TotalSeconds >= request.BudgetSeconds,
                     stoppedEarly, boundPruned, independentlyVerified)));
@@ -1050,6 +1051,8 @@ public static class LocalWorker
             Publish(best == null ? stoppedEarly || sharedExhausted ? "searched" : "unsupported" : request.DeferVerification ? "searched" : "done",
                 stoppedEarly ? request.StopOnFirstWin ? best?.Won == true ?
                     "已找到获胜路线，停止后续搜索。" : "已停止其余搜索。" :
+                    request.CardGoals?.Enabled == true ? LocalSearchPolicy.CanStopOnCardGoals(best, request) ?
+                    "当前消耗目标已完成，损血符合设置，停止后续搜索。" : "已停止其余搜索。" :
                     best?.NetHpLoss is > 0 ? $"已达到最低净损失 {best.NetHpLoss}，停止后续搜索。" :
                     "已达到无伤通关停止条件，停止后续搜索。" : best == null ? "没有找到可完整结算的路线。" :
                 turns != null ? $"已完成当前预算；评估 {evaluated} 条整场路线，另探查 {probes} 个回合组合，剪枝 {boundPruned} 次；尚未证明全局最优。" :
