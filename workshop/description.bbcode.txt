@@ -1,49 +1,53 @@
 [h1]尖塔教练 / Spire AI Coach[/h1]
-AI 本回合指导 + 无需 API 的本地整场战斗规划 + 点击执行方案。为了娱乐、研究与比较打法。
+《杀戮尖塔 2》的战斗助手：AI 本回合指导、本地整场战斗规划，以及自动执行方案。用于娱乐、研究与比较打法。
 
-[h2]设计目标：尽力兼容不同 Mod[/h2]
-尽量从游戏底层读取状态，直接调用原生规则与已加载的 Mod 钩子，按照真实玩法模拟出牌、抽牌、弃牌、消耗、选牌、遗物、能力及敌方行动，减少逐张卡和逐件遗物手写适配。后台省略已识别的展示与动画等待；尚不能保证所有 Mod 自动兼容。
-
-[h2]使用方法[/h2]
+[h2]功能[/h2]
 [list]
-[*]订阅、启动游戏并启用 Mod。不要同时保留手动安装的同一份 Mod。
-[*]按 F8 打开／收起面板。左上角入口默认隐藏，战斗面板默认自动展开；在“计算选项 → 高级设置”可关闭“进入战斗自动展开面板”，改为仅手动打开，也可启用左上角入口。
-[*]“路线采样”以完整战斗路线组织搜索；“分支扩展”按回合扩展候选。两者都规划到本次战斗结束，共用预算与原生模拟。
-[*]按战后净损血比较，包含战中与战后回血；同等损失优先保留药水。药水仅在开启选项时考虑，不是必须喝掉。
-[*]可设置并发、尝试次数、搜索时间、回合上限、首次获胜返回及可选补刀／多打牌目标。可查看进度与耗时，或继续优化。
-[*]点击“执行方案”才自动出牌，仅限单人战斗。每步校验，偏离预测会停止；Esc 可停止执行。AI 回复不会自动执行。
-[*]AI 功能需自行配置 Chat Completions 兼容服务的 URL、模型与 API Key；支持流式回复。点击 AI 分析会把战斗信息发给所填服务商，可能产生费用。本地计算无需 API。
+[*]AI 根据手牌、牌堆、Buff、遗物、药水和敌人意图给出本回合建议，支持流式回复。
+[*]“路线采样”和“分支扩展”都计算整场战斗，无需 API；优先降低战后净损血，计入回血，同等损失优先保留药水。
+[*]可设置并发、次数、搜索时间、回合上限、提前返回条件，以及用药、补刀和目标牌选项。
+[*]可查看进度、路线与耗时，并继续搜索。
+[*]自动执行支持单人战斗；实际状态偏离方案时停止。
 [/list]
 
-主要验证 Windows x64 / 游戏 v0.111.0；界面主要为中文。搜索有预算限制，找到获胜候选不等于已证明全局最优。依赖界面、自定义流程或外部服务的 Mod 可能需要额外适配。
+[h2]使用[/h2]
+[list]
+[*]订阅、启动游戏并启用 Mod。创意工坊版与手动安装版选一种。
+[*]按 F8 打开／收起面板，选择“路线采样”或“分支扩展”进行本地计算。
+[*]获得方案后可手动照做，或点击“执行方案”；Esc 停止执行。
+[*]使用 AI 时填写 Chat Completions 兼容服务的 URL、模型和 API Key，保存后点击“AI 分析”。这会向所填服务商发送战斗信息，可能产生 API 费用。
+[/list]
 
-[h2]欢迎一起优化算法[/h2]
-欢迎大家通过 Issue / PR 改进搜索、原生模拟、状态复用、公共前缀、并发与有证明依据的剪枝，争取以最快的方式找到最低损失、更接近或可证明最优的完整方案。请在相同输入、预算、目标下比较速度与路线质量；不要用减少预算或漏掉合法操作制造提速。
+[h2]兼容与算法优化[/h2]
+为尽力兼容不同 Mod，搜索尽量复用游戏底层规则和已加载的 Mod 钩子，模拟出牌与结算，减少逐卡适配。部分 Mod 仍可能需要额外处理。
+
+已验证 Windows x64 / 游戏 v0.111.0，界面主要为中文。搜索受时间和次数限制，结果不保证全局最优。
+
+欢迎通过 GitHub Issue / PR 改进算法，争取以最快的方式找到损伤最低、更接近或可证明最优的完整获胜路线。
 
 [h2]English[/h2]
-AI advice for the current turn, local planning for the whole battle without an API, and optional click-to-execute plans. Built for fun and experimentation.
-
-The design aims for broad mod compatibility by capturing underlying game state and reusing native rules and loaded mod hooks, rather than hand-coding every card or relic. Background simulation skips recognized presentation work and animation waits. This approach reduces adapters, but does not guarantee support for every mod.
+A Slay the Spire 2 battle assistant: AI advice for the current turn, local whole-battle planning, and plan execution. Built for fun, research and comparing strategies.
 
 [list]
-[*]Press F8 to open/close the panel. The corner button is hidden by default; the panel automatically opens on combat entry. Disable “进入战斗自动展开面板” in advanced calculation settings for manual-only opening, or enable the corner button separately.
-[*]Rollout Sampling (路线采样) explores complete battle candidates. Branch Expansion (分支扩展) organizes continuations by turn. Both plan to the end of combat.
-[*]Plans prioritize net HP loss after combat, including healing; equal-loss routes prefer preserving potions. Optional potion use does not require drinking every potion.
-[*]Configure workers, attempts, search time and turn limits, first-win stopping and optional card goals. Inspect progress and timing or continue optimizing.
-[*]Click “执行方案” to execute in singleplayer. State checks stop on divergence; Esc stops active execution. AI text is never executed automatically.
-[*]AI requires your own Chat Completions compatible URL, model and key. Clicking AI analysis sends combat data to that provider and may incur charges. Local search does not use an AI provider.
+[*]AI uses your hand, piles, buffs, relics, potions and enemy intents to suggest plays, with streamed replies.
+[*]Rollout Sampling (路线采样) and Branch Expansion (分支扩展) both plan the whole battle without an API. Plans prioritize net HP loss including healing; equal-loss routes prefer preserving potions.
+[*]Configure concurrency, attempts, search time, turn limits, stopping conditions, potion use and card goals. Inspect progress, routes and timing, or continue searching.
+[*]Subscribe, enable the mod and press F8 to open/close the panel. Choose either the Workshop or manual installation.
+[*]Follow a plan manually or click “执行方案” to execute in singleplayer. Esc stops execution; divergence from the plan also stops it.
+[*]AI requires a Chat Completions compatible URL, model and API key. Clicking AI analysis sends combat information to your provider and may incur charges.
 [/list]
 
-Primarily validated on Windows x64 and game v0.111.0. In-game labels are currently Chinese. Budgeted search does not prove global optimality. UI-dependent mods, custom flows and external services may need additional integration.
+Local search aims to support different mods by reusing underlying game rules and loaded mod hooks. Some mods may need additional integration. Validated on Windows x64 / game v0.111.0; in-game labels are mainly Chinese. Budgeted search does not guarantee globally optimal results.
 
-Contributions are welcome! Help find complete minimum-damage or provably optimal winning plans as quickly as possible, while preserving native and mod rules. Compare identical inputs, budgets and objectives.
+Contributions are welcome! Help find complete winning routes with the lowest damage, approaching or proving optimal play, as quickly as possible.
 
 [h2]源码与致谢 / Source and credits[/h2]
-[url=https://github.com/w7lau/spire-ai-coach]GitHub · MIT source · Issues / PRs[/url]
+[url=https://github.com/w7lau/spire-ai-coach]GitHub · Source · Issues / PRs[/url]
 [url=https://github.com/w7lau/spire-ai-coach/blob/main/README.en.md]English documentation[/url]
-参考 CombatSolver、autoSpire、SpireVibePlaying、ModTemplate-StS2 等项目的搜索、动作／选择与加载思路，未导入它们的求解器。感谢作者公开研究；这些参考项目不是安装依赖。
-Research references include CombatSolver, autoSpire, SpireVibePlaying and ModTemplate-StS2. Their solvers were not imported and are not required mods.
-[url=https://github.com/w7lau/spire-ai-coach/blob/main/ACKNOWLEDGEMENTS.md]完整参考关系 / Full acknowledgements[/url]
 
-独立社区 Mod，不代表 Mega Crit。不重新分发游戏代码、游戏资源或玩家存档。
-Independent community mod, not an official Mega Crit product. No game code, assets or player saves are redistributed.
+开发参考了 CombatSolver、autoSpire、SpireVibePlaying、ModTemplate-StS2 等项目。
+Development referenced CombatSolver, autoSpire, SpireVibePlaying and ModTemplate-StS2.
+[url=https://github.com/w7lau/spire-ai-coach/blob/main/ACKNOWLEDGEMENTS.md]致谢与来源 / Acknowledgements and sources[/url]
+
+原创代码采用 MIT 许可。本项目是独立社区 Mod。
+Original code uses the MIT License. This is an independent community mod.
