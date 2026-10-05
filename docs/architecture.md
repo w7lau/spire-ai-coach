@@ -1,5 +1,11 @@
 # 设计与合同
 
+## 未发布：搜索顺序实验
+
+LocalSearchRequest.SearchOrder 缺省为 MonteCarlo；实验开关另提供 LimitedDiscrepancy、DepthDiscrepancy 和 DiscrepancyPortfolio。LocalSearchTree 保留原调度，实验模式通过 LocalDiscrepancyTree 维护确切操作/选牌历史的开放后续及真实结算；组合的两种排序共享本进程的覆盖标记，不共享可执行原生检查点。实验不重写卡牌效果、不按即时收益删除分支，不改变预算或发布/执行校验。
+
+LocalBranchPartition 在每条原生试走的动作和选牌分岔分配进程所有权，首步分支不足时继续在后续拆分。实验模式不使用旧的有限公共提案/局部改进队列，常规最终复核保留。合法集合在同一历史下改变时拒绝该路，不声明完成。此实验尚未通过真实整场搜索质量比较，保持默认关闭。方法和短验证见 [搜索顺序实验](search-ordering-experiment.md)。
+
 ## 0.7.7 原生模型执行与常规复核
 
 LocalWorkerDataMode 只在目录所有权标记和独立可执行文件路径核对后安装，使用独立 Harmony owner；任何受检查的原生 IL 边界变化会撤回这一组补丁，继续常规执行。DataOnlyCombat / DataOnlyRun 默认开启，不属于玩家设置；只影响后台搜索 scope。普通玩家进程不安装这些边界，最终 VerifyBest 关闭它们并恢复原生动作入口，重建常规场景后核对每步状态、历史及完整终局。

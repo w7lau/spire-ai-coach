@@ -124,7 +124,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             var best = verifiedBest;
             var allRuns = results.Concat(verificationResults).ToArray();
             LocalWorkStats? workStats = null;
-            if (request.ShareSearchWork && count > 1)
+            if (request.ShareSearchWork && request.SearchOrder == LocalSearchOrder.MonteCarlo && count > 1)
             {
                 using var scheduling = timeline.Measure(-1, "main", "schedule", "释放已结束的分支提案", depth: 1);
                 var work = new LocalSearchWork(Path.GetDirectoryName(_workers[0].Root)!, request);

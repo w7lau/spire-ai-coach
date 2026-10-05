@@ -119,17 +119,21 @@ public static class LocalWorker
         using var session = Trace(request.VerifyCandidate == null ? "session" : "verify", depth: 0);
         _targetLabels = request.TargetLabels;
         _includePotions = false;
+        bool systematic = request.SearchOrder != LocalSearchOrder.MonteCarlo;
         _excludedModels = new(request.ExcludedModels ?? [], StringComparer.Ordinal);
         var timer = Stopwatch.StartNew();
         var budget = new Stopwatch();
         LocalCandidate? best = null;
         int evaluated = 0, rejected = 0, victories = 0;
-        var noPotionSearch = new LocalSearchTree(1729 + request.Partition);
-        var potionSearch = new LocalSearchTree(2718 + request.Partition);
+        var noPotionSearch = new LocalSearchTree(1729 + request.Partition, order: request.SearchOrder);
+        var potionSearch = new LocalSearchTree(2718 + request.Partition, order: request.SearchOrder);
         var search = noPotionSearch;
         var refiner = new LocalRouteRefiner();
         LocalCandidate? refinementSeed = null;
-        LocalSearchWork? work = request.ShareSearchWork && request.Partitions > 1 && request.VerifyCandidate == null
+        // The experimental tree owns a complete observed-prefix frontier. Do not overwrite
+        // its order with the old bounded expansion/refinement proposal queue. Workers still
+        // partition first actions; every continuation remains in its owning native process.
+        LocalSearchWork? work = !systematic && request.ShareSearchWork && request.Partitions > 1 && request.VerifyCandidate == null
             ? new(Path.GetDirectoryName(_root)!, request) : null;
         int refinements = 0;
         LocalWorkerResources.Retain = true;
@@ -279,7 +283,7 @@ public static class LocalWorker
                 using var refining = Trace("refine");
                 // Other workers' candidates seed exploration only. Their results are never adopted without
                 // executing the proposed line in this worker, including all native effects and choices.
-                foreach (var peer in Directory.EnumerateDirectories(Path.GetDirectoryName(_root)!, "worker-*"))
+                if (!systematic) foreach (var peer in Directory.EnumerateDirectories(Path.GetDirectoryName(_root)!, "worker-*"))
                 {
                     var file = Path.Combine(peer, "result.json");
                     if (peer == _root || !File.Exists(file)) continue;
@@ -292,7 +296,7 @@ public static class LocalWorker
                     catch (IOException) { /* Peer can be replacing its private IPC file. */ }
                 }
                 if (best != null && LocalSearchPolicy.Better(best, refinementSeed)) refinementSeed = best;
-                if (refinementSeed != null) refiner.Offer(refinementSeed, work == null ? request.Partition : 0,
+                if (!systematic && refinementSeed != null) refiner.Offer(refinementSeed, work == null ? request.Partition : 0,
                     work == null ? request.Partitions : 1);
                 LocalAction[]? planned = null;
                 LocalWorkTask? sharedTask = null;
@@ -311,7 +315,7 @@ public static class LocalWorker
                 else
                 {
                     if (evaluated == 0 && request.InitialPlan is { Length: > 0 }) planned = request.InitialPlan;
-                    if ((evaluated % 2 == 1 || search.Exhausted) && refiner.TryTake(out var proposal))
+                    if (!systematic && (evaluated % 2 == 1 || search.Exhausted) && refiner.TryTake(out var proposal))
                     { planned = proposal; refinements++; }
                 }
                 route = evaluated + 1;
@@ -336,6 +340,7 @@ public static class LocalWorker
                 }
                 var actions = new List<LocalAction>();
                 var decisions = new List<LocalDecision>();
+                var partition = systematic ? new LocalBranchPartition(request.Partition, request.Partitions) : null;
                 var trial = search.Begin();
                 int planIndex = 0;
                 int lost = 0;
@@ -359,6 +364,7 @@ public static class LocalWorker
                         decisionStarted = Stopwatch.GetTimestamp();
                         using var deciding = Trace("decision");
                         var legal = EnumerateActions();
+                        if (partition != null) legal = partition.Assign(legal);
                         LocalAction? preferred = null;
                         LocalAction? plannedAction = null;
                         if (planned != null)
@@ -373,7 +379,7 @@ public static class LocalWorker
                                 preferred = LocalRouteRefiner.Resolve(plannedAction, legal);
                             }
                         }
-                        else if (evaluated == 0 && actions.Count == 0)
+                        else if (!systematic && evaluated == 0 && actions.Count == 0)
                             preferred = roots.OrderByDescending(a => a.Preference).First();
                         // Explore explicit branch proposals, then continue most trials coherently.
                         // Randomizing every card in a long rollout almost never preserves a combo.
@@ -405,7 +411,8 @@ public static class LocalWorker
                                     (c.Indices ?? []).SequenceEqual(expected.Indices ?? []));
                                 var choices = options.Select(c => new LocalAction(c.Index, "choice:" + c.ModelId,
                                     null, c.Name, "", c.OfferHash, round, Preference: c.Preference)).ToArray();
-                                var selected = search.Select(trial, choices, match == null ? null : choices.Single(c => c.HandIndex == match.Index),
+                                if (partition != null) choices = partition.Assign(choices);
+                                var selected = search.Select(trial, choices, match == null ? null : choices.SingleOrDefault(c => c.HandIndex == match.Index),
                                     greedy: coherent);
                                 return options.Single(c => c.Index == selected.HandIndex);
                             });

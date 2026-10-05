@@ -2,14 +2,22 @@ namespace SpireAiCoach.Core;
 
 // Outcome-guided tree search. Nodes represent exact action histories, not merged visible states.
 // Nothing here predicts card mechanics: only native, settled rollouts supply rewards.
-public sealed class LocalSearchTree(int seed, int capacity = 8192)
+public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOrder order = LocalSearchOrder.MonteCarlo)
 {
     private readonly Random _random = new(seed);
     private readonly Node _root = new();
+    // Systematic modes retain every observed prefix. Native trial/time/round limits
+    // still bound the request; the Monte Carlo storage cap must not discard this frontier.
+    private readonly LocalDiscrepancyTree? _discrepancy = order switch
+    {
+        LocalSearchOrder.MonteCarlo => null,
+        LocalSearchOrder.LimitedDiscrepancy or LocalSearchOrder.DepthDiscrepancy or LocalSearchOrder.DiscrepancyPortfolio => new(order),
+        _ => throw new ArgumentOutOfRangeException(nameof(order))
+    };
     private int _nodes = 1;
-    public int Nodes => _nodes;
-    public int CompletedTrials => _root.Visits;
-    public bool Exhausted => _root.Closed;
+    public int Nodes => _discrepancy?.Nodes ?? _nodes;
+    public int CompletedTrials => _discrepancy?.CompletedTrials ?? _root.Visits;
+    public bool Exhausted => _discrepancy?.Exhausted ?? _root.Closed;
 
     internal sealed class Node
     {
@@ -25,13 +33,16 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192)
         internal Node? Current;
         internal readonly List<Node> Path;
         internal bool Finished;
+        internal LocalDiscrepancyTree.Trial? Discrepancy;
         internal Trial(Node root) { Current = root; Path = [root]; }
     }
 
-    public Trial Begin() => new(_root);
+    public Trial Begin() => new(_root) { Discrepancy = _discrepancy?.Begin() };
 
     public LocalAction Select(Trial trial, IReadOnlyList<LocalAction> legal, LocalAction? preferred = null, bool greedy = false)
     {
+        if (_discrepancy != null) return _discrepancy.Select(trial.Discrepancy ??
+            throw new InvalidOperationException("Trial belongs to a different search"), legal, preferred);
         if (trial.Finished) throw new InvalidOperationException("Trial has already finished");
         if (legal.Count == 0) throw new InvalidOperationException("No legal action");
         var parent = trial.Current;
@@ -74,6 +85,11 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192)
 
     public void Complete(Trial trial, LocalCandidate result, int initialEnemyHp, bool closeExactPrefix = false)
     {
+        if (_discrepancy != null)
+        {
+            _discrepancy.Complete(trial.Discrepancy ?? throw new InvalidOperationException("Trial belongs to a different search"), result, closeExactPrefix);
+            return;
+        }
         if (trial.Finished) throw new InvalidOperationException("Trial has already finished");
         trial.Finished = true;
         var reward = Reward(result, initialEnemyHp);
