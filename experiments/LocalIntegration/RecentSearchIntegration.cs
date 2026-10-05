@@ -32,6 +32,7 @@ internal static class RecentSearchIntegration
                 result.TurnSearch.CoveredPrefixes, result.TurnSearch.CompletedHistories, result.TurnSearch.RepeatedHistories,
                 result.TurnSearch.ClaimedByRound, result.TurnSearch.RolloutStyles },
             result.Work, result.HealthBounds, result.MinimumLoss, result.CardGoals, result.Evidence,
+            result.HealthTarget, result.StoppedEarly, result.StoppedOnHealthTarget, result.StoppedOnMinimum,
             recoveredFailures = failures, result.Failure,
             foundVictory = result.Best?.Won == true,
             best = result.Best == null ? null : new { result.Best.Won, result.Best.Dead,

@@ -91,7 +91,8 @@ public sealed record LocalSearchResult(string Id, string SnapshotId, string Stat
     LocalSimulationFailure[]? RecoveredFailures = null, LocalCardGoals? CardGoals = null,
     LocalMinimumLossStatus? MinimumLoss = null, LocalSearchEvidence? Evidence = null,
     bool StoppedOnFirstWin = false, bool StoppedOnCardGoals = false, LocalSearchProgress? SearchProgress = null,
-    bool StoppedOnMinimum = false, bool StoppedOnManualVictory = false);
+    bool StoppedOnMinimum = false, bool StoppedOnManualVictory = false,
+    LocalHealthTarget? HealthTarget = null, bool StoppedOnHealthTarget = false);
 
 public static class LocalSearchPolicy
 {
@@ -132,8 +133,15 @@ public static class LocalSearchPolicy
     public static bool CanStopAtFirstWin(LocalCandidate? candidate, LocalSearchRequest request) =>
         request.StopOnFirstWin && WinningRouteFrom(candidate, request);
     public static bool CanStopAfterVictory(LocalCandidate? candidate, LocalSearchRequest request,
-        LocalMinimumLossCertificate? certificate = null) => request.VerifyCandidate == null &&
-        (CanStop(candidate, request) || CanStopOnCardGoals(candidate, request) || CanStopAtMinimum(candidate, request, certificate));
+        LocalMinimumLossCertificate? certificate = null, LocalHealthTarget? healthTarget = null) => request.VerifyCandidate == null &&
+        (CanStop(candidate, request) || CanStopOnCardGoals(candidate, request) ||
+            CanStopAtHealthTarget(candidate, request, healthTarget) || CanStopAtMinimum(candidate, request, certificate));
+    public static bool CanStopAtHealthTarget(LocalCandidate? candidate, LocalSearchRequest request,
+        LocalHealthTarget? target) => request.StopOnZeroLoss && !request.StopOnFirstWin && !HasSpecificGoal(request) &&
+        request.VerifyCandidate == null && target != null && target.StartingHp > 0 && target.TargetHp >= target.StartingHp &&
+        WinningRouteFrom(candidate, request) && candidate!.StartingHp == target.StartingHp &&
+        candidate.MaxHp > 0 && candidate.Hp <= candidate.MaxHp && target.Scope == LocalMinimumLossProof.Scope(request) &&
+        (target.FullHealth ? FullHealthVictory(candidate) && candidate.NetHpLoss == 0 : candidate.Hp >= target.TargetHp);
     public static bool CanStopOnCardGoals(LocalCandidate? candidate, LocalSearchRequest request) =>
         request.StopOnZeroLoss && !request.StopOnFirstWin && request.VerifyCandidate == null &&
         request.CardGoals is { Enabled: true } goals &&
@@ -166,7 +174,7 @@ public static class LocalSearchPolicy
         proof.MinimumNetHpLoss == candidate.NetHpLoss &&
         (proof.MaximumFinalHp is { } maximum ? maximum == candidate.Hp : proof.MinimumNetHpLoss > 0);
     public static bool HasMinimumProof(LocalSearchResult result) => result.CardGoals?.Enabled != true &&
-        result.Status == "done" && !result.StoppedOnFirstWin && !result.StoppedOnManualVictory &&
+        result.Status == "done" && !result.StoppedOnFirstWin && !result.StoppedOnManualVictory && !result.StoppedOnHealthTarget &&
         result.Best is { Won: true, Dead: false, Hp: > 0, StartingHp: not null } best &&
         result.MinimumLoss is { Confirmed: true, Certificate: { } proof } &&
         proof.StartingHp == best.StartingHp && ReachesHealthProof(best, proof) &&
@@ -263,6 +271,8 @@ public static class LocalSearchPolicy
                 "已跳过最终复核，但未取得完整逐步记录；目前仅供手动查看，暂不能自动执行。");
         if (result.StoppedOnManualVictory)
             lines.Add("已手动停止搜索并采用当前胜利路线；尚未证明最优。");
+        if (result.StoppedOnHealthTarget && result.HealthTarget is { } target)
+            lines.Add(HealthTargetDescription(target));
         if (result.StoppedOnFirstWin && best is { Won: true, Dead: false })
             lines.Add("已按「找到获胜路线即返回」停止搜索，未继续优化损失或用药。");
         if (HasMinimumProof(result)) lines.Add(MinimumProofDescription(best));
@@ -277,7 +287,7 @@ public static class LocalSearchPolicy
                 lines.Add("部分生命变化绕过了事件接口，已核对最终生命；中途扣血与回血次数可能不完整。");
         }
         lines.AddRange(CardGoalAdvice(result));
-        if (result.CardGoals?.Enabled != true && best.Won && best.NetHpLoss == 0 && !HasMinimumProof(result))
+        if (!result.StoppedOnHealthTarget && result.CardGoals?.Enabled != true && best.Won && best.NetHpLoss == 0 && !HasMinimumProof(result))
             lines.Add(FullHealthVictory(best) ?
                 "已达到战后满血目标；其他收益和最短路线未证明最优。" :
                 $"战后净损失为 0，但仍差 {Math.Max(0, best.MaxHp - best.Hp)} 点生命才满血；不满足满血提前返回条件。");
@@ -330,6 +340,8 @@ public static class LocalSearchPolicy
         if (best.Dead) lines.Add("注意：这条路线会死亡，不能保证存活。");
         if (result.StoppedOnManualVictory)
             lines.Add("已手动停止搜索并采用当前胜利路线；尚未证明最优。");
+        if (result.StoppedOnHealthTarget && result.HealthTarget is { } target)
+            lines.Add(HealthTargetDescription(target));
         if (result.StoppedOnFirstWin && best is { Won: true, Dead: false })
             lines.Add("已按「找到获胜路线即返回」停止搜索，未继续优化损失或用药。");
         if (HasMinimumProof(result)) lines.Add(MinimumProofDescription(best));
@@ -348,6 +360,9 @@ public static class LocalSearchPolicy
         }
         return string.Join("\n", lines);
     }
+
+    public static string HealthTargetDescription(LocalHealthTarget target) =>
+        $"已达到当前内容的生命目标（{(target.FullHealth ? "战后满血" : target.TargetHp + " 点生命")}），停止搜索；尚未证明全局最优。";
 
     public static string MinimumProofDescription(LocalCandidate best) => best.NetHpLoss > 0 ?
         $"已证明最低净损失为 {best.NetHpLoss}；同等战后生命下用药也已达下界。" :

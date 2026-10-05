@@ -12,6 +12,7 @@ var estimatorType = typeof(LocalWorker).Assembly.GetType("SpireAiCoach.Mod.Local
 var request = new LocalSearchRequest("metadata-audit", "root", [], "native", 1, [], false);
 var estimator = Activator.CreateInstance(estimatorType, request)!;
 var describe = estimatorType.GetMethod("Describe", BindingFlags.NonPublic | BindingFlags.Instance)!;
+var describeContent = estimatorType.GetMethod("DescribeContent", BindingFlags.NonPublic | BindingFlags.Instance)!;
 var output = new List<object>();
 foreach (var (property, field) in new[] { ("CurrentHp", "_currentHp"), ("MaxHp", "_maxHp") })
 {
@@ -57,6 +58,14 @@ foreach (var (id, expectedHeals, expectedUnknown) in new (string, int, bool)[]
         throw new InvalidOperationException("Unexpected recovery certificate for " + id + ": " + unknown);
     output.Add(new { Model = id, Unknown = unknown, VictoryHealCalls = heals, VictoryMaxHpCalls = maxHpGains,
         References = references.Select(t => t.Name).ToArray() });
+    var content = describeContent.Invoke(estimator, [type])!;
+    var contentType = content.GetType();
+    bool active = (bool)contentType.GetProperty("ActiveRecovery")!.GetValue(content)!;
+    int terminalHeals = (int)contentType.GetProperty("VictoryHeals")!.GetValue(content)!;
+    int terminalMax = (int)contentType.GetProperty("VictoryMaxHpGains")!.GetValue(content)!;
+    if (active != (id == "Cards.Feed") || terminalHeals != expectedHeals || terminalMax != maxHpGains)
+        throw new InvalidOperationException("Unexpected current-content recovery goal for " + id);
+    output.Add(new { ContentModel = id, ActiveRecovery = active, TerminalHeals = terminalHeals, TerminalMaxHpGains = terminalMax });
 }
 // Find real native healing powers by their code rather than assuming names
 // carried over from the first game.
@@ -75,8 +84,20 @@ foreach (var type in typeof(AbstractModel).Assembly.GetTypes().Where(t => !t.IsA
     var proof = describe.Invoke(estimator, [type])!;
     var unknown = proof.GetType().GetProperty("Unknown")!.GetValue(proof) as string;
     if (unknown == null) throw new InvalidOperationException("Repeated healing power became bounded: " + type.Name);
+    var content = describeContent.Invoke(estimator, [type])!;
+    if (!(bool)content.GetType().GetProperty("ActiveRecovery")!.GetValue(content)!)
+        throw new InvalidOperationException("Healing power was missed by content scan: " + type.Name);
     output.Add(new { Model = type.FullName, Unknown = unknown });
 }
+int healingPotions = 0;
+foreach (var type in typeof(AbstractModel).Assembly.GetTypes().Where(t => !t.IsAbstract && typeof(PotionModel).IsAssignableFrom(t)))
+{
+    var content = describeContent.Invoke(estimator, [type])!;
+    if (!(bool)content.GetType().GetProperty("ActiveRecovery")!.GetValue(content)!) continue;
+    healingPotions++;
+    output.Add(new { HealingPotion = type.FullName, DetectedByCode = true });
+}
+if (healingPotions == 0) throw new InvalidOperationException("No native healing potion was recognized");
 var external = Activator.CreateInstance(estimatorType, request with { LoadedMods = ["unknown-mod:1"] })!;
 var guarded = (LocalRecoveryAllowance)estimatorType.GetMethod("Estimate")!.Invoke(external, [null])!;
 if (guarded.MaximumFurtherHpGain != null || !guarded.Reason.Contains("Mod", StringComparison.Ordinal))

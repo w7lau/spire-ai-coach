@@ -233,7 +233,8 @@ public static class LocalWorker
             return selected;
         }
         LocalHealthBoundStats HealthStats() => new(boundPruned, knownRecoveryChecks, unknownRecoveryChecks,
-            sharedIncumbentUpdates, unknownRecoveryReason);
+            sharedIncumbentUpdates, unknownRecoveryReason, recovery.TargetAnalysisCount,
+            recovery.TargetAnalysisElapsedMs, recovery.MethodBodyReads);
         LocalHealthEnvelope Envelope(Player p, int hp, IReadOnlyList<LocalAction> line)
         {
             var allowance = recovery.Estimate(p);
@@ -367,8 +368,11 @@ public static class LocalWorker
                 Trials: status == "running" ? null : trials.ToArray(), CardGoals: request.CardGoals, MinimumLoss: minimumStatus,
                 StoppedOnFirstWin: stoppedEarly && !stoppedOnManualVictory && LocalSearchPolicy.CanStopAtFirstWin(best, request),
                 StoppedOnCardGoals: stoppedEarly && !stoppedOnManualVictory && LocalSearchPolicy.CanStopOnCardGoals(best, request),
-                StoppedOnMinimum: stoppedEarly && !stoppedOnManualVictory && LocalSearchPolicy.RequiresMinimumConfirmation(best, request, minimumStatus?.Certificate),
+                StoppedOnMinimum: stoppedEarly && !stoppedOnManualVictory && !LocalSearchPolicy.CanStopAtHealthTarget(best, request, recovery.HealthTarget) &&
+                    LocalSearchPolicy.RequiresMinimumConfirmation(best, request, minimumStatus?.Certificate),
                 StoppedOnManualVictory: stoppedOnManualVictory,
+                HealthTarget: recovery.HealthTarget,
+                StoppedOnHealthTarget: stoppedEarly && !stoppedOnManualVictory && LocalSearchPolicy.CanStopAtHealthTarget(best, request, recovery.HealthTarget),
                 Evidence: status == "running" ? null : audit.Snapshot(request, best, coverage?.Exhausted == true,
                     turns?.Count, evaluated, searchFinished ? searchTimeReached : budget.Elapsed.TotalSeconds >= request.BudgetSeconds,
                     stoppedEarly, boundPruned, independentlyVerified, stoppedOnManualVictory)));
@@ -486,6 +490,7 @@ public static class LocalWorker
             await RestoreMeasured();
             // Freeze the recovery closure before exploring any action. All
             // subsequent envelopes/hints reuse this request's cached allowance.
+            recovery.SharedDirectory = Path.GetDirectoryName(_root)!;
             recovery.Estimate(LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!);
             // Owned diagnostic process only. Read one restored root; never
             // search, play cards or return an executable empty candidate.
@@ -512,9 +517,10 @@ public static class LocalWorker
                     if (beforeAudit != LocalCapture.Fingerprint())
                         throw new InvalidOperationException("Health audit did not restore its frozen root");
                 }
-                LocalWire.Write(Path.Combine(_root, "recovery-audit.json"), new { request.Id, allowance,
+                LocalWire.Write(Path.Combine(_root, "recovery-audit.json"), new { request.Id, allowance, recovery.HealthTarget,
                     CodeAudit = codeAudit,
                     recovery.AnalysisCount, recovery.AnalysisElapsedMs,
+                    recovery.TargetAnalysisCount, recovery.TargetAnalysisElapsedMs,
                     BoundMethodBodyReads = boundMethodBodyReads,
                     CachedReads = 10000, CachedReadsMs = cachedReadsMs,
                     ElapsedMs = auditClock.Elapsed.TotalMilliseconds, RootUnchanged = true,
@@ -1095,7 +1101,7 @@ public static class LocalWorker
                                 candidate with { Continuation = null }));
                     }
                     if (completeAttempt && stop != "达到时间预算") activePolicy?.Complete(candidate);
-                    if (LocalSearchPolicy.CanStopAfterVictory(best, request, minimumStatus?.Certificate))
+                    if (LocalSearchPolicy.CanStopAfterVictory(best, request, minimumStatus?.Certificate, recovery.HealthTarget))
                     { stoppedEarly = true; break; }
                     if (work != null)
                     {
@@ -1175,6 +1181,8 @@ public static class LocalWorker
                     "已找到获胜路线，停止后续搜索。" : "已停止其余搜索。" :
                     request.CardGoals?.Enabled == true ? LocalSearchPolicy.CanStopOnCardGoals(best, request) ?
                     "当前消耗目标已完成，损血符合设置，停止后续搜索。" : "已停止其余搜索。" :
+                    LocalSearchPolicy.CanStopAtHealthTarget(best, request, recovery.HealthTarget) ?
+                    LocalSearchPolicy.HealthTargetDescription(recovery.HealthTarget!) :
                     LocalSearchPolicy.RequiresMinimumConfirmation(best, request, minimumStatus?.Certificate) ?
                     LocalSearchPolicy.MinimumProofDescription(best!) + "停止后续搜索。" :
                     "已达到战后满血停止条件，停止后续搜索。" : best == null ? "没有找到可完整结算的路线。" :
