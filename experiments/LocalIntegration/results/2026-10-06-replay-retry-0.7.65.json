@@ -49,12 +49,18 @@
   "protected_files_changed": 0,
   "algorithm_strategy_changed_by_this_patch": false,
   "rng_directly_modified": false,
-  "installed": false,
+  "installed": true,
   "private_inputs_routes_mod_files_paths_or_player_ids_included": false,
   "limits": [
     "Cold wall time includes native/Mod startup, not successful route-search throughput.",
     "The earlier 82.590-second developer check and final cold check had different concurrent host load; no stable speedup percentage is claimed.",
     "Missing Mod-private proc state remains unsupported; this patch bounds retries rather than fabricating it.",
     "Known native 36-step replay is not optimum-search or live-player-success proof."
-  ]
+  ],
+  "installed_dll_sha256": "030a32b97637803884a9e39aaab56a0e0e02b6c8424a3c4203175714b427a9d4",
+  "installation_utc": "2026-10-05T19:44:44.7006120Z",
+  "previous_version": "0.7.64",
+  "backup_hashes_verified": 2,
+  "cache_cleanup": false,
+  "started_player": false
 }
