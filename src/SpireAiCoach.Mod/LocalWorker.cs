@@ -81,18 +81,20 @@ public static class LocalWorker
         if (!File.Exists(Path.Combine(_root, ".coach-worker")) ||
             !string.Equals(Path.GetFullPath(OS.GetExecutablePath()), Path.Combine(_root, "game", "SlayTheSpire2.exe"), StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException("Refusing a worker outside its isolated installation");
+        LocalWorkerStartup.Begin(_root);
         var harmony = new Harmony("SpireAiCoach.owned-worker");
-        LocalReplayChoices.Install(harmony);
-        LocalWorkerResources.Install(harmony);
-        LocalWorkerVisuals.Install(harmony);
-        LocalWorkerBootstrap.Install(harmony);
-        LocalWorkerDataMode.Install(harmony);
-        LocalModelDisplay.Install();
-        LocalWorkerLogic.Install();
-        LocalHpAccounting.Install();
-        LocalWorkerOverhead.Install();
-        LocalWorkerVerification.Install();
-        LocalDiscardObservation.Install();
+        LocalWorkerStartup.Install("patch_startup_timing", () => LocalWorkerStartup.ProfileNative(harmony));
+        LocalWorkerStartup.Install("patch_choices", () => LocalReplayChoices.Install(harmony));
+        LocalWorkerStartup.Install("patch_resources", () => LocalWorkerResources.Install(harmony));
+        LocalWorkerStartup.Install("patch_visuals", () => LocalWorkerVisuals.Install(harmony));
+        LocalWorkerStartup.Install("patch_bootstrap", () => LocalWorkerBootstrap.Install(harmony));
+        LocalWorkerStartup.Install("patch_data_mode", () => LocalWorkerDataMode.Install(harmony));
+        LocalWorkerStartup.Install("scan_model_display", LocalModelDisplay.Install);
+        LocalWorkerStartup.Install("patch_logic", LocalWorkerLogic.Install);
+        LocalWorkerStartup.Install("patch_health", LocalHpAccounting.Install);
+        LocalWorkerStartup.Install("patch_overhead", LocalWorkerOverhead.Install);
+        LocalWorkerStartup.Install("patch_verification", LocalWorkerVerification.Install);
+        LocalWorkerStartup.Install("patch_discard", LocalDiscardObservation.Install);
         Callable.From(Run).CallDeferred();
         return true;
     }
@@ -102,9 +104,12 @@ public static class LocalWorker
         _tree = (SceneTree)Engine.GetMainLoop();
         try
         {
-            while (NGame.Instance == null) await Frame();
-            await NGame.Instance.GameStartupComplete;
-            await WaitAssets();
+            using (LocalWorkerStartup.Measure("engine_remaining"))
+            {
+                while (NGame.Instance == null) await Frame();
+                await NGame.Instance.GameStartupComplete;
+            }
+            using (LocalWorkerStartup.Measure("startup_assets")) await WaitAssets();
             Silence();
             long nextMute = 0;
             _tree.ProcessFrame += () => { if (System.Environment.TickCount64 >= nextMute) { nextMute = System.Environment.TickCount64 + 1000; Silence(); } };
@@ -118,6 +123,7 @@ public static class LocalWorker
             int readyFps = Engine.MaxFps;
             void IdleFrames() { Engine.MaxFps = 10; }
             IdleFrames();
+            LocalWorkerStartup.Ready();
             File.WriteAllText(Path.Combine(_root, "ready"), "ready");
             string? previous = null;
             var idle = Stopwatch.StartNew();

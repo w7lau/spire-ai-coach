@@ -621,7 +621,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
         public async Task Ensure(string directory, int index, LocalInstallation installation, CancellationToken token, LocalTimeline? timeline = null)
         {
             var signature = typeof(LocalWorkerPool).Assembly.ManifestModule.ModuleVersionId + "|" +
-                installation.GameDirectory + "|" + Path.GetFullPath(directory) + "|" + string.Join("|", installation.ModDirectories) + "|" + installation.MinimalWorkerBootstrap;
+                installation.GameDirectory + "|" + Path.GetFullPath(directory) + "|" + string.Join("|", installation.ModDirectories) + "|" + installation.MinimalWorkerBootstrap + "|" + installation.LimitRuntimeThreads;
             var configuration = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(signature)))[..16];
             Task preparation;
             bool reuse;
@@ -701,6 +701,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 ShareTree(source, Path.Combine(game, Path.GetFileName(source)), token);
             for (var i = 0; i < installation.ModDirectories.Length; i++)
                 CopyTree(installation.ModDirectories[i], Path.Combine(game, "mods", "loaded-" + i), token);
+            if (installation.LimitRuntimeThreads)
+                File.WriteAllText(Path.Combine(game, "override.cfg"), "[threading]\nworker_pool/max_threads=2\n");
             var roaming = Path.Combine(Root, "Roaming");
             var local = Path.Combine(Root, "Local");
             var settings = Path.Combine(roaming, "SlayTheSpire2", "default", "1");
@@ -713,13 +715,22 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 var saves = Path.Combine(profile, "saves"); Directory.CreateDirectory(saves);
                 File.WriteAllText(Path.Combine(saves, "progress.save"), "{\"schema_version\":24,\"enable_ftues\":false,\"ftue_completed\":[\"combat_rules_ftue\"]}");
             }
-            foreach (var name in new[] { "ready", "fatal.txt", "result.json", "request.json", "progress.json", "audio.json", "idle.json", "stop-search.json" }) File.Delete(Path.Combine(Root, name));
+            foreach (var name in new[] { "ready", "fatal.txt", "result.json", "request.json", "progress.json", "audio.json", "idle.json", "stop-search.json", "startup.json" }) File.Delete(Path.Combine(Root, name));
             var start = new ProcessStartInfo(Path.Combine(game, "SlayTheSpire2.exe"))
             { WorkingDirectory = game, UseShellExecute = false, CreateNoWindow = true, WindowStyle = ProcessWindowStyle.Hidden };
             foreach (var arg in new[] { "--headless", "--audio-driver", "Dummy", "--disable-vsync", "--max-fps", "120", "--force-steam=off", "--log-file", Path.Combine(Root, "game.log") }) start.ArgumentList.Add(arg);
             start.Environment["APPDATA"] = roaming; start.Environment["LOCALAPPDATA"] = local;
             start.Environment["SPIRE_COACH_WORKER"] = Root;
             start.Environment["SPIRE_COACH_WORKER_GENERATION"] = identity;
+            start.Environment["SPIRE_COACH_WORKER_INDEX"] = index.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            if (installation.LimitRuntimeThreads)
+            {
+                // Each lane executes game rules on one native main thread. Avoid
+                // eight runtimes each allocating one GC heap/thread per CPU.
+                // Keep normal GC and all logical worker tasks; bound parallelism.
+                start.Environment["DOTNET_GCHeapCount"] = "2";
+                start.Environment["DOTNET_GCNoAffinitize"] = "1";
+            }
             LocalWorkerOwner.Attach(start);
             start.Environment["SPIRE_COACH_MINIMAL_BOOTSTRAP"] = installation.MinimalWorkerBootstrap ? "1" : "0";
             start.Environment.Remove("SPIRE_NATIVE_PROBE_ROOT");
@@ -729,6 +740,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             {
                 // Dispose/Stop can race file preparation, but never a new launch.
                 token.ThrowIfCancellationRequested();
+                start.Environment["SPIRE_COACH_STARTUP_ORIGIN"] = LocalTimeline.Timestamp.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 using (timeline?.Measure(index, "prepare", "launch", depth: 1)) Process = IsolatedProcess.Start(start);
                 _starts++; _changed = LocalTimeline.Timestamp;
             }
@@ -740,6 +752,14 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 if (Process.HasExited || timer.Elapsed.TotalSeconds > 90) throw new IOException("Worker startup failed or timed out");
                 await Task.Delay(250, token);
             }
+            try
+            {
+                var report = LocalWire.Read<LocalStartupReport>(Path.Combine(Root, "startup.json"));
+                if (report.Generation == identity && report.ModMvid == typeof(LocalWorkerPool).Assembly.ManifestModule.ModuleVersionId)
+                    timeline?.Import(report.Trace);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
+            { /* Optional startup diagnostics never invalidate a ready worker. */ }
         }
 
         public async Task<bool> WaitIdle(LocalSearchRequest command, LocalTimeline? timeline = null, int index = 0)

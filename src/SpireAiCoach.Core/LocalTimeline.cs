@@ -158,6 +158,15 @@ public sealed class LocalTimeline
     {
         "capture" => "读取当前战斗", "queue" => "等待准备或计算队列", "prepare" => "准备计算",
         "files" => "共享资源、加载 Mod 配置", "launch" => "创建计算进程", "engine" => "引擎与 Mod 启动",
+        "before_coach_init" => "引擎与前置 Mod 加载", "patch_startup_timing" => "建立启动计时",
+        "patch_choices" => "准备选牌支持", "patch_resources" => "准备资源复用", "patch_visuals" => "准备显示省略",
+        "patch_bootstrap" => "准备直接启动", "patch_data_mode" => "准备数据计算",
+        "scan_model_display" => "检查效果中的可选显示", "patch_logic" => "准备动作结算",
+        "patch_health" => "准备生命变化记录", "patch_overhead" => "准备后台执行优化",
+        "patch_verification" => "准备路线核对", "patch_discard" => "准备弃牌效果记录",
+        "native_CallModInitializer" => "加载其他 Mod", "native_InitPools" => "准备原生对象池",
+        "native_ExecuteEssential" => "初始化游戏规则与模型", "engine_remaining" => "等待游戏初始化完成",
+        "startup_assets" => "等待启动资源完成",
         "reuse" => "复用已启动进程", "session" => "搜索", "restore" => "恢复路线起点",
         "cold_start" => "首次准备计算", "rebuild" => "重新准备计算", "retire" => "释放计算实例",
         "cleanup" => "清理上次模拟", "decode" => "解码战斗记录", "setup" => "建立运行状态",
@@ -191,8 +200,11 @@ public sealed class LocalTimeline
         foreach (var worker in trace.Spans.Where(s => s.Worker >= 0).GroupBy(s => s.Worker).OrderBy(g => g.Key))
         {
             lines.Add($"—— 计算 {worker.Key + 1}：各阶段内部累计 ——");
-            foreach (var group in worker.Where(s => s.Depth == 1).GroupBy(s => (s.Stage, s.Phase)))
-                lines.Add($"{(group.Key.Stage == "verify" ? "复核 / " : "")}{Label(group.Key.Phase)}：{group.Sum(s => s.DurationMs) / 1000:F2}s，{group.Count()} 次");
+            foreach (var group in worker.Where(s => s.Depth == 1 || s.Stage == "prepare" && s.Depth == 2)
+                .GroupBy(s => (s.Stage, s.Phase, Detail: s.Phase == "native_CallModInitializer" ? s.Detail : "")))
+                lines.Add($"{(group.Key.Stage == "verify" ? "复核 / " : "")}{Label(group.Key.Phase)}" +
+                    (group.Key.Detail.Length > 0 ? " / " + group.Key.Detail : "") +
+                    $"：{group.Sum(s => s.DurationMs) / 1000:F2}s，{group.Count()} 次");
         }
         if (trace.Methods is { Length: > 0 })
         {

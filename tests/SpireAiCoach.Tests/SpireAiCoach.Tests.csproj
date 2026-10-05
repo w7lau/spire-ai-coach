@@ -7,5 +7,6 @@
     <Compile Include="../../src/SpireAiCoach.Mod/LocalWorkerPool.cs" Link="LocalWorkerPool.cs" />
     <Compile Include="../../src/SpireAiCoach.Mod/LocalWorkerOwner.cs" Link="LocalWorkerOwner.cs" />
     <Compile Include="../../src/SpireAiCoach.Mod/LocalInstallation.cs" Link="LocalInstallation.cs" />
+    <Compile Include="../../src/SpireAiCoach.Mod/LocalStartupReport.cs" Link="LocalStartupReport.cs" />
   </ItemGroup>
 </Project>
