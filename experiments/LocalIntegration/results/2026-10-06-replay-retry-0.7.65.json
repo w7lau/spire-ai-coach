@@ -1,0 +1,60 @@
+{
+  "date": "2026-10-06",
+  "coach_version": "0.7.65",
+  "tested_dll_sha256": "030a32b97637803884a9e39aaab56a0e0e02b6c8424a3c4203175714b427a9d4",
+  "zip_sha256": "51c817318cd46ff4283d8a9b789461e5ba8630a200692e083036ea61b03f7177",
+  "core_tests": {
+    "passed": 404,
+    "total": 404
+  },
+  "native_failure_acceptance": {
+    "exact_incident_root_rejected": true,
+    "configured_workers": 8,
+    "numeric_workers": 1,
+    "ordinary_root_probes": 1,
+    "ordinary_searches": 0,
+    "evaluated_routes": 0,
+    "same_frozen_input_reused_failure": true,
+    "extra_starts_on_repeat": 0,
+    "cold_failure_ms": 55947,
+    "repeated_failure_ms": 0,
+    "total_process_starts": 2,
+    "caller_cancel_preserved": true,
+    "usable_or_executable_plan": false,
+    "valid_root_only_checks": 2,
+    "root_only_native_actions": 0,
+    "valid_root_pid_reused": true,
+    "valid_candidate_native_checkpoints": 36
+  },
+  "native_reconstructed_route": {
+    "actions": 36,
+    "learning_enabled_samples": [
+      false,
+      true
+    ],
+    "all_checkpoints_and_settlement_match": true,
+    "live_divergence_reproduced": false
+  },
+  "mod_state_persistence_gap": {
+    "native_play_ordinal": 1,
+    "native_serialized_restore_ordinal": 0,
+    "read_only_selection_query_preserved_native_state": true,
+    "fresh_ordinal_selection": "SOUL",
+    "prior_two_procs_selection": "BORROWED_TIME",
+    "live_private_field_value_was_not_captured": true
+  },
+  "native_runtime_error_gate_passed": true,
+  "player_exit": "User-reported manual exit; normal Quit/save log present.",
+  "protected_files_checked": 1023,
+  "protected_files_changed": 0,
+  "algorithm_strategy_changed_by_this_patch": false,
+  "rng_directly_modified": false,
+  "installed": false,
+  "private_inputs_routes_mod_files_paths_or_player_ids_included": false,
+  "limits": [
+    "Cold wall time includes native/Mod startup, not successful route-search throughput.",
+    "The earlier 82.590-second developer check and final cold check had different concurrent host load; no stable speedup percentage is claimed.",
+    "Missing Mod-private proc state remains unsupported; this patch bounds retries rather than fabricating it.",
+    "Known native 36-step replay is not optimum-search or live-player-success proof."
+  ]
+}
