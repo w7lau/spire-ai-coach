@@ -83,7 +83,7 @@ internal static class EventEntryIntegration
         // Only add the entry history just captured from the recreated native run.
         var command = frozen with { EventEntry = captured.EventEntry,
             MaxNodes = 1, MaxDepth = 1, MaxRounds = 1, Workers = 1, Partition = 0, Partitions = 1,
-            InitialPlan = [new(-1, "", null, "", "", "", 1, EndTurn: true)],
+            InitialPlan = [new(-1, "", null, "", "", frozen.NativeHash, 1, EndTurn: true)],
             SearchOrder = LocalSearchOrder.MonteCarlo, VerifyCandidate = null, RecordedReplayProbe = null,
             DeferVerification = true, SkipFinalVerification = true, StopOnZeroLoss = false, StopOnFirstWin = false,
             ShareSearchWork = false, SearchWorkPipe = null, TurnWorkPipe = null, MinimumLossPipe = null, ProgressPipe = null };
