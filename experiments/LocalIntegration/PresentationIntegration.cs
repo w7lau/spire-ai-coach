@@ -129,15 +129,29 @@ internal static class PresentationIntegration
         // Opaque context tokens test panel transitions only. They are never
         // installed as game combat states or passed to gameplay code.
         var battle = new object();
-        visibility.Invoke(overlay, [battle, false]); CheckVisibility("enter battle remains hidden", false);
+        visibility.Invoke(overlay, [battle, false]); CheckVisibility("enter battle opens panel with entry hidden", true);
         manual.SetValue(overlay, false);
         visibility.Invoke(overlay, [battle, false]); CheckVisibility("manual battle hide persists", false);
         visibility.Invoke(overlay, [battle, true]); CheckVisibility("execution starts hidden", false);
         manual.SetValue(overlay, true);
         visibility.Invoke(overlay, [battle, true]); CheckVisibility("manual execution open is retained", true);
-        visibility.Invoke(overlay, [battle, false]); CheckVisibility("execution stops in battle remains hidden", false);
+        visibility.Invoke(overlay, [battle, false]); CheckVisibility("execution stops in battle shows panel", true);
         visibility.Invoke(overlay, [null, false]); CheckVisibility("combat exit hides", false);
-        visibility.Invoke(overlay, [new object(), false]); CheckVisibility("next combat resets to hidden", false);
+        visibility.Invoke(overlay, [new object(), false]); CheckVisibility("next combat resets manual override and opens panel", true);
+        var autoPanel = CheckBox("AutoShowCombatPanel");
+        if (!autoPanel.ButtonPressed || !interfaceStore.Load().Settings.AutoShowCombatPanel)
+            throw new InvalidOperationException("Combat popup must default to enabled");
+        autoPanel.ButtonPressed = false;
+        CheckVisibility("turning off automatic opening keeps current settings visible", true);
+        visibility.Invoke(overlay, [new object(), false]); CheckVisibility("manual-only mode hides on next battle", false);
+        manual.SetValue(overlay, true);
+        visibility.Invoke(overlay, [new object(), false]); CheckVisibility("manual-only mode does not auto-reopen for another battle", false);
+        if (interfaceStore.Load().Settings.AutoShowCombatPanel || toggle.Visible)
+            throw new InvalidOperationException("Entry and popup preferences interfered or failed to persist");
+        autoPanel.ButtonPressed = true;
+        visibility.Invoke(overlay, [new object(), false]); CheckVisibility("re-enabled automatic mode opens next battle", true);
+        if (!interfaceStore.Load().Settings.AutoShowCombatPanel)
+            throw new InvalidOperationException("Automatic mode preference was not saved");
         visibility.Invoke(overlay, [null, false]);
         toggle.EmitSignal(Button.SignalName.Pressed);
         // Exercise the merged budget controls in this private userdata without
@@ -299,6 +313,8 @@ internal static class PresentationIntegration
             visibility_contexts_are_ui_only = true
             , entry_default_hidden = true, entry_opt_in_persisted = true, only_f8_global_shortcut = true,
             previous_f9_f10_have_no_action = true, algorithm_names_match_results = true
+            , combat_popup_default_enabled = true, manual_only_mode_persisted = true,
+            entry_and_popup_are_independent = true
             , skip_final_verification_defaults_checked = true, checkbox_options_persisted = true,
             checkbox_algorithm_checks = optionChecks, advanced_and_diagnostics_default_hidden = true,
             visualization_input_is_presentation_fixture_only = true, stale_and_late_progress_rejected = true,

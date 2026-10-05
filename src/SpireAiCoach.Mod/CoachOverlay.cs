@@ -146,7 +146,7 @@ public sealed class CoachOverlay
         var options = CoachTheme.Section(body, "计算选项");
         var advanced = new VBoxContainer { Name = "LocalAdvancedOptions", Visible = false };
         var showEntry = new CheckBox { Name = "ShowOverlayButton", Text = "显示左上角入口", ButtonPressed = _settings.ShowOverlayButton,
-            TooltipText = "默认隐藏。无论是否显示入口，都可以用 F8 打开面板。进入战斗不会自动展开。" };
+            TooltipText = "左上角入口默认隐藏。无论是否显示入口，都可以用 F8 打开面板。" };
         showEntry.Toggled += enabled =>
         {
             _settings = _settings with { ShowOverlayButton = enabled };
@@ -155,6 +155,17 @@ public sealed class CoachOverlay
             catch (Exception ex) { _status.Text = "界面选项本次已生效，保存失败：" + ex.GetType().Name; }
         };
         advanced.AddChild(showEntry);
+        var autoShow = new CheckBox { Name = "AutoShowCombatPanel", Text = "进入战斗自动展开面板",
+            ButtonPressed = _settings.AutoShowCombatPanel,
+            TooltipText = "默认开启。关闭后只通过 F8 或左上角入口手动打开；本次已打开的面板保持显示。" };
+        autoShow.Toggled += enabled =>
+        {
+            _settings = _settings with { AutoShowCombatPanel = enabled };
+            _manualPanelVisibility = _panel.Visible;
+            try { _store.SaveInterfaceOptions(autoShowCombatPanel: enabled); }
+            catch (Exception ex) { _status.Text = "界面选项本次已生效，保存失败：" + ex.GetType().Name; }
+        };
+        advanced.AddChild(autoShow);
         _resources = Wrapped("计算资源 · 尚未准备"); _resources.AddThemeColorOverride("font_color", CoachTheme.Muted); advanced.AddChild(_resources);
         var localOptions = new GridContainer { Columns = 2 }; advanced.AddChild(localOptions);
         localOptions.AddChild(new Label { Text = "并发上限", TooltipText = "0 自动，1–16 为手动上限。按待办任务逐步增加，健康实例保留供后续计算。" });
@@ -366,14 +377,14 @@ public sealed class CoachOverlay
 
     private void ApplyPanelContext(object? combat, bool executing)
     {
-        // Only a manual request opens the panel. New battle/execution contexts
-        // restore the hidden default, without reopening on polling or completion.
+        // The corner entry and combat popup are independent preferences.
+        // A manual choice lasts for the current battle/execution context.
         if (!ReferenceEquals(_panelCombat, combat) || _panelExecuting != executing)
         {
             _panelCombat = combat; _panelExecuting = executing;
             _manualPanelVisibility = null;
         }
-        _panel.Visible = _manualPanelVisibility ?? false;
+        _panel.Visible = _manualPanelVisibility ?? (_settings.AutoShowCombatPanel && combat != null && !executing);
     }
 
     private void SetPanelVisible(bool visible)
@@ -454,8 +465,9 @@ public sealed class CoachOverlay
             _resources.Text = $"计算资源 · {resources.Ready} 路可复用" +
                 (resources.Preparing > 0 ? $" · {resources.Preparing} 路准备中" : "");
             _resources.TooltipText = resources.LastChange + "\n手动并发提前准备所选数量，自动模式按需增加；可用实例会复用。";
-            var preparationScope = snapshot?.CombatId ??
-                (MegaCrit.Sts2.Core.Runs.RunManager.Instance.IsInProgress ? "active-run" : null);
+            // Finish run/room loading before background games compete for CPU.
+            // This changes warmup timing, not configured calculation concurrency.
+            var preparationScope = snapshot is { CanAdvise: true } && LocalCapture.Stable() ? snapshot.CombatId : null;
             if (preparationScope != null && _preparedCombat != preparationScope && _request == null && !_executing &&
                 MegaCrit.Sts2.Core.Runs.RunManager.Instance.NetService.Type == MegaCrit.Sts2.Core.Multiplayer.Game.NetGameType.Singleplayer &&
                 System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_INTEGRATION") == null)

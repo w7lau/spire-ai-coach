@@ -19,8 +19,8 @@ public static class LocalCalculation
 
     public static string Name(LocalSearchOrder order) => order switch
     {
-        LocalSearchOrder.MonteCarlo => "整战探索",
-        LocalSearchOrder.TurnFrontier => "回合探索",
+        LocalSearchOrder.MonteCarlo => "路线采样",
+        LocalSearchOrder.TurnFrontier => "分支扩展",
         _ => throw new ArgumentOutOfRangeException(nameof(order))
     };
 

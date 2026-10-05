@@ -11,6 +11,23 @@ static class TurnWorkTests
 
     public static void Register(Action<string, Action> test, Action<string, Func<Task>> asyncTest)
     {
+        asyncTest("turn work endpoint survives bursts of peers that close before sending a command", async () =>
+        {
+            var captured = Request(); using var broker = new LocalTurnWork(captured, 1);
+            await Task.WhenAll(Enumerable.Range(0, 4).Select(_ => Task.Run(() =>
+            {
+                for (int i = 0; i < 32; i++)
+                {
+                    using var peer = new System.IO.Pipes.NamedPipeClientStream(".", broker.PipeName, System.IO.Pipes.PipeDirection.InOut);
+                    peer.Connect(10000);
+                }
+            })));
+            using var client = new LocalTurnWorkClient(captured with { TurnWorkPipe = broker.PipeName });
+            client.Offer([Move(0)], 1, Hint());
+            Check(client.TryTake(out var task) && task.Prefix[0].CombatCardIndex == 0,
+                "Closing unrelated sessions reset the endpoint or lost valid owned work");
+            client.Finish(task);
+        });
         test("budget-returned turn task neither publishes an incomplete outcome nor closes its returned prefix", () =>
         {
             var captured = Request(); using var broker = new LocalTurnWork(captured, 2);

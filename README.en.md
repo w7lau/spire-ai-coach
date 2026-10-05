@@ -1,6 +1,6 @@
 # Spire AI Coach · 尖塔 AI 教练
 
-[中文](README.md) · [Download](https://github.com/w7lau/spire-ai-coach/releases/latest) · [Issues](https://github.com/w7lau/spire-ai-coach/issues) · [Contribute](CONTRIBUTING.md)
+[中文](README.md) · [Workshop](https://steamcommunity.com/sharedfiles/filedetails/?id=3814010843) · [Download](https://github.com/w7lau/spire-ai-coach/releases/latest) · [Issues](https://github.com/w7lau/spire-ai-coach/issues) · [Contribute](CONTRIBUTING.md)
 
 A **Slay the Spire 2** mod for AI advice on the current turn, local planning for the entire battle without an API, and optional execution of a computed plan. Built for fun, experimentation and comparing strategies. A candidate found within a budget is not necessarily globally optimal.
 
@@ -9,8 +9,8 @@ The design aims for **broad compatibility with different mods**: capture underly
 ## Getting started
 
 1. Extract the release and place the `SpireAiCoach` folder in the game's `mods` directory, then start the game and enable the mod. Use either the Workshop installation or the manual installation to avoid duplicate loading.
-2. Press **F8** to open or close the panel. The corner button is hidden by default, and entering combat does not open the panel. Enable “显示左上角入口” in the expanded calculation options if you want the button.
-3. During your play phase, choose **整战探索 / Battle Search** or **回合探索 / Turn Search**. Follow a complete plan manually or click “执行方案” to execute it. **Esc stops an active plan execution**.
+2. Press **F8** to open or close the panel. The corner button is hidden by default; the panel opens automatically when entering combat. In “计算选项 → 高级设置” (advanced calculation settings), disable “进入战斗自动展开面板” for manual-only opening, or enable “显示左上角入口” for the corner button.
+3. During your play phase, choose **路线采样 / Rollout Sampling** or **分支扩展 / Branch Expansion**. Follow a complete plan manually or click “执行方案” to execute it. **Esc stops an active plan execution**.
 4. For AI advice, expand “AI 指导与设置”, enter a Chat Completions compatible URL, model and API key, save, and click “AI 分析”. F9 and F10 are no longer bound.
 
 The current release is primarily validated on **Windows x64 and game v0.111.0**. Game updates and third-party mods can change interfaces or introduce unsupported effects. Include your game, mod list and coach versions in reports. The in-game UI currently uses Chinese labels.
@@ -19,8 +19,8 @@ The current release is primarily validated on **Windows x64 and game v0.111.0**.
 
 | Search | How it explores | Scope |
 | --- | --- | --- |
-| **Battle Search / 整战探索** | Expands complete battle candidates and refines action exploration using existing outcomes | A winning plan from the current state to the end of combat |
-| **Turn Search / 回合探索** | Organizes candidates by turn and extends and distributes continuations into later turns | The entire battle, rather than just the current turn |
+| **Rollout Sampling / 路线采样** | Expands complete battle candidates and refines action exploration using existing outcomes | A winning plan from the current state to the end of combat |
+| **Branch Expansion / 分支扩展** | Organizes candidates by turn and extends and distributes continuations into later turns | The entire battle, rather than just the current turn |
 
 Both use native rules for damage, block, draw, discard, exhaust, selections, powers, relics and enemy actions. Mods requiring UI nodes, external services or custom selection flows may need additional integration.
 

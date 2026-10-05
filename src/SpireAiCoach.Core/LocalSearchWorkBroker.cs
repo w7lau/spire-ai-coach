@@ -37,14 +37,29 @@ public sealed class LocalSearchWorkBroker : IDisposable
     {
         try
         {
-            while (!_stop.IsCancellationRequested)
+            NamedPipeServerStream CreateListener()
             {
-                var pipe = new NamedPipeServerStream(PipeName, PipeDirection.InOut,
+                var listener = new NamedPipeServerStream(PipeName, PipeDirection.InOut,
                     NamedPipeServerStream.MaxAllowedServerInstances, PipeTransmissionMode.Byte,
                     PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
-                _pipes.TryAdd(pipe, 0);
-                await pipe.WaitForConnectionAsync(_stop.Token);
-                _sessions.Add(Serve(pipe));
+                _pipes.TryAdd(listener, 0);
+                return listener;
+            }
+            var pipe = CreateListener();
+            while (!_stop.IsCancellationRequested)
+            {
+                try { await pipe.WaitForConnectionAsync(_stop.Token); }
+                catch (IOException ex) when (OperatingSystem.IsWindows() && (ex.HResult & 0xffff) == 232)
+                {
+                    // ERROR_NO_DATA: a peer closed before the accept completed.
+                    var closed = pipe; pipe = CreateListener();
+                    _pipes.TryRemove(closed, out _); closed.Dispose();
+                    continue;
+                }
+                var connected = pipe;
+                // Preserve the endpoint when a short-lived peer disconnects.
+                pipe = CreateListener();
+                _sessions.Add(Serve(connected));
             }
         }
         catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException ||

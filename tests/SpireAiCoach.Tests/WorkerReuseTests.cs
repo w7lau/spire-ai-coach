@@ -200,7 +200,8 @@ internal static class WorkerReuseTests
             await Until(() => Received(worker, r, false), "Stuck request missing");
             using var owned = Process.GetProcessById(worker.Process!.Id); var watch = Stopwatch.StartNew();
             await worker.CancelRequest(r); watch.Stop();
-            Check(worker.Process == null && owned.HasExited && watch.Elapsed < TimeSpan.FromSeconds(5), "Unsafe callback was retained or cancellation unbounded");
+            Check(worker.Process == null && owned.HasExited && watch.Elapsed < TimeSpan.FromSeconds(5),
+                $"Unsafe callback was retained or cancellation unbounded: retained={worker.Process != null}, exited={owned.HasExited}, elapsed_ms={watch.ElapsedMilliseconds}");
             await worker.Ensure(directory, 0, f.Installation, CancellationToken.None); int rebuilt = worker.Process!.Id;
             LocalWire.Write(Path.Combine(worker.Root, "request.json"), Request("exit"));
             await worker.Process!.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(5));

@@ -61,14 +61,30 @@ public sealed class LocalTurnWork : IDisposable
     {
         try
         {
+            NamedPipeServerStream CreateListener()
+            {
+                var listener = new NamedPipeServerStream(PipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
+                    PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                _pipes.TryAdd(listener, 0);
+                return listener;
+            }
+            var pipe = CreateListener();
             while (!_stop.IsCancellationRequested)
             {
-                // Keep room for the next listener while all sixteen owners are connected.
-                var pipe = new NamedPipeServerStream(PipeName, PipeDirection.InOut, NamedPipeServerStream.MaxAllowedServerInstances,
-                    PipeTransmissionMode.Byte, PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
-                _pipes.TryAdd(pipe, 0);
-                await pipe.WaitForConnectionAsync(_stop.Token);
-                _sessions.Add(Serve(pipe));
+                try { await pipe.WaitForConnectionAsync(_stop.Token); }
+                catch (IOException ex) when (OperatingSystem.IsWindows() && (ex.HResult & 0xffff) == 232)
+                {
+                    // ERROR_NO_DATA: the peer closed before the accept completed.
+                    // Keep the endpoint alive while retiring this empty session.
+                    var closed = pipe; pipe = CreateListener();
+                    _pipes.TryRemove(closed, out _); closed.Dispose();
+                    continue;
+                }
+                var connected = pipe;
+                // A closing session can complete synchronously. Keep the next
+                // listener alive so Unix does not unlink/reset queued peers.
+                pipe = CreateListener();
+                _sessions.Add(Serve(connected));
             }
         }
         catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException or IOException && _stop.IsCancellationRequested) { }

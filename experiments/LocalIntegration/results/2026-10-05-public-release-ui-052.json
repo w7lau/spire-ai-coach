@@ -1,0 +1,200 @@
+{
+  "passed": true,
+  "version": "0.7.52",
+  "regular_scene_dependency_preserved": true,
+  "data_callback_preserves_unsubscribe": true,
+  "creature_hp_unchanged": true,
+  "no_combat_scene": true,
+  "no_worker_started": true,
+  "layouts": [
+    {
+      "width": 1280,
+      "height": 720,
+      "measured_width": 560,
+      "measured_height": 1200,
+      "controls": 33,
+      "horizontal_overflow": 0,
+      "primary_actions_fixed": true,
+      "expanded_sections_checked": 3,
+      "visualization_workers": 16,
+      "visualization_rendered": true,
+      "hidden_and_finished_animation_stops": true,
+      "route_sixteen_selectable": true
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "measured_width": 560,
+      "measured_height": 1840,
+      "controls": 33,
+      "horizontal_overflow": 0,
+      "primary_actions_fixed": true,
+      "expanded_sections_checked": 3,
+      "visualization_workers": 16,
+      "visualization_rendered": true,
+      "hidden_and_finished_animation_stops": true,
+      "route_sixteen_selectable": true
+    }
+  ],
+  "merged_budget_controls_persisted": true,
+  "both_algorithm_requests_checked": true,
+  "manual_worker_limit_preserved": 8,
+  "visibility_checks": [
+    {
+      "name": "outside combat initially hidden",
+      "visible": false
+    },
+    {
+      "name": "former shortcuts do not open panel",
+      "visible": false
+    },
+    {
+      "name": "single shortcut opens once while held",
+      "visible": true
+    },
+    {
+      "name": "single shortcut closes panel",
+      "visible": false
+    },
+    {
+      "name": "manual outside-combat open survives frame and snapshot updates",
+      "visible": true
+    },
+    {
+      "name": "manual toggle hides",
+      "visible": false
+    },
+    {
+      "name": "enter battle opens panel with entry hidden",
+      "visible": true
+    },
+    {
+      "name": "manual battle hide persists",
+      "visible": false
+    },
+    {
+      "name": "execution starts hidden",
+      "visible": false
+    },
+    {
+      "name": "manual execution open is retained",
+      "visible": true
+    },
+    {
+      "name": "execution stops in battle shows panel",
+      "visible": true
+    },
+    {
+      "name": "combat exit hides",
+      "visible": false
+    },
+    {
+      "name": "next combat resets manual override and opens panel",
+      "visible": true
+    },
+    {
+      "name": "turning off automatic opening keeps current settings visible",
+      "visible": true
+    },
+    {
+      "name": "manual-only mode hides on next battle",
+      "visible": false
+    },
+    {
+      "name": "manual-only mode does not auto-reopen for another battle",
+      "visible": false
+    },
+    {
+      "name": "re-enabled automatic mode opens next battle",
+      "visible": true
+    }
+  ],
+  "visibility_contexts_are_ui_only": true,
+  "entry_default_hidden": true,
+  "entry_opt_in_persisted": true,
+  "only_f8_global_shortcut": true,
+  "previous_f9_f10_have_no_action": true,
+  "algorithm_names_match_results": true,
+  "combat_popup_default_enabled": true,
+  "manual_only_mode_persisted": true,
+  "entry_and_popup_are_independent": true,
+  "skip_final_verification_defaults_checked": true,
+  "checkbox_options_persisted": true,
+  "checkbox_algorithm_checks": [
+    {
+      "algorithm": "MonteCarlo",
+      "skip_final_verification": false
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "skip_final_verification": false
+    },
+    {
+      "algorithm": "MonteCarlo",
+      "skip_final_verification": true
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "skip_final_verification": true
+    }
+  ],
+  "advanced_and_diagnostics_default_hidden": true,
+  "visualization_input_is_presentation_fixture_only": true,
+  "stale_and_late_progress_rejected": true,
+  "visual_factories": [
+    "NDemonFormVfx.Create",
+    "NEchoFormVfx.Create",
+    "NReaperFormVfx.Create",
+    "NSerpentFormVfx.Create",
+    "NVoidFormVfx.Create"
+  ],
+  "form_visual_checks": [
+    {
+      "factory": "NDemonFormVfx",
+      "regular_requires_scene": true,
+      "numerical_returns_null": true
+    },
+    {
+      "factory": "NEchoFormVfx",
+      "regular_requires_scene": true,
+      "numerical_returns_null": true
+    },
+    {
+      "factory": "NReaperFormVfx",
+      "regular_requires_scene": true,
+      "numerical_returns_null": true
+    },
+    {
+      "factory": "NSerpentFormVfx",
+      "regular_requires_scene": true,
+      "numerical_returns_null": true
+    },
+    {
+      "factory": "NVoidFormVfx",
+      "regular_requires_scene": true,
+      "numerical_returns_null": true
+    }
+  ],
+  "global_test_mode_unchanged": true,
+  "elapsed_seconds": 50.344,
+  "installed_dll_unchanged": true,
+  "coreChecks": 358,
+  "modSha256": "4845f8de9b75b7448600257eceb1bdcbdd8999b9776c69a56286f7ff0bfea6a5",
+  "validation_scope": "owned native UI, settings, startup and core protocol checks; no battle search benchmark",
+  "background_process_priority": "BelowNormal; checked in owned Windows child process",
+  "preparation_timing": "stable player combat phase, without active-run warmup",
+  "observed_live_startup_ms": {
+    "0.7.51": 28538,
+    "previous_0.7.50": 29753
+  },
+  "live_game_performance_after_fix_measured": false,
+  "installation": {
+    "version": "0.7.52",
+    "old_version": "0.7.51",
+    "installed_at": "2026-10-05T20:51:22.9676197+08:00",
+    "protected_file_count": 425,
+    "protected_files_unchanged": true,
+    "worker_cache_unchanged": true,
+    "game_was_closed": true
+  }
+}

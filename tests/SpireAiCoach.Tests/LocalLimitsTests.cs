@@ -43,7 +43,8 @@ static class LocalLimitsTests
                 var key = Path.Combine(directory, "api-key.dpapi");
                 File.WriteAllBytes(key, [1, 2, 3, 4]);
                 var store = new SettingsStore(directory);
-                Check(!store.Load().Settings.ShowOverlayButton && !new CoachSettings().ShowOverlayButton);
+                Check(!store.Load().Settings.ShowOverlayButton && !new CoachSettings().ShowOverlayButton &&
+                    store.Load().Settings.AutoShowCombatPanel && new CoachSettings().AutoShowCombatPanel);
                 var before = JsonNode.Parse(File.ReadAllText(config))!;
                 store.SaveInterfaceOptions(true);
                 before["show_overlay_button"] = true;
@@ -53,6 +54,12 @@ static class LocalLimitsTests
                 Check(store.Load().Settings.ShowOverlayButton && store.Load().Settings.LocalWorkers == 4);
                 store.SaveInterfaceOptions(false);
                 Check(!store.Load().Settings.ShowOverlayButton && store.Load().Settings.Model == "");
+                store.SaveInterfaceOptions(autoShowCombatPanel: false);
+                store.SaveInterfaceOptions(true);
+                Check(store.Load().Settings.ShowOverlayButton && !store.Load().Settings.AutoShowCombatPanel);
+                store.SaveLocalWorkers(8);
+                Check(!store.Load().Settings.AutoShowCombatPanel && store.Load().Settings.LocalWorkers == 8 &&
+                    File.ReadAllBytes(key).SequenceEqual(new byte[] { 1, 2, 3, 4 }));
             }
             finally { if (Directory.Exists(directory)) Directory.Delete(directory, true); }
         });

@@ -8,8 +8,8 @@ Chinese and English issues and PRs are welcome. We aim to find complete winning 
 
 | 方向 / Area | 文件 / Files |
 | --- | --- |
-| 整战探索 / Battle search | `LocalSearchTree.cs`, `LocalRolloutPolicy.cs`, `LocalRouteRefiner.cs` |
-| 回合探索 / Turn search | `LocalTurnSearch.cs`, `LocalTurnWork.cs` |
+| 路线采样 / Rollout sampling | `LocalSearchTree.cs`, `LocalRolloutPolicy.cs`, `LocalRouteRefiner.cs` |
+| 分支扩展 / Branch expansion | `LocalTurnSearch.cs`, `LocalTurnWork.cs` |
 | 公共前缀、任务分发 / Shared prefixes and work distribution | `LocalSearchWorkBroker.cs`, `LocalTurnWork.cs`, `LocalWorker.cs`, `LocalWorkerPool.cs` |
 | 原生数值模拟与展示省略 / Native simulation and presentation overhead | `LocalWorkerLogic.cs`, `LocalWorkerDataMode.cs`, `LocalWorkerOverhead.cs`, `LocalModelDisplay.cs` |
 | 损失、回血、停止条件 / HP accounting and proven stopping bounds | `LocalHealthAccounting.cs`, `LocalMinimumLossProof.cs`, `LocalRecoveryEstimator.cs` |
