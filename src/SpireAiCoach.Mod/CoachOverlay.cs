@@ -114,10 +114,15 @@ public sealed class CoachOverlay
         body.AddThemeConstantOverride("separation", 10);
         scroll.AddChild(body);
         var heading = new HBoxContainer(); shell.AddChild(heading);
+        var modVersion = typeof(CoachOverlay).Assembly.GetName().Version?.ToString(3) ?? "未知";
         var title = new Label { Text = "尖塔教练", SizeFlagsHorizontal = Control.SizeFlags.ExpandFill,
-            TooltipText = "F8 面板 · F9 AI 指导 · F10 AI 设置\nv" + typeof(CoachOverlay).Assembly.GetName().Version?.ToString(3) };
+            TooltipText = "F8 面板 · F9 AI 指导 · F10 AI 设置\nv" + modVersion };
         title.AddThemeFontSizeOverride("font_size", 22); title.AddThemeColorOverride("font_color", CoachTheme.Gold);
         heading.AddChild(title);
+        var version = new Label { Name = "CoachVersion", Text = "v" + modVersion,
+            VerticalAlignment = VerticalAlignment.Center, TooltipText = "当前已加载的 Mod 版本" };
+        version.AddThemeFontSizeOverride("font_size", 13); version.AddThemeColorOverride("font_color", CoachTheme.Muted);
+        heading.AddChild(version);
         _battle = Wrapped("进入战斗后可计算。"); shell.AddChild(_battle);
         _status = Wrapped("本地计算无需配置 API。"); _status.AddThemeColorOverride("font_color", CoachTheme.Gold); shell.AddChild(_status);
         var row = new HBoxContainer();
