@@ -20,10 +20,10 @@ Both algorithms plan the whole battle from the current state without an API.
 | **Rollout Sampling / 路线采样** | Repeatedly simulates whole-battle routes, adjusts play order, targets and choices, and compares outcomes |
 | **Branch Expansion / 分支扩展** | Expands alternative action branches, schedules exploration by turn, and compares whole-battle outcomes |
 
-- Prioritizes net HP loss after combat, including healing during and after battle. Equal-loss routes prefer preserving potions.
+- Prioritizes actual HP after combat, including healing above the starting HP. Equal-HP routes prefer preserving potions.
 - Configure concurrency, attempts, search time, turn limits, stopping conditions, potion use and card goals.
 - Inspect progress, routes and timing, or continue searching.
-- Zero-loss early return requires full HP after combat resolution, using the final HP cap. Zero net loss alone keeps searching.
+- Early return accepts full HP after combat resolution or a certified maximum final HP with minimum potion use at that HP. Zero net loss alone does not prove maximum healing.
 - Plan execution supports singleplayer and stops when the actual state diverges from the plan.
 
 To support different mods, local search aims to reuse underlying game rules and loaded mod hooks for plays and resolution, reducing per-card adapters.

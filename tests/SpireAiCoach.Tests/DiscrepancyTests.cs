@@ -168,7 +168,7 @@ static class DiscrepancyTests
             Check(rejected && !tree.Exhausted, "Changed native legality must not yield a completion proof");
         });
 
-        test("discrepancy keeps potions optional and ranks postcombat net loss before their cost", () =>
+        test("discrepancy keeps potions optional and ranks actual final HP before their cost", () =>
         {
             foreach (var order in Orders)
             {
@@ -182,7 +182,8 @@ static class DiscrepancyTests
                     if (LocalSearchPolicy.Better(candidate, best)) best = candidate;
                     tree.Complete(trial, candidate, 100, true);
                 }
-                Check(best?.NetHpLoss == 0 && best.Actions[0].PotionSlot == null, "No potion is required for an equal no-loss victory");
+                Check(best is { Hp: 95, NetHpLoss: 0 } && best.Actions[0].PotionSlot == 0,
+                    "Potion reserve flattened two different healed endpoints");
             }
         });
 

@@ -15,7 +15,8 @@ public sealed class LocalSharedHealthBound(string directory, LocalSearchRequest 
         request.MaxRounds, request.IncludePotions, request.TargetVictoryRounds, request.TargetPotionUses,
         request.StopOnZeroLoss, request.StopOnFirstWin,
         request.RequireKnownZeroEnemyDamage, request.DataOnlyCombat, request.DataOnlyRun,
-        request.NumericalExecution, request.FastNativeWaits, request.FastStateSettling, request.CardGoals
+        request.NumericalExecution, request.FastNativeWaits, request.FastStateSettling, request.CardGoals,
+        HealthObjective = "final-hp-v2"
     }))));
     private readonly string _file = Path.Combine(directory, "health-bound-" +
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(request.Id))) + ".json");

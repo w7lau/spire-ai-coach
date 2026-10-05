@@ -88,10 +88,9 @@ public sealed class LocalProgressPanel
         if (_book == null) return;
         int victories = _book.Latest.Values.Sum(p => p.Victories);
         _caption.Text = victories > 0 ? $"已找到 {victories} 条获胜路线 · 继续寻找更好的出牌" : "寻找损伤更低的路线…";
-        var best = _book.Latest.Values.Select(p => p.Best).Where(b => b != null)
-            .OrderBy(b => b!.NetHpLoss ?? int.MaxValue).ThenBy(b => b!.Potions).ThenByDescending(b => b!.Hp).FirstOrDefault();
+        var best = LocalProgressBook.BestVictory(_book.Latest.Values)?.Best;
         _best.Text = best == null ? "" : $"获胜候选 · 战后生命 {best.Hp}/{best.MaxHp}" +
-            (best.NetHpLoss is { } loss ? $" · 净损失 {loss}" : "");
+            (best.HpChange is { } change ? $" · 生命净变化 {change:+0;-0;0}" : "");
         _map.Select(Math.Max(0, _worker.Selected));
         if (!_book.Latest.TryGetValue(Math.Max(0, _worker.Selected), out var progress))
         {

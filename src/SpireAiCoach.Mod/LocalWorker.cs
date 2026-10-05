@@ -357,6 +357,7 @@ public static class LocalWorker
                 Trials: status == "running" ? null : trials.ToArray(), CardGoals: request.CardGoals, MinimumLoss: minimumStatus,
                 StoppedOnFirstWin: stoppedEarly && LocalSearchPolicy.CanStopAtFirstWin(best, request),
                 StoppedOnCardGoals: stoppedEarly && LocalSearchPolicy.CanStopOnCardGoals(best, request),
+                StoppedOnMinimum: stoppedEarly && LocalSearchPolicy.RequiresMinimumConfirmation(best, request, minimumStatus?.Certificate),
                 Evidence: status == "running" ? null : audit.Snapshot(request, best, coverage?.Exhausted == true,
                     turns?.Count, evaluated, searchFinished ? searchTimeReached : budget.Elapsed.TotalSeconds >= request.BudgetSeconds,
                     stoppedEarly, boundPruned, independentlyVerified)));
@@ -725,18 +726,9 @@ public static class LocalWorker
                             legal = coverage.Open(coveredTrial!, legal);
                             if (legal.Length == 0) { covered = true; stop = "该操作前缀已全部评估"; break; }
                         }
-                        // An incumbent may arrive from another worker during exact
-                        // replay. Keep prescribed actions intact; prune their state
-                        // after execution rather than making replay appear illegal.
-                        if (winningBound?.NetHpLoss == 0 && planIndex >= (planned?.Length ?? 0))
-                        {
-                            int spent = actions.Count(a => a.PotionSlot.HasValue);
-                            var admissible = legal.Where(a => !LocalHealthBound.CannotImprove(new(healthRoot, startingHp,
-                                player.Creature.CurrentHp, spent + (a.PotionSlot.HasValue ? 1 : 0)), winningBound, request.CardGoals)).ToArray();
-                            boundPruned += legal.Length - admissible.Length;
-                            legal = admissible;
-                            if (legal.Length == 0) { cut = true; stop = "该操作前缀的所有后续均已无法改进"; break; }
-                        }
+                        // Keep all native potion actions available here. A
+                        // zero-loss victory does not bound further healing;
+                        // certified expense cuts belong to settled checkpoints.
                         LocalAction? preferred = null;
                         LocalAction? plannedAction = null;
                         bool exactAction = false;
@@ -947,9 +939,9 @@ public static class LocalWorker
                             player.Creature.Block, stepEnvelope.PotionsUsed, stepEnvelope.MaximumFurtherHpGain) : null;
                         proofSteps?.Add(new(next, proofLegal!, proofChoices!.ToArray(), stepEnvelope, proofComplete,
                             beforeHint, afterHint, settledState?.RoundNumber));
-                        if (turnTask?.LossProof == true && stepEnvelope != null && minimumStatus is { InvalidReason.Length: 0, Target: { } target } &&
-                            (LocalHealthBound.MinimumNetHpLoss(stepEnvelope) > target.NetHpLoss ||
-                             LocalHealthBound.MinimumNetHpLoss(stepEnvelope) == target.NetHpLoss &&
+                        if (turnTask?.LossProof == true && stepEnvelope != null && minimumStatus is { InvalidReason.Length: 0, Target.FinalHp: { } targetHp, Target: { } target } &&
+                            LocalHealthBound.MaximumFinalHp(stepEnvelope) is { } maximumHp &&
+                            (maximumHp < targetHp || maximumHp == targetHp &&
                              stepEnvelope.PotionsUsed >= target.PotionsUsed))
                         {
                             turnProbed = true; stop = "本分支已达到现有获胜路线的损失下界"; break;
@@ -1037,8 +1029,8 @@ public static class LocalWorker
                         trials.Add(new(request.Partition, route, _timeline!.ElapsedMs, candidate.Won, candidate.Hp,
                             candidate.NetHpLoss, candidate.Rounds, actions.Count(a => a.PotionSlot.HasValue), completeAttempt,
                             sharedTask?.Kind == "expand" ? LocalSearchWork.MatchesPrefix(actions, sharedTask.Plan) : null,
-                            candidate.CardGoalOutcome?.Plays, candidate.CardGoalOutcome?.Kills));
-                    using (Trace("trial-result", $"won={won};hp={candidate.Hp};loss={candidate.NetHpLoss};gross={candidate.HpLost};potions={actions.Count(a => a.PotionSlot.HasValue)};" +
+                            candidate.CardGoalOutcome?.Plays, candidate.CardGoalOutcome?.Kills, candidate.HpChange));
+                    using (Trace("trial-result", $"won={won};hp={candidate.Hp};loss={candidate.NetHpLoss};change={candidate.HpChange};gross={candidate.HpLost};potions={actions.Count(a => a.PotionSlot.HasValue)};" +
                         $"rounds={candidate.Rounds};plays={candidate.CardGoalOutcome?.Plays};finishers={candidate.CardGoalOutcome?.Kills};" +
                         $"complete={completeAttempt};probe={turnProbed};cut={cut};limited={stop == "达到时间预算"}")) { }
                     if (turnTask != null && stop != "达到时间预算" && !cut)
@@ -1147,7 +1139,8 @@ public static class LocalWorker
                     "已找到获胜路线，停止后续搜索。" : "已停止其余搜索。" :
                     request.CardGoals?.Enabled == true ? LocalSearchPolicy.CanStopOnCardGoals(best, request) ?
                     "当前消耗目标已完成，损血符合设置，停止后续搜索。" : "已停止其余搜索。" :
-                    best?.NetHpLoss is > 0 ? $"已达到最低净损失 {best.NetHpLoss}，停止后续搜索。" :
+                    LocalSearchPolicy.RequiresMinimumConfirmation(best, request, minimumStatus?.Certificate) ?
+                    LocalSearchPolicy.MinimumProofDescription(best!) + "停止后续搜索。" :
                     "已达到战后满血停止条件，停止后续搜索。" : best == null ? "没有找到可完整结算的路线。" :
                 turns != null ? $"已完成当前预算；评估 {evaluated} 条整场路线，另探查 {probes} 个回合组合，剪枝 {boundPruned} 次；尚未证明全局最优。" :
                 $"已完成当前预算，操作树 {noPotionSearch.Nodes + (request.IncludePotions ? potionSearch.Nodes : 0)} 个节点，比较了 {refinements} 条补牌、删牌、换牌和选牌路线。");

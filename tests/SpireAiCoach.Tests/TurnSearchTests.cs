@@ -295,11 +295,11 @@ static class TurnSearchTests
                 "An optimistic recovery ceiling must not overflow into a false prune");
         });
 
-        test("turn optimization potion reserve pruning is safe even with unknown healing", () =>
+        test("turn optimization retains potion-assisted improvements with unknown healing", () =>
         {
             var incumbent = LocalWinningBound.From("battle", Win(50));
-            Check(LocalHealthBound.CannotImprove(new("battle", 50, 1, 1), incumbent),
-                "Even unlimited recovery cannot beat a no-loss victory with fewer spent potions");
+            Check(!LocalHealthBound.CannotImprove(new("battle", 50, 1, 1), incumbent),
+                "Unknown recovery may raise final HP above a no-loss victory despite potion expense");
             Check(!LocalHealthBound.CannotImprove(new("battle", 50, 1, 0), incumbent),
                 "Equal potion count may still improve HP, gold or route length");
             Check(!LocalHealthBound.CannotImprove(new("battle", 50, 1, 1), LocalWinningBound.From("battle", Win(49))),
@@ -364,10 +364,10 @@ static class TurnSearchTests
                 "Replay cost orders work but never discards a promising late turn");
         });
 
-        test("turn optimization known winning bounds discard prescribed potion prefixes before replay", () =>
+        test("turn optimization certified final HP bounds discard inferior potion prefixes before replay", () =>
         {
             var search = new LocalTurnSearch(1, "battle");
-            var hint = new LocalTurnHint(20, 50, 10, 100);
+            var hint = new LocalTurnHint(20, 50, 10, 100, MaximumFurtherHpGain: 30);
             search.Offer([Move(1) with { PotionSlot = 0 }], 1, hint);
             search.Offer([Move(2)], 1, hint);
             Check(search.DiscardProvenExpenses(LocalWinningBound.From("battle", Win(49))) == 0,
@@ -375,7 +375,7 @@ static class TurnSearchTests
             Check(search.DiscardProvenExpenses(LocalWinningBound.From("another battle", Win(50))) == 0,
                 "A different frozen root cannot certify a frontier cut");
             Check(search.DiscardProvenExpenses(LocalWinningBound.From("battle", Win(50))) == 1 && search.Count == 1,
-                "An exact future potion expense need not be replayed to prove its inferiority");
+                "A certified equal-HP ceiling with higher potion expense is inferior");
             Check(search.TryTake(out var task) && task.Prefix[0].PotionSlot == null, "The no-potion sibling was discarded");
         });
 

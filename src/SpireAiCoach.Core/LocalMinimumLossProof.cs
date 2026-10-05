@@ -13,20 +13,21 @@ public sealed record LocalLossProofStep(LocalAction Action, LocalAction[] Legal,
 public sealed record LocalLossProofTrial(int StartingHp, LocalLossProofStep[] Steps,
     int Hp, bool Won = false, bool Dead = false);
 public sealed record LocalMinimumLossCertificate(string Scope, int StartingHp,
-    int MinimumNetHpLoss, int MinimumPotionsUsed);
-public sealed record LocalLossProofTarget(int NetHpLoss, int PotionsUsed);
+    int MinimumNetHpLoss, int MinimumPotionsUsed, int? MaximumFinalHp = null);
+public sealed record LocalLossProofTarget(int NetHpLoss, int PotionsUsed, int? FinalHp = null);
 public sealed record LocalLossProofFocus(LocalAction[] Prefix, int SearchRound, LocalTurnHint Hint);
 public sealed record LocalMinimumLossStatus(int Trials = 0, int Nodes = 1,
     LocalMinimumLossCertificate? Certificate = null, string InvalidReason = "", bool Confirmed = false,
     LocalLossProofTarget? Target = null, LocalLossProofFocus[]? Focus = null);
 
-// Each exact history has an optimistic (net loss, spent potions) floor. Taking
+// Each exact history has an optimistic (signed HP loss, spent potions) floor. Taking
 // the MIN over a COMPLETE native offer and the MAX with its own certified floor
 // proves an ancestor bound without finishing every descendant battle.
 public sealed class LocalMinimumLossProof(LocalSearchRequest request, int capacity = 131072)
 {
     private readonly record struct Floor(int Loss, int Potions) : IComparable<Floor>
     {
+        public static Floor Unknown => new(int.MinValue, 0);
         public int CompareTo(Floor other) => Loss != other.Loss ? Loss.CompareTo(other.Loss) : Potions.CompareTo(other.Potions);
         public static Floor Max(Floor a, Floor b) => a.CompareTo(b) >= 0 ? a : b;
         public static Floor Min(Floor a, Floor b) => a.CompareTo(b) <= 0 ? a : b;
@@ -42,7 +43,7 @@ public sealed class LocalMinimumLossProof(LocalSearchRequest request, int capaci
         public LocalCardChoice? Choice;
         public LocalTurnHint? Hint;
         public int Round;
-        public Floor Own, Minimum;
+        public Floor Own = Floor.Unknown, Minimum = Floor.Unknown;
         public bool Complete, Terminal;
     }
     private readonly Node _root = new();
@@ -55,11 +56,14 @@ public sealed class LocalMinimumLossProof(LocalSearchRequest request, int capaci
     private LocalLossProofFocus[]? _focus;
     public static string Scope(LocalSearchRequest r) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
         JsonSerializer.Serialize(new { r.Id, r.SnapshotId, r.NativeHash, r.ModelHash, r.LoadedMods,
-            r.IncludePotions, r.ExcludedModels, r.CardGoals, r.DataOnlyCombat, r.DataOnlyRun, r.NumericalExecution }))));
+            r.IncludePotions, r.ExcludedModels, r.CardGoals, r.DataOnlyCombat, r.DataOnlyRun, r.NumericalExecution,
+            HealthObjective = "final-hp-v2" }))));
     public LocalMinimumLossStatus Status => new(_trials, _nodes,
         _invalid.Length == 0 && _startingHp is { } hp && _root.Minimum.Loss <= hp
-            ? new(_scope, hp, _root.Minimum.Loss, _root.Minimum.Potions) : null, _invalid,
-        Target: _goal is { } goal ? new(goal.Loss, goal.Potions) : null,
+            ? new(_scope, hp, Math.Max(0, _root.Minimum.Loss), _root.Minimum.Potions,
+                _root.Minimum.Loss == int.MinValue ? null : hp - _root.Minimum.Loss) : null, _invalid,
+        Target: _goal is { } goal ? new(Math.Max(0, goal.Loss), goal.Potions,
+            _startingHp!.Value - goal.Loss) : null,
         Focus: _focus ??= FindFocus());
     public void Invalidate(string reason) { if (_invalid.Length == 0) _invalid = reason; _focus = []; }
 
@@ -107,7 +111,7 @@ public sealed class LocalMinimumLossProof(LocalSearchRequest request, int capaci
                     envelope.StartingHp != trial.StartingHp || envelope.Hp < 0 || envelope.PotionsUsed != potions ||
                     envelope.MaximumFurtherHpGain < 0)
                 { Invalidate("Proof recovery bound does not match its settled history"); return; }
-                var own = new Floor((int)LocalHealthBound.MinimumNetHpLoss(envelope), potions);
+                var own = new Floor(LocalHealthBound.MinimumHpLoss(envelope) ?? int.MinValue, potions);
                 node.Own = Floor.Max(node.Own, own);
                 _knownRecovery |= envelope.MaximumFurtherHpGain.HasValue;
             }
@@ -119,7 +123,7 @@ public sealed class LocalMinimumLossProof(LocalSearchRequest request, int capaci
         if (trial.Won || trial.Dead)
         {
             var terminal = trial.Dead ? new Floor(int.MaxValue, 0) :
-                new Floor(Math.Max(0, trial.StartingHp - trial.Hp), potions);
+                new Floor(trial.StartingHp - trial.Hp, potions);
             for (var parent = node; parent != null; parent = parent.Parent)
                 if (parent.Own.CompareTo(terminal) > 0)
                 { Invalidate("A native victory contradicts a proposed loss floor"); return; }
@@ -136,7 +140,7 @@ public sealed class LocalMinimumLossProof(LocalSearchRequest request, int capaci
     // optimistic score becomes a certificate and no legal sibling is removed.
     private LocalLossProofFocus[] FindFocus()
     {
-        if (_invalid.Length > 0 || !_knownRecovery || _goal is not { Loss: > 0 } target ||
+        if (_invalid.Length > 0 || !_knownRecovery || _goal is not { } target ||
             _root.Minimum.CompareTo(target) >= 0) return [];
         var result = new List<LocalLossProofFocus>();
         var queue = new Queue<Node>(); queue.Enqueue(_root);
@@ -203,7 +207,7 @@ public sealed class LocalMinimumLossProof(LocalSearchRequest request, int capaci
             {
                 var children = new Floor(int.MaxValue, int.MaxValue);
                 foreach (var key in current.Legal)
-                    children = Floor.Min(children, current.Children.TryGetValue(key, out var child) ? child.Minimum : default);
+                    children = Floor.Min(children, current.Children.TryGetValue(key, out var child) ? child.Minimum : Floor.Unknown);
                 floor = Floor.Max(floor, children);
             }
             if (floor == current.Minimum) break;

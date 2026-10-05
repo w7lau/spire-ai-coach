@@ -439,7 +439,7 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         if (incumbent == null || _root == null || incumbent.Root != _root) return 0;
         // Every action in the prefix is mandatory. Its last native observation
         // carries a certified recovery ceiling, or null when effects are unknown.
-        // Potion expense alone can still bound a no-loss incumbent with null.
+        // Potion expense alone cannot bound unknown future healing.
         var ids = _pending.Where(p => LocalHealthBound.CannotImprove(new(_root,
             p.Value.Hint.StartingHp, p.Value.Hint.Hp, p.Value.Task.Prefix.Count(a => a.PotionSlot.HasValue),
             p.Value.Hint.MaximumFurtherHpGain), incumbent, _cardGoals))

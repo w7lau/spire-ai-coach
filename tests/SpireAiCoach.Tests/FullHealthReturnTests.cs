@@ -28,8 +28,8 @@ static class FullHealthReturnTests
             var full = Win(250, 250) with { Actions = [partial.Actions[0] with { PotionSlot = 0 }] };
             Check(LocalSearchPolicy.BetterForGoal(full, partial, request) &&
                 !LocalSearchPolicy.BetterForGoal(partial, full, request), "A non-full peer displaced the achieved return goal");
-            Check(LocalSearchPolicy.BetterForGoal(partial, full, request with { StopOnZeroLoss = false }),
-                "Disabling the return goal must preserve the saved potion-reserve policy");
+            Check(LocalSearchPolicy.BetterForGoal(full, partial, request with { StopOnZeroLoss = false }),
+                "Disabling the return goal still compares actual final HP before potion reserve");
             Check(LocalSearchPolicy.BetterForGoal(Win(150, 250), partial, request), "Extra native healing was ignored");
             Check(LocalSearchPolicy.BetterForGoal(Win(100, 300), partial, request), "Cap growth was ignored while health was tied");
         });

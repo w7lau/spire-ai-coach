@@ -1,0 +1,49 @@
+{
+  "version": "0.7.60",
+  "passed": true,
+  "scope": "Native potion and victory-healing ordering; two algorithms; seeded mechanism probe",
+  "nativeGame": true,
+  "samples": [
+    {
+      "algorithm": "MonteCarlo",
+      "baselineHp": 106,
+      "finalHp": 156,
+      "HpChange": 56,
+      "HpLost": 0,
+      "hpGained": 56,
+      "Evaluated": 8,
+      "Victories": 8,
+      "measuredNoPotionWins": 3,
+      "measuredPotionWins": 5,
+      "ElapsedMs": 1550,
+      "finalVerifications": 1,
+      "unknownRecoveryStopChecked": true,
+      "unknownRecoveryEvaluated": 8,
+      "unknownRecoveryChecks": 5,
+      "executionCheckpoints": true,
+      "sourceCombatUnchanged": true
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "baselineHp": 106,
+      "finalHp": 156,
+      "HpChange": 56,
+      "HpLost": 0,
+      "hpGained": 56,
+      "Evaluated": 8,
+      "Victories": 8,
+      "measuredNoPotionWins": 2,
+      "measuredPotionWins": 6,
+      "ElapsedMs": 1557,
+      "finalVerifications": 1,
+      "unknownRecoveryStopChecked": true,
+      "unknownRecoveryEvaluated": 8,
+      "unknownRecoveryChecks": 6,
+      "executionCheckpoints": true,
+      "sourceCombatUnchanged": true
+    }
+  ],
+  "testedDllSha256": "553aed6411f34bde07be03da326eab9b9f6ff67d012a76e84c1c216c8b47c845",
+  "installedDllUnchanged": true,
+  "nativeScope": "Native game with coach and private integration mod"
+}

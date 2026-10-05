@@ -325,7 +325,7 @@ static class CardGoalTests
         });
         test("card goals preserve affordable goal branches in both health bound modes", () =>
         {
-            var best = new LocalWinningBound("root", 50, 0, 0);
+            var best = new LocalWinningBound("root", 50, 0, 0, FinalHp: 50);
             var paid = new LocalHealthEnvelope("root", 50, 47, 1, 0);
             Check(LocalHealthBound.CannotImprove(paid, best), "Baseline HP bound changed");
             Check(!LocalHealthBound.CannotImprove(paid, best, Goals(5)), "Allowed HP tradeoff pruned");

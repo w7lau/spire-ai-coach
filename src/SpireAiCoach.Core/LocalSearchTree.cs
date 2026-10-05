@@ -152,15 +152,17 @@ public sealed class LocalSearchTree(int seed, int capacity = 8192, LocalSearchOr
     public static double Reward(LocalCandidate result, int initialEnemyHp, LocalCardGoals? cardGoals = null)
     {
         if (result.Dead) return 0;
-        var health = Math.Clamp((double)result.Hp / Math.Max(1, result.MaxHp), 0, 1);
         var expense = .04 * Math.Min(1, result.Actions.Count(a => a.PotionSlot.HasValue) / 5d) +
             .001 * Math.Min(1, result.Actions.Length / 200d);
         // Disjoint ranges: even a low-HP victory outranks any unfinished horizon.
-        var damageQuality = Math.Exp(-(result.NetHpLoss ?? Math.Max(0, result.MaxHp - result.Hp)) / 25d);
+        // A bounded learning hint retains gains above the root, rather than
+        // giving every healed victory the same zero-loss reward. Native final
+        // selection and certified cuts still use the exact integer HP.
+        var damageQuality = 1 / (1 + Math.Exp(-((double)result.Hp - (result.StartingHp ?? result.MaxHp)) / 25d));
         if (result.Won && cardGoals?.Enabled == true)
             return cardGoals.WithinThreshold(result) ? .9 + .07 * cardGoals.Quality(result) + .005 * damageQuality :
                 .7 + .18 * damageQuality + .001 * cardGoals.Quality(result);
-        return result.Won ? .8 + .18 * damageQuality + .001 * health - expense :
+        return result.Won ? .8 + .19 * damageQuality :
             .1 + .4 * LocalSearchPolicy.UnfinishedQuality(result, initialEnemyHp) - expense;
     }
 

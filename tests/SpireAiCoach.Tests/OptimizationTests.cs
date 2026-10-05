@@ -29,16 +29,17 @@ static class OptimizationTests
             Check(!LocalSearchPolicy.Better(healed with { HpLost = 40 }, healed), "Gross healed costs must not disqualify equal final outcomes");
             Check(!LocalSearchPolicy.Better(less with { Won = false }, healed), "A partial no-loss route is not a victory");
         });
-        test("optimization reserve potions only improve a route when final net loss benefits", () =>
+        test("optimization healing above starting HP outranks potion reserve", () =>
         {
             var potion = new LocalAction(-1, "unknown-potion", null, "", "", "", PotionSlot: 0);
             var kept = new LocalCandidate([], 70, 20, 0, 0, 80, true, false, false, StartingHp: 60);
             var used = kept with { Hp = 80, Actions = [potion] };
-            Check(LocalSearchPolicy.Better(kept, used), "No net loss without potion: preserve it even if potion heals above start HP");
-            Check(LocalSearchTree.Reward(kept, 100) > LocalSearchTree.Reward(used, 100), "Tree must also prefer preserving a reserve");
+            Check(LocalSearchPolicy.Better(used, kept), "Additional final HP must survive the zero net-loss clamp");
+            Check(LocalSearchTree.Reward(used, 100) > LocalSearchTree.Reward(kept, 100), "Tree flattened native healing above starting HP");
+            Check(LocalSearchPolicy.Better(kept with { Hp = 80 }, used), "Equal final HP must preserve the potion");
             Check(LocalSearchPolicy.Better(used, kept with { Hp = 59 }), "Potion preventing final HP loss is valid");
             var result = new LocalSearchResult("", "", "done", "", 1, 0, 1, kept);
-            Check(LocalSearchPolicy.Format(result).Contains("净生命损失 0") && LocalSearchPolicy.Format(result).Contains("累计扣血 20"), "Display separates net and gross");
+            Check(LocalSearchPolicy.Format(result).Contains("生命净变化 +10") && LocalSearchPolicy.Format(result).Contains("累计扣血 20"), "Display separates net change and gross damage");
         });
         test("optimization varies native selection targets without per-card adapters", () =>
         {

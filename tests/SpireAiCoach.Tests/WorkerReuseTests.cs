@@ -289,6 +289,26 @@ internal static class WorkerReuseTests
                 Console.WriteLine($"  minimum-loss protocol evidence: algorithm={algorithm}; scenario={scenario}; loss=12; peers=2; elapsed_ms={watch.ElapsedMilliseconds}; confirmed={result.MinimumLoss!.Confirmed}; verifications={result.Timing!.Verifications}; peer_budget_ms=10000; native_game=false");
             }
         });
+        asyncTest("both algorithms confirm maximum healed HP before stopping peers", async () =>
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            await using var f = new Fixture();
+            foreach (var algorithm in new[] { LocalSearchOrder.MonteCarlo, LocalSearchOrder.TurnFrontier })
+            foreach (var scenario in new[] { "minimum-zero", "minimum-zero-late-proof", "minimum-healed", "minimum-healed-late-proof" })
+            {
+                int hp = scenario.Contains("healed") ? 70 : 50;
+                var r = Request(scenario) with { SearchOrder = algorithm, StopOnZeroLoss = true };
+                var watch = Stopwatch.StartNew();
+                var result = await f.Pool.Analyze(r, f.Installation, _ => { }, CancellationToken.None);
+                Check(result.Status == "done" && result.StoppedEarly && result.StoppedOnMinimum &&
+                    result.Best is { Won: true, MaxHp: 100, NetHpLoss: 0 } && result.Best.Hp == hp &&
+                    result.MinimumLoss is { Confirmed: true, Certificate: { } proof } && proof.MaximumFinalHp == hp,
+                    "Non-full zero/gained HP was returned without a confirmed final-HP proof");
+                Check(result.Timing?.Verifications == 1 && watch.Elapsed < TimeSpan.FromSeconds(8) &&
+                    LocalSearchPolicy.FormatAdvice(result).Contains($"已证明最高战后生命为 {hp}"),
+                    "The healed optimum waited for its peer budget or lost final verification");
+            }
+        });
         asyncTest("both algorithms return a first costly victory and stop peers under either loss-stop setting", async () =>
         {
             if (!OperatingSystem.IsWindows()) return;
@@ -399,6 +419,10 @@ internal static class WorkerReuseTests
             [new(0, "synthetic", null, "fake", "", request.NativeHash)], 50, 0, 0, 0, 50, true, false, false, StartingHp: 50);
         if (request.VerifyCandidate == null && request.DebugEncounter is "minimum-goal" or "minimum-errors" or "minimum-late-proof")
             candidate = candidate with { Hp = 38, HpLost = 12, Actions = [MinimumLossTests.FirstTurn(request, request.Partition).Steps[0].Action] };
+        if (request.VerifyCandidate == null && request.DebugEncounter is { } scenario &&
+            (scenario.StartsWith("minimum-zero", StringComparison.Ordinal) || scenario.StartsWith("minimum-healed", StringComparison.Ordinal)))
+            candidate = candidate with { Hp = scenario.Contains("healed") ? 70 : 50, MaxHp = 100,
+                Actions = [MinimumLossTests.FirstTurn(request, request.Partition).Steps[0].Action] };
         if (request.VerifyCandidate == null && request.DebugEncounter?.StartsWith("first-win", StringComparison.Ordinal) == true)
             candidate = candidate with { Hp = 8, HpLost = 42, Rounds = 10, DamageSources = new(42, 0, 0, 0, true),
                 Actions = [candidate.Actions[0] with { PotionSlot = 0, Round = 10 }] };
@@ -444,14 +468,20 @@ internal static class WorkerReuseTests
                     if (request.DebugEncounter == "exit") return 71;
                     using var client = request.TurnWorkPipe == null ? null : new LocalTurnWorkClient(request);
                     using var loss = request.MinimumLossPipe == null ? null : new LocalMinimumLossClient(request);
-                    bool minimum = request.DebugEncounter is "minimum-goal" or "minimum-errors" or "minimum-late-proof" && request.VerifyCandidate == null;
+                    bool minimum = request.DebugEncounter?.StartsWith("minimum-", StringComparison.Ordinal) == true && request.VerifyCandidate == null;
                     if (minimum)
                     {
                         // The first winner finishes before this peer establishes
                         // the final missing bound; it need not be found again.
-                        bool late = request.DebugEncounter == "minimum-late-proof" && request.Partition == 1;
+                        bool late = request.DebugEncounter!.EndsWith("late-proof", StringComparison.Ordinal) && request.Partition == 1;
                         if (late) await Task.Delay(1300);
-                        loss!.Observe(MinimumLossTests.FirstTurn(request, request.Partition, finish: !late));
+                        var trial = MinimumLossTests.FirstTurn(request, request.Partition, finish: !late);
+                        if (request.DebugEncounter.Contains("zero") || request.DebugEncounter.Contains("healed"))
+                        {
+                            int hp = request.DebugEncounter.Contains("healed") ? 70 : 50;
+                            trial = trial with { Hp = hp, Steps = [trial.Steps[0] with { After = trial.Steps[0].After! with { Hp = hp } }] };
+                        }
+                        loss!.Observe(trial);
                     }
                     LocalTurnTask? task = null;
                     if (client != null) { client.Offer([], 1, new(50, 50, 100, 100)); if (client.TryTake(out var claimed)) task = claimed; }

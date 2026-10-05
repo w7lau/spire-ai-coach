@@ -64,9 +64,7 @@ internal sealed class LocalRouteMap
     private List<Row> Rows()
     {
         var rows = new List<Row>();
-        var winner = _latest.Values.Where(p => p.Best != null)
-            .OrderBy(p => p.Best!.NetHpLoss ?? int.MaxValue).ThenBy(p => p.Best!.Potions)
-            .ThenByDescending(p => p.Best!.Hp).ThenBy(p => p.Best!.Rounds).FirstOrDefault();
+        var winner = LocalProgressBook.BestVictory(_latest.Values);
         if (winner?.Best is { } best)
         {
             _recent.TryGetValue((winner.Worker, best.Route), out var trace);

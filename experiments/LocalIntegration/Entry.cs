@@ -58,6 +58,12 @@ public static class Entry
                 return;
             }
             var save = JsonSerializer.Deserialize(File.ReadAllText(Path.Combine(root, "fixture.json")), JsonSerializationUtility.GetTypeInfo<SerializableRun>())!;
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_HEALTH_RECOVERY_TEST") == "1")
+            {
+                await HealthRecoveryIntegration.Run(root, tree, pool, save);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_FULL_HEALTH_TEST") == "1")
             {
                 await FullHealthReturnIntegration.Run(root, tree, pool, save);

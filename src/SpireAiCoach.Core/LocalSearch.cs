@@ -63,6 +63,7 @@ public sealed record LocalCandidate(LocalAction[] Actions, int Hp, int HpLost, i
 {
     // Gross HP costs remain useful diagnostics, but healing and victory hooks are part of the goal.
     public int? NetHpLoss => StartingHp.HasValue ? Math.Max(0, StartingHp.Value - Hp) : null;
+    public int? HpChange => StartingHp.HasValue ? Hp - StartingHp.Value : null;
 }
 
 // Legal alternatives observed before a real native action. Search hints only, never instructions.
@@ -72,7 +73,7 @@ public sealed record LocalChoiceDecision(int AtChoice, LocalCardChoice[] Legal);
 // Bounded per-trial metrics survive truncation of detailed native event traces.
 public sealed record LocalSearchTrial(int Worker, int Attempt, double FinishedMs, bool Won,
     int Hp, int? NetHpLoss, int Rounds, int PotionsUsed, bool Complete, bool? ClaimedPrefixMatched = null,
-    int? GoalPlays = null, int? FinisherKills = null);
+    int? GoalPlays = null, int? FinisherKills = null, int? HpChange = null);
 
 // A peer's measured route is an exploration proposal. Keep diagnostic traces
 // out of the scheduling protocol; it does not certify a result or an HP bound.
@@ -88,7 +89,8 @@ public sealed record LocalSearchResult(string Id, string SnapshotId, string Stat
     LocalHealthBoundStats? HealthBounds = null, LocalSimulationFailure? Failure = null,
     LocalSimulationFailure[]? RecoveredFailures = null, LocalCardGoals? CardGoals = null,
     LocalMinimumLossStatus? MinimumLoss = null, LocalSearchEvidence? Evidence = null,
-    bool StoppedOnFirstWin = false, bool StoppedOnCardGoals = false, LocalSearchProgress? SearchProgress = null);
+    bool StoppedOnFirstWin = false, bool StoppedOnCardGoals = false, LocalSearchProgress? SearchProgress = null,
+    bool StoppedOnMinimum = false);
 
 public static class LocalSearchPolicy
 {
@@ -149,16 +151,22 @@ public static class LocalSearchPolicy
             request.TargetVictoryRounds, request.TargetPotionUses, request.RequireKnownZeroEnemyDamage);
     public static bool CanStopAtMinimum(LocalCandidate? candidate, LocalSearchRequest request,
         LocalMinimumLossCertificate? certificate) => request.StopOnZeroLoss && !request.StopOnFirstWin && !HasSpecificGoal(request) &&
-        candidate is { Won: true, Dead: false, NetHpLoss: > 0, Actions.Length: > 0 } && certificate != null &&
+        candidate is { Won: true, Dead: false, Hp: > 0, StartingHp: not null, Actions.Length: > 0 } && certificate != null &&
         candidate.Actions[0].BeforeHash == request.NativeHash &&
         certificate.Scope == LocalMinimumLossProof.Scope(request) && certificate.StartingHp == candidate.StartingHp &&
-        certificate.MinimumNetHpLoss == candidate.NetHpLoss && certificate.MinimumNetHpLoss > 0 &&
+        ReachesHealthProof(candidate, certificate) &&
         certificate.MinimumPotionsUsed == candidate.Actions.Count(a => a.PotionSlot.HasValue);
+    public static bool RequiresMinimumConfirmation(LocalCandidate? candidate, LocalSearchRequest request,
+        LocalMinimumLossCertificate? certificate) => !CanStop(candidate, request) && !CanStopOnCardGoals(candidate, request) &&
+        CanStopAtMinimum(candidate, request, certificate);
+    private static bool ReachesHealthProof(LocalCandidate candidate, LocalMinimumLossCertificate proof) =>
+        proof.MinimumNetHpLoss == candidate.NetHpLoss &&
+        (proof.MaximumFinalHp is { } maximum ? maximum == candidate.Hp : proof.MinimumNetHpLoss > 0);
     public static bool HasMinimumProof(LocalSearchResult result) => result.CardGoals?.Enabled != true &&
         result.Status == "done" && !result.StoppedOnFirstWin &&
-        result.Best is { Won: true, Dead: false, NetHpLoss: > 0 } best &&
+        result.Best is { Won: true, Dead: false, Hp: > 0, StartingHp: not null } best &&
         result.MinimumLoss is { Confirmed: true, Certificate: { } proof } &&
-        proof.StartingHp == best.StartingHp && proof.MinimumNetHpLoss == best.NetHpLoss &&
+        proof.StartingHp == best.StartingHp && ReachesHealthProof(best, proof) &&
         proof.MinimumPotionsUsed == best.Actions.Count(a => a.PotionSlot.HasValue);
     public static bool MeetsGoal(LocalCandidate? candidate, LocalSearchRequest request) =>
         CanStop(candidate, true, request.TargetVictoryRounds, request.TargetPotionUses, request.RequireKnownZeroEnemyDamage);
@@ -207,14 +215,11 @@ public static class LocalSearchPolicy
             var priorQuality = UnfinishedQuality(prior, initialEnemyHp);
             if (quality != priorQuality) return quality > priorQuality;
         }
-        bool sameRoot = candidate.StartingHp.HasValue && candidate.StartingHp == prior.StartingHp;
-        if (sameRoot && candidate.NetHpLoss != prior.NetHpLoss) return candidate.NetHpLoss < prior.NetHpLoss;
-        if (!sameRoot && candidate.Hp != prior.Hp) return candidate.Hp > prior.Hp;
+        // Completed native final HP includes damage, healing and victory hooks.
+        // Do not flatten all gains to zero before comparing potion expense.
+        if (candidate.Hp != prior.Hp) return candidate.Hp > prior.Hp;
         if (candidate.Won && cardGoals?.Enabled == true)
         {
-            // Without a threshold, a higher final HP always wins, including healing
-            // above the starting HP (both routes would otherwise have NetHpLoss=0).
-            if (candidate.Hp != prior.Hp) return candidate.Hp > prior.Hp;
             int goalRank = cardGoals.Compare(candidate, prior);
             if (goalRank != 0) return goalRank > 0;
         }
@@ -235,7 +240,7 @@ public static class LocalSearchPolicy
         var lines = new List<string> { best.Won ? "本地整场战斗 · 已找到获胜路线" : "本地整场战斗 · 尚未找到获胜路线", result.Message,
             $"启用 {result.Workers} 路，评估 {result.Evaluated} 条路线，其中 {result.Victories} 条获胜，不支持 {result.Rejected}。",
             best.StartingHp is { } initial ?
-                $"{(best.Won ? "预测战后生命" : "已模拟到的生命")} {initial} → {best.Hp}/{best.MaxHp}；净生命损失 {best.NetHpLoss}{(best.Won ? "（包含战中、战后回血）" : "（战斗尚未完成）")}。" :
+                $"{(best.Won ? "预测战后生命" : "已模拟到的生命")} {initial} → {best.Hp}/{best.MaxHp}；生命净变化 {best.HpChange:+0;-0;0}{(best.Won ? "（包含战中、战后回血）" : "（战斗尚未完成）")}。" :
                 $"{(best.Won ? "预测战后生命" : "已模拟到的生命")} {best.Hp}/{best.MaxHp}。",
             $"过程累计扣血 {best.HpLost}" + (best.HealthChanges is { } health ? $"，已恢复或增加生命 {health.HpGained}" :
                 best.StartingHp is { } start ? $"，已恢复或增加生命 {Math.Max(0, best.Hp - start + best.HpLost)}" : "") +
@@ -255,6 +260,7 @@ public static class LocalSearchPolicy
                 "已跳过最终复核，但未取得完整逐步记录；目前仅供手动查看，暂不能自动执行。");
         if (result.StoppedOnFirstWin && best is { Won: true, Dead: false })
             lines.Add("已按「找到获胜路线即返回」停止搜索，未继续优化损失或用药。");
+        if (HasMinimumProof(result)) lines.Add(MinimumProofDescription(best));
         if (best.DamageSources is { } damage)
             lines.Add($"伤害来源：敌方 {damage.Enemy}，自身 {damage.Self}，来源未明 {damage.Unknown + damage.Unattributed}" +
                 (damage.AccountingMatches ? "。" : "（来源记录与扣血统计不一致）。"));
@@ -266,7 +272,7 @@ public static class LocalSearchPolicy
                 lines.Add("部分生命变化绕过了事件接口，已核对最终生命；中途扣血与回血次数可能不完整。");
         }
         lines.AddRange(CardGoalAdvice(result));
-        if (result.CardGoals?.Enabled != true && best.Won && best.NetHpLoss == 0)
+        if (result.CardGoals?.Enabled != true && best.Won && best.NetHpLoss == 0 && !HasMinimumProof(result))
             lines.Add(FullHealthVictory(best) ?
                 "已达到战后满血目标；其他收益和最短路线未证明最优。" :
                 $"战后净损失为 0，但仍差 {Math.Max(0, best.MaxHp - best.Hp)} 点生命才满血；不满足满血提前返回条件。");
@@ -278,7 +284,9 @@ public static class LocalSearchPolicy
         if (result.TurnSearch is { } turns) lines.Add($"另探查 {turns.Probes} 个回合组合，按可证明的界限剪枝 {turns.BoundPruned} 次，跳过 {turns.CoveredPrefixes} 个已评估前缀，仍待搜索 {turns.Pending} 个操作前缀。");
         if (result.TurnSearch is { LossProofProbes: > 0 } proofTurns)
             lines.Add($"其中 {proofTurns.LossProofProbes} 次只检查局部损失下界，达到界限后即结束该次探查。");
-        if (result.MinimumLoss is { Certificate: { } floor } && best.NetHpLoss is > 0 && !HasMinimumProof(result))
+        if (result.MinimumLoss is { Certificate.MaximumFinalHp: { } ceiling } && !HasMinimumProof(result))
+            lines.Add($"已确认的战后生命上界 {ceiling}，当前候选生命 {best.Hp}；尚未达到已证明的最优。");
+        else if (result.MinimumLoss is { Certificate: { } floor } && best.NetHpLoss is > 0 && !HasMinimumProof(result))
             lines.Add($"已确认的净损失下界 {floor.MinimumNetHpLoss}，当前候选净损失 {best.NetHpLoss}；尚未达到已证明的最优。");
         if (result.HealthBounds is { } bounds)
         {
@@ -298,7 +306,7 @@ public static class LocalSearchPolicy
             lines.Add($"{i + 1}. " + Describe(action));
         }
         if (best.Won) lines.Add("模拟结果：战斗获胜。");
-        lines.Add($"最多规划 {result.MaxRounds} 轮；{(result.IncludePotions ? "已纳入主动使用药水，优先保留药水" : "未纳入主动使用药水（自动触发仍按游戏结算）")}；选牌组合受搜索预算限制。实际状态偏离时请重新计算。" );
+        lines.Add($"最多规划 {result.MaxRounds} 轮；{(result.IncludePotions ? "已纳入主动使用药水，同等战后生命优先保留药水" : "未纳入主动使用药水（自动触发仍按游戏结算）")}；选牌组合受搜索预算限制。实际状态偏离时请重新计算。" );
         return string.Join("\n", lines);
     }
 
@@ -311,13 +319,13 @@ public static class LocalSearchPolicy
         {
             best.Won ? $"预计获胜 · {best.Rounds} 回合" : "战斗尚未打完，以下是部分路线。",
             $"{(best.Won ? "预计战后生命" : "当前模拟生命")} {best.Hp}/{best.MaxHp}" +
-                (best.NetHpLoss is { } loss ? $" · 净损失 {loss}（含回血）" : "")
+                (best.HpChange is { } change ? $" · 生命净变化 {change:+0;-0;0}（含回血）" : "")
         };
         if (result.Evidence is { } evidence) lines.Insert(0, evidence.Description);
         if (best.Dead) lines.Add("注意：这条路线会死亡，不能保证存活。");
         if (result.StoppedOnFirstWin && best is { Won: true, Dead: false })
             lines.Add("已按「找到获胜路线即返回」停止搜索，未继续优化损失或用药。");
-        if (HasMinimumProof(result)) lines.Add($"已证明最低净损失为 {best.NetHpLoss}；同等损失下用药也已达下界。");
+        if (HasMinimumProof(result)) lines.Add(MinimumProofDescription(best));
         if (!best.Won) lines.Add("尚未找到能打赢的路线，请继续优化或重新计算。");
         if (result.Status == "partial") lines.Add("部分搜索未完成，显示当前取得的路线。");
         lines.AddRange(CardGoalAdvice(result));
@@ -333,6 +341,10 @@ public static class LocalSearchPolicy
         }
         return string.Join("\n", lines);
     }
+
+    public static string MinimumProofDescription(LocalCandidate best) => best.NetHpLoss > 0 ?
+        $"已证明最低净损失为 {best.NetHpLoss}；同等战后生命下用药也已达下界。" :
+        $"已证明最高战后生命为 {best.Hp}（生命净变化 {best.HpChange:+0;-0;0}）；同等战后生命下用药也已达下界。";
 
     private static IEnumerable<string> CardGoalAdvice(LocalSearchResult result)
     {

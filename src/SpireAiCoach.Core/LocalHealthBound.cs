@@ -5,30 +5,43 @@ namespace SpireAiCoach.Core;
 public sealed record LocalHealthEnvelope(string Root, int StartingHp, int Hp, int PotionsUsed,
     long? MaximumFurtherHpGain = null);
 
-public sealed record LocalWinningBound(string Root, int StartingHp, int NetHpLoss, int PotionsUsed)
+public sealed record LocalWinningBound(string Root, int StartingHp, int NetHpLoss, int PotionsUsed,
+    int? FinalHp = null)
 {
+    // A legacy zero-loss record does not say how far above the starting HP it healed.
+    public int? ActualHp => FinalHp ?? (NetHpLoss > 0 ? StartingHp - NetHpLoss : null);
     public static LocalWinningBound? From(string root, LocalCandidate? candidate, bool requireFullHealthForZeroLoss = false) =>
         candidate is { Won: true, Dead: false, StartingHp: not null, NetHpLoss: not null }
             && (!requireFullHealthForZeroLoss || candidate.NetHpLoss != 0 || LocalSearchPolicy.FullHealthVictory(candidate))
             ? new(root, candidate.StartingHp.Value, candidate.NetHpLoss.Value,
-                candidate.Actions.Count(a => a.PotionSlot.HasValue)) : null;
+                candidate.Actions.Count(a => a.PotionSlot.HasValue), candidate.Hp) : null;
 }
 
 public static class LocalHealthBound
 {
+    public static int? MaximumFinalHp(LocalHealthEnvelope branch)
+    {
+        if (branch.PotionsUsed < 0 || branch.Hp < 0 || branch.MaximumFurtherHpGain < 0)
+            throw new ArgumentOutOfRangeException(nameof(branch));
+        if (branch.MaximumFurtherHpGain is not { } gain) return null;
+        // Native current HP is an int. Saturate the optimistic sum before adding;
+        // overflow must never turn unlimited recovery into a low HP ceiling.
+        return gain >= int.MaxValue - (long)branch.Hp ? int.MaxValue : branch.Hp + (int)gain;
+    }
+    public static int? MinimumHpLoss(LocalHealthEnvelope branch) =>
+        MaximumFinalHp(branch) is { } hp ? branch.StartingHp - hp : null;
+
     public static long MinimumNetHpLoss(LocalHealthEnvelope branch)
     {
-        if (branch.PotionsUsed < 0 || branch.MaximumFurtherHpGain < 0)
-            throw new ArgumentOutOfRangeException(nameof(branch));
-        long deficit = (long)branch.StartingHp - branch.Hp;
-        return branch.MaximumFurtherHpGain is { } gain && deficit > gain ? deficit - gain : 0;
+        return Math.Max(0, MinimumHpLoss(branch) ?? 0);
     }
     public static LocalWinningBound? Better(LocalWinningBound? current, LocalWinningBound? proposed)
     {
         if (proposed == null) return current;
         if (current == null) return proposed;
         if (current.Root != proposed.Root || current.StartingHp != proposed.StartingHp) return current;
-        return proposed.NetHpLoss < current.NetHpLoss || proposed.NetHpLoss == current.NetHpLoss &&
+        if (proposed.ActualHp is not { } proposedHp || current.ActualHp is not { } currentHp) return current;
+        return proposedHp > currentHp || proposedHp == currentHp &&
             proposed.PotionsUsed < current.PotionsUsed ? proposed : current;
     }
 
@@ -50,9 +63,10 @@ public static class LocalHealthBound
                 return lowerLoss >= limit;
             return lowerLoss > incumbent.NetHpLoss;
         }
-        if (lowerLoss > incumbent.NetHpLoss) return true;
-        // Used-potion count is a monotone expense in the current objective.
-        // Strict inequality preserves HP, gold, max-HP and shorter-route ties.
-        return lowerLoss == incumbent.NetHpLoss && branch.PotionsUsed > incumbent.PotionsUsed;
+        if (MaximumFinalHp(branch) is not { } maximumHp || incumbent.ActualHp is not { } winningHp) return false;
+        if (maximumHp < winningHp) return true;
+        // Potion expense breaks equal final-HP ties only. Unknown recovery may
+        // still improve HP, even when a no-loss, no-potion victory already exists.
+        return maximumHp == winningHp && branch.PotionsUsed > incumbent.PotionsUsed;
     }
 }

@@ -18,6 +18,7 @@ ResumeSearchTests.Register(Test);
 MinimumLossTests.Register(Test, AsyncTest);
 HealthAccountingTests.Register(Test);
 FullHealthReturnTests.Register(Test);
+HealthRecoveryTests.Register(Test);
 SelectionSpaceTests.Register(Test);
 SearchEvidenceTests.Register(Test);
 

@@ -10,6 +10,7 @@ public sealed record LocalSimEvent(int Step, int Round, string Action, string Ch
 public sealed record LocalProgressBest(int Route, int Hp, int MaxHp, int? StartingHp, int Rounds, int Potions)
 {
     public int? NetHpLoss => StartingHp.HasValue ? Math.Max(0, StartingHp.Value - Hp) : null;
+    public int? HpChange => StartingHp.HasValue ? Hp - StartingHp.Value : null;
 }
 public sealed record LocalProgress(string Id, string SnapshotId, int Worker, int Workers, long Sequence,
     int Route, int Evaluated, int MaxNodes, int Victories, long ElapsedMs, int BudgetSeconds,
@@ -18,6 +19,9 @@ public sealed record LocalProgress(string Id, string SnapshotId, int Worker, int
 
 public sealed class LocalProgressBook(string id, string snapshotId)
 {
+    public static LocalProgress? BestVictory(IEnumerable<LocalProgress> progress) =>
+        progress.Where(p => p.Best != null).OrderByDescending(p => p.Best!.Hp)
+            .ThenBy(p => p.Best!.Potions).ThenBy(p => p.Best!.Rounds).FirstOrDefault();
     private readonly SortedDictionary<int, LocalProgress> _latest = new();
     public IReadOnlyDictionary<int, LocalProgress> Latest => _latest;
     public bool Accept(LocalProgress progress)
