@@ -1,0 +1,66 @@
+{
+  "version": "0.7.56",
+  "passed": true,
+  "scope": "Two native victory-healing endpoints per algorithm; one worker; seeded short mechanism probe",
+  "encounter": "TOADPOLES_WEAK",
+  "nativeGame": true,
+  "productLimitsUnchanged": true,
+  "samples": [
+    {
+      "algorithm": "MonteCarlo",
+      "startingHp": 100,
+      "hp": 106,
+      "maxHp": 250,
+      "netHpLoss": 0,
+      "stoppedEarly": false,
+      "Evaluated": 4,
+      "Victories": 4,
+      "ElapsedMs": 23480,
+      "verifications": 1,
+      "nativeVictoryHealingIncluded": true,
+      "sourceCombatUnchanged": true
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "startingHp": 100,
+      "hp": 106,
+      "maxHp": 250,
+      "netHpLoss": 0,
+      "stoppedEarly": false,
+      "Evaluated": 4,
+      "Victories": 4,
+      "ElapsedMs": 1345,
+      "verifications": 1,
+      "nativeVictoryHealingIncluded": true,
+      "sourceCombatUnchanged": true
+    },
+    {
+      "algorithm": "MonteCarlo",
+      "startingHp": 247,
+      "hp": 250,
+      "maxHp": 250,
+      "netHpLoss": 0,
+      "stoppedEarly": true,
+      "Evaluated": 1,
+      "Victories": 1,
+      "ElapsedMs": 1342,
+      "verifications": 1,
+      "nativeVictoryHealingIncluded": true,
+      "sourceCombatUnchanged": true
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "startingHp": 247,
+      "hp": 250,
+      "maxHp": 250,
+      "netHpLoss": 0,
+      "stoppedEarly": true,
+      "Evaluated": 1,
+      "Victories": 1,
+      "ElapsedMs": 2876,
+      "verifications": 1,
+      "nativeVictoryHealingIncluded": true,
+      "sourceCombatUnchanged": true
+    }
+  ]
+}
