@@ -32,7 +32,7 @@ internal static class FinisherTargetIntegration
         var ledgerType = native.GetType("SpireAiCoach.Mod.LocalCardGoalAccounting", true)!;
         var previewType = native.GetType("SpireAiCoach.Mod.LocalTacticalPreview", true)!;
         var finisherPriority = previewType.GetMethod("FinisherPriority", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        foreach (var kind in new[] { "ordinary", "minion", "mod-fatal-denied", "mixed-final-hit" })
+        foreach (var kind in new[] { "ordinary", "minion", "mod-fatal-denied", "mixed-final-hit", "no-eligible" })
         {
             if (RunManager.Instance.IsInProgress) RunManager.Instance.CleanUp();
             NGame.Instance!.RootSceneContainer.SetCurrentScene(new Control()); await Frame(); await Frame();
@@ -64,13 +64,14 @@ internal static class FinisherTargetIntegration
             else if (denied)
                 await PowerCmd.Apply<MinionPower>(new ThrowingPlayerChoiceContext(), target, 1, target, null);
             if (denied)
-                foreach (var extra in enemies.Skip(1).SkipLast(1))
+                foreach (var extra in kind == "no-eligible" ? enemies.Skip(1) : enemies.Skip(1).SkipLast(1))
                     await PowerCmd.Apply<MinionPower>(new ThrowingPlayerChoiceContext(), extra, 1, extra, null);
             var goals = new LocalCardGoals("CARD.ANGER", "CARD.FEED", 5);
             using var ledger = (IDisposable)Activator.CreateInstance(ledgerType, player, goals)!;
             LocalCardGoalOutcome Counts() => (LocalCardGoalOutcome)ledgerType.GetMethod("Snapshot")!.Invoke(ledger, null)!;
             var stock = Counts().ConsumableGoals!.Finisher!;
-            if (stock.LivingEnemies != (denied ? 1 : enemies.Length) || stock.Target != (denied ? 1 : 2))
+            int eligibleEnemies = kind == "no-eligible" ? 0 : denied ? 1 : enemies.Length;
+            if (stock.LivingEnemies != eligibleEnemies || stock.Target != Math.Min(2, eligibleEnemies))
                 throw new InvalidOperationException(kind + ": ineligible enemy raised the consumable goal target");
             var legal = player.PlayerCombatState!.Hand.Cards.Where(c => c.CanPlay()).ToArray();
             var feed = legal.First(c => c.Id.Entry == "FEED");
@@ -83,16 +84,33 @@ internal static class FinisherTargetIntegration
             var lethal = Preview();
             int lethalFeed = Hint(feed, lethal), lethalOther = Hint(anger, lethal);
             int finite = (int)finisherPriority.Invoke(lethal, [feed, target])!;
-            if (lethalFeed != (denied ? 0 : 120) || lethalOther != (denied ? 30 : -30) || finite != (denied ? 0 : 120))
+            int reservation = eligibleEnemies > 0 ? -180 : 0;
+            if (lethalFeed != (denied ? reservation : 120) || lethalOther != (denied ? 30 : -30) ||
+                finite != (denied ? reservation : 120))
                 throw new InvalidOperationException(kind + ": finishing/reservation hint ignored native Fatal eligibility");
+            if (denied && (int)finisherPriority.Invoke(lethal, [anger, target])! != 0)
+                throw new InvalidOperationException(kind + ": repeatable damage was reserved as a finite opportunity");
             target.SetCurrentHpInternal(16);
             var setup = Preview();
             int setupFeed = Hint(feed, setup), setupOther = Hint(anger, setup);
-            if (setupFeed != (denied ? 0 : -180) || setupOther != (denied ? 30 : 80))
-                throw new InvalidOperationException(kind + ": setup hint reserved a reward on an ineligible target");
+            if (setupFeed != (denied ? reservation : -180) || setupOther != (denied ? 30 : 80))
+                throw new InvalidOperationException(kind + ": finite reservation or eligible-only setup hint changed");
             target.SetCurrentHpInternal(1);
             if (!feed.CanPlay() || !feed.IsValidTarget(target) || !anger.IsValidTarget(target))
                 throw new InvalidOperationException("Ineligible finisher targets must remain legal damage targets");
+            if (eligibleEnemies == 0)
+            {
+                // Native combat can settle at the next frame when every enemy is a
+                // minion. Check this observed ordering boundary without enqueueing
+                // an attack that may run only after victory has already started.
+                var unchanged = Counts();
+                if (unchanged.Kills != 0 || unchanged.ConsumableGoals!.Finisher!.Complete)
+                    throw new InvalidOperationException("No eligible opportunity became a completed finisher goal");
+                records.Add(new { kind, eligibleLivingEnemies = stock.LivingEnemies, target = stock.Target,
+                    lethalFeed, lethalOther, finite, setupFeed, setupOther, nativePlayPerformed = false,
+                    unchanged.Kills, consumable = unchanged.ConsumableGoals.Finisher });
+                continue;
+            }
             async Task PlayFeed(Creature enemy)
             {
                 var card = player.PlayerCombatState!.Hand.Cards.First(c => c.Id.Entry == "FEED");
@@ -108,7 +126,9 @@ internal static class FinisherTargetIntegration
             int gain = player.Creature.MaxHp - maxBefore;
             if (!target.IsDead || first.Kills != (denied ? 0 : 1) || first.ConsumableGoals!.Finisher!.CompletedCopies != first.Kills ||
                 first.ConsumableGoals.Finisher.Complete || (denied ? gain != 0 : gain <= 0))
-                throw new InvalidOperationException(kind + ": goal credit disagrees with actual native Fatal reward");
+                throw new InvalidOperationException(kind + ": goal credit disagrees with actual native Fatal reward: " +
+                    $"dead={target.IsDead};kills={first.Kills};completed={first.ConsumableGoals!.Finisher!.CompletedCopies};" +
+                    $"complete={first.ConsumableGoals.Finisher.Complete};gain={gain};battleEnded={CombatManager.Instance.IsOverOrEnding}");
             bool removedAfterDeath = kind == "mod-fatal-denied" &&
                 target.Powers.All(p => p.ShouldOwnerDeathTriggerFatal());
             if (kind == "mod-fatal-denied" && !removedAfterDeath)
@@ -124,14 +144,14 @@ internal static class FinisherTargetIntegration
             if (final.Steps.Sum(s => s.Kills) != final.Kills || !((bool)ledgerType.GetMethod("Matches")!.Invoke(ledger, [final])!))
                 throw new InvalidOperationException("Step counts or independent recount contract changed");
             records.Add(new { kind, eligibleLivingEnemies = stock.LivingEnemies, target = stock.Target,
-                lethalFeed, lethalOther, finite, setupFeed, setupOther, nativeKilled = target.IsDead,
+                lethalFeed, lethalOther, finite, setupFeed, setupOther, nativePlayPerformed = true, nativeKilled = target.IsDead,
                 firstKills = first.Kills, firstMaxHpGain = gain, removedAfterDeath, final.Kills,
                 final.Steps, consumable = final.ConsumableGoals!.Finisher });
         }
         LocalWire.Write(Path.Combine(root, "integration-finisher-targets-summary.json"), new {
             version = native.GetName().Version!.ToString(3), nativeModule = typeof(Creature).Assembly.ManifestModule.ModuleVersionId,
             modSha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(native.Location))),
-            scope = "Four owned synthetic native cases; no full search or arbitrary-Mod coverage claim", records });
+            scope = "Five owned synthetic native cases; no full search or arbitrary-Mod coverage claim", records });
     }
 }
 

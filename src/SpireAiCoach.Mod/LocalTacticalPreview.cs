@@ -25,6 +25,7 @@ internal sealed class LocalTacticalPreview(Player player, bool efficient = false
     private double _incoming;
     private double _handEndHpLoss;
     private bool _retainsBlock;
+    private bool? _hasEligibleFinisherTarget;
     private CardModel[] _playable = [];
 
     public static LocalTacticalPreview Capture(Player player, CardModel[] playable, bool efficient = false) =>
@@ -129,10 +130,10 @@ internal sealed class LocalTacticalPreview(Player player, bool efficient = false
     public int CardGoalPriority(CardModel card, Creature? target, LocalCardGoals goals)
     {
         int hint = card.Id.ToString() == goals.PlayModelId ? 30 : 0;
-        if (target == null || !LocalFinisherEligibility.AllowsFatal(target)) return hint;
-        var damage = DamageHint(card, target);
         if (card.Id.ToString() == goals.FinisherModelId)
             return hint + FinisherPriority(card, target);
+        if (target == null || !LocalFinisherEligibility.AllowsFatal(target)) return hint;
+        var damage = DamageHint(card, target);
         // Reserve a potential finishing blow only if that model is actually playable.
         // Unknown effects remain native candidates; this is never a legality filter.
         var finishers = _playable.Where(c => c.Id.ToString() == goals.FinisherModelId).ToArray();
@@ -150,9 +151,19 @@ internal sealed class LocalTacticalPreview(Player player, bool efficient = false
         return hint;
     }
 
-    internal int FinisherPriority(CardModel card, Creature? target) => target != null && LocalFinisherEligibility.AllowsFatal(target)
-        ? LocalCardGoalTactics.FinisherPriority(card.Keywords.Contains(CardKeyword.Exhaust),
-            DamageHint(card, target), target.CurrentHp, target.Block) : 0;
+    internal int FinisherPriority(CardModel card, Creature? target)
+    {
+        if (target == null) return 0;
+        bool eligible = LocalFinisherEligibility.AllowsFatal(target);
+        if (!eligible)
+        {
+            _hasEligibleFinisherTarget ??= player.Creature.CombatState!.Enemies
+                .Any(e => e.IsAlive && LocalFinisherEligibility.AllowsFatal(e));
+            if (_hasEligibleFinisherTarget != true) return 0;
+        }
+        return LocalCardGoalTactics.FinisherPriority(card.Keywords.Contains(CardKeyword.Exhaust),
+            DamageHint(card, target), target.CurrentHp, target.Block, rewardEligible: eligible);
+    }
 
     internal LocalFollowupCard Followup(CardModel card, LocalRolloutStyle style, Func<CardModel, int, int> learned)
     {

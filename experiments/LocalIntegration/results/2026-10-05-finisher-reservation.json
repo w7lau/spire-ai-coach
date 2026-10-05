@@ -1,0 +1,183 @@
+{
+  "version": "0.7.58",
+  "nativeModule": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
+  "modSha256": "2C39E163FC0A50165CAE1787CF90D15EEA9D920CCC9D6D627D11B0F4D5887133",
+  "scope": "Five owned synthetic native cases; no full search or arbitrary-Mod coverage claim",
+  "records": [
+    {
+      "kind": "ordinary",
+      "eligibleLivingEnemies": 3,
+      "target": 2,
+      "lethalFeed": 120,
+      "lethalOther": -30,
+      "finite": 120,
+      "setupFeed": -180,
+      "setupOther": 80,
+      "nativePlayPerformed": true,
+      "nativeKilled": true,
+      "firstKills": 1,
+      "firstMaxHpGain": 4,
+      "removedAfterDeath": false,
+      "Kills": 1,
+      "Steps": [
+        {
+          "Plays": 0,
+          "Kills": 1
+        }
+      ],
+      "consumable": {
+        "Copies": 2,
+        "CompletedCopies": 1,
+        "ExhaustedCopies": 1,
+        "LivingEnemies": 3,
+        "BattleEnded": false,
+        "Target": 2,
+        "Complete": false
+      }
+    },
+    {
+      "kind": "minion",
+      "eligibleLivingEnemies": 1,
+      "target": 1,
+      "lethalFeed": -180,
+      "lethalOther": 30,
+      "finite": -180,
+      "setupFeed": -180,
+      "setupOther": 30,
+      "nativePlayPerformed": true,
+      "nativeKilled": true,
+      "firstKills": 0,
+      "firstMaxHpGain": 0,
+      "removedAfterDeath": false,
+      "Kills": 0,
+      "Steps": [
+        {
+          "Plays": 0,
+          "Kills": 0
+        }
+      ],
+      "consumable": {
+        "Copies": 2,
+        "CompletedCopies": 0,
+        "ExhaustedCopies": 1,
+        "LivingEnemies": 1,
+        "BattleEnded": false,
+        "Target": 1,
+        "Complete": false
+      }
+    },
+    {
+      "kind": "mod-fatal-denied",
+      "eligibleLivingEnemies": 1,
+      "target": 1,
+      "lethalFeed": -180,
+      "lethalOther": 30,
+      "finite": -180,
+      "setupFeed": -180,
+      "setupOther": 30,
+      "nativePlayPerformed": true,
+      "nativeKilled": true,
+      "firstKills": 0,
+      "firstMaxHpGain": 0,
+      "removedAfterDeath": true,
+      "Kills": 0,
+      "Steps": [
+        {
+          "Plays": 0,
+          "Kills": 0
+        }
+      ],
+      "consumable": {
+        "Copies": 2,
+        "CompletedCopies": 0,
+        "ExhaustedCopies": 1,
+        "LivingEnemies": 1,
+        "BattleEnded": false,
+        "Target": 1,
+        "Complete": false
+      }
+    },
+    {
+      "kind": "mixed-final-hit",
+      "eligibleLivingEnemies": 1,
+      "target": 1,
+      "lethalFeed": -180,
+      "lethalOther": 30,
+      "finite": -180,
+      "setupFeed": -180,
+      "setupOther": 30,
+      "nativePlayPerformed": true,
+      "nativeKilled": true,
+      "firstKills": 0,
+      "firstMaxHpGain": 0,
+      "removedAfterDeath": false,
+      "Kills": 1,
+      "Steps": [
+        {
+          "Plays": 0,
+          "Kills": 0
+        },
+        {
+          "Plays": 0,
+          "Kills": 1
+        }
+      ],
+      "consumable": {
+        "Copies": 2,
+        "CompletedCopies": 1,
+        "ExhaustedCopies": 1,
+        "LivingEnemies": 1,
+        "BattleEnded": true,
+        "Target": 1,
+        "Complete": true
+      }
+    },
+    {
+      "kind": "no-eligible",
+      "eligibleLivingEnemies": 0,
+      "target": 0,
+      "lethalFeed": 0,
+      "lethalOther": 30,
+      "finite": 0,
+      "setupFeed": 0,
+      "setupOther": 30,
+      "nativePlayPerformed": false,
+      "Kills": 0,
+      "consumable": {
+        "Copies": 2,
+        "CompletedCopies": 0,
+        "ExhaustedCopies": 0,
+        "LivingEnemies": 0,
+        "BattleEnded": false,
+        "Target": 0,
+        "Complete": false
+      }
+    }
+  ],
+  "date": "2026-10-05",
+  "core_checks": {
+    "full_run_passed": 374,
+    "full_run_total": 375,
+    "failed_check": "both algorithms stop all peers at fulfilled consumable goals inside the permitted loss range",
+    "focused_rerun_passed": 1,
+    "focused_rerun_total": 1,
+    "assertions_relaxed": false
+  },
+  "limitations": [
+    "Five owned native fixture cases; the all-minion case checks ordering without queuing an action after automatic victory.",
+    "No fresh full-battle search, optimum or arbitrary private Mod reward claim.",
+    "The initial suite had one failure and was not a single 375/375 pass."
+  ],
+  "installation": {
+    "version": "0.7.58",
+    "previous_version": "0.7.57",
+    "installed_at": "2026-10-05T23:07:40.0547113+08:00",
+    "installed_dll_sha256": "2c39e163fc0a50165cae1787cf90d15eea9d920ccc9d6d627d11b0f4d5887133",
+    "protected_files": 15,
+    "protected_files_unchanged": true,
+    "cache_cleanup": false,
+    "started_player_game": false,
+    "backups_verified": true,
+    "zip_sha256": "a0a398866c67ced4809d594f0e07baf0003ea70254988265f4342ba79453064b"
+  }
+}

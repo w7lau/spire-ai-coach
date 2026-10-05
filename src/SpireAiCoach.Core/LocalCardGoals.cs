@@ -74,8 +74,12 @@ public static class LocalCardGoalTactics
         return hints.Any(h => h.Action == proposed && h.Priority < 0) ? null : proposed;
     }
 
-    public static int FinisherPriority(bool consumable, double? damage, double hp, double block = 0)
+    public static int FinisherPriority(bool consumable, double? damage, double hp, double block = 0,
+        bool rewardEligible = true)
     {
+        // A denied reward is still a spent finite opportunity, even on a lethal hit.
+        // Callers keep this neutral when no eligible enemy remains in the decision.
+        if (!rewardEligible) return consumable ? -180 : 0;
         if (!Known(damage, hp, block)) return 0;
         return damage >= hp + block ? 120 : consumable ? -180 : 0;
     }

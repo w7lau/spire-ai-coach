@@ -113,6 +113,34 @@ static class CardGoalTests
                 "Ordinary algorithm missed the same prior");
             Check(legal.Length == 3 && legal.Contains(hunt), "Removed the survival fallback action");
         });
+        test("both searches reserve a finite finisher on a denied reward target without removing its damage branch", () =>
+        {
+            var minion = new LocalAction(0, "mod:finisher", 1, "", "", "root", Preference:
+                18 + LocalCardGoalTactics.FinisherPriority(true, 15, 1, rewardEligible: false));
+            var boss = minion with { TargetId = 3, Preference =
+                12 + LocalCardGoalTactics.FinisherPriority(true, 15, 199) };
+            var defend = new LocalAction(1, "defend", null, "", "", "root", Preference: 10);
+            var end = new LocalAction(-1, "", null, "", "", "root", EndTurn: true, Preference: -15);
+            var legal = new[] { minion, boss, defend, end };
+            var turns = new LocalTurnSearch(1);
+            Check(turns.Choose(legal) == defend && turns.Choose([minion, boss, end]) == end,
+                "A denied reward spent the finite finisher ahead of a future eligible kill");
+            var ordinary = new LocalSearchTree(1);
+            Check(ordinary.TrySelect(ordinary.Begin(), legal, out var choice, greedy: true) && choice == defend,
+                "The ordinary search still used the denied-reward shortcut");
+            var hint = new[] { new LocalFinisherHint(minion, minion.Preference - 18) };
+            Check(LocalCardGoalTactics.AdaptSoftContinuation(minion, hint, true) == null &&
+                LocalCardGoalTactics.AdaptSoftContinuation(minion, hint, false) == minion,
+                "Soft continuation or exact-prefix handling ignored reservation");
+            Check(ordinary.TrySelect(ordinary.Begin(), legal, out choice, preferred: minion, greedy: true) &&
+                choice == minion && legal.Contains(minion), "Removed the native damage/survival branch");
+            var ready = boss with { Preference = 12 + LocalCardGoalTactics.FinisherPriority(true, 15, 10) };
+            Check(turns.Choose([minion, ready, defend, end]) == ready,
+                "An eligible finishing blow lost to ordinary damage or reservation");
+            Check(LocalCardGoalTactics.FinisherPriority(false, 15, 1, rewardEligible: false) == 0 &&
+                LocalCardGoalTactics.FinisherPriority(true, null, 1, rewardEligible: false) < 0,
+                "Confused repeatable damage or a known native reward denial with a finishing opportunity");
+        });
         test("finisher hints distinguish known nonlethal damage from repeatable or opaque effects", () =>
         {
             Check(LocalCardGoalTactics.FinisherPriority(false, 15, 80) == 0,
