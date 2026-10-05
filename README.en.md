@@ -11,7 +11,7 @@ The design aims for **broad compatibility with different mods**: capture underly
 1. Extract the release and place the `SpireAiCoach` folder in the game's `mods` directory, then start the game and enable the mod. Use either the Workshop installation or the manual installation to avoid duplicate loading.
 2. Press **F8** to open or close the panel. The corner button is hidden by default; the panel opens automatically when entering combat. In “计算选项 → 高级设置” (advanced calculation settings), disable “进入战斗自动展开面板” for manual-only opening, or enable “显示左上角入口” for the corner button.
 3. During your play phase, choose **路线采样 / Rollout Sampling** or **分支扩展 / Branch Expansion**. Follow a complete plan manually or click “执行方案” to execute it. **Esc stops an active plan execution**.
-4. For AI advice, expand “AI 指导与设置”, enter a Chat Completions compatible URL, model and API key, save, and click “AI 分析”. F9 and F10 are no longer bound.
+4. For AI advice, expand “AI 指导与设置”, enter a Chat Completions compatible URL, model and API key, save, and click “AI 分析”.
 
 The current release is primarily validated on **Windows x64 and game v0.111.0**. Game updates and third-party mods can change interfaces or introduce unsupported effects. Include your game, mod list and coach versions in reports. The in-game UI currently uses Chinese labels.
 
