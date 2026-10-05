@@ -484,6 +484,14 @@ public static class LocalWorker
             if (turnMode) _includePotions = request.IncludePotions;
             Progress("恢复当前战斗", force: true);
             await RestoreMeasured();
+            if (request.ReplayRootOnly)
+            {
+                // Compatibility admission checks the exact root before starting
+                // any search budget or additional game processes. No empty plan.
+                await Cleanup(); session?.Dispose();
+                Publish("restored", "当前战斗起点已核对，尚未搜索路线。");
+                return true;
+            }
             // Owned diagnostic process only. Read one restored root; never
             // search, play cards or return an executable empty candidate.
             if (System.Environment.GetEnvironmentVariable("SPIRE_COACH_RECOVERY_AUDIT") == "1")
@@ -1469,8 +1477,18 @@ public static class LocalWorker
             historical.Finish();
             history?.Dispose();
             using var fingerprint = Trace("fingerprint", depth: 2);
-            if (!completedReplayProbe && (IsTerminal(player) || LocalCapture.Fingerprint() != request.NativeHash))
-                throw new InvalidOperationException("后台重放与当前战斗状态不一致，未发布本地建议。可切换 AI 模式。");
+            if (!completedReplayProbe)
+            {
+                var actual = IsTerminal(player) ? null : LocalCapture.Fingerprint();
+                if (actual != request.NativeHash)
+                {
+                    var mismatch = new CoachException("local_replay_mismatch",
+                        "后台重放无法还原当前战斗起点，未发布本地建议。继续重试相同状态不会补回缺失的战斗数据。");
+                    mismatch.Data["expected_native_hash"] = request.NativeHash;
+                    mismatch.Data["actual_native_hash"] = actual;
+                    throw mismatch;
+                }
+            }
         }
         finally { _restoreDepth = 0; }
     }

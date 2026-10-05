@@ -896,8 +896,23 @@ public sealed class CoachOverlay
             catch (OperationCanceledException) { }
             catch (Exception ex)
             {
+                var failedTrace = ex.Data["local_trace"] as LocalTrace ?? timeline.Snapshot();
+                var failures = ex.Data["local_failures"] as LocalSimulationFailure[] ?? [];
+                var failedResult = new LocalSearchResult(request.Id, request.SnapshotId, "failed", ex.Message,
+                    0, 0, (long)timeline.ElapsedMs, null, Trace: failedTrace, RecoveredFailures: failures);
+                try
+                {
+                    LocalTimingArchive.Write(ProjectSettings.GlobalizePath("user://spire_ai_coach/diagnostics"), request.Id, new {
+                        request.Id, request.SnapshotId, request.NativeHash, completed_at = DateTimeOffset.UtcNow,
+                        version = typeof(ModEntry).Assembly.GetName().Version!.ToString(3),
+                        failedResult.Status, category = (ex as CoachException)?.Category, failedResult.Message,
+                        failedResult.ElapsedMs, failedResult.Trace, failedResult.RecoveredFailures,
+                        request.SearchOrder, request.Workers, request.BudgetSeconds, request.MaxNodes });
+                }
+                catch (Exception recording) { GD.Print("[SpireAiCoach] Timing save failed: " + recording.GetType().Name); }
                 _mainThread.Enqueue(() => { if (generation == _generation)
                     { _status.Text = ex.Message; _advice.Text = "本次未取得可靠的本地方案，可改用 AI 分析。";
+                        _localTiming.Text = LocalTimeline.Format(failedResult);
                         _pendingLocalProgress.Clear(); _localProgress.Finish("计算失败，过程数据已清除。", true); } });
             }
             finally

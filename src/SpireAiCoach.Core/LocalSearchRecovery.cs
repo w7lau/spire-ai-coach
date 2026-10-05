@@ -22,4 +22,7 @@ public static class LocalSearchRecovery
         var lanes = results.ToArray();
         return request.DataOnlyCombat && lanes.Any(Failed) && !lanes.Any(Usable);
     }
+
+    public static bool NeedsReplayValidation(IEnumerable<LocalSimulationFailure> failures) =>
+        failures.Any(f => f.Category == "local_replay_mismatch");
 }
