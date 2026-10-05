@@ -68,6 +68,7 @@ parser.add_argument('--route-feedback-focused-only', action='store_true')
 parser.add_argument('--recent-search-test', action='store_true', help='Frozen unseeded incident; preserve its trial/time/turn limits and report incomplete search honestly')
 parser.add_argument('--selection-paging-test', action='store_true')
 parser.add_argument('--card-goals-test', action='store_true')
+parser.add_argument('--finisher-targets-test', action='store_true', help='Four direct native Fatal eligibility cases; no route search or benchmark')
 parser.add_argument('--finisher-retention-test', action='store_true', help='Selected-finisher frozen incident, including previous route, with original budget and independent final verification')
 parser.add_argument('--followup-test', action='store_true', help='Short synthetic native return-to-hand/topdeck ordering probe; no full search')
 parser.add_argument('--recovery-audit', action='store_true', help='Inspect one frozen root and its actual loaded Mod callbacks; no route search or play')
@@ -173,6 +174,8 @@ with worker_lock(root):
     for name in ['integration-success', 'integration-error.txt', 'integration-result.json',
                  'integration-algorithm-private.json', 'integration-algorithm-summary.json']:
         (root / name).unlink(missing_ok=True)
+    if args.finisher_targets_test:
+        (root / 'integration-finisher-targets-summary.json').unlink(missing_ok=True)
     if args.recent_search_test:
         for name in ['integration-recent-search-summary.json', 'integration-recent-search-private.json']:
             (root / name).unlink(missing_ok=True)
@@ -227,6 +230,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_EVENT_ENTRY_TEST'] = '1' if args.event_entry_test else '0'
     env['SPIRE_LOCAL_SELECTION_PAGING_TEST'] = '1' if args.selection_paging_test else '0'
     env['SPIRE_LOCAL_CARD_GOALS_TEST'] = '1' if args.card_goals_test else '0'
+    env['SPIRE_LOCAL_FINISHER_TARGETS_TEST'] = '1' if args.finisher_targets_test else '0'
     if args.selection_paging_test:
         env['SPIRE_LOCAL_SELECTION_MATRIX'] = '1'
     env['SPIRE_LOCAL_BENCHMARK'] = '1' if args.benchmark else '0'
@@ -290,7 +294,7 @@ with worker_lock(root):
     settings_data = json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}
     settings_data.update(volume_master=0, volume_bgm=0, volume_sfx=0, volume_ambience=0)
     settings.write_text(json.dumps(settings_data), encoding='utf-8')
-    if args.survival_test or args.card_goals_test:
+    if args.survival_test or args.card_goals_test or args.finisher_targets_test:
         # Match the product worker's private tutorial state. A fresh headless
         # profile must not open the interactive combat tutorial during settlement.
         progress = settings.parent / 'modded/profile1/saves/progress.save'
@@ -298,7 +302,7 @@ with worker_lock(root):
         progress_data = json.loads(progress.read_text(encoding='utf-8-sig')) if progress.exists() else {'schema_version': 24}
         progress_data.update(enable_ftues=False, ftue_completed=['combat_rules_ftue'])
         progress.write_text(json.dumps(progress_data), encoding='utf-8')
-        if args.card_goals_test:
+        if args.card_goals_test or args.finisher_targets_test:
             ordinary_progress = settings.parent / 'profile1/saves/progress.save'
             ordinary_progress.parent.mkdir(parents=True, exist_ok=True)
             ordinary_progress.write_text(json.dumps(progress_data), encoding='utf-8')
@@ -323,6 +327,7 @@ with worker_lock(root):
         # experiments may reuse the host immediately after it exits.
         args.results_dir.mkdir(parents=True, exist_ok=True)
         names = ['integration-replay-private.json', 'integration-replay-summary.json',
+                     'integration-finisher-targets-summary.json',
                      'integration-card-goals-summary.json', 'integration-card-goals-MonteCarlo-private.json',
                      'integration-card-goals-TurnFrontier-private.json',
                      'integration-card-goal-stop-MonteCarlo-private.json', 'integration-card-goal-stop-TurnFrontier-private.json',

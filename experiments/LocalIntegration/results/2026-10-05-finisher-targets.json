@@ -1,0 +1,136 @@
+{
+  "version": "0.7.49",
+  "nativeModule": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
+  "modSha256": "F84A63444529C986CD1C7F9B6963BBA7D5679CBA1444F221B5A713C30AF926D8",
+  "scope": "Four owned synthetic native cases; no full search or arbitrary-Mod coverage claim",
+  "records": [
+    {
+      "kind": "ordinary",
+      "eligibleLivingEnemies": 3,
+      "target": 2,
+      "lethalFeed": 120,
+      "lethalOther": -30,
+      "finite": 120,
+      "setupFeed": -180,
+      "setupOther": 80,
+      "nativeKilled": true,
+      "firstKills": 1,
+      "firstMaxHpGain": 4,
+      "removedAfterDeath": false,
+      "Kills": 1,
+      "Steps": [
+        {
+          "Plays": 0,
+          "Kills": 1
+        }
+      ],
+      "consumable": {
+        "Copies": 2,
+        "CompletedCopies": 1,
+        "ExhaustedCopies": 1,
+        "LivingEnemies": 3,
+        "BattleEnded": false,
+        "Target": 2,
+        "Complete": false
+      }
+    },
+    {
+      "kind": "minion",
+      "eligibleLivingEnemies": 1,
+      "target": 1,
+      "lethalFeed": 0,
+      "lethalOther": 30,
+      "finite": 0,
+      "setupFeed": 0,
+      "setupOther": 30,
+      "nativeKilled": true,
+      "firstKills": 0,
+      "firstMaxHpGain": 0,
+      "removedAfterDeath": false,
+      "Kills": 0,
+      "Steps": [
+        {
+          "Plays": 0,
+          "Kills": 0
+        }
+      ],
+      "consumable": {
+        "Copies": 2,
+        "CompletedCopies": 0,
+        "ExhaustedCopies": 1,
+        "LivingEnemies": 1,
+        "BattleEnded": false,
+        "Target": 1,
+        "Complete": false
+      }
+    },
+    {
+      "kind": "mod-fatal-denied",
+      "eligibleLivingEnemies": 1,
+      "target": 1,
+      "lethalFeed": 0,
+      "lethalOther": 30,
+      "finite": 0,
+      "setupFeed": 0,
+      "setupOther": 30,
+      "nativeKilled": true,
+      "firstKills": 0,
+      "firstMaxHpGain": 0,
+      "removedAfterDeath": true,
+      "Kills": 0,
+      "Steps": [
+        {
+          "Plays": 0,
+          "Kills": 0
+        }
+      ],
+      "consumable": {
+        "Copies": 2,
+        "CompletedCopies": 0,
+        "ExhaustedCopies": 1,
+        "LivingEnemies": 1,
+        "BattleEnded": false,
+        "Target": 1,
+        "Complete": false
+      }
+    },
+    {
+      "kind": "mixed-final-hit",
+      "eligibleLivingEnemies": 1,
+      "target": 1,
+      "lethalFeed": 0,
+      "lethalOther": 30,
+      "finite": 0,
+      "setupFeed": 0,
+      "setupOther": 30,
+      "nativeKilled": true,
+      "firstKills": 0,
+      "firstMaxHpGain": 0,
+      "removedAfterDeath": false,
+      "Kills": 1,
+      "Steps": [
+        {
+          "Plays": 0,
+          "Kills": 0
+        },
+        {
+          "Plays": 0,
+          "Kills": 1
+        }
+      ],
+      "consumable": {
+        "Copies": 2,
+        "CompletedCopies": 1,
+        "ExhaustedCopies": 1,
+        "LivingEnemies": 1,
+        "BattleEnded": true,
+        "Target": 1,
+        "Complete": true
+      }
+    }
+  ],
+  "coreChecks": 340,
+  "passed": true,
+  "fullSearchExecuted": false,
+  "installed": false
+}

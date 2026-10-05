@@ -29,7 +29,7 @@ internal sealed class LocalCardGoalAccounting : IDisposable
     private bool _won;
     private readonly List<LocalCardGoalStep> _steps = [];
     private readonly HashSet<CardModel>? _playCopies, _finisherCopies;
-    private readonly int _livingEnemies;
+    private readonly int _eligibleLivingEnemies;
     private readonly HashSet<CardModel> _playedCopies = new(ReferenceEqualityComparer.Instance),
         _killingCopies = new(ReferenceEqualityComparer.Instance), _exhaustedCopies = new(ReferenceEqualityComparer.Instance);
     private readonly List<(Creature Receiver, CardModel Source)> _pendingKills = [];
@@ -37,7 +37,8 @@ internal sealed class LocalCardGoalAccounting : IDisposable
     public LocalCardGoalAccounting(Player player, LocalCardGoals? goals)
     {
         _player = player; _goals = goals;
-        _livingEnemies = player.Creature.CombatState?.Enemies.Count(e => e.IsAlive) ?? 0;
+        _eligibleLivingEnemies = string.IsNullOrEmpty(goals?.FinisherModelId) ? 0 :
+            player.Creature.CombatState?.Enemies.Count(e => e.IsAlive && LocalFinisherEligibility.AllowsFatal(e)) ?? 0;
         _playCopies = CurrentConsumableCopies(goals?.PlayModelId);
         _finisherCopies = CurrentConsumableCopies(goals?.FinisherModelId);
         if (goals?.Enabled == true)
@@ -63,6 +64,7 @@ internal sealed class LocalCardGoalAccounting : IDisposable
             harmony.Patch(AccessTools.Method(typeof(CreatureCmd), nameof(CreatureCmd.Damage),
                 [typeof(PlayerChoiceContext), typeof(IEnumerable<Creature>), typeof(decimal), typeof(ValueProp),
                     typeof(Creature), typeof(CardModel), typeof(CardPlay)]),
+                prefix: new(AccessTools.Method(typeof(LocalCardGoalAccounting), nameof(BeforeDamage))),
                 postfix: new(AccessTools.Method(typeof(LocalCardGoalAccounting), nameof(Damaged))));
             _installed = true;
         }
@@ -100,23 +102,35 @@ internal sealed class LocalCardGoalAccounting : IDisposable
     {
         if (_current is { } ledger && ReferenceEquals(ledger._history, __instance)) ledger._exhaustedCopies.Add(card);
     }
-    private static void Damaged(CardModel? cardSource, ref Task<IEnumerable<DamageResult>> __result)
+    private static void BeforeDamage(IEnumerable<Creature> __1, CardModel? cardSource,
+        out HashSet<Creature>? __state)
     {
+        __state = null;
         if (_current is not { } ledger || cardSource == null || !ReferenceEquals(cardSource.Owner, ledger._player) ||
             cardSource.Id.ToString() != ledger._goals!.FinisherModelId) return;
-        if (__result.IsCompletedSuccessfully) ledger.ObserveDamage(__result.Result, cardSource);
-        else __result = ledger.AfterDamage(__result, cardSource);
+        // Death can remove a Mod power denying Fatal rewards. Observe its rule
+        // before damage, not after cleanup. This never changes native effects.
+        __state = new(__1.Where(target => target.IsAlive && LocalFinisherEligibility.AllowsFatal(target)),
+            ReferenceEqualityComparer.Instance);
     }
-    private async Task<IEnumerable<DamageResult>> AfterDamage(Task<IEnumerable<DamageResult>> native, CardModel source)
+    private static void Damaged(CardModel? cardSource, HashSet<Creature>? __state,
+        ref Task<IEnumerable<DamageResult>> __result)
+    {
+        if (_current is not { } ledger || cardSource == null || __state == null || __state.Count == 0) return;
+        if (__result.IsCompletedSuccessfully) ledger.ObserveDamage(__result.Result, cardSource, __state);
+        else __result = ledger.AfterDamage(__result, cardSource, __state);
+    }
+    private async Task<IEnumerable<DamageResult>> AfterDamage(Task<IEnumerable<DamageResult>> native, CardModel source,
+        HashSet<Creature> eligible)
     {
         var results = await native;
-        if (ReferenceEquals(_current, this)) ObserveDamage(results, source);
+        if (ReferenceEquals(_current, this)) ObserveDamage(results, source, eligible);
         return results;
     }
-    private void ObserveDamage(IEnumerable<DamageResult> results, CardModel source)
+    private void ObserveDamage(IEnumerable<DamageResult> results, CardModel source, HashSet<Creature> eligible)
     {
         foreach (var result in results)
-            if (result.WasTargetKilled && result.Receiver.IsEnemy) _pendingKills.Add((result.Receiver, source));
+            if (result.WasTargetKilled && eligible.Contains(result.Receiver)) _pendingKills.Add((result.Receiver, source));
     }
 
     public void CompleteStep()
@@ -133,7 +147,7 @@ internal sealed class LocalCardGoalAccounting : IDisposable
 
     public LocalCardGoalOutcome? Snapshot() => _goals?.Enabled == true ?
         new(_goals.PlayModelId, _goals.FinisherModelId, _plays, _kills, _steps.ToArray(),
-            new(Progress(_playCopies, _playedCopies), Progress(_finisherCopies, _killingCopies, _livingEnemies))) : null;
+            new(Progress(_playCopies, _playedCopies), Progress(_finisherCopies, _killingCopies, _eligibleLivingEnemies))) : null;
 
     private HashSet<CardModel>? CurrentConsumableCopies(string? model)
     {

@@ -129,7 +129,7 @@ internal sealed class LocalTacticalPreview(Player player, bool efficient = false
     public int CardGoalPriority(CardModel card, Creature? target, LocalCardGoals goals)
     {
         int hint = card.Id.ToString() == goals.PlayModelId ? 30 : 0;
-        if (target?.IsEnemy != true) return hint;
+        if (target == null || !LocalFinisherEligibility.AllowsFatal(target)) return hint;
         var damage = DamageHint(card, target);
         if (card.Id.ToString() == goals.FinisherModelId)
             return hint + FinisherPriority(card, target);
@@ -150,7 +150,7 @@ internal sealed class LocalTacticalPreview(Player player, bool efficient = false
         return hint;
     }
 
-    internal int FinisherPriority(CardModel card, Creature? target) => target?.IsEnemy == true
+    internal int FinisherPriority(CardModel card, Creature? target) => target != null && LocalFinisherEligibility.AllowsFatal(target)
         ? LocalCardGoalTactics.FinisherPriority(card.Keywords.Contains(CardKeyword.Exhaust),
             DamageHint(card, target), target.CurrentHp, target.Block) : 0;
 

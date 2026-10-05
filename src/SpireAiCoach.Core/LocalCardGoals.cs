@@ -97,7 +97,7 @@ public static class LocalCardGoalTactics
 // A product stopping target, not an upper bound on arbitrary Mod-generated,
 // recovered or repeated plays. CompletedCopies counts distinct successful root
 // copies. Victory closes their opportunities even when cleanup omits exhaustion.
-// Finishers are capped by the current living enemies;
+// Finishers are capped by the current living enemies eligible for Fatal rewards;
 // playing the other goal still needs every available root copy once.
 public sealed record LocalConsumableGoalProgress(int Copies, int CompletedCopies, int ExhaustedCopies,
     int? LivingEnemies = null, bool BattleEnded = false)
