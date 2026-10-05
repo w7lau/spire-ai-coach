@@ -1,0 +1,348 @@
+{
+  "date": "2026-10-06",
+  "coach_version": "0.7.63",
+  "combined_source_commit": "d6e9735",
+  "default_enabled": false,
+  "algorithm_changed_by_metadata_experiment": false,
+  "native_game_version": "0.111.0",
+  "native_game_mvid": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
+  "native_dll_sha256": "20a15e78fe6ea94a232ea02c840baef396d5425ed8af381ca7c5ea4ea422b2a4",
+  "zip_sha256": "a845e0fa6ef82d49ef061cc915c769f292a45fdfa7cd19243284c3b7ae77d690",
+  "core_tests": {
+    "passed": 391,
+    "total": 391
+  },
+  "sdk_metadata_checks": {
+    "passed": true,
+    "reflection_getter_calls": 0,
+    "preserved_foreign_constructor_calls": 3,
+    "keyword_table_matches_native": true,
+    "altered_native_boundaries_rejected": 2,
+    "combat_or_save_created": false
+  },
+  "resident_worker_count": 1,
+  "frozen_mod_count": 7,
+  "samples": [
+    {
+      "enabled": false,
+      "warm": true,
+      "ElapsedMs": 3147,
+      "fingerprint_ms": 80.90190000000001,
+      "native_snapshots": 20,
+      "metadata": {
+        "enabled": false,
+        "condition_loads": 1323,
+        "condition_hits": 0,
+        "keyword_copies": 107,
+        "keyword_reuses": 0,
+        "boundaries": [
+          "SavedProperties.FromInternal",
+          "CardState.From"
+        ],
+        "failures": []
+      },
+      "steps": 15
+    },
+    {
+      "enabled": true,
+      "warm": true,
+      "ElapsedMs": 454,
+      "fingerprint_ms": 66.17439999999999,
+      "native_snapshots": 20,
+      "metadata": {
+        "enabled": true,
+        "condition_loads": 207,
+        "condition_hits": 1116,
+        "keyword_copies": 5,
+        "keyword_reuses": 102,
+        "boundaries": [
+          "SavedProperties.FromInternal",
+          "CardState.From"
+        ],
+        "failures": []
+      },
+      "steps": 15
+    },
+    {
+      "enabled": false,
+      "warm": false,
+      "ElapsedMs": 297,
+      "fingerprint_ms": 71.36840000000001,
+      "native_snapshots": 20,
+      "metadata": {
+        "enabled": false,
+        "condition_loads": 1323,
+        "condition_hits": 0,
+        "keyword_copies": 107,
+        "keyword_reuses": 0,
+        "boundaries": [
+          "SavedProperties.FromInternal",
+          "CardState.From"
+        ],
+        "failures": []
+      },
+      "steps": 15
+    },
+    {
+      "enabled": true,
+      "warm": false,
+      "ElapsedMs": 364,
+      "fingerprint_ms": 154.61090000000002,
+      "native_snapshots": 20,
+      "metadata": {
+        "enabled": true,
+        "condition_loads": 145,
+        "condition_hits": 1178,
+        "keyword_copies": 5,
+        "keyword_reuses": 102,
+        "boundaries": [
+          "SavedProperties.FromInternal",
+          "CardState.From"
+        ],
+        "failures": []
+      },
+      "steps": 15
+    },
+    {
+      "enabled": true,
+      "warm": false,
+      "ElapsedMs": 228,
+      "fingerprint_ms": 52.951800000000006,
+      "native_snapshots": 20,
+      "metadata": {
+        "enabled": true,
+        "condition_loads": 145,
+        "condition_hits": 1178,
+        "keyword_copies": 5,
+        "keyword_reuses": 102,
+        "boundaries": [
+          "SavedProperties.FromInternal",
+          "CardState.From"
+        ],
+        "failures": []
+      },
+      "steps": 15
+    },
+    {
+      "enabled": false,
+      "warm": false,
+      "ElapsedMs": 239,
+      "fingerprint_ms": 57.00979999999999,
+      "native_snapshots": 20,
+      "metadata": {
+        "enabled": false,
+        "condition_loads": 1323,
+        "condition_hits": 0,
+        "keyword_copies": 107,
+        "keyword_reuses": 0,
+        "boundaries": [
+          "SavedProperties.FromInternal",
+          "CardState.From"
+        ],
+        "failures": []
+      },
+      "steps": 15
+    },
+    {
+      "enabled": false,
+      "warm": false,
+      "ElapsedMs": 274,
+      "fingerprint_ms": 67.48310000000001,
+      "native_snapshots": 20,
+      "metadata": {
+        "enabled": false,
+        "condition_loads": 1323,
+        "condition_hits": 0,
+        "keyword_copies": 107,
+        "keyword_reuses": 0,
+        "boundaries": [
+          "SavedProperties.FromInternal",
+          "CardState.From"
+        ],
+        "failures": []
+      },
+      "steps": 15
+    },
+    {
+      "enabled": true,
+      "warm": false,
+      "ElapsedMs": 221,
+      "fingerprint_ms": 51.89339999999999,
+      "native_snapshots": 20,
+      "metadata": {
+        "enabled": true,
+        "condition_loads": 145,
+        "condition_hits": 1178,
+        "keyword_copies": 5,
+        "keyword_reuses": 102,
+        "boundaries": [
+          "SavedProperties.FromInternal",
+          "CardState.From"
+        ],
+        "failures": []
+      },
+      "steps": 15
+    },
+    {
+      "enabled": true,
+      "warm": false,
+      "ElapsedMs": 246,
+      "fingerprint_ms": 57.41150000000001,
+      "native_snapshots": 20,
+      "metadata": {
+        "enabled": true,
+        "condition_loads": 145,
+        "condition_hits": 1178,
+        "keyword_copies": 5,
+        "keyword_reuses": 102,
+        "boundaries": [
+          "SavedProperties.FromInternal",
+          "CardState.From"
+        ],
+        "failures": []
+      },
+      "steps": 15
+    },
+    {
+      "enabled": false,
+      "warm": false,
+      "ElapsedMs": 249,
+      "fingerprint_ms": 59.1533,
+      "native_snapshots": 20,
+      "metadata": {
+        "enabled": false,
+        "condition_loads": 1323,
+        "condition_hits": 0,
+        "keyword_copies": 107,
+        "keyword_reuses": 0,
+        "boundaries": [
+          "SavedProperties.FromInternal",
+          "CardState.From"
+        ],
+        "failures": []
+      },
+      "steps": 15
+    }
+  ],
+  "native_state_rng_actions_choices_history_and_settlement_match": true,
+  "ordinary_verified_steps": 15,
+  "ordinary_verification_metadata": {
+    "enabled": false,
+    "condition_loads": 2811,
+    "condition_hits": 0,
+    "keyword_copies": 240,
+    "keyword_reuses": 0,
+    "boundaries": [
+      "SavedProperties.FromInternal",
+      "CardState.From"
+    ],
+    "failures": []
+  },
+  "manual_return_native_cases": [
+    {
+      "algorithm": "MonteCarlo",
+      "skipFinalVerification": false,
+      "autoStopEnabled": false,
+      "cardGoalsEnabled": false,
+      "snapshotMetadataEnabled": false,
+      "Evaluated": 9,
+      "Victories": 9,
+      "finalHp": 106,
+      "HpChange": 6,
+      "finalVerifications": 1,
+      "stopToResultMs": 5996,
+      "usableExecutionPoints": true,
+      "executeButtonEnabled": true,
+      "actualButtonSignal": true,
+      "automaticExecution": false,
+      "sourceCombatUnchanged": true
+    },
+    {
+      "algorithm": "MonteCarlo",
+      "skipFinalVerification": true,
+      "autoStopEnabled": true,
+      "cardGoalsEnabled": true,
+      "snapshotMetadataEnabled": false,
+      "Evaluated": 5,
+      "Victories": 5,
+      "finalHp": 106,
+      "HpChange": 6,
+      "finalVerifications": 0,
+      "stopToResultMs": 549,
+      "usableExecutionPoints": true,
+      "executeButtonEnabled": true,
+      "actualButtonSignal": true,
+      "automaticExecution": false,
+      "sourceCombatUnchanged": true
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "skipFinalVerification": false,
+      "autoStopEnabled": false,
+      "cardGoalsEnabled": false,
+      "snapshotMetadataEnabled": false,
+      "Evaluated": 9,
+      "Victories": 9,
+      "finalHp": 106,
+      "HpChange": 6,
+      "finalVerifications": 1,
+      "stopToResultMs": 1823,
+      "usableExecutionPoints": true,
+      "executeButtonEnabled": true,
+      "actualButtonSignal": true,
+      "automaticExecution": false,
+      "sourceCombatUnchanged": true
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "skipFinalVerification": true,
+      "autoStopEnabled": true,
+      "cardGoalsEnabled": true,
+      "snapshotMetadataEnabled": false,
+      "Evaluated": 13,
+      "Victories": 13,
+      "finalHp": 106,
+      "HpChange": 6,
+      "finalVerifications": 0,
+      "stopToResultMs": 548,
+      "usableExecutionPoints": true,
+      "executeButtonEnabled": true,
+      "actualButtonSignal": true,
+      "automaticExecution": false,
+      "sourceCombatUnchanged": true
+    }
+  ],
+  "manual_return_layout": [
+    {
+      "width": 1280,
+      "height": 720,
+      "fixedButtonVisible": true,
+      "overflow": false
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "fixedButtonVisible": true,
+      "overflow": false
+    }
+  ],
+  "installed": true,
+  "installed_dll_sha256": "20a15e78fe6ea94a232ea02c840baef396d5425ed8af381ca7c5ea4ea422b2a4",
+  "installation_utc": "2026-10-05T18:04:15.6258755Z",
+  "previous_version": "0.7.62",
+  "backup_hashes_checked": 2,
+  "protected_files_checked": 1427,
+  "protected_files_changed": 0,
+  "cache_cleanup": false,
+  "started_player": false,
+  "delivery": "Retained the already-installed combined-source package; supplemented native metadata checks against its exact DLL.",
+  "limits": [
+    "The fixed known route checks execution overhead, not autonomous-search speed, optimality or hundreds-of-routes throughput.",
+    "Ten alternating samples are delivery validation, not a stable performance claim.",
+    "Mutable values, costs, Mod hooks and every full native snapshot remain fresh.",
+    "Ordinary independent verification does not reuse metadata.",
+    "The native worker runtime-error gate passed; existing engine exit/resource warnings may remain.",
+    "Manual return tests use an owned synthetic combat and actual button signals; no arbitrary-Mod or live-player execution guarantee."
+  ],
+  "private_game_inputs_paths_route_or_ids_included": false
+}
