@@ -70,6 +70,7 @@ parser.add_argument('--selection-paging-test', action='store_true')
 parser.add_argument('--card-goals-test', action='store_true')
 parser.add_argument('--finisher-targets-test', action='store_true', help='Five direct native Fatal eligibility and finite reservation cases; no route search or benchmark')
 parser.add_argument('--finisher-retention-test', action='store_true', help='Selected-finisher frozen incident, including previous route, with original budget and independent final verification')
+parser.add_argument('--finisher-retention-order', choices=['monte-carlo', 'turn-frontier'], help='Explicitly select one algorithm for the same frozen finisher regression; default checks both')
 parser.add_argument('--followup-test', action='store_true', help='Short synthetic native return-to-hand/topdeck ordering probe; no full search')
 parser.add_argument('--recovery-audit', action='store_true', help='Inspect one frozen root and its actual loaded Mod callbacks; no route search or play')
 parser.add_argument('--health-audit', action='store_true', help='Also check low-level HP writes and nested healing in the owned worker')
@@ -90,6 +91,8 @@ if args.animation_presentation_test and (not args.replay or not args.seed_result
     parser.error('--animation-presentation-test requires frozen --replay and measured --seed-result')
 if args.finisher_retention_test and (not args.replay or args.seed_result or args.recorded_replay):
     parser.error('--finisher-retention-test requires a frozen --replay without an extra answer seed or recorded replay')
+if args.finisher_retention_order and not args.finisher_retention_test:
+    parser.error('--finisher-retention-order requires --finisher-retention-test')
 if args.event_entry_test and (not args.replay or args.seed_result or args.recorded_replay):
     parser.error('--event-entry-test requires an unseeded frozen --replay')
 if args.summon_presentation_test and (not args.replay or args.seed_result or args.recorded_replay):
@@ -186,6 +189,7 @@ with worker_lock(root):
         (root / name).unlink(missing_ok=True)
     if args.finisher_targets_test:
         (root / 'integration-finisher-targets-summary.json').unlink(missing_ok=True)
+        (root / 'integration-goal-consumption-summary.json').unlink(missing_ok=True)
     if args.resume_search_test:
         for name in ['integration-resume-search-summary.json', 'integration-resume-search-source-before-private.json',
                      *[f'integration-resume-search-source-after-{order}-private.json'
@@ -276,6 +280,9 @@ with worker_lock(root):
     env['SPIRE_LOCAL_REPLAY_GAME'] = str(args.game.resolve()) if args.game else ''
     env['SPIRE_LOCAL_REPLAY_MODS'] = str(args.mods.resolve()) if args.mods else ''
     env['SPIRE_LOCAL_FINISHER_RETENTION_TEST'] = '1' if args.finisher_retention_test else '0'
+    env['SPIRE_LOCAL_FINISHER_RETENTION_ORDER'] = {
+        'monte-carlo': 'MonteCarlo', 'turn-frontier': 'TurnFrontier'
+    }.get(args.finisher_retention_order, '')
     env['SPIRE_LOCAL_SEED_RESULT'] = str(args.seed_result.resolve()) if args.seed_result else ''
     env['SPIRE_LOCAL_SPEED_BENCHMARK'] = '1' if args.speed_benchmark else '0'
     env['SPIRE_LOCAL_VISUAL_BENCHMARK'] = '1' if args.visual_benchmark else '0'
@@ -358,7 +365,7 @@ with worker_lock(root):
         # experiments may reuse the host immediately after it exits.
         args.results_dir.mkdir(parents=True, exist_ok=True)
         names = ['integration-replay-private.json', 'integration-replay-summary.json',
-                     'integration-finisher-targets-summary.json',
+                     'integration-finisher-targets-summary.json', 'integration-goal-consumption-summary.json',
                      'integration-card-goals-summary.json', 'integration-card-goals-MonteCarlo-private.json',
                      'integration-card-goals-TurnFrontier-private.json',
                      'integration-card-goal-stop-MonteCarlo-private.json', 'integration-card-goal-stop-TurnFrontier-private.json',

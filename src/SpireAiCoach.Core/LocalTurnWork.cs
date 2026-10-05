@@ -226,6 +226,7 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
     private readonly string _scope;
     private readonly int _owner;
     private readonly LocalTurnSearch _choices;
+    private readonly LocalCardGoals? _cardGoals;
     private readonly List<LocalTurnOffer> _offers = [];
     private LocalTurnWork.Reply _last = new(null, 0, 0, 0, 0);
     private LocalTurnTask? _owned;
@@ -243,6 +244,7 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
     public LocalTurnWorkClient(LocalSearchRequest request)
     {
         _scope = LocalTurnWork.Scope(request); _owner = request.Partition;
+        _cardGoals = request.CardGoals;
         _choices = new(1729 + _owner, cardGoals: request.CardGoals);
         _pipe = new(".", request.TurnWorkPipe ?? throw new ArgumentException("Missing turn pipe"), PipeDirection.InOut);
         _pipe.Connect(10000);
@@ -281,9 +283,17 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
         return true;
     }
 
-    public void FocusNext(LocalTurnTask task, IReadOnlyList<LocalAction> actions, IReadOnlyList<LocalDecision> decisions) =>
-        Exchange("focus", task, actions.Take(task.Prefix.Length + 1).ToArray(),
-            decisions.Where(d => d.BeforeStep == task.Prefix.Length).ToArray());
+    public void FocusNext(LocalTurnTask task, IReadOnlyList<LocalAction> actions, IReadOnlyList<LocalDecision> decisions)
+    {
+        // Ordinary focus needs only the next decision. Measured goal loss can
+        // occur deeper in a full rollout; include its exact history and observed
+        // legal siblings, without transferring unrelated decision rows.
+        var focused = decisions.Where(d => d.BeforeStep == task.Prefix.Length ||
+            d.BeforeStep >= task.Prefix.Length - 1 &&
+            LocalGoalOpportunity.LossPenalty(d.GoalsBefore, d.GoalsAfter, _cardGoals) > 0).ToArray();
+        int length = focused.Select(d => d.BeforeStep + 1).DefaultIfEmpty(task.Prefix.Length + 1).Max();
+        Exchange("focus", task, actions.Take(length).ToArray(), focused);
+    }
     public void ObserveOutcome(LocalCandidate candidate) => Exchange("outcome", _owned, outcome: candidate);
     public void PrioritizeLossProof(LocalLossProofFocus[] focus) => Exchange("loss-proof", lossProof: focus);
     public void PromoteWinning(LocalCandidate candidate)

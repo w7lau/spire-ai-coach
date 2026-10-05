@@ -73,6 +73,7 @@ public static class Entry
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_FINISHER_TARGETS_TEST") == "1")
             {
                 await FinisherTargetIntegration.Run(root, tree, save);
+                await GoalConsumptionIntegration.Run(root, tree, save);
                 File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
                 return;
             }

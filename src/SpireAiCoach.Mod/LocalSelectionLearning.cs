@@ -41,7 +41,8 @@ internal sealed class LocalSelectionLearning
             bool observed = _effects.TryGetValue(Id(source, ordinal, kind, prefs), out var effect);
             if (observed && effect == Effect.Other) return null;
             if (observed && effect == Effect.Exhaust)
-                return indices => indices.Sum(i => cards[i].Type is CardType.Status or CardType.Curse ? 40 : 0);
+                return indices => indices.Sum(i => (cards[i].Type is CardType.Status or CardType.Curse ? 40 : 0) -
+                    LocalCardGoalAccounting.ExhaustSelectionPenalty(cards[i]));
             var pcs = player.PlayerCombatState!;
             // The source has already paid when the native command asks for a
             // selection. Do not reuse the energy from before playing it.

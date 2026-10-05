@@ -20,7 +20,10 @@ internal static class FinisherRetentionIntegration
             TurnWorkPipe = null, SearchWorkPipe = null, ProgressPipe = null, MinimumLossPipe = null,
             SkipFinalVerification = false };
         installation = installation with { GameDirectory = Path.Combine(root, "game") };
-        foreach (var order in new[] { LocalSearchOrder.MonteCarlo, LocalSearchOrder.TurnFrontier })
+        var orders = new[] { LocalSearchOrder.MonteCarlo, LocalSearchOrder.TurnFrontier };
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_FINISHER_RETENTION_ORDER") is { Length: > 0 } selected)
+            orders = [Enum.Parse<LocalSearchOrder>(selected)];
+        foreach (var order in orders)
         {
             var frozen = request with { Id = Guid.NewGuid().ToString("N"), SearchOrder = order };
             var result = await Task.Run(() => pool.Analyze(frozen, installation, _ => { }, CancellationToken.None));

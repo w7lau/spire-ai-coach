@@ -11,6 +11,29 @@ static class TurnWorkTests
 
     public static void Register(Action<string, Action> test, Action<string, Func<Task>> asyncTest)
     {
+        test("shared turn work carries deeper native goal loss through the owned pipe without losing other branches", () =>
+        {
+            var goals = new LocalCardGoals(FinisherModelId: "opaque", HpLossThreshold: 100);
+            var captured = Request() with { CardGoals = goals };
+            using var broker = new LocalTurnWork(captured, 1);
+            using var owner = new LocalTurnWorkClient(captured with { TurnWorkPipe = broker.PipeName });
+            var start = Move(0); owner.Offer([start], 1, Hint());
+            Check(owner.TryTake(out var task), "Missing owned root");
+            for (int i = 10; i < 30; i++) owner.Offer([Move(i)], 1, Hint());
+            var setup = Move(1, "later"); var sacrifice = Move(2, "deeper"); var keep = Move(3, "deeper");
+            var before = new LocalGoalOpportunity(null, "opaque", null, new(1, 0, 1));
+            var after = before with { Finisher = new(1, 0, 0) };
+            var decision = new LocalDecision(2, [sacrifice, keep], GoalsBefore: before, GoalsAfter: after);
+            owner.OfferAlternatives([start, setup, sacrifice], decision, Hint(), task);
+            owner.FocusNext(task, [start, setup, sacrifice], [decision]); owner.Finish(task);
+            Check(owner.TryTake(out var broad), "Missing fair queue task"); owner.Finish(broad);
+            Check(owner.TryTake(out var focused) && focused.Prefix.Length == 3 && focused.Prefix[2].CombatCardIndex == 3,
+                "The pipe trimmed deeper loss evidence to the first rollout decision");
+            Check(focused.GoalLossFocus && focused.FullRollout && focused.Continuation == null,
+                "The broker replaced the goal-preserving full rollout with another winning tail");
+            owner.Finish(focused);
+            Check(broker.Pending == 19, "Goal focus deleted or duplicated other owned work");
+        });
         asyncTest("turn work endpoint survives bursts of peers that close before sending a command", async () =>
         {
             var captured = Request(); using var broker = new LocalTurnWork(captured, 1);
