@@ -474,6 +474,9 @@ public static class LocalWorker
             if (turnMode) _includePotions = request.IncludePotions;
             Progress("恢复当前战斗", force: true);
             await RestoreMeasured();
+            // Freeze the recovery closure before exploring any action. All
+            // subsequent envelopes/hints reuse this request's cached allowance.
+            recovery.Estimate(LocalContext.GetMe(CombatManager.Instance.DebugOnlyGetState()!)!);
             // Owned diagnostic process only. Read one restored root; never
             // search, play cards or return an executable empty candidate.
             if (System.Environment.GetEnvironmentVariable("SPIRE_COACH_RECOVERY_AUDIT") == "1")
@@ -482,6 +485,12 @@ public static class LocalWorker
                 var beforeAudit = LocalCapture.Fingerprint();
                 var auditClock = Stopwatch.StartNew();
                 var allowance = recovery.Estimate(auditPlayer);
+                var boundMethodBodyReads = recovery.MethodBodyReads;
+                for (int reuse = 0; reuse < 10000; reuse++)
+                    if (!ReferenceEquals(allowance, recovery.Estimate(null!)) || recovery.AnalysisCount != 1)
+                        throw new InvalidOperationException("Recovery closure was read more than once");
+                var cachedReadsMs = auditClock.Elapsed.TotalMilliseconds;
+                var codeAudit = recovery.Audit(auditPlayer);
                 auditClock.Stop();
                 var afterAudit = LocalCapture.Fingerprint();
                 if (beforeAudit != afterAudit) throw new InvalidOperationException("Recovery audit mutated its native root");
@@ -494,6 +503,10 @@ public static class LocalWorker
                         throw new InvalidOperationException("Health audit did not restore its frozen root");
                 }
                 LocalWire.Write(Path.Combine(_root, "recovery-audit.json"), new { request.Id, allowance,
+                    CodeAudit = codeAudit,
+                    recovery.AnalysisCount, recovery.AnalysisElapsedMs,
+                    BoundMethodBodyReads = boundMethodBodyReads,
+                    CachedReads = 10000, CachedReadsMs = cachedReadsMs,
                     ElapsedMs = auditClock.Elapsed.TotalMilliseconds, RootUnchanged = true,
                     HealthWritesHooked = LocalHpAccounting.WritesHooked, HealthAudit = healthAudit,
                     version = typeof(LocalWorker).Assembly.GetName().Version!.ToString(3),

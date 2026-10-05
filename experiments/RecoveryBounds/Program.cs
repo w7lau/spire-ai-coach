@@ -43,7 +43,7 @@ foreach (var (id, expectedHeals, expectedUnknown) in new (string, int, bool)[]
     ("Cards.Armaments", 0, false), ("Cards.TrueGrit", 0, false),
     ("Cards.Barricade", 0, false), ("Cards.BodySlam", 0, false),
     ("Cards.Discovery", 0, true), ("Cards.Feed", 0, true),
-    ("Relics.BurningBlood", 1, false), ("Relics.BlackBlood", 1, false)
+    ("Relics.BurningBlood", 1, false), ("Relics.BlackBlood", 1, false), ("Relics.ChosenCheese", 0, false)
 })
 {
     var type = typeof(AbstractModel).Assembly.GetType("MegaCrit.Sts2.Core.Models." + id, true)!;
@@ -51,10 +51,12 @@ foreach (var (id, expectedHeals, expectedUnknown) in new (string, int, bool)[]
     var proofType = proof.GetType();
     var unknown = proofType.GetProperty("Unknown")!.GetValue(proof) as string;
     var heals = (int)proofType.GetProperty("VictoryHeals")!.GetValue(proof)!;
+    var maxHpGains = (int)proofType.GetProperty("VictoryMaxHpGains")!.GetValue(proof)!;
     var references = (Type[])proofType.GetProperty("References")!.GetValue(proof)!;
-    if ((unknown != null) != expectedUnknown || heals != expectedHeals)
+    if ((unknown != null) != expectedUnknown || heals != expectedHeals || maxHpGains != (id == "Relics.ChosenCheese" ? 1 : 0))
         throw new InvalidOperationException("Unexpected recovery certificate for " + id + ": " + unknown);
-    output.Add(new { Model = id, Unknown = unknown, VictoryHealCalls = heals, References = references.Select(t => t.Name).ToArray() });
+    output.Add(new { Model = id, Unknown = unknown, VictoryHealCalls = heals, VictoryMaxHpCalls = maxHpGains,
+        References = references.Select(t => t.Name).ToArray() });
 }
 // Find real native healing powers by their code rather than assuming names
 // carried over from the first game.
@@ -79,11 +81,15 @@ var external = Activator.CreateInstance(estimatorType, request with { LoadedMods
 var guarded = (LocalRecoveryAllowance)estimatorType.GetMethod("Estimate")!.Invoke(external, [null])!;
 if (guarded.MaximumFurtherHpGain != null || !guarded.Reason.Contains("Mod", StringComparison.Ordinal))
     throw new InvalidOperationException("External global effects were treated as no healing");
+var cached = (LocalRecoveryAllowance)estimatorType.GetMethod("Estimate")!.Invoke(external, [null])!;
+if (!ReferenceEquals(guarded, cached) || (int)estimatorType.GetProperty("AnalysisCount")!.GetValue(external)! != 1)
+    throw new InvalidOperationException("An unknown allowance was rescanned instead of cached");
 var report = new { ModVersion = typeof(LocalWorker).Assembly.GetName().Version!.ToString(3),
     ModSha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
         File.ReadAllBytes(typeof(LocalWorker).Assembly.Location))),
     NativeModule = typeof(AbstractModel).Assembly.ManifestModule.ModuleVersionId,
-    MetadataChecks = output.Count + 1, ExternalGlobalEffectsRemainUnknown = true, Models = output,
+    MetadataChecks = output.Count + 2, ExternalGlobalEffectsRemainUnknown = true, Models = output,
+    UnknownResultCached = true,
     NativeBattleExecuted = false, SpeedBenchmarkExecuted = false };
 var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true,
     Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
