@@ -6,5 +6,8 @@
 - Game assemblies are local references only. Never commit DLLs, PCKs, decompiled game source, saves, credentials or real API configurations.
 - Prefer codebase-memory graph tools for code discovery; fall back to local search if they are unavailable or insufficient.
 - Run `dotnet run --project tests/SpireAiCoach.Tests -c Release` after core changes. Build the mod against the installed game with `-p:GameDir=...` after game adapter changes.
+- Deliver fixes through `scripts/Update.ps1 -GameDir ...`: it validates, packages and installs, with exact source/SDK validation reuse and verified package reuse. Do not create per-version installers or clean worker caches during routine updates. Prefer this entry point to separately repeating its core checks and build; use `-ForceTests` for an intentional rerun.
+- For changes needing native validation, prepare with `Update.ps1 -BuildOnly`, run the relevant isolated native check against that exact DLL, then use `Update.ps1 -InstallOnly` to install the same package. Do not substitute mocked workflow checks or cached core evidence for native proof. After a running-game refusal, the prepared package/evidence remain reusable; install when the user exits, without asking for installation authorization again. Never stop the player's game or downgrade a newer installed version.
+- After delivery-script changes, run `scripts/TestUpdate.ps1`; it uses disposable fixtures and simulated SDK/process commands. Keep workflow checks separate from game benchmarks.
 - Do not equate compile success or mocked HTTP tests with in-game / provider validation. Record unverified work in `docs/validation.md`.
 - Keep experimental forecasts explicitly conditional. Use stable instance identities; never map actions by display name.
