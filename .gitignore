@@ -16,3 +16,32 @@ GamePath.props
 *.pck
 **/__pycache__/
 *.pyc
+
+# Local build caches, diagnostics and installation backups.
+.cache/
+.codebase-memory/
+.local/
+node_modules/
+TestResults/
+logs/
+attachments/
+*.log
+*.bak
+*.tmp
+*.dmp
+*.zip
+
+# Local game copies, player data and unsanitized captures.
+/game/
+/data_sts2_windows_x86_64/
+/profiles/
+/saves/
+/private/
+/local-data/
+*.exe
+
+# Private credentials must never be staged, including encrypted key files.
+**/credentials*.json
+**/secrets*.json
+*.key
+*.pem
