@@ -28,6 +28,10 @@ public sealed class LocalContinuation(string combatId, string[] mods, LocalSearc
             Continuation = best.Continuation.Skip(CompletedActions).Select(p => p with
                 { ActionIndex = p.ActionIndex - CompletedActions, HpLost = Math.Max(0, p.HpLost - point.HpLost) }).ToArray(),
             StartingHp = point.Hp ?? best.StartingHp, HpLost = Math.Max(0, best.HpLost - point.HpLost),
+            // The point has an exact gross-loss total, but not a full gain/max-HP
+            // ledger. Recompute that optional diagnostic in the next simulation;
+            // do not compare the completed prefix's ledger against a fresh root.
+            HealthChanges = CompletedActions == 0 ? best.HealthChanges : null,
             Rounds = remaining.Select(a => a.Round).Distinct().Count() },
             Message = CompletedActions == 0 ? original.Message : $"已核对并完成前 {CompletedActions} 步，继续使用原路线；未重新搜索。" };
     }

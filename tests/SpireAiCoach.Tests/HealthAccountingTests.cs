@@ -53,6 +53,21 @@ internal static class HealthAccountingTests
             var old = JsonSerializer.Deserialize<LocalCandidate>(JsonSerializer.Serialize(candidate with { HealthChanges = null }))!;
             Check(old.HealthChanges == null && old.NetHpLoss == 0);
         });
+        test("continuing a partially executed route rebases loss without reusing its old health ledger", () =>
+        {
+            var actions = new[] { new LocalAction(0, "one", null, "one", "", "root", 1),
+                new LocalAction(0, "two", null, "two", "", "next", 1) };
+            var health = new LocalHealthChanges(50, 80, 44, 80, 14, 8, 0, 0, 0);
+            var points = new[] { new LocalContinuationPoint(0, "root", new(0, "h0"), 0, 50),
+                new LocalContinuationPoint(1, "next", new(1, "h1"), 10, 40) };
+            var candidate = new LocalCandidate(actions, 44, 14, 0, 0, 80, true, false, false,
+                StartingHp: 50, Continuation: points, HealthChanges: health);
+            var route = new LocalContinuation("battle", ["mod"], new("id", "snapshot", "done", "", 1, 0, 1, candidate));
+            Check(route.Advance("battle", ["mod"], "root", new(0, "h0"))!.Best!.HealthChanges == health);
+            var remaining = route.Advance("battle", ["mod"], "next", new(1, "h1"), requireProgress: true)!.Best!;
+            Check(remaining.Actions.Length == 1 && remaining.StartingHp == 40 && remaining.HpLost == 4 &&
+                remaining.HealthChanges == null && remaining.NetHpLoss == 0 && remaining.Continuation![0].HpLost == 0);
+        });
     }
 
     private static void Check(bool condition) { if (!condition) throw new Exception("Health accounting assertion failed"); }

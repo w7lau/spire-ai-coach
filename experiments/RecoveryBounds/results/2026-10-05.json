@@ -1,6 +1,6 @@
 {
-  "ModVersion": "0.7.42",
-  "ModSha256": "6F06407C7BA227D80F16EFECDF15D01A30C8E290E1660BCF376DB978390E2123",
+  "ModVersion": "0.7.43",
+  "ModSha256": "3A4A8EFEDB3811511C338CC5BF7A067D8733F59D86B4030D0F9B27ADFBC747E4",
   "NativeModule": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
   "MetadataChecks": 23,
   "ExternalGlobalEffectsRemainUnknown": true,
