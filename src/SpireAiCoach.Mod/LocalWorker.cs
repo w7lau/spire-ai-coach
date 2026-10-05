@@ -62,6 +62,8 @@ public static class LocalWorker
     internal static void SkipMethod(string name) => _timeline?.SkipMethod(_traceWorker, _traceStage, name);
     private static readonly LocalDecisionFingerprint DecisionFingerprint = new();
     internal static bool ReuseFingerprintBuffer => _activeRequest?.ReuseFingerprintBuffer != false && LocalWorkerOverhead.Active;
+    internal static bool ReuseSnapshotMetadata => _activeRequest?.ReuseSnapshotMetadata == true &&
+        _traceStage == "search" && LocalWorkerOverhead.Active && !LocalWorkerVerification.Running;
     private static readonly FieldInfo? PendingNotification = typeof(CombatStateTracker)
         .GetField("_combatStateChangedDeferredTask", BindingFlags.NonPublic | BindingFlags.Instance);
     private static long _frameVersion;
@@ -93,6 +95,7 @@ public static class LocalWorker
         LocalWorkerStartup.Install("patch_logic", LocalWorkerLogic.Install);
         LocalWorkerStartup.Install("patch_health", LocalHpAccounting.Install);
         LocalWorkerStartup.Install("patch_overhead", LocalWorkerOverhead.Install);
+        LocalWorkerStartup.Install("patch_snapshot_metadata", LocalWorkerSnapshotMetadata.Install);
         LocalWorkerStartup.Install("patch_verification", LocalWorkerVerification.Install);
         LocalWorkerStartup.Install("patch_discard", LocalDiscardObservation.Install);
         Callable.From(Run).CallDeferred();
@@ -163,6 +166,7 @@ public static class LocalWorker
         _selectionCursor = new();
         DecisionFingerprint.Clear();
         LocalWorkerLogic.ResetCounters();
+        LocalWorkerSnapshotMetadata.ResetCounters();
         LocalWorkerVerification.Reset();
         _timeline = new(request.TimelineOrigin);
         _traceWorker = request.Partition; _traceRoute = _traceStep = _restoreDepth = 0;
@@ -350,7 +354,8 @@ public static class LocalWorker
             if (status != "running") LocalWire.Write(Path.Combine(_root, "runtime.json"), new
                 { status, model_display = LocalModelDisplay.Status(), mode = LocalWorkerDataMode.MinimalRun ? "native-model" : LocalWorkerDataMode.Active ? "no-combat-scene" : "regular-scene",
                     max_fps = Engine.MaxFps, observed_fps = Engine.GetFramesPerSecond(), numerical = LocalWorkerLogic.Counters(),
-                    overhead = LocalWorkerOverhead.Status(), verification = LocalWorkerVerification.Status(), preload_enabled = PreloadManager.Enabled,
+                    overhead = LocalWorkerOverhead.Status(), snapshot_metadata = LocalWorkerSnapshotMetadata.Status(),
+                    verification = LocalWorkerVerification.Status(), preload_enabled = PreloadManager.Enabled,
                     progress_transport = new { pipe = progressSender?.Connected == true, fallback = progressSender?.Fallback } });
             LocalWire.Write(Path.Combine(_root, "result.json"),
             new LocalSearchResult(request.Id, request.SnapshotId, status, message, evaluated, rejected, timer.ElapsedMilliseconds, best,

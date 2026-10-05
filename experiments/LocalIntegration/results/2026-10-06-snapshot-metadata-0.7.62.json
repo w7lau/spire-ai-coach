@@ -1,0 +1,251 @@
+{
+  "date": "2026-10-06",
+  "coach_version": "0.7.62",
+  "merged_main_commit": "b3a067d",
+  "default_enabled": false,
+  "algorithm_changed_by_this_delivery": false,
+  "native_game_version": "0.111.0",
+  "native_game_mvid": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
+  "native_dll_sha256": "0bc40e530f8937410c35ad4b5091a4a5e0345d6b627300f6b39a51bf783e7a84",
+  "zip_sha256": "5d355341b58fae496417f32b341bf7b556686da57eede14b061e32becdaa43d2",
+  "core_tests": {
+    "passed": 385,
+    "total": 385
+  },
+  "sdk_metadata_checks": {
+    "passed": true,
+    "reflection_getter_calls": 0,
+    "preserved_foreign_constructor_calls": 3,
+    "keyword_table_matches_native": true,
+    "altered_native_boundaries_rejected": 2,
+    "combat_or_save_created": false
+  },
+  "resident_worker_count": 1,
+  "frozen_mod_count": 7,
+  "samples": [
+    {
+      "enabled": false,
+      "warm": true,
+      "ElapsedMs": 3707,
+      "fingerprint_ms": 92.72330000000001,
+      "native_snapshots": 20,
+      "metadata": {
+        "enabled": false,
+        "condition_loads": 1323,
+        "condition_hits": 0,
+        "keyword_copies": 107,
+        "keyword_reuses": 0,
+        "boundaries": [
+          "SavedProperties.FromInternal",
+          "CardState.From"
+        ],
+        "failures": []
+      },
+      "steps": 15
+    },
+    {
+      "enabled": true,
+      "warm": true,
+      "ElapsedMs": 681,
+      "fingerprint_ms": 116.37309999999998,
+      "native_snapshots": 20,
+      "metadata": {
+        "enabled": true,
+        "condition_loads": 207,
+        "condition_hits": 1116,
+        "keyword_copies": 5,
+        "keyword_reuses": 102,
+        "boundaries": [
+          "SavedProperties.FromInternal",
+          "CardState.From"
+        ],
+        "failures": []
+      },
+      "steps": 15
+    },
+    {
+      "enabled": false,
+      "warm": false,
+      "ElapsedMs": 326,
+      "fingerprint_ms": 90.27380000000001,
+      "native_snapshots": 20,
+      "metadata": {
+        "enabled": false,
+        "condition_loads": 1323,
+        "condition_hits": 0,
+        "keyword_copies": 107,
+        "keyword_reuses": 0,
+        "boundaries": [
+          "SavedProperties.FromInternal",
+          "CardState.From"
+        ],
+        "failures": []
+      },
+      "steps": 15
+    },
+    {
+      "enabled": true,
+      "warm": false,
+      "ElapsedMs": 392,
+      "fingerprint_ms": 167.6797,
+      "native_snapshots": 20,
+      "metadata": {
+        "enabled": true,
+        "condition_loads": 145,
+        "condition_hits": 1178,
+        "keyword_copies": 5,
+        "keyword_reuses": 102,
+        "boundaries": [
+          "SavedProperties.FromInternal",
+          "CardState.From"
+        ],
+        "failures": []
+      },
+      "steps": 15
+    },
+    {
+      "enabled": true,
+      "warm": false,
+      "ElapsedMs": 304,
+      "fingerprint_ms": 77.5815,
+      "native_snapshots": 20,
+      "metadata": {
+        "enabled": true,
+        "condition_loads": 145,
+        "condition_hits": 1178,
+        "keyword_copies": 5,
+        "keyword_reuses": 102,
+        "boundaries": [
+          "SavedProperties.FromInternal",
+          "CardState.From"
+        ],
+        "failures": []
+      },
+      "steps": 15
+    },
+    {
+      "enabled": false,
+      "warm": false,
+      "ElapsedMs": 335,
+      "fingerprint_ms": 87.99319999999999,
+      "native_snapshots": 20,
+      "metadata": {
+        "enabled": false,
+        "condition_loads": 1323,
+        "condition_hits": 0,
+        "keyword_copies": 107,
+        "keyword_reuses": 0,
+        "boundaries": [
+          "SavedProperties.FromInternal",
+          "CardState.From"
+        ],
+        "failures": []
+      },
+      "steps": 15
+    },
+    {
+      "enabled": false,
+      "warm": false,
+      "ElapsedMs": 281,
+      "fingerprint_ms": 73.065,
+      "native_snapshots": 20,
+      "metadata": {
+        "enabled": false,
+        "condition_loads": 1323,
+        "condition_hits": 0,
+        "keyword_copies": 107,
+        "keyword_reuses": 0,
+        "boundaries": [
+          "SavedProperties.FromInternal",
+          "CardState.From"
+        ],
+        "failures": []
+      },
+      "steps": 15
+    },
+    {
+      "enabled": true,
+      "warm": false,
+      "ElapsedMs": 252,
+      "fingerprint_ms": 67.54509999999999,
+      "native_snapshots": 20,
+      "metadata": {
+        "enabled": true,
+        "condition_loads": 145,
+        "condition_hits": 1178,
+        "keyword_copies": 5,
+        "keyword_reuses": 102,
+        "boundaries": [
+          "SavedProperties.FromInternal",
+          "CardState.From"
+        ],
+        "failures": []
+      },
+      "steps": 15
+    },
+    {
+      "enabled": true,
+      "warm": false,
+      "ElapsedMs": 257,
+      "fingerprint_ms": 57.6135,
+      "native_snapshots": 20,
+      "metadata": {
+        "enabled": true,
+        "condition_loads": 145,
+        "condition_hits": 1178,
+        "keyword_copies": 5,
+        "keyword_reuses": 102,
+        "boundaries": [
+          "SavedProperties.FromInternal",
+          "CardState.From"
+        ],
+        "failures": []
+      },
+      "steps": 15
+    },
+    {
+      "enabled": false,
+      "warm": false,
+      "ElapsedMs": 291,
+      "fingerprint_ms": 74.7201,
+      "native_snapshots": 20,
+      "metadata": {
+        "enabled": false,
+        "condition_loads": 1323,
+        "condition_hits": 0,
+        "keyword_copies": 107,
+        "keyword_reuses": 0,
+        "boundaries": [
+          "SavedProperties.FromInternal",
+          "CardState.From"
+        ],
+        "failures": []
+      },
+      "steps": 15
+    }
+  ],
+  "native_state_rng_actions_choices_history_and_settlement_match": true,
+  "ordinary_verified_steps": 15,
+  "ordinary_verification_metadata": {
+    "enabled": false,
+    "condition_loads": 2811,
+    "condition_hits": 0,
+    "keyword_copies": 240,
+    "keyword_reuses": 0,
+    "boundaries": [
+      "SavedProperties.FromInternal",
+      "CardState.From"
+    ],
+    "failures": []
+  },
+  "installed": false,
+  "limits": [
+    "Fixed known route validation; no autonomous-search speed, optimality or hundreds-of-routes throughput claim.",
+    "Ten alternating samples are delivery validation, not a stable performance result.",
+    "Native values, costs, Mod hooks and every full native snapshot remain fresh.",
+    "Ordinary independent verification does not reuse metadata.",
+    "The native worker runtime-error gate passed; existing engine exit/resource warnings may remain.",
+    "No arbitrary Mod private-state compatibility claim."
+  ],
+  "private_game_inputs_paths_route_or_ids_included": false
+}

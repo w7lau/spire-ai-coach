@@ -101,8 +101,9 @@ public static class LocalCapture
         try
         {
             _snapshotDepth++;
+            bool metadata = LocalWorkerSnapshotMetadata.Enter();
             try { NetFullCombatState.FromRun(state.RunState, null).Serialize(writer); }
-            finally { _snapshotDepth--; }
+            finally { LocalWorkerSnapshotMetadata.Exit(metadata); _snapshotDepth--; }
             var extra = Encoding.UTF8.GetBytes($"|{state.RoundNumber}|" + string.Join(";",
                 state.Enemies.Select(e => $"{e.CombatId}:{e.Monster?.NextMove?.Id}")) + "|potions|" +
                 string.Join(";", state.Players.SelectMany(p => p.PotionSlots.Select((potion, slot) =>

@@ -1,0 +1,505 @@
+{
+  "date": "2026-10-06",
+  "source_base_commit": "98f3b6c",
+  "coach_base_version": "0.7.60",
+  "game_version": "0.111.0",
+  "workers_per_comparison": 1,
+  "frozen_mod_count": 7,
+  "route_steps": 15,
+  "native_snapshots_per_route": 20,
+  "core_tests": {
+    "passed": 380,
+    "total": 380,
+    "completed_full_passes": 2,
+    "intermediate_fixture_directory_in_use_failure": "379/380; the failed check passed 1/1 and the complete rerun passed 380/380 without product/test changes"
+  },
+  "sdk_metadata_checks": {
+    "passed": true,
+    "reflection_getter_calls": 0,
+    "preserved_foreign_constructor_calls": 3,
+    "keyword_table_matches_native": true,
+    "altered_native_boundaries_rejected": 2,
+    "combat_or_save_created": false
+  },
+  "experiments": [
+    {
+      "implementation": "weak_metadata_cache",
+      "native_dll_sha256": "3fa70e8567ad91f94a29bb44e91478079e89c7334fa46ff53f78157aff404a84",
+      "samples": [
+        {
+          "enabled": false,
+          "warm": true,
+          "ElapsedMs": 4689,
+          "fingerprint_ms": 86.91249999999998,
+          "native_snapshots": 20,
+          "metadata": {
+            "enabled": false,
+            "condition_loads": 1323,
+            "condition_hits": 0,
+            "keyword_copies": 107,
+            "keyword_reuses": 0,
+            "boundaries": [
+              "SavedProperties.FromInternal",
+              "CardState.From"
+            ],
+            "failures": []
+          },
+          "steps": 15
+        },
+        {
+          "enabled": true,
+          "warm": true,
+          "ElapsedMs": 598,
+          "fingerprint_ms": 157.35539999999997,
+          "native_snapshots": 20,
+          "metadata": {
+            "enabled": true,
+            "condition_loads": 207,
+            "condition_hits": 1116,
+            "keyword_copies": 5,
+            "keyword_reuses": 102,
+            "boundaries": [
+              "SavedProperties.FromInternal",
+              "CardState.From"
+            ],
+            "failures": []
+          },
+          "steps": 15
+        },
+        {
+          "enabled": false,
+          "warm": false,
+          "ElapsedMs": 318,
+          "fingerprint_ms": 58.391,
+          "native_snapshots": 20,
+          "metadata": {
+            "enabled": false,
+            "condition_loads": 1323,
+            "condition_hits": 0,
+            "keyword_copies": 107,
+            "keyword_reuses": 0,
+            "boundaries": [
+              "SavedProperties.FromInternal",
+              "CardState.From"
+            ],
+            "failures": []
+          },
+          "steps": 15
+        },
+        {
+          "enabled": true,
+          "warm": false,
+          "ElapsedMs": 346,
+          "fingerprint_ms": 76.52149999999999,
+          "native_snapshots": 20,
+          "metadata": {
+            "enabled": true,
+            "condition_loads": 145,
+            "condition_hits": 1178,
+            "keyword_copies": 5,
+            "keyword_reuses": 102,
+            "boundaries": [
+              "SavedProperties.FromInternal",
+              "CardState.From"
+            ],
+            "failures": []
+          },
+          "steps": 15
+        },
+        {
+          "enabled": true,
+          "warm": false,
+          "ElapsedMs": 285,
+          "fingerprint_ms": 66.6485,
+          "native_snapshots": 20,
+          "metadata": {
+            "enabled": true,
+            "condition_loads": 145,
+            "condition_hits": 1178,
+            "keyword_copies": 5,
+            "keyword_reuses": 102,
+            "boundaries": [
+              "SavedProperties.FromInternal",
+              "CardState.From"
+            ],
+            "failures": []
+          },
+          "steps": 15
+        },
+        {
+          "enabled": false,
+          "warm": false,
+          "ElapsedMs": 248,
+          "fingerprint_ms": 59.6647,
+          "native_snapshots": 20,
+          "metadata": {
+            "enabled": false,
+            "condition_loads": 1323,
+            "condition_hits": 0,
+            "keyword_copies": 107,
+            "keyword_reuses": 0,
+            "boundaries": [
+              "SavedProperties.FromInternal",
+              "CardState.From"
+            ],
+            "failures": []
+          },
+          "steps": 15
+        },
+        {
+          "enabled": false,
+          "warm": false,
+          "ElapsedMs": 341,
+          "fingerprint_ms": 85.86749999999998,
+          "native_snapshots": 20,
+          "metadata": {
+            "enabled": false,
+            "condition_loads": 1323,
+            "condition_hits": 0,
+            "keyword_copies": 107,
+            "keyword_reuses": 0,
+            "boundaries": [
+              "SavedProperties.FromInternal",
+              "CardState.From"
+            ],
+            "failures": []
+          },
+          "steps": 15
+        },
+        {
+          "enabled": true,
+          "warm": false,
+          "ElapsedMs": 312,
+          "fingerprint_ms": 76.0848,
+          "native_snapshots": 20,
+          "metadata": {
+            "enabled": true,
+            "condition_loads": 145,
+            "condition_hits": 1178,
+            "keyword_copies": 5,
+            "keyword_reuses": 102,
+            "boundaries": [
+              "SavedProperties.FromInternal",
+              "CardState.From"
+            ],
+            "failures": []
+          },
+          "steps": 15
+        },
+        {
+          "enabled": true,
+          "warm": false,
+          "ElapsedMs": 387,
+          "fingerprint_ms": 76.4929,
+          "native_snapshots": 20,
+          "metadata": {
+            "enabled": true,
+            "condition_loads": 145,
+            "condition_hits": 1178,
+            "keyword_copies": 5,
+            "keyword_reuses": 102,
+            "boundaries": [
+              "SavedProperties.FromInternal",
+              "CardState.From"
+            ],
+            "failures": []
+          },
+          "steps": 15
+        },
+        {
+          "enabled": false,
+          "warm": false,
+          "ElapsedMs": 252,
+          "fingerprint_ms": 56.9339,
+          "native_snapshots": 20,
+          "metadata": {
+            "enabled": false,
+            "condition_loads": 1323,
+            "condition_hits": 0,
+            "keyword_copies": 107,
+            "keyword_reuses": 0,
+            "boundaries": [
+              "SavedProperties.FromInternal",
+              "CardState.From"
+            ],
+            "failures": []
+          },
+          "steps": 15
+        }
+      ],
+      "measured_statistics": {
+        "disabled": {
+          "elapsed_median_ms": 285.0,
+          "elapsed_mean_ms": 289.75,
+          "fingerprint_median_ms": 59.02785
+        },
+        "enabled": {
+          "elapsed_median_ms": 329.0,
+          "elapsed_mean_ms": 332.5,
+          "fingerprint_median_ms": 76.28885
+        }
+      },
+      "native_state_rng_actions_choices_history_and_settlement_match": true,
+      "ordinary_verified_steps": 15,
+      "ordinary_verification_metadata": {
+        "enabled": false,
+        "condition_loads": 2811,
+        "condition_hits": 0,
+        "keyword_copies": 240,
+        "keyword_reuses": 0,
+        "boundaries": [
+          "SavedProperties.FromInternal",
+          "CardState.From"
+        ],
+        "failures": []
+      }
+    },
+    {
+      "implementation": "snapshot_scoped_gate_and_bounded_thread_cache",
+      "native_dll_sha256": "d2dd2921f0ced1d493cd008a5c8cb79478dcb9c0a124b48c303227d92620e28b",
+      "samples": [
+        {
+          "enabled": false,
+          "warm": true,
+          "ElapsedMs": 3332,
+          "fingerprint_ms": 89.8842,
+          "native_snapshots": 20,
+          "metadata": {
+            "enabled": false,
+            "condition_loads": 1323,
+            "condition_hits": 0,
+            "keyword_copies": 107,
+            "keyword_reuses": 0,
+            "boundaries": [
+              "SavedProperties.FromInternal",
+              "CardState.From"
+            ],
+            "failures": []
+          },
+          "steps": 15
+        },
+        {
+          "enabled": true,
+          "warm": true,
+          "ElapsedMs": 556,
+          "fingerprint_ms": 166.1031,
+          "native_snapshots": 20,
+          "metadata": {
+            "enabled": true,
+            "condition_loads": 207,
+            "condition_hits": 1116,
+            "keyword_copies": 5,
+            "keyword_reuses": 102,
+            "boundaries": [
+              "SavedProperties.FromInternal",
+              "CardState.From"
+            ],
+            "failures": []
+          },
+          "steps": 15
+        },
+        {
+          "enabled": false,
+          "warm": false,
+          "ElapsedMs": 276,
+          "fingerprint_ms": 64.5124,
+          "native_snapshots": 20,
+          "metadata": {
+            "enabled": false,
+            "condition_loads": 1323,
+            "condition_hits": 0,
+            "keyword_copies": 107,
+            "keyword_reuses": 0,
+            "boundaries": [
+              "SavedProperties.FromInternal",
+              "CardState.From"
+            ],
+            "failures": []
+          },
+          "steps": 15
+        },
+        {
+          "enabled": true,
+          "warm": false,
+          "ElapsedMs": 251,
+          "fingerprint_ms": 58.443099999999994,
+          "native_snapshots": 20,
+          "metadata": {
+            "enabled": true,
+            "condition_loads": 145,
+            "condition_hits": 1178,
+            "keyword_copies": 5,
+            "keyword_reuses": 102,
+            "boundaries": [
+              "SavedProperties.FromInternal",
+              "CardState.From"
+            ],
+            "failures": []
+          },
+          "steps": 15
+        },
+        {
+          "enabled": true,
+          "warm": false,
+          "ElapsedMs": 315,
+          "fingerprint_ms": 83.68979999999999,
+          "native_snapshots": 20,
+          "metadata": {
+            "enabled": true,
+            "condition_loads": 145,
+            "condition_hits": 1178,
+            "keyword_copies": 5,
+            "keyword_reuses": 102,
+            "boundaries": [
+              "SavedProperties.FromInternal",
+              "CardState.From"
+            ],
+            "failures": []
+          },
+          "steps": 15
+        },
+        {
+          "enabled": false,
+          "warm": false,
+          "ElapsedMs": 321,
+          "fingerprint_ms": 75.7714,
+          "native_snapshots": 20,
+          "metadata": {
+            "enabled": false,
+            "condition_loads": 1323,
+            "condition_hits": 0,
+            "keyword_copies": 107,
+            "keyword_reuses": 0,
+            "boundaries": [
+              "SavedProperties.FromInternal",
+              "CardState.From"
+            ],
+            "failures": []
+          },
+          "steps": 15
+        },
+        {
+          "enabled": false,
+          "warm": false,
+          "ElapsedMs": 304,
+          "fingerprint_ms": 75.52150000000002,
+          "native_snapshots": 20,
+          "metadata": {
+            "enabled": false,
+            "condition_loads": 1323,
+            "condition_hits": 0,
+            "keyword_copies": 107,
+            "keyword_reuses": 0,
+            "boundaries": [
+              "SavedProperties.FromInternal",
+              "CardState.From"
+            ],
+            "failures": []
+          },
+          "steps": 15
+        },
+        {
+          "enabled": true,
+          "warm": false,
+          "ElapsedMs": 286,
+          "fingerprint_ms": 66.2083,
+          "native_snapshots": 20,
+          "metadata": {
+            "enabled": true,
+            "condition_loads": 145,
+            "condition_hits": 1178,
+            "keyword_copies": 5,
+            "keyword_reuses": 102,
+            "boundaries": [
+              "SavedProperties.FromInternal",
+              "CardState.From"
+            ],
+            "failures": []
+          },
+          "steps": 15
+        },
+        {
+          "enabled": true,
+          "warm": false,
+          "ElapsedMs": 337,
+          "fingerprint_ms": 78.1665,
+          "native_snapshots": 20,
+          "metadata": {
+            "enabled": true,
+            "condition_loads": 145,
+            "condition_hits": 1178,
+            "keyword_copies": 5,
+            "keyword_reuses": 102,
+            "boundaries": [
+              "SavedProperties.FromInternal",
+              "CardState.From"
+            ],
+            "failures": []
+          },
+          "steps": 15
+        },
+        {
+          "enabled": false,
+          "warm": false,
+          "ElapsedMs": 317,
+          "fingerprint_ms": 77.41290000000001,
+          "native_snapshots": 20,
+          "metadata": {
+            "enabled": false,
+            "condition_loads": 1323,
+            "condition_hits": 0,
+            "keyword_copies": 107,
+            "keyword_reuses": 0,
+            "boundaries": [
+              "SavedProperties.FromInternal",
+              "CardState.From"
+            ],
+            "failures": []
+          },
+          "steps": 15
+        }
+      ],
+      "measured_statistics": {
+        "disabled": {
+          "elapsed_median_ms": 310.5,
+          "elapsed_mean_ms": 304.5,
+          "fingerprint_median_ms": 75.64645000000002
+        },
+        "enabled": {
+          "elapsed_median_ms": 300.5,
+          "elapsed_mean_ms": 297.25,
+          "fingerprint_median_ms": 72.1874
+        }
+      },
+      "native_state_rng_actions_choices_history_and_settlement_match": true,
+      "ordinary_verified_steps": 15,
+      "ordinary_verification_metadata": {
+        "enabled": false,
+        "condition_loads": 2811,
+        "condition_hits": 0,
+        "keyword_copies": 240,
+        "keyword_reuses": 0,
+        "boundaries": [
+          "SavedProperties.FromInternal",
+          "CardState.From"
+        ],
+        "failures": []
+      }
+    }
+  ],
+  "algorithm_changed": false,
+  "stable_speedup_observed": false,
+  "default_enabled": false,
+  "installed": false,
+  "limits": [
+    "Each implementation measured four samples per mode after warming both paths once.",
+    "The fixed known route verifies execution overhead, not autonomous discovery, optimality or whole-search throughput.",
+    "The player's foreground game and eight separate resident workers were observed during these runs; their load was not controlled or stopped.",
+    "The final small median improvement is below the observed sample variation and does not establish a stable speedup.",
+    "Native cost/Mod hooks and all twenty fresh native snapshots remain; no mutable property value or combat state is cached.",
+    "Native SDK metadata callbacks and altered boundaries were checked; arbitrary Mod private state is not certified.",
+    "Existing headless exit/resource warnings remain; the owned worker game-error gate passed.",
+    "Experiments remain on a separate branch with the default flag off; the installed Mod and routine worker caches were not replaced or cleaned."
+  ],
+  "private_game_inputs_paths_route_or_ids_included": false
+}
