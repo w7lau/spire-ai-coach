@@ -1,0 +1,264 @@
+{
+  "date": "2026-10-05",
+  "purpose": "Paired production worker cold-start configurations; no full-battle algorithm rerun",
+  "game_version": "v0.111.0",
+  "game_mvid": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
+  "benchmark_source_base": "63be129",
+  "benchmark_candidate_dll_sha256": "8a1a84dddbb77b6bc7ca98f1c4faec45d01cefbf505ff41b45a9ed8dbbb0d189",
+  "benchmark_candidate_mvid": "8cdb398f-8a6f-477a-ba1c-37d61692cc3f",
+  "same_dll_and_frozen_mod_bytes": true,
+  "player_game_exited_during_startup_comparison": true,
+  "loaded_mod_count": 7,
+  "measurements": [
+    {
+      "runtime_configuration": "original",
+      "startup_wall_ms": 51633.8803,
+      "workers": 8,
+      "runtime": {
+        "server_gc": true,
+        "gc_configuration": {
+          "NoAffinitize": false,
+          "HeapCount": 16,
+          "MaxHeapCount": 0
+        },
+        "godot_max_threads": -1,
+        "ranges": {
+          "Threads": [
+            63,
+            65
+          ],
+          "PrivateBytes": [
+            771133440,
+            777142272
+          ],
+          "CpuMs": [
+            17859.375,
+            18968.75
+          ],
+          "GcPauseMs": [
+            603.018,
+            943.858
+          ]
+        }
+      },
+      "mean_phases_ms": {
+        "before_coach_init": 17279.07,
+        "scan_model_display": 1143.8,
+        "native_ExecuteEssential": 4705.79,
+        "startup_assets": 380.2
+      }
+    },
+    {
+      "runtime_configuration": "limited",
+      "startup_wall_ms": 36224.0447,
+      "workers": 8,
+      "runtime": {
+        "server_gc": true,
+        "gc_configuration": {
+          "NoAffinitize": true,
+          "HeapCount": 2,
+          "MaxHeapCount": 0
+        },
+        "godot_max_threads": 2,
+        "ranges": {
+          "Threads": [
+            36,
+            38
+          ],
+          "PrivateBytes": [
+            1065160704,
+            1084821504
+          ],
+          "CpuMs": [
+            16859.375,
+            17562.5
+          ],
+          "GcPauseMs": [
+            183.087,
+            266.525
+          ]
+        }
+      },
+      "mean_phases_ms": {
+        "before_coach_init": 9230.69,
+        "scan_model_display": 1173.98,
+        "native_ExecuteEssential": 5405.69,
+        "startup_assets": 161.75
+      }
+    },
+    {
+      "runtime_configuration": "limited",
+      "startup_wall_ms": 40728.824,
+      "workers": 8,
+      "runtime": {
+        "server_gc": true,
+        "gc_configuration": {
+          "NoAffinitize": true,
+          "HeapCount": 2,
+          "MaxHeapCount": 0
+        },
+        "godot_max_threads": 2,
+        "ranges": {
+          "Threads": [
+            34,
+            38
+          ],
+          "PrivateBytes": [
+            1064894464,
+            1089671168
+          ],
+          "CpuMs": [
+            18218.75,
+            19156.25
+          ],
+          "GcPauseMs": [
+            200.01,
+            290.044
+          ]
+        }
+      },
+      "mean_phases_ms": {
+        "before_coach_init": 9124.73,
+        "scan_model_display": 893.79,
+        "native_ExecuteEssential": 7173.09,
+        "startup_assets": 192.58
+      }
+    }
+  ],
+  "native_fixed_prefix": {
+    "passed": true,
+    "samples": [
+      {
+        "index": 0,
+        "order": "MonteCarlo",
+        "ElapsedMs": 5810,
+        "steps": 25,
+        "identicalNativeStateRngHistoryAndHealth": true
+      },
+      {
+        "index": 1,
+        "order": "TurnFrontier",
+        "ElapsedMs": 6647,
+        "steps": 25,
+        "identicalNativeStateRngHistoryAndHealth": true
+      },
+      {
+        "index": 2,
+        "order": "MonteCarlo",
+        "ElapsedMs": 5710,
+        "steps": 25,
+        "identicalNativeStateRngHistoryAndHealth": true
+      },
+      {
+        "index": 3,
+        "order": "TurnFrontier",
+        "ElapsedMs": 6359,
+        "steps": 25,
+        "identicalNativeStateRngHistoryAndHealth": true
+      },
+      {
+        "index": 4,
+        "order": "MonteCarlo",
+        "ElapsedMs": 5828,
+        "steps": 25,
+        "identicalNativeStateRngHistoryAndHealth": true
+      },
+      {
+        "index": 5,
+        "order": "TurnFrontier",
+        "ElapsedMs": 6389,
+        "steps": 25,
+        "identicalNativeStateRngHistoryAndHealth": true
+      },
+      {
+        "index": 6,
+        "order": "MonteCarlo",
+        "ElapsedMs": 6030,
+        "steps": 25,
+        "identicalNativeStateRngHistoryAndHealth": true
+      },
+      {
+        "index": 7,
+        "order": "TurnFrontier",
+        "ElapsedMs": 6355,
+        "steps": 25,
+        "identicalNativeStateRngHistoryAndHealth": true
+      }
+    ]
+  },
+  "fixture_correction": "An initial comparison dispatched the seed to nonzero partitions, which do not seed TurnFrontier. Correct standalone partition 0/1 comparisons passed all 8; no product/checkpoint relaxation.",
+  "limits": [
+    "Single original configuration run and two limited runs; OS caches and unrelated desktop work were not fully controlled.",
+    "Wall time saved 10.9-15.4 seconds (21-30%); not a universal speed guarantee.",
+    "Server GC retained; lower thread counts did not reduce this sample's private memory.",
+    "Nested or parallel phase totals cannot be added into user waiting time.",
+    "25-step fixed prefix covers native action/state/RNG/history/health equality, not full-battle optimality or arbitrary Mod compatibility.",
+    "The final 0.7.59 build also incorporates published 0.7.58 finisher changes and is checked separately below."
+  ],
+  "final_059_native_acceptance": {
+    "version": "0.7.59",
+    "dll_sha256": "b345a1031cd01d36ea2a39db0fcf5283dd4b0e85518c3705da3a0fd067409a3f",
+    "mvid": "96dab372-3c02-4521-8a76-a23f650cdc67",
+    "exact_prepared_package": true,
+    "prefix_validation": {
+      "passed": true,
+      "samples": [
+        {
+          "index": 0,
+          "order": "MonteCarlo",
+          "ElapsedMs": 5317,
+          "steps": 25,
+          "identicalNativeStateRngHistoryAndHealth": true
+        },
+        {
+          "index": 1,
+          "order": "TurnFrontier",
+          "ElapsedMs": 5717,
+          "steps": 25,
+          "identicalNativeStateRngHistoryAndHealth": true
+        }
+      ]
+    },
+    "startup_profile_effective": true,
+    "runtime_reports": [
+      {
+        "ServerGc": true,
+        "GcConfiguration": {
+          "NoAffinitize": true,
+          "HeapCount": 2,
+          "MaxHeapCount": 0
+        },
+        "Threads": 38,
+        "PrivateBytes": 1089421312,
+        "CpuMs": 16359.375,
+        "GcPauseMs": 173.34,
+        "GodotMaxThreads": 2
+      },
+      {
+        "ServerGc": true,
+        "GcConfiguration": {
+          "NoAffinitize": true,
+          "HeapCount": 2,
+          "MaxHeapCount": 0
+        },
+        "Threads": 39,
+        "PrivateBytes": 1089437696,
+        "CpuMs": 16843.75,
+        "GcPauseMs": 183.732,
+        "GodotMaxThreads": 2
+      }
+    ],
+    "performance_comparison": false
+  },
+  "installation": {
+    "previous_version": "0.7.58",
+    "version": "0.7.59",
+    "dll_sha256": "b345a1031cd01d36ea2a39db0fcf5283dd4b0e85518c3705da3a0fd067409a3f",
+    "zip_sha256": "20bf69cd8d1678bf8466dc65d24d63489d8dd2c63c6f2e6992e290ceb9bfece3",
+    "protected_file_paths_unchanged": 125,
+    "backup_hashes_verified": true,
+    "cache_cleanup": false,
+    "started_player": false,
+    "utc": "2026-10-05T15:28:13.3639897Z"
+  }
+}

@@ -1,0 +1,4 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><AssemblyName>WorkerStartup</AssemblyName></PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../src/SpireAiCoach.Mod/SpireAiCoach.Mod.csproj" /></ItemGroup>
+</Project>

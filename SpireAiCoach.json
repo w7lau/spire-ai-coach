@@ -3,7 +3,7 @@
   "name": "尖塔 AI 教练 / Spire AI Coach",
   "author": "w7lau",
   "description": "AI turn advice, local battle planning and optional guarded plan execution. / AI 回合指导、本地整战规划与可选方案执行。",
-  "version": "0.7.58",
+  "version": "0.7.59",
   "has_dll": true,
   "has_pck": false,
   "affects_gameplay": false,
