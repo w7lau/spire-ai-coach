@@ -301,11 +301,12 @@ public static class LocalSearchPolicy
         if (result.TurnSearch is { LossProofProbes: > 0 } proofTurns)
             lines.Add($"其中 {proofTurns.LossProofProbes} 次只检查局部损失下界，达到界限后即结束该次探查。");
         if (result.MinimumLoss is { Certificate.MaximumFinalHp: { } ceiling } && !HasMinimumProof(result))
-            lines.Add($"已确认的战后生命上界 {ceiling}，当前候选生命 {best.Hp}；尚未达到已证明的最优。");
+            lines.Add($"{(result.MinimumLoss.Certificate.ContentScoped ? "按当前玩家内容判断的" : "已确认的")}战后生命上界 {ceiling}，当前候选生命 {best.Hp}；尚未达到已证明的最优。");
         else if (result.MinimumLoss is { Certificate: { } floor } && best.NetHpLoss is > 0 && !HasMinimumProof(result))
-            lines.Add($"已确认的净损失下界 {floor.MinimumNetHpLoss}，当前候选净损失 {best.NetHpLoss}；尚未达到已证明的最优。");
+            lines.Add($"{(floor.ContentScoped ? "按当前玩家内容判断的" : "已确认的")}净损失下界 {floor.MinimumNetHpLoss}，当前候选净损失 {best.NetHpLoss}；尚未达到已证明的最优。");
         if (result.HealthBounds is { } bounds)
         {
+            if (bounds.LossProofProbes > 0) lines.Add($"另完成 {bounds.LossProofProbes} 次局部损失证明，达到不可改善的界限即结束探查。");
             if (result.TurnSearch == null) lines.Add($"按可证明的界限剪枝 {bounds.Pruned} 次。");
             if (result.Victories == 0 && bounds.KnownRecoveryChecks == 0 && bounds.UnknownRecoveryChecks == 0 &&
                 bounds.SharedIncumbentUpdates == 0) lines.Add("尚未取得完整获胜基准，暂未进行收益界限剪枝。");

@@ -18,6 +18,35 @@ internal static class MinimumLossTests
     }
     public static void Register(Action<string, Action> test, Action<string, Func<Task>> asyncTest)
     {
+        test("short loss proofs stop at irreversible HP bounds and preserve healing and cheaper potion alternatives", () =>
+        {
+            var r = Request(); var target = new LocalLossProofTarget(9, 1, 41);
+            Check(LocalMinimumLossProof.CannotImproveTarget(Bound(r, 41, 0, 1), target), "An equal HP and potion bound remained open");
+            Check(!LocalMinimumLossProof.CannotImproveTarget(Bound(r, 41, 0, 0), target), "A cheaper potion route was discarded");
+            Check(!LocalMinimumLossProof.CannotImproveTarget(Bound(r, 40, 2, 1), target), "Future healing was omitted");
+            Check(!LocalMinimumLossProof.CannotImproveTarget(Bound(r, 40, null, 1), target), "Unknown healing became a proof");
+            Check(LocalMinimumLossProof.CannotImproveTarget(Bound(r, 40, 0, 0), target), "A worse HP branch failed to close");
+        });
+        asyncTest("both algorithms claim distinct short proof prefixes independently of rollout queues", async () =>
+        {
+            var r = Request(); using var broker = new LocalMinimumLossBroker(r, 2);
+            var command = r with { MinimumLossPipe = broker.PipeName };
+            using var left = new LocalMinimumLossClient(command);
+            using var right = new LocalMinimumLossClient(command with { Partition = 1 });
+            var legal = new[] { Move(1), Move(2), Move(3), Move(4) };
+            var hint = new LocalTurnHint(50, 50, 100, 100, MaximumFurtherHpGain: 0);
+            LocalLossProofTrial Trial(LocalAction a, bool won = false) =>
+                new(50, [new(a, legal, [], Bound(r, 38), BeforeHint: hint)], 38, Won: won);
+            left.Observe(Trial(legal[0], true));
+            var claims = await Task.WhenAll(Task.Run(left.TakeFocus), Task.Run(right.TakeFocus));
+            Check(claims.All(c => c != null) && claims[0]!.Prefix[0] != claims[1]!.Prefix[0], "Concurrent workers repeated the same proof prefix");
+            left.Observe(Trial(claims[0]!.Prefix[0]));
+            var next = left.TakeFocus();
+            Check(next != null && next.Prefix[0] != claims[1]!.Prefix[0], "An active proof lease was assigned twice");
+            left.Observe(Trial(next!.Prefix[0])); right.Observe(Trial(claims[1]!.Prefix[0]));
+            Check(broker.Status.Certificate is { MinimumNetHpLoss: 12, MaximumFinalHp: 38 }, "Partial settled prefixes failed to establish the root bound");
+            Check(left.TakeFocus() == null && right.TakeFocus() == null, "Closed bounds continued to schedule proof work");
+        });
         test("loss proof targets open early turns without needing later battle terminals", () =>
         {
             var r = Request(); var proof = new LocalMinimumLossProof(r);

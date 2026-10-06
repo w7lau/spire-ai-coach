@@ -14,6 +14,21 @@ var estimator = Activator.CreateInstance(estimatorType, request)!;
 var describe = estimatorType.GetMethod("Describe", BindingFlags.NonPublic | BindingFlags.Instance)!;
 var describeContent = estimatorType.GetMethod("DescribeContent", BindingFlags.NonPublic | BindingFlags.Instance)!;
 var output = new List<object>();
+foreach (var (type, expectedHealing) in new[] {
+    (typeof(RecoveryModels.HealingRelic), true), (typeof(RecoveryModels.NeutralRelic), false) })
+{
+    var effects = describeContent.Invoke(estimator, [type])!;
+    bool healing = (bool)effects.GetType().GetProperty("ActiveRecovery")!.GetValue(effects)!;
+    bool uncertain = (bool)effects.GetType().GetProperty("Uncertain")!.GetValue(effects)!;
+    if (healing != expectedHealing || uncertain)
+        throw new InvalidOperationException("Cross-namespace player helper was not resolved: " + type.FullName);
+    output.Add(new { PlayerSource = type.FullName, CrossNamespaceHelper = true, ActiveRecovery = healing, Uncertain = uncertain,
+        Executed = false });
+}
+var opaque = describeContent.Invoke(estimator, [typeof(RecoveryModels.ReflectionRelic)])!;
+if (!(bool)opaque.GetType().GetProperty("Uncertain")!.GetValue(opaque)!)
+    throw new InvalidOperationException("Unresolved reflection inside a player source was treated as known");
+output.Add(new { PlayerSource = typeof(RecoveryModels.ReflectionRelic).FullName, UnresolvedSourceRemainsUnknown = true, Executed = false });
 foreach (var (property, field) in new[] { ("CurrentHp", "_currentHp"), ("MaxHp", "_maxHp") })
 {
     var setter = typeof(Creature).GetProperty(property)!.GetSetMethod(true)!;
@@ -133,3 +148,21 @@ public static class ExternalRecoveryFixture
     private static void HealingEvent() { _ = Healing(); }
 }
 public class ExternalVirtualCallback { public virtual void Run() { } }
+
+namespace RecoveryModels
+{
+    public abstract class HealingRelic : RelicModel
+    { public Task AfterFixture() => RecoveryHelpers.Commands.Heal(); }
+    public abstract class NeutralRelic : RelicModel
+    { public int AfterFixture() => RecoveryHelpers.Commands.Neutral(); }
+    public abstract class ReflectionRelic : RelicModel
+    { public void AfterFixture() => typeof(RecoveryHelpers.Commands).GetMethod("Heal")!.Invoke(null, null); }
+}
+namespace RecoveryHelpers
+{
+    public static class Commands
+    {
+        public static Task Heal() => CreatureCmd.Heal(null!, 1, true);
+        public static int Neutral() => 1;
+    }
+}

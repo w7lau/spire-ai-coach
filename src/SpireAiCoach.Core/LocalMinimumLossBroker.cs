@@ -9,13 +9,14 @@ namespace SpireAiCoach.Core;
 // share this proof; their queues and heuristics are deliberately independent.
 public sealed class LocalMinimumLossBroker : IDisposable
 {
-    internal sealed record Command(string Scope, int Owner, LocalLossProofTrial? Trial = null);
-    internal sealed record Reply(LocalMinimumLossStatus Status, string? Error = null);
+    internal sealed record Command(string Scope, int Owner, LocalLossProofTrial? Trial = null, bool ClaimFocus = false);
+    internal sealed record Reply(LocalMinimumLossStatus Status, string? Error = null, LocalLossProofFocus? Focus = null);
     private readonly object _gate = new();
     private readonly LocalMinimumLossProof _proof;
     private readonly string _scope;
     private readonly int _maximum;
     private readonly HashSet<int> _submitted = [], _confirmed = [];
+    private readonly Dictionary<int, string> _claims = [];
     private readonly CancellationTokenSource _stop = new();
     private readonly ConcurrentDictionary<NamedPipeServerStream, byte> _pipes = new();
     private readonly List<Task> _sessions = [];
@@ -69,15 +70,27 @@ public sealed class LocalMinimumLossBroker : IDisposable
                     else
                     {
                         owner = c.Owner;
-                        if (c.Trial != null) { _submitted.Add(c.Owner); _proof.Observe(c.Trial); }
-                        reply = new(Status);
+                        if (c.Trial != null)
+                        { _claims.Remove(c.Owner); _submitted.Add(c.Owner); _proof.Observe(c.Trial); }
+                        LocalLossProofFocus? focus = null;
+                        if (c.ClaimFocus && !_claims.ContainsKey(c.Owner))
+                        {
+                            focus = (_proof.Status.Focus ?? []).FirstOrDefault(f =>
+                                !_claims.ContainsValue(LocalTurnSearch.HistoryKey(f.Prefix)));
+                            if (focus != null) _claims.Add(c.Owner, LocalTurnSearch.HistoryKey(focus.Prefix));
+                        }
+                        reply = new(Status, Focus: focus);
                     }
                 }
                 await writer.WriteLineAsync(JsonSerializer.Serialize(reply));
             }
         }
         catch (Exception ex) when (ex is IOException or OperationCanceledException or ObjectDisposedException or JsonException) { }
-        finally { _pipes.TryRemove(pipe, out _); pipe.Dispose(); }
+        finally
+        {
+            lock (_gate) if (owner.HasValue) _claims.Remove(owner.Value);
+            _pipes.TryRemove(pipe, out _); pipe.Dispose();
+        }
     }
     public void Dispose()
     {
@@ -106,13 +119,18 @@ public sealed class LocalMinimumLossClient : IDisposable
     }
     public LocalMinimumLossStatus Observe(LocalLossProofTrial? trial)
     {
-        var command = JsonSerializer.Serialize(new LocalMinimumLossBroker.Command(_scope, _owner, trial));
+        return Send(trial).Status;
+    }
+    public LocalLossProofFocus? TakeFocus() => Send(claimFocus: true).Focus;
+    private LocalMinimumLossBroker.Reply Send(LocalLossProofTrial? trial = null, bool claimFocus = false)
+    {
+        var command = JsonSerializer.Serialize(new LocalMinimumLossBroker.Command(_scope, _owner, trial, claimFocus));
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         _writer.WriteLineAsync(command.AsMemory(), deadline.Token).GetAwaiter().GetResult();
         var response = _reader.ReadLineAsync(deadline.Token).AsTask().GetAwaiter().GetResult() ?? throw new IOException("Loss proof broker closed");
         var reply = JsonSerializer.Deserialize<LocalMinimumLossBroker.Reply>(response) ?? throw new InvalidDataException("Empty loss proof reply");
         if (reply.Error != null) throw new InvalidDataException(reply.Error);
-        return Status = reply.Status;
+        Status = reply.Status; return reply;
     }
     public void Dispose()
     {

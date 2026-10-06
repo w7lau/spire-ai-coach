@@ -68,6 +68,10 @@ public sealed class LocalMinimumLossProof(LocalSearchRequest request, int capaci
         Focus: _focus ??= FindFocus());
     public void Invalidate(string reason) { if (_invalid.Length == 0) _invalid = reason; _focus = []; }
 
+    public static bool CannotImproveTarget(LocalHealthEnvelope state, LocalLossProofTarget? target) =>
+        target?.FinalHp is { } hp && LocalHealthBound.MaximumFinalHp(state) is { } ceiling &&
+        (ceiling < hp || ceiling == hp && state.PotionsUsed >= target.PotionsUsed);
+
     public void Observe(LocalLossProofTrial trial)
     {
         if (_invalid.Length > 0 || trial.Steps.Length == 0) return;

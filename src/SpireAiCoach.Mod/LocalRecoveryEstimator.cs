@@ -10,10 +10,8 @@ using SpireAiCoach.Core;
 
 namespace SpireAiCoach.Mod;
 
-// A conservative code certificate, NOT an observed-healing estimate or card-name
-// table. Only native gameplay callbacks with understood boundaries can establish
-// no healing. Generation, arbitrary setters, external code and repeated healing
-// leave the ceiling unknown; the native simulator still explores those branches.
+// Read the player's effect-source closure once. Unrelated global Mods do not
+// invalidate the chosen domain; unresolved calls inside a held source do.
 internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
 {
     private sealed record Proof(string? Unknown, int VictoryHeals, Type[] References, string? UnknownAt = null,
@@ -21,9 +19,10 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
     private readonly Dictionary<Type, Proof> _proofs = [];
     private readonly Dictionary<MethodBase, LocalInstruction[]?> _bodies = [];
     private sealed record ContentEffects(bool ActiveRecovery, int VictoryHeals, int VictoryMaxHpGains,
-        bool Uncertain, Type[] Generated, bool DynamicMaxHp = false, bool UsesCardPool = false);
+        bool Uncertain, Type[] Generated, bool DynamicMaxHp = false, bool UsesCardPool = false, string? UncertainAt = null);
     private readonly Dictionary<Type, ContentEffects> _content = [];
     private LocalRecoveryAllowance? _allowance;
+    private Type[] _sourceTypes = [];
     public LocalHealthTarget? HealthTarget { get; private set; }
     public string? SharedDirectory { get; set; }
     public int TargetAnalysisCount { get; private set; }
@@ -53,9 +52,8 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
         ["PotionCmd"] = ["Discard", "TryToProcure"]
     };
 
-    // One closure per frozen search root. Generation/repeated effects are
-    // already unknown at the root; fixed terminal gains are safe optimistic
-    // allowances throughout its branches. Never rescan after individual moves.
+    // One closure per frozen search root. Fixed gains and repeatable healing
+    // caps are reused throughout the branches, never rescanned after a move.
     public int AnalysisCount { get; private set; }
     public double AnalysisElapsedMs { get; private set; }
     public int MethodBodyReads => _bodies.Count;
@@ -84,13 +82,14 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
             return new(null, "当前游戏版本的回复边界尚未认证");
         try
         {
-            AbstractModel[]? models = null;
+            AbstractModel[]? models = player == null ? null : CurrentModels(player);
+            if (player != null) _sourceTypes = PlayerSources(player, models!).Select(m => m.GetType()).Distinct().ToArray();
             if (player != null && request.StopOnZeroLoss && !request.StopOnFirstWin && !LocalSearchPolicy.HasSpecificGoal(request))
             {
                 LocalHealthTarget CalculateTarget()
                 {
                     long started = Stopwatch.GetTimestamp(); TargetAnalysisCount++;
-                    try { return ContentTarget(player, models = CurrentModels(player)); }
+                    try { return ContentTarget(player, models!); }
                     finally { TargetAnalysisElapsedMs = Stopwatch.GetElapsedTime(started).TotalMilliseconds; }
                 }
                 HealthTarget = SharedDirectory == null ? CalculateTarget() :
@@ -115,8 +114,15 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                     continue;
                 }
                 var effect = DescribeContent(type);
+                if (effect.Uncertain)
+                {
+                    if (HealthTarget != null) HealthTarget = HealthTarget with { FullHealth = true,
+                        Basis = "当前玩家效果包含尚未解析的动态调用，目标为战后满血", Uncertain = true };
+                    return new(null, "当前玩家效果的辅助调用尚未完整解析：" + (effect.UncertainAt ?? type.FullName), ContentScoped: true);
+                }
                 active |= effect.ActiveRecovery; growth |= effect.DynamicMaxHp;
                 foreach (var reference in effect.Generated) pending.Enqueue(reference);
+                _sourceTypes = _sourceTypes.Concat(effect.Generated).Distinct().ToArray();
                 if (effect.UsesCardPool && !poolRead)
                 {
                     poolRead = true;
@@ -214,6 +220,10 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
     {
         if (_content.TryGetValue(type, out var cached)) return cached;
         bool active = false, uncertain = false, growth = false, pool = false;
+        string? uncertainAt = null;
+        void Unknown(MethodBase method, MethodBase? caller = null)
+        { uncertain = true; uncertainAt ??= (caller == null ? "" : caller.DeclaringType?.FullName + "." + caller.Name + " -> ") +
+            method.DeclaringType?.FullName + "." + method.Name; }
         int heals = 0, gains = 0;
         var generated = new HashSet<Type>();
         var queue = new Queue<(MethodBase Method, bool Terminal, bool Direct)>();
@@ -238,7 +248,14 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
         while (queue.TryDequeue(out var entry))
         {
             if (!seen.Add(entry)) continue;
-            if (seen.Count > 256) { active = uncertain = true; break; }
+            var sourceOwner = entry.Method.DeclaringType;
+            while (sourceOwner?.DeclaringType != null) sourceOwner = sourceOwner.DeclaringType;
+            if (sourceOwner != null && typeof(RelicModel).IsAssignableFrom(sourceOwner) &&
+                !_sourceTypes.Any(sourceOwner.IsAssignableFrom) && sourceOwner != type &&
+                (entry.Method.Name.StartsWith("After", StringComparison.Ordinal) ||
+                 entry.Method.Name.StartsWith("Before", StringComparison.Ordinal) ||
+                 entry.Method.DeclaringType != sourceOwner)) continue;
+            if (seen.Count > 512) { active = true; Unknown(entry.Method); break; }
             var (method, terminal, direct) = entry;
             var state = method.GetCustomAttribute<AsyncStateMachineAttribute>()?.StateMachineType ??
                 method.GetCustomAttribute<IteratorStateMachineAttribute>()?.StateMachineType;
@@ -249,7 +266,7 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                 foreach (var patch in patches.Prefixes.Concat(patches.Postfixes).Concat(patches.Finalizers).Concat(patches.Transpilers)
                     .Where(p => !OurPatch(p.owner))) queue.Enqueue((patch.PatchMethod, false, false));
             var code = Body(method);
-            if (code == null) { uncertain = true; continue; }
+            if (code == null) { Unknown(method); continue; }
             for (int i = 0; i < code.Length; i++)
             {
                 // Relevant patch builders can name the HP API they insert.
@@ -263,10 +280,9 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                 { active = true; growth |= field.Name == "_maxHp"; }
                 if (code[i].Operand is not MethodBase called) continue;
                 var declaring = called.DeclaringType!;
-                var calledPatches = Harmony.GetPatchInfo(called);
-                if (calledPatches != null)
-                    foreach (var patch in calledPatches.Prefixes.Concat(calledPatches.Postfixes).Concat(calledPatches.Finalizers).Concat(calledPatches.Transpilers)
-                        .Where(p => !OurPatch(p.owner))) queue.Enqueue((patch.PatchMethod, false, false));
+                // Native command rewrites are global Mod behavior, outside the
+                // selected held-player-source domain. Patches on the concrete
+                // source callbacks/helpers are read when those methods are queued.
                 if (declaring.FullName == "MegaCrit.Sts2.Core.Commands.CreatureCmd" && called.Name is "Heal" or "GainMaxHp")
                 {
                     bool gain = called.Name == "GainMaxHp";
@@ -288,20 +304,43 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                 // Core commands/entities are boundaries; e.g. healing a summoned
                 // ally does not create a new held player's recovery source.
                 if (declaring.Assembly == Native && !typeof(AbstractModel).IsAssignableFrom(declaring)) continue;
-                if (called.IsSpecialName || called.IsConstructor || PureModelMethods.Contains(called.Name)) continue;
+                if (PureModelMethods.Contains(called.Name) && declaring.Assembly == Native) continue;
+                if (declaring.Assembly == Native && (called.IsSpecialName || called.IsConstructor)) continue;
+                // A queried but absent relic cannot receive an instance callback.
+                // Static helpers remain part of the calling source's code closure.
+                if (!called.IsStatic && typeof(RelicModel).IsAssignableFrom(declaring) &&
+                    !_sourceTypes.Any(declaring.IsAssignableFrom)) continue;
                 bool own = false;
                 for (var parent = declaring; parent != null; parent = parent.DeclaringType)
-                    if (parent == type || parent.IsAssignableFrom(type) && parent != typeof(AbstractModel) &&
+                    if (parent == type || parent.IsAssignableFrom(type) && parent != typeof(object) && parent != typeof(AbstractModel) &&
                         parent != typeof(CardModel) && parent != typeof(RelicModel) && parent != typeof(PowerModel) &&
                         parent != typeof(PotionModel) && parent != typeof(CharacterModel)) { own = true; break; }
-                if (own || declaring.Assembly == type.Assembly && declaring.Assembly != Native &&
-                    !typeof(AbstractModel).IsAssignableFrom(declaring) && declaring.Namespace == type.Namespace)
-                    queue.Enqueue((called, terminal, false));
-                else if (declaring.Assembly != Native && declaring.Namespace?.StartsWith("System", StringComparison.Ordinal) != true)
-                    uncertain = true;
+                bool framework = declaring.Assembly == typeof(object).Assembly ||
+                    declaring.Assembly.GetName().Name is { } assemblyName &&
+                    (assemblyName.StartsWith("System.", StringComparison.Ordinal) || assemblyName == "GodotSharp");
+                if (declaring.Namespace?.StartsWith("System.Reflection", StringComparison.Ordinal) == true &&
+                    (called.Name is "Invoke" or "SetValue" or "CreateDelegate" ||
+                     called.Name == "GetValue" && !typeof(FieldInfo).IsAssignableFrom(declaring))) Unknown(called, method);
+                if (own || declaring.Assembly != Native && !framework)
+                {
+                    if (called is MethodInfo virtualCall && virtualCall.IsVirtual && !virtualCall.IsFinal && !own)
+                    {
+                        var candidates = declaring.Namespace?.StartsWith("BaseLib.Utils.Patching", StringComparison.Ordinal) == true ?
+                            declaring.Assembly.GetTypes().Where(t => !t.IsAbstract && declaring.IsAssignableFrom(t)) :
+                            _sourceTypes.Where(declaring.IsAssignableFrom);
+                        var implementations = candidates.SelectMany(t =>
+                            declaring.IsInterface ? t.GetInterfaceMap(declaring).TargetMethods :
+                            t.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                                .Where(m => m.GetBaseDefinition() == virtualCall.GetBaseDefinition())).Distinct().ToArray();
+                        foreach (var implementation in implementations) queue.Enqueue((implementation, terminal, false));
+                        if (implementations.Length == 0 && !typeof(AbstractModel).IsAssignableFrom(declaring)) Unknown(called);
+                        if (!called.IsAbstract) queue.Enqueue((called, terminal, false));
+                    }
+                    else queue.Enqueue((called, terminal, false));
+                }
             }
         }
-        return _content[type] = new(active, heals, gains, uncertain, generated.ToArray(), growth, pool);
+        return _content[type] = new(active, heals, gains, uncertain, generated.ToArray(), growth, pool, uncertainAt);
     }
 
     private LocalInstruction[]? Body(MethodBase method)
@@ -347,7 +386,7 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                 return new { Type = t.FullName, proof.Unknown, proof.UnknownAt, proof.VictoryHeals,
                     proof.VictoryMaxHpGains, References = proof.References.Select(r => r.FullName).ToArray(),
                     Content = new { content.ActiveRecovery, content.VictoryHeals, content.VictoryMaxHpGains,
-                        content.Uncertain, Generated = content.Generated.Select(g => g.FullName).ToArray() } };
+                        content.Uncertain, content.UncertainAt, Generated = content.Generated.Select(g => g.FullName).ToArray() } };
             }).ToArray();
     }
 

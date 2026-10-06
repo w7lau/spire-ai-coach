@@ -27,4 +27,5 @@ public sealed record LocalHealthTarget(string Scope, int StartingHp, int TargetH
 // Kept separate from duplicate-history counters and available to both algorithms.
 public sealed record LocalHealthBoundStats(int Pruned = 0, int KnownRecoveryChecks = 0,
     int UnknownRecoveryChecks = 0, int SharedIncumbentUpdates = 0, string UnknownReason = "",
-    int TargetAnalyses = 0, double TargetAnalysisMs = 0, int MethodBodyReads = 0, bool ContentScoped = false);
+    int TargetAnalyses = 0, double TargetAnalysisMs = 0, int MethodBodyReads = 0, bool ContentScoped = false,
+    int LossProofProbes = 0);

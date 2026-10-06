@@ -1,0 +1,325 @@
+{
+  "version": "0.7.69",
+  "date": "2026-10-06",
+  "scope": "Native partial loss-bound proofs without battle terminals; player-source helper closure",
+  "testedDllSha256": "25e660091d7e316966c33ce7d3434268e5602c048ba8e9b4db205218c8adc354",
+  "packageMatched": true,
+  "coreChecks": {
+    "passed": 413,
+    "failed": 0,
+    "modBuildWarnings": 0,
+    "modBuildErrors": 0
+  },
+  "nativeSearches": [
+    {
+      "algorithm": "MonteCarlo",
+      "budget": {
+        "BudgetSeconds": 60,
+        "MaxNodes": 64,
+        "MaxRounds": 64,
+        "Workers": 8,
+        "IncludePotions": true
+      },
+      "status": "done",
+      "fullTrials": 6,
+      "victories": 6,
+      "healthBounds": {
+        "Pruned": 511,
+        "KnownRecoveryChecks": 6538,
+        "UnknownRecoveryChecks": 0,
+        "SharedIncumbentUpdates": 8,
+        "UnknownReason": "",
+        "TargetAnalyses": 1,
+        "TargetAnalysisMs": 35.9667,
+        "MethodBodyReads": 7168,
+        "ContentScoped": true,
+        "LossProofProbes": 1564
+      },
+      "best": {
+        "Won": true,
+        "Dead": false,
+        "StartingHp": 53,
+        "Hp": 44,
+        "MaxHp": 75,
+        "NetHpLoss": 9,
+        "EnemyHp": 0,
+        "Rounds": 4,
+        "StopReason": "胜利结算完成",
+        "steps": 20,
+        "choices": 0,
+        "potions": 1
+      },
+      "minimum": {
+        "StartingHp": 53,
+        "MinimumNetHpLoss": 0,
+        "MinimumPotionsUsed": 0,
+        "MaximumFinalHp": null,
+        "ContentScoped": true
+      },
+      "confirmed": true,
+      "invalidReason": "",
+      "stoppedOnMinimum": false,
+      "pendingPrefixes": 1278,
+      "simulationErrors": 0,
+      "independentVerifications": 1,
+      "observedPartialProofsInRetainedTrace": 502,
+      "partialProofExamples": [
+        {
+          "hp": "24",
+          "loss": "29",
+          "rounds": "4",
+          "potions": "2",
+          "complete": "False",
+          "probe": "True",
+          "limited": "False"
+        },
+        {
+          "hp": "39",
+          "loss": "14",
+          "rounds": "1",
+          "potions": "0",
+          "complete": "False",
+          "probe": "True",
+          "limited": "False"
+        },
+        {
+          "hp": "44",
+          "loss": "9",
+          "rounds": "1",
+          "potions": "2",
+          "complete": "False",
+          "probe": "True",
+          "limited": "False"
+        },
+        {
+          "hp": "44",
+          "loss": "9",
+          "rounds": "1",
+          "potions": "2",
+          "complete": "False",
+          "probe": "True",
+          "limited": "False"
+        },
+        {
+          "hp": "44",
+          "loss": "9",
+          "rounds": "1",
+          "potions": "2",
+          "complete": "False",
+          "probe": "True",
+          "limited": "False"
+        }
+      ],
+      "searchElapsedMs": 63142,
+      "totalElapsedMs": 173836
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "budget": {
+        "BudgetSeconds": 60,
+        "MaxNodes": 64,
+        "MaxRounds": 64,
+        "Workers": 8,
+        "IncludePotions": true
+      },
+      "status": "done",
+      "fullTrials": 60,
+      "victories": 60,
+      "healthBounds": {
+        "Pruned": 1652,
+        "KnownRecoveryChecks": 6815,
+        "UnknownRecoveryChecks": 0,
+        "SharedIncumbentUpdates": 6,
+        "UnknownReason": "",
+        "TargetAnalyses": 1,
+        "TargetAnalysisMs": 37.373,
+        "MethodBodyReads": 7168,
+        "ContentScoped": true,
+        "LossProofProbes": 1566
+      },
+      "best": {
+        "Won": true,
+        "Dead": false,
+        "StartingHp": 53,
+        "Hp": 44,
+        "MaxHp": 75,
+        "NetHpLoss": 9,
+        "EnemyHp": 0,
+        "Rounds": 4,
+        "StopReason": "胜利结算完成",
+        "steps": 18,
+        "choices": 0,
+        "potions": 0
+      },
+      "minimum": {
+        "StartingHp": 53,
+        "MinimumNetHpLoss": 0,
+        "MinimumPotionsUsed": 0,
+        "MaximumFinalHp": null,
+        "ContentScoped": true
+      },
+      "confirmed": true,
+      "invalidReason": "",
+      "stoppedOnMinimum": false,
+      "pendingPrefixes": 49103,
+      "simulationErrors": 0,
+      "independentVerifications": 1,
+      "observedPartialProofsInRetainedTrace": 483,
+      "partialProofExamples": [
+        {
+          "hp": "32",
+          "loss": "21",
+          "rounds": "4",
+          "potions": "2",
+          "complete": "False",
+          "probe": "True",
+          "limited": "False"
+        },
+        {
+          "hp": "35",
+          "loss": "18",
+          "rounds": "4",
+          "potions": "2",
+          "complete": "False",
+          "probe": "True",
+          "limited": "False"
+        },
+        {
+          "hp": "35",
+          "loss": "18",
+          "rounds": "4",
+          "potions": "2",
+          "complete": "False",
+          "probe": "True",
+          "limited": "False"
+        },
+        {
+          "hp": "35",
+          "loss": "18",
+          "rounds": "4",
+          "potions": "2",
+          "complete": "False",
+          "probe": "True",
+          "limited": "False"
+        },
+        {
+          "hp": "31",
+          "loss": "22",
+          "rounds": "4",
+          "potions": "2",
+          "complete": "False",
+          "probe": "True",
+          "limited": "False"
+        }
+      ],
+      "searchElapsedMs": 62038,
+      "totalElapsedMs": 146091
+    }
+  ],
+  "nativeAudit": {
+    "allowance": {
+      "MaximumFurtherHpGain": 0,
+      "Reason": "按当前玩家内容的固定回复判断",
+      "ContentScoped": true,
+      "MaximumFinalHp": null
+    },
+    "AnalysisCount": 1,
+    "CachedReads": 10000,
+    "BoundMethodBodyReads": 896,
+    "RootUnchanged": true
+  },
+  "nativeHealing": {
+    "version": "0.7.69",
+    "passed": true,
+    "scope": "Native potion and victory-healing ordering; two algorithms; seeded mechanism probe",
+    "nativeGame": true,
+    "samples": [
+      {
+        "algorithm": "MonteCarlo",
+        "baselineHp": 106,
+        "finalHp": 156,
+        "HpChange": 56,
+        "HpLost": 0,
+        "hpGained": 56,
+        "Evaluated": 8,
+        "Victories": 8,
+        "measuredNoPotionWins": 3,
+        "measuredPotionWins": 5,
+        "ElapsedMs": 1806,
+        "finalVerifications": 1,
+        "contentCapStopChecked": true,
+        "contentCapEvaluated": 8,
+        "knownRecoveryChecks": 2,
+        "unknownRecoveryChecks": 0,
+        "fixedHealingEarlyStopChecked": true,
+        "fixedHealingFinalHp": 106,
+        "fixedHealingEvaluated": 1,
+        "StoppedOnMinimum": false,
+        "StoppedOnHealthTarget": true,
+        "executionCheckpoints": true,
+        "sourceCombatUnchanged": true
+      },
+      {
+        "algorithm": "TurnFrontier",
+        "baselineHp": 106,
+        "finalHp": 156,
+        "HpChange": 56,
+        "HpLost": 0,
+        "hpGained": 56,
+        "Evaluated": 8,
+        "Victories": 8,
+        "measuredNoPotionWins": 2,
+        "measuredPotionWins": 6,
+        "ElapsedMs": 2363,
+        "finalVerifications": 1,
+        "contentCapStopChecked": true,
+        "contentCapEvaluated": 8,
+        "knownRecoveryChecks": 2,
+        "unknownRecoveryChecks": 0,
+        "fixedHealingEarlyStopChecked": true,
+        "fixedHealingFinalHp": 106,
+        "fixedHealingEvaluated": 1,
+        "StoppedOnMinimum": false,
+        "StoppedOnHealthTarget": true,
+        "executionCheckpoints": true,
+        "sourceCombatUnchanged": true
+      }
+    ],
+    "testedDllSha256": "25e660091d7e316966c33ce7d3434268e5602c048ba8e9b4db205218c8adc354",
+    "installedDllUnchanged": true,
+    "nativeScope": "Native game with coach and private integration mod"
+  },
+  "metadata": {
+    "checks": 43,
+    "crossNamespaceHealingDetected": true,
+    "neutralHelperResolved": true,
+    "opaquePlayerReflectionRemainsUnknown": true,
+    "nativeBattleExecuted": false
+  },
+  "validationDifferences": {
+    "finalIndependentVerificationEnabled": true,
+    "unseededFrozenSearches": true,
+    "originalBudgetsAndWorkersRetained": true
+  },
+  "limitations": [
+    "Conditional on the selected held-player-source domain; arbitrary global Mod rewrites are outside it.",
+    "Loss 9 remains unproved for the frozen battle; open legal prefixes remain.",
+    "Observed traces can omit proof events when timing retention reaches its limit.",
+    "Elapsed times are not a controlled speed or quality comparison.",
+    "Player restart and new live combat are not verified."
+  ],
+  "rawInputsPublished": false,
+  "delivery": {
+    "previousVersion": "0.7.68",
+    "installedVersion": "0.7.69",
+    "installOnly": true,
+    "rebuilt": false,
+    "elapsedMs": 1759,
+    "installedDllSha256": "25e660091d7e316966c33ce7d3434268e5602c048ba8e9b4db205218c8adc354",
+    "matchesTestedDll": true,
+    "verifiedBackups": 2,
+    "protectedFiles": 328,
+    "changedProtectedFiles": 0,
+    "playerRestartVerified": false
+  }
+}
