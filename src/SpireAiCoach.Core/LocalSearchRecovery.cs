@@ -11,12 +11,12 @@ public static class LocalSearchRecovery
     private static bool Usable(LocalSearchResult r) => r.Status is "searched" or "done" or "partial" && r.Best != null;
 
     private static bool CompatibilityFailure(LocalSearchResult r) =>
-        Failed(r) && r.Failure?.Category is not ("local_ipc" or "local_runtime");
+        Failed(r) && r.Failure?.Category is not ("local_ipc" or "local_runtime" or "local_resource");
 
     public static bool OnlyLocalFailures(IEnumerable<LocalSimulationFailure> failures)
     {
         var reasons = failures.ToArray();
-        return reasons.Length > 0 && reasons.All(f => f.Category is "local_ipc" or "local_runtime");
+        return reasons.Length > 0 && reasons.All(f => f.Category is "local_ipc" or "local_runtime" or "local_resource");
     }
 
     // A failure before a decision can invalidate the entire bootstrap. A later

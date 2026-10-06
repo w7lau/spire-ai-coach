@@ -1,4 +1,5 @@
 using System.Runtime.InteropServices;
+using System.ComponentModel;
 using Microsoft.Win32.SafeHandles;
 
 namespace SpireAiCoach.Core;
@@ -37,8 +38,9 @@ public static class LocalWorkerFileSharing
         if (File.Exists(target)) File.Delete(target);
         if (!CreateHardLink(target, source, IntPtr.Zero))
         {
-            var error = Marshal.GetLastWin32Error();
-            throw new IOException($"无法共享游戏资源文件（{Path.GetFileName(source)}，Windows {error}：{new System.ComponentModel.Win32Exception(error).Message}）；未回退为复制整套资源。", error);
+            int error = Marshal.GetLastWin32Error();
+            var cause = new Win32Exception(error);
+            throw new LocalWorkerResourceException($"无法共享游戏资源文件 {Path.GetFileName(source)}（Windows {error}：{cause.Message}）。", cause);
         }
     }
 }

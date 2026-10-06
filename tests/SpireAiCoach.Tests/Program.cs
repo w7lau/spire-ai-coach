@@ -37,7 +37,7 @@ ProgressTransportTests.Register(Test, AsyncTest);
 RuntimeLogTests.Register(Test);
 LocalWirePollingTests.Register(Test, AsyncTest);
 WorkerReuseTests.Register(Test, AsyncTest);
-WorkerLayoutTests.Register(Test);
+WorkerDirectoryTests.Register(Test);
 ReplayFailureTests.Register(Test, AsyncTest);
 ModReplayTests.Register(Test);
 AsyncTest("worker isolation prevents inherited save locks and preserves environment and arguments", WorkerIsolationTests.Run);

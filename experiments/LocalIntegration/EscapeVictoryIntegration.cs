@@ -44,6 +44,14 @@ internal static class EscapeVictoryIntegration
         var expectedLayout = System.Environment.GetEnvironmentVariable("SPIRE_ESCAPE_EXPECTED_LAYOUT");
         string CodeHash(string directory) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(
             Directory.EnumerateFiles(Path.Combine(directory, "game", "mods"), "SpireAiCoach.dll", SearchOption.AllDirectories).Single())));
+        var priorCodes = new Dictionary<string, string>();
+        var layoutDirectory = Path.Combine(root, ".spire-ai-coach-workers");
+        if (Directory.Exists(layoutDirectory))
+            foreach (var group in Directory.EnumerateDirectories(layoutDirectory))
+                foreach (var prior in Directory.EnumerateDirectories(group, "worker-*"))
+                    if (File.Exists(Path.Combine(prior, ".coach-worker")) && Directory.Exists(Path.Combine(prior, "game", "mods")) &&
+                        Directory.EnumerateFiles(Path.Combine(prior, "game", "mods"), "SpireAiCoach.dll", SearchOption.AllDirectories).Count() == 1)
+                        priorCodes[prior] = CodeHash(prior);
         string? previousCode = null;
         if (!string.IsNullOrEmpty(expectedLayout))
         {
@@ -101,7 +109,7 @@ internal static class EscapeVictoryIntegration
                     var workers = (Array)typeof(LocalWorkerPool).GetField("_workers", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(pool)!;
                     string RootAt(int i) => (string)workers.GetValue(i)!.GetType().GetProperty("Root")!.GetValue(workers.GetValue(i))!;
                     var currentCode = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(typeof(LocalWorkerPool).Assembly.Location)));
-                    bool reused = !string.IsNullOrEmpty(expectedLayout) && RootAt(0) == expectedLayout;
+                    bool reused = !string.IsNullOrEmpty(expectedLayout) ? RootAt(0) == expectedLayout : priorCodes.TryGetValue(RootAt(0), out previousCode);
                     if (before != LocalCapture.Fingerprint() || pool.Resources().Ready != 8 ||
                         Enumerable.Range(0, 8).Any(i => CodeHash(RootAt(i)) != currentCode) ||
                         !string.IsNullOrEmpty(expectedLayout) && (!reused || previousCode == currentCode))

@@ -1,5 +1,7 @@
 {
   "version": "0.7.74",
+  "supersededBy": "0.7.75",
+  "delivery": "Intermediate native-validated package; final delivery retains the concurrent main resource-directory owner in 0.7.75.",
   "gameVersion": "0.111.0",
   "nativeModule": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
   "dllSha256": "86ab59cc2a88ae3bc63732b28dd7f2daa87713bf4427b30e2f2c0f2aab13f4b9",
