@@ -352,7 +352,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     results.Sum(r => r.HealthBounds?.SharedIncumbentUpdates ?? 0),
                     string.Join("；", results.Select(r => r.HealthBounds?.UnknownReason).Where(r => !string.IsNullOrEmpty(r)).Distinct()),
                     results.Sum(r => r.HealthBounds?.TargetAnalyses ?? 0), results.Sum(r => r.HealthBounds?.TargetAnalysisMs ?? 0),
-                    results.Sum(r => r.HealthBounds?.MethodBodyReads ?? 0)),
+                    results.Sum(r => r.HealthBounds?.MethodBodyReads ?? 0), results.Any(r => r.HealthBounds?.ContentScoped == true)),
                 Work = workStats,
                 TurnSearch = request.SearchOrder != LocalSearchOrder.TurnFrontier ? null : new(
                     results.Sum(r => r.TurnSearch?.Probes ?? 0), results.Sum(r => r.TurnSearch?.BoundPruned ?? 0),
@@ -378,7 +378,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     "已找到获胜路线，已停止全部后续搜索；未继续优化损失或用药。" : Volatile.Read(ref consumableGoalReached) != 0 ?
                     "当前消耗出牌及补刀目标已完成，战斗获胜且损血符合设置，已停止全部后续搜索。" : Volatile.Read(ref healthTargetReached) != 0 ?
                     LocalSearchPolicy.HealthTargetDescription(best.HealthTarget!) : Volatile.Read(ref minimumGoalReached) != 0 ?
-                    LocalSearchPolicy.MinimumProofDescription(best.Best!) + "已停止后续搜索。" :
+                    LocalSearchPolicy.MinimumProofDescription(best.Best!, minimumLoss?.Status.Certificate?.ContentScoped == true) + "已停止后续搜索。" :
                     "已找到战后满血获胜路线，已停止全部后续搜索。") +
                     (request.SkipFinalVerification ? "已跳过最终复核，执行时逐步核对模拟记录。" : "路线已通过复核。") :
                     "本地整场计算完成。" + (request.SkipFinalVerification ? "已跳过最终复核，执行时逐步核对模拟记录。" : "") +

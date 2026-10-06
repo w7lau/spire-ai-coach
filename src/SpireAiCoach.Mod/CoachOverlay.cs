@@ -881,7 +881,8 @@ public sealed class CoachOverlay
                     string optimality = result.StoppedOnManualVictory ? "已手动采用胜利路线，尚未证明最优。" : result.StoppedOnFirstWin ? "已找到获胜路线，未继续优化损失。" :
                         result.StoppedOnCardGoals ? "已完成当前消耗目标，损血符合设置。" :
                         result.StoppedOnHealthTarget ? "生命目标已达成；尚未证明全局最优。" :
-                        LocalSearchPolicy.HasMinimumProof(result) ? "已达到可证明的最优战后血量。" : "候选路线尚未证明最优。";
+                        LocalSearchPolicy.HasMinimumProof(result) ? result.MinimumLoss?.Certificate?.ContentScoped == true ?
+                            "按当前玩家内容的回复边界已达标。" : "已达到可证明的最优战后血量。" : "候选路线尚未证明最优。";
                     _freshness.Text = result.VerificationSkipped ? LocalSearchPolicy.HasExecutionPoints(result) ?
                         "可执行方案，偏离时自动停止。" + optimality :
                         "暂不能自动执行，可手动参考。" :

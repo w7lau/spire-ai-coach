@@ -13,7 +13,7 @@ public sealed record LocalLossProofStep(LocalAction Action, LocalAction[] Legal,
 public sealed record LocalLossProofTrial(int StartingHp, LocalLossProofStep[] Steps,
     int Hp, bool Won = false, bool Dead = false);
 public sealed record LocalMinimumLossCertificate(string Scope, int StartingHp,
-    int MinimumNetHpLoss, int MinimumPotionsUsed, int? MaximumFinalHp = null);
+    int MinimumNetHpLoss, int MinimumPotionsUsed, int? MaximumFinalHp = null, bool ContentScoped = false);
 public sealed record LocalLossProofTarget(int NetHpLoss, int PotionsUsed, int? FinalHp = null);
 public sealed record LocalLossProofFocus(LocalAction[] Prefix, int SearchRound, LocalTurnHint Hint);
 public sealed record LocalMinimumLossStatus(int Trials = 0, int Nodes = 1,
@@ -53,15 +53,16 @@ public sealed class LocalMinimumLossProof(LocalSearchRequest request, int capaci
     private string _invalid = "";
     private Floor? _goal;
     private bool _knownRecovery;
+    private bool _contentScoped;
     private LocalLossProofFocus[]? _focus;
     public static string Scope(LocalSearchRequest r) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
         JsonSerializer.Serialize(new { r.Id, r.SnapshotId, r.NativeHash, r.ModelHash, r.LoadedMods,
             r.IncludePotions, r.ExcludedModels, r.CardGoals, r.DataOnlyCombat, r.DataOnlyRun, r.NumericalExecution,
-            HealthObjective = "final-hp-v2" }))));
+            HealthObjective = "final-hp-v3-player-content" }))));
     public LocalMinimumLossStatus Status => new(_trials, _nodes,
         _invalid.Length == 0 && _startingHp is { } hp && _root.Minimum.Loss <= hp
             ? new(_scope, hp, Math.Max(0, _root.Minimum.Loss), _root.Minimum.Potions,
-                _root.Minimum.Loss == int.MinValue ? null : hp - _root.Minimum.Loss) : null, _invalid,
+                _root.Minimum.Loss == int.MinValue ? null : hp - _root.Minimum.Loss, _contentScoped) : null, _invalid,
         Target: _goal is { } goal ? new(Math.Max(0, goal.Loss), goal.Potions,
             _startingHp!.Value - goal.Loss) : null,
         Focus: _focus ??= FindFocus());
@@ -114,6 +115,7 @@ public sealed class LocalMinimumLossProof(LocalSearchRequest request, int capaci
                 var own = new Floor(LocalHealthBound.MinimumHpLoss(envelope) ?? int.MinValue, potions);
                 node.Own = Floor.Max(node.Own, own);
                 _knownRecovery |= envelope.MaximumFurtherHpGain.HasValue;
+                _contentScoped |= envelope.ContentScoped;
             }
             node.Hint = step.AfterHint ?? node.Hint;
             node.Round = step.AfterRound ?? node.Round;

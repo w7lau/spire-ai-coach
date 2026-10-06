@@ -235,14 +235,16 @@ public static class LocalWorker
         }
         LocalHealthBoundStats HealthStats() => new(boundPruned, knownRecoveryChecks, unknownRecoveryChecks,
             sharedIncumbentUpdates, unknownRecoveryReason, recovery.TargetAnalysisCount,
-            recovery.TargetAnalysisElapsedMs, recovery.MethodBodyReads);
-        LocalHealthEnvelope Envelope(Player p, int hp, IReadOnlyList<LocalAction> line)
+            recovery.TargetAnalysisElapsedMs, recovery.MethodBodyReads, recovery.ContentScoped);
+        LocalHealthEnvelope Envelope(Player p, int hp, IReadOnlyList<LocalAction> line, LocalHealthChanges? observed = null)
         {
             var allowance = recovery.Estimate(p);
-            if (allowance.MaximumFurtherHpGain.HasValue) knownRecoveryChecks++;
+            if (observed != null) recovery.ValidateObserved(observed);
+            long? gain = allowance.MaximumFinalHp is { } ceiling ? Math.Max(0L, ceiling - (long)p.Creature.CurrentHp) : allowance.MaximumFurtherHpGain;
+            if (gain.HasValue) knownRecoveryChecks++;
             else { unknownRecoveryChecks++; unknownRecoveryReason = allowance.Reason; }
             return new(sharedBounds.Root, hp, p.Creature.CurrentHp, line.Count(a => a.PotionSlot.HasValue),
-                allowance.MaximumFurtherHpGain);
+                gain, allowance.ContentScoped);
         }
         bool stoppedEarly = false;
         bool stoppedOnManualVictory = false;
@@ -983,7 +985,7 @@ public static class LocalWorker
                         LocalHealthEnvelope? stepEnvelope = proofSteps != null && !IsTerminal(player) &&
                             (next.EndTurn || next.PotionSlot.HasValue || player.Creature.CurrentHp != previousHp ||
                              CombatManager.Instance.DebugOnlyGetState()!.RoundNumber > round)
-                            ? Envelope(player, startingHp, actions) : null;
+                            ? Envelope(player, startingHp, actions, healthAccounting.Snapshot()) : null;
                         var settledState = CombatManager.Instance.DebugOnlyGetState();
                         var afterHint = turns != null && stepEnvelope != null ? new LocalTurnHint(player.Creature.CurrentHp,
                             startingHp, settledState?.Enemies.Sum(e => Math.Max(0, e.CurrentHp)) ?? 0, initialEnemyHp,
@@ -1002,7 +1004,7 @@ public static class LocalWorker
                              CombatManager.Instance.DebugOnlyGetState()!.RoundNumber > round))
                         {
                             winningBound = WinningBound();
-                            if (winningBound != null && LocalHealthBound.CannotImprove(stepEnvelope ?? Envelope(player, startingHp, actions), winningBound, request.CardGoals))
+                            if (winningBound != null && LocalHealthBound.CannotImprove(stepEnvelope ?? Envelope(player, startingHp, actions, healthAccounting.Snapshot()), winningBound, request.CardGoals))
                             {
                                 cut = true; boundPruned += 1 + (turns?.DiscardDescendants(actions) ?? 0);
                                 stop = "分支已无法优于现有获胜路线"; break;
@@ -1045,6 +1047,7 @@ public static class LocalWorker
                     var won = _combatWon && !player.Creature.IsDead;
                     var endTurnRisk = !IsTerminal(player) ? LocalTacticalPreview.Capture(player, []).EndTurnHpLossHint : (double?)null;
                     var health = healthAccounting.Snapshot();
+                    recovery.ValidateObserved(health);
                     var candidate = new LocalCandidate(actions.ToArray(), player.Creature.CurrentHp, health.HpLost,
                         state?.Enemies.Sum(e => Math.Max(0, e.CurrentHp)) ?? 0,
                         player.Gold, player.Creature.MaxHp, won, player.Creature.IsDead,
@@ -1193,7 +1196,7 @@ public static class LocalWorker
                     LocalSearchPolicy.CanStopAtHealthTarget(best, request, recovery.HealthTarget) ?
                     LocalSearchPolicy.HealthTargetDescription(recovery.HealthTarget!) :
                     LocalSearchPolicy.RequiresMinimumConfirmation(best, request, minimumStatus?.Certificate) ?
-                    LocalSearchPolicy.MinimumProofDescription(best!) + "停止后续搜索。" :
+                    LocalSearchPolicy.MinimumProofDescription(best!, minimumStatus?.Certificate?.ContentScoped == true) + "停止后续搜索。" :
                     "已达到战后满血停止条件，停止后续搜索。" : best == null ? "没有找到可完整结算的路线。" :
                 turns != null ? $"已完成当前预算；评估 {evaluated} 条整场路线，另探查 {probes} 个回合组合，剪枝 {boundPruned} 次；尚未证明全局最优。" :
                 $"已完成当前预算，操作树 {noPotionSearch.Nodes + (request.IncludePotions ? potionSearch.Nodes : 0)} 个节点，比较了 {refinements} 条补牌、删牌、换牌和选牌路线。");

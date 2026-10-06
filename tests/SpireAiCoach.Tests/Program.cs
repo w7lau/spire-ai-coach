@@ -19,6 +19,7 @@ MinimumLossTests.Register(Test, AsyncTest);
 HealthAccountingTests.Register(Test);
 FullHealthReturnTests.Register(Test);
 HealthRecoveryTests.Register(Test);
+PlayerRecoveryBoundTests.Register(Test);
 HealthTargetTests.Register(Test, AsyncTest);
 ManualVictoryReturnTests.Register(Test);
 SelectionSpaceTests.Register(Test);

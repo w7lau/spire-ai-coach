@@ -21,7 +21,7 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
     private readonly Dictionary<Type, Proof> _proofs = [];
     private readonly Dictionary<MethodBase, LocalInstruction[]?> _bodies = [];
     private sealed record ContentEffects(bool ActiveRecovery, int VictoryHeals, int VictoryMaxHpGains,
-        bool Uncertain, Type[] Generated);
+        bool Uncertain, Type[] Generated, bool DynamicMaxHp = false, bool UsesCardPool = false);
     private readonly Dictionary<Type, ContentEffects> _content = [];
     private LocalRecoveryAllowance? _allowance;
     public LocalHealthTarget? HealthTarget { get; private set; }
@@ -59,6 +59,15 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
     public int AnalysisCount { get; private set; }
     public double AnalysisElapsedMs { get; private set; }
     public int MethodBodyReads => _bodies.Count;
+    public bool ContentScoped => _allowance?.ContentScoped == true;
+    public void ValidateObserved(LocalHealthChanges health)
+    {
+        if (_allowance is not { ContentScoped: true } allowance) return;
+        bool outside = allowance.MaximumFinalHp is { } cap ? health.FinalHp > cap || health.FinalMaxHp > cap :
+            allowance.MaximumFurtherHpGain is { } gain && (health.HpGained > gain || health.MaxHpGained > gain);
+        if (outside) throw new CoachException("local_recovery_bound",
+            "原生结算出现当前内容边界之外的回血或生命上限增加，未采用该边界的计算结果。");
+    }
     public LocalRecoveryAllowance Estimate(Player player)
     {
         if (_allowance != null) return _allowance;
@@ -87,33 +96,54 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                 HealthTarget = SharedDirectory == null ? CalculateTarget() :
                     LocalHealthTargetCache.Get(SharedDirectory, request, player.Creature.CurrentHp, CalculateTarget);
             }
-            var global = DescribeGlobals();
-            if (global.Unknown != null) return new(null, Detail(global));
             if (player == null) return new(null, "无法读取当前玩家内容");
             models ??= CurrentModels(player);
-            var pending = new Queue<Type>(models.Select(m => m.GetType()).Concat(global.References).Distinct());
+            var held = PlayerSources(player, models);
+            var pending = new Queue<Type>(held.Select(m => m.GetType()).Distinct());
             var visited = new HashSet<Type>();
-            long total = 0;
+            decimal heal = 0, maxHp = 0;
+            bool active = false, growth = false, poolRead = false;
             while (pending.TryDequeue(out var type))
             {
                 if (!visited.Add(type)) continue;
-                var proof = Describe(type);
-                if (proof.Unknown != null) return new(null, Detail(proof));
-                foreach (var reference in proof.References) pending.Enqueue(reference);
-                if (proof.VictoryHeals == 0 && proof.VictoryMaxHpGains == 0) continue;
-                // Referenced future healing models, rather than current relic
-                // instances, have no fixed current variable value to certify.
-                var owners = models.OfType<RelicModel>().Where(r => r.GetType() == type).ToArray();
-                if (owners.Length == 0) return new(null, "后续可能生成新的回复来源");
+                if (visited.Count > 256) return new(null, "当前内容生成的回复来源过多", ContentScoped: true);
+                if (typeof(CardPoolModel).IsAssignableFrom(type))
+                {
+                    var pool = ModelDb.AllCardPools.FirstOrDefault(p => p.GetType() == type);
+                    if (pool == null) return new(null, "当前内容引用的生成牌池无法读取", ContentScoped: true);
+                    foreach (var card in pool.AllCards) pending.Enqueue(card.GetType());
+                    continue;
+                }
+                var effect = DescribeContent(type);
+                active |= effect.ActiveRecovery; growth |= effect.DynamicMaxHp;
+                foreach (var reference in effect.Generated) pending.Enqueue(reference);
+                if (effect.UsesCardPool && !poolRead)
+                {
+                    poolRead = true;
+                    // Superset of the character's unlocked offers. No selection,
+                    // generation or RNG is executed while reading canonical data.
+                    foreach (var card in player.Character.CardPool.AllCards) pending.Enqueue(card.GetType());
+                }
+                var owners = held.OfType<RelicModel>().Where(r => r.GetType() == type).ToArray();
+                if (owners.Length == 0 && (effect.VictoryHeals > 0 || effect.VictoryMaxHpGains > 0))
+                    return new(null, "后续可能生成新的战后回复来源", ContentScoped: true);
                 foreach (var owner in owners)
                 {
-                    decimal gain = (proof.VictoryHeals == 0 ? 0 : Math.Max(0, owner.DynamicVars.Heal.BaseValue) * proof.VictoryHeals) +
-                        (proof.VictoryMaxHpGains == 0 ? 0 : Math.Max(0, owner.DynamicVars.MaxHp.BaseValue) * proof.VictoryMaxHpGains);
-                    if (gain > long.MaxValue - total) return new(null, "回复上界溢出");
-                    total += (long)decimal.Ceiling(gain);
+                    if (effect.VictoryHeals > 0) heal += Math.Max(0, owner.DynamicVars.Heal.BaseValue) * effect.VictoryHeals;
+                    if (effect.VictoryMaxHpGains > 0) maxHp += Math.Max(0, owner.DynamicVars.MaxHp.BaseValue) * effect.VictoryMaxHpGains;
                 }
             }
-            return new(total);
+            if (HealthTarget != null && (active || growth) && !HealthTarget.FullHealth)
+                HealthTarget = HealthTarget with { FullHealth = true, TargetHp = player.Creature.MaxHp,
+                    Basis = "当前内容或其生成效果可恢复生命，目标为战后满血", Uncertain = true };
+            if (growth) return new(null, "当前玩家内容存在可重复或动态生命上限增加", ContentScoped: true);
+            if (heal + maxHp > long.MaxValue || player.Creature.MaxHp + maxHp > int.MaxValue)
+                return new(null, "当前内容回复上界溢出", ContentScoped: true);
+            // This is the user-selected player-content domain. Unrelated global
+            // Mod rewrites do not disable it; results carry this narrower scope.
+            return active ? new(null, "按当前玩家内容的生命上限判断重复回血", ContentScoped: true,
+                MaximumFinalHp: (int)decimal.Ceiling(player.Creature.MaxHp + maxHp)) :
+                new((long)decimal.Ceiling(heal + maxHp), "按当前玩家内容的固定回复判断", ContentScoped: true);
         }
         catch (Exception ex) when (ex is InvalidOperationException or ArgumentException or NotSupportedException or OverflowException or
             ReflectionTypeLoadException or TypeLoadException or AmbiguousMatchException)
@@ -126,6 +156,19 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
             .Concat(player.PlayerCombatState!.AllPiles.SelectMany(p => p.Cards)).Concat(player.Potions)
             .OfType<AbstractModel>().Distinct<AbstractModel>(ReferenceEqualityComparer.Instance).ToArray();
 
+    private static AbstractModel[] PlayerSources(Player player, IEnumerable<AbstractModel> models) =>
+        models.Concat(player.PlayerCombatState!.AllPiles.SelectMany(p => p.Cards)
+            .SelectMany(c => new AbstractModel?[] { c.Enchantment, c.Affliction }).OfType<AbstractModel>())
+        .Where(m => m switch {
+            CardModel card => card.Owner == player,
+            RelicModel relic => relic.Owner == player,
+            PotionModel potion => potion.Owner == player,
+            PowerModel power => power.Owner == player.Creature,
+            EnchantmentModel enchantment => enchantment.HasCard && enchantment.Card.Owner == player,
+            AfflictionModel affliction => affliction.HasCard && affliction.Card.Owner == player,
+            CharacterModel character => character == player.Character,
+            _ => false }).Distinct<AbstractModel>(ReferenceEqualityComparer.Instance).ToArray();
+
     private LocalHealthTarget ContentTarget(Player player, AbstractModel[] models)
     {
         // The chosen policy estimates a goal from held content, even when global
@@ -136,13 +179,7 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
         // Global modifiers also touch enemy HP. The user's policy is a goal
         // inferred from held PLAYER content; unresolved global effects remain
         // uncertain instead of masquerading as an owned healing source.
-        var held = models.Where(m => m switch {
-            CardModel card => card.Owner == player,
-            RelicModel relic => relic.Owner == player,
-            PotionModel potion => potion.Owner == player,
-            PowerModel power => power.Owner == player.Creature,
-            CharacterModel character => character == player.Character,
-            _ => false }).ToArray();
+        var held = PlayerSources(player, models);
         var pending = new Queue<Type>(held.Select(m => m.GetType()).Distinct());
         var seen = new HashSet<Type>();
         while (pending.TryDequeue(out var type))
@@ -176,7 +213,7 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
     private ContentEffects DescribeContent(Type type)
     {
         if (_content.TryGetValue(type, out var cached)) return cached;
-        bool active = false, uncertain = false;
+        bool active = false, uncertain = false, growth = false, pool = false;
         int heals = 0, gains = 0;
         var generated = new HashSet<Type>();
         var queue = new Queue<(MethodBase Method, bool Terminal, bool Direct)>();
@@ -191,6 +228,7 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                 // owning model instead of a Hook override (e.g. resurrection).
                 if (!method.IsSpecialName && !method.IsVirtual && method.IsPublic)
                 { queue.Enqueue((method, false, false)); continue; }
+                if (!request.IncludePotions && typeof(PotionModel).IsAssignableFrom(type) && method.Name == "OnUse") continue;
                 if (method.IsSpecialName || !method.IsVirtual || method.GetBaseDefinition() == method ||
                     !overrides.Add(method.GetBaseDefinition()) || method.Name is "AfterObtained" or "BeforeRemoved" or "AfterRemoved") continue;
                 queue.Enqueue((method, method.Name is "AfterCombatVictory" or "AfterCombatEnd", true));
@@ -206,26 +244,46 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                 method.GetCustomAttribute<IteratorStateMachineAttribute>()?.StateMachineType;
             if (state?.GetMethod("MoveNext", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) is { } move)
                 queue.Enqueue((move, terminal, direct));
+            var patches = Harmony.GetPatchInfo(method);
+            if (patches != null)
+                foreach (var patch in patches.Prefixes.Concat(patches.Postfixes).Concat(patches.Finalizers).Concat(patches.Transpilers)
+                    .Where(p => !OurPatch(p.owner))) queue.Enqueue((patch.PatchMethod, false, false));
             var code = Body(method);
             if (code == null) { uncertain = true; continue; }
             for (int i = 0; i < code.Length; i++)
             {
+                // Relevant patch builders can name the HP API they insert.
+                // Arbitrary display patch names do not invalidate every source.
+                if (method.DeclaringType?.Assembly != Native && code[i].Operand is string api &&
+                    (HpWrites.Contains(api) || api is "Heal" or "set_CurrentHp" or "set_MaxHp"))
+                { active = true; growth |= api.Contains("MaxHp", StringComparison.Ordinal); }
+                if (code[i].Operand is FieldInfo field && field.DeclaringType?.FullName == "MegaCrit.Sts2.Core.Entities.Creatures.Creature" &&
+                    field.Name is "_currentHp" or "_maxHp" && code[i].Code is var op &&
+                    (op == System.Reflection.Emit.OpCodes.Stfld || op == System.Reflection.Emit.OpCodes.Ldflda))
+                { active = true; growth |= field.Name == "_maxHp"; }
                 if (code[i].Operand is not MethodBase called) continue;
                 var declaring = called.DeclaringType!;
+                var calledPatches = Harmony.GetPatchInfo(called);
+                if (calledPatches != null)
+                    foreach (var patch in calledPatches.Prefixes.Concat(calledPatches.Postfixes).Concat(calledPatches.Finalizers).Concat(calledPatches.Transpilers)
+                        .Where(p => !OurPatch(p.owner))) queue.Enqueue((patch.PatchMethod, false, false));
                 if (declaring.FullName == "MegaCrit.Sts2.Core.Commands.CreatureCmd" && called.Name is "Heal" or "GainMaxHp")
                 {
                     bool gain = called.Name == "GainMaxHp";
                     if (terminal && direct && typeof(RelicModel).IsAssignableFrom(type) && !LocalMethodBody.HasBackwardJump(code) &&
                         FixedVictoryValue(code, i, type, gain ? "get_MaxHp" : "get_Heal", !gain))
                     { if (gain) gains++; else heals++; }
-                    else active = true;
+                    else { active = true; growth |= gain; }
                     continue;
                 }
                 if (declaring.Namespace?.StartsWith("MegaCrit.Sts2.Core", StringComparison.Ordinal) == true &&
-                    (HpWrites.Contains(called.Name) || called.Name is "set_CurrentHp" or "set_MaxHp")) active = true;
+                    (HpWrites.Contains(called.Name) || called.Name is "set_CurrentHp" or "set_MaxHp"))
+                { active = true; growth |= called.Name.Contains("MaxHp", StringComparison.Ordinal); }
+                if (typeof(CardPoolModel).IsAssignableFrom(declaring) || called.Name == "get_CardPool") pool = true;
                 if (called.IsGenericMethod && (declaring == typeof(ModelDb) || declaring.FullName == "MegaCrit.Sts2.Core.Commands.PowerCmd" && called.Name == "Apply"))
                     foreach (var argument in called.GetGenericArguments())
-                        if (!argument.IsAbstract && (typeof(CardModel).IsAssignableFrom(argument) || typeof(PowerModel).IsAssignableFrom(argument)))
+                        if (!argument.IsAbstract && (typeof(CardModel).IsAssignableFrom(argument) || typeof(PowerModel).IsAssignableFrom(argument) ||
+                            typeof(CardPoolModel).IsAssignableFrom(argument)))
                             generated.Add(argument);
                 // Core commands/entities are boundaries; e.g. healing a summoned
                 // ally does not create a new held player's recovery source.
@@ -243,7 +301,7 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                     uncertain = true;
             }
         }
-        return _content[type] = new(active, heals, gains, uncertain, generated.ToArray());
+        return _content[type] = new(active, heals, gains, uncertain, generated.ToArray(), growth, pool);
     }
 
     private LocalInstruction[]? Body(MethodBase method)

@@ -1,9 +1,10 @@
 namespace SpireAiCoach.Core;
 
 // A bound is about a completed victory from this frozen root, not another partial
-// turn with more HP. Arbitrary Mod healing remains unknown, never assumed absent.
+// turn with more HP. ContentScoped bounds explicitly use the player's current
+// effect sources rather than claiming completeness of arbitrary Mod globals.
 public sealed record LocalHealthEnvelope(string Root, int StartingHp, int Hp, int PotionsUsed,
-    long? MaximumFurtherHpGain = null);
+    long? MaximumFurtherHpGain = null, bool ContentScoped = false);
 
 public sealed record LocalWinningBound(string Root, int StartingHp, int NetHpLoss, int PotionsUsed,
     int? FinalHp = null)

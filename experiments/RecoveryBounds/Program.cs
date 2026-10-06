@@ -9,7 +9,7 @@ using SpireAiCoach.Mod;
 // Inspect the installed game's actual asynchronous method bodies, without
 // launching a battle, executing model getters, changing saves or benchmarking.
 var estimatorType = typeof(LocalWorker).Assembly.GetType("SpireAiCoach.Mod.LocalRecoveryEstimator", true)!;
-var request = new LocalSearchRequest("metadata-audit", "root", [], "native", 1, [], false);
+var request = new LocalSearchRequest("metadata-audit", "root", [], "native", 1, [], false, IncludePotions: true);
 var estimator = Activator.CreateInstance(estimatorType, request)!;
 var describe = estimatorType.GetMethod("Describe", BindingFlags.NonPublic | BindingFlags.Instance)!;
 var describeContent = estimatorType.GetMethod("DescribeContent", BindingFlags.NonPublic | BindingFlags.Instance)!;
@@ -100,8 +100,8 @@ foreach (var type in typeof(AbstractModel).Assembly.GetTypes().Where(t => !t.IsA
 if (healingPotions == 0) throw new InvalidOperationException("No native healing potion was recognized");
 var external = Activator.CreateInstance(estimatorType, request with { LoadedMods = ["unknown-mod:1"] })!;
 var guarded = (LocalRecoveryAllowance)estimatorType.GetMethod("Estimate")!.Invoke(external, [null])!;
-if (guarded.MaximumFurtherHpGain != null || !guarded.Reason.Contains("Mod", StringComparison.Ordinal))
-    throw new InvalidOperationException("External global effects were treated as no healing");
+if (guarded.MaximumFurtherHpGain != null || !guarded.Reason.Contains("玩家", StringComparison.Ordinal))
+    throw new InvalidOperationException("Missing player content was treated as no healing");
 var cached = (LocalRecoveryAllowance)estimatorType.GetMethod("Estimate")!.Invoke(external, [null])!;
 if (!ReferenceEquals(guarded, cached) || (int)estimatorType.GetProperty("AnalysisCount")!.GetValue(external)! != 1)
     throw new InvalidOperationException("An unknown allowance was rescanned instead of cached");
@@ -109,7 +109,7 @@ var report = new { ModVersion = typeof(LocalWorker).Assembly.GetName().Version!.
     ModSha256 = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
         File.ReadAllBytes(typeof(LocalWorker).Assembly.Location))),
     NativeModule = typeof(AbstractModel).Assembly.ManifestModule.ModuleVersionId,
-    MetadataChecks = output.Count + 2, ExternalGlobalEffectsRemainUnknown = true, Models = output,
+    MetadataChecks = output.Count + 2, MissingPlayerRemainsUnknown = true, Models = output,
     UnknownResultCached = true,
     NativeBattleExecuted = false, SpeedBenchmarkExecuted = false };
 var json = JsonSerializer.Serialize(report, new JsonSerializerOptions { WriteIndented = true,

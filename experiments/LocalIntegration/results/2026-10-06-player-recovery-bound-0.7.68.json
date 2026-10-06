@@ -1,0 +1,256 @@
+{
+  "version": "0.7.68",
+  "date": "2026-10-06",
+  "scope": "Player-content recovery inference, conditional HP pruning, native healing ordering and early target return",
+  "testedDllSha256": "2d8be358e43c48a9a693dde93ab9a8ed34a311b8c435639e4b1455e99e921046",
+  "packageMatched": true,
+  "coreChecks": {
+    "passed": 411,
+    "failed": 0,
+    "modBuildWarnings": 0,
+    "modBuildErrors": 0
+  },
+  "requestDifferences": {
+    "finalVerificationEnabledForValidation": true,
+    "originalSkipFinalVerification": true,
+    "communicationHandlesCleared": true,
+    "initialPlanHint": false,
+    "historicalLogBudgetsNotPairedBenchmark": true
+  },
+  "originalRequestBudgets": {
+    "BudgetSeconds": 60,
+    "MaxNodes": 64,
+    "MaxRounds": 64,
+    "Workers": 8,
+    "IncludePotions": true
+  },
+  "historicalLiveDiagnostics": {
+    "startingHp": 53,
+    "finalHp": 44,
+    "netHpLoss": 9,
+    "hpGained": 0,
+    "prunedPrefixes": 0,
+    "knownRecoveryChecks": 0,
+    "unknownReason": "外部 IL 补丁的回复效果尚未证明：MegaCrit.Sts2.Core.Entities.Cards.PileTypeExtensions.GetTargetPosition",
+    "scope": "Earlier live logs from the same combat; budgets differ from the latest frozen request."
+  },
+  "nativeAudit": {
+    "allowance": {
+      "MaximumFurtherHpGain": 0,
+      "Reason": "按当前玩家内容的固定回复判断",
+      "ContentScoped": true,
+      "MaximumFinalHp": null
+    },
+    "analysisCount": 1,
+    "targetAnalysisCount": 1,
+    "methodBodyReads": 756,
+    "cachedReads": 10000,
+    "rootUnchanged": true
+  },
+  "nativeSearches": [
+    {
+      "algorithm": "MonteCarlo",
+      "request": {
+        "BudgetSeconds": 60,
+        "MaxNodes": 64,
+        "MaxRounds": 64,
+        "Workers": 8,
+        "IncludePotions": true,
+        "SkipFinalVerification": false,
+        "unseeded": true
+      },
+      "status": "done",
+      "evaluated": 31,
+      "victories": 31,
+      "rejected": 0,
+      "healthBounds": {
+        "Pruned": 1179,
+        "KnownRecoveryChecks": 6947,
+        "UnknownRecoveryChecks": 0,
+        "SharedIncumbentUpdates": 6,
+        "UnknownReason": "",
+        "TargetAnalyses": 1,
+        "TargetAnalysisMs": 48.6382,
+        "MethodBodyReads": 6048,
+        "ContentScoped": true
+      },
+      "lowerBound": {
+        "StartingHp": 53,
+        "MinimumNetHpLoss": 0,
+        "MinimumPotionsUsed": 0,
+        "MaximumFinalHp": null,
+        "ContentScoped": true
+      },
+      "best": {
+        "Won": true,
+        "Dead": false,
+        "StartingHp": 53,
+        "Hp": 44,
+        "MaxHp": 75,
+        "NetHpLoss": 9,
+        "EnemyHp": 0,
+        "Rounds": 4,
+        "StopReason": "胜利结算完成",
+        "steps": 19,
+        "choices": 0,
+        "potions": 1
+      },
+      "stoppedEarly": false,
+      "stoppedOnMinimum": false,
+      "stoppedOnHealthTarget": false,
+      "pendingPrefixes": 1386,
+      "independentVerifications": 1,
+      "recoveredFailures": 0,
+      "simulationErrors": 0,
+      "exactRootCovered": false,
+      "searchElapsedMs": 62519,
+      "totalElapsedMs": 154660
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "request": {
+        "BudgetSeconds": 60,
+        "MaxNodes": 64,
+        "MaxRounds": 64,
+        "Workers": 8,
+        "IncludePotions": true,
+        "SkipFinalVerification": false,
+        "unseeded": true
+      },
+      "status": "done",
+      "evaluated": 87,
+      "victories": 87,
+      "rejected": 0,
+      "healthBounds": {
+        "Pruned": 2961,
+        "KnownRecoveryChecks": 3630,
+        "UnknownRecoveryChecks": 0,
+        "SharedIncumbentUpdates": 7,
+        "UnknownReason": "",
+        "TargetAnalyses": 1,
+        "TargetAnalysisMs": 44.2268,
+        "MethodBodyReads": 6048,
+        "ContentScoped": true
+      },
+      "lowerBound": {
+        "StartingHp": 53,
+        "MinimumNetHpLoss": 0,
+        "MinimumPotionsUsed": 0,
+        "MaximumFinalHp": null,
+        "ContentScoped": true
+      },
+      "best": {
+        "Won": true,
+        "Dead": false,
+        "StartingHp": 53,
+        "Hp": 44,
+        "MaxHp": 75,
+        "NetHpLoss": 9,
+        "EnemyHp": 0,
+        "Rounds": 4,
+        "StopReason": "胜利结算完成",
+        "steps": 19,
+        "choices": 0,
+        "potions": 1
+      },
+      "stoppedEarly": false,
+      "stoppedOnMinimum": false,
+      "stoppedOnHealthTarget": false,
+      "pendingPrefixes": 22551,
+      "independentVerifications": 1,
+      "recoveredFailures": 0,
+      "simulationErrors": 0,
+      "exactRootCovered": false,
+      "searchElapsedMs": 62540,
+      "totalElapsedMs": 166100
+    }
+  ],
+  "nativeHealing": {
+    "version": "0.7.68",
+    "passed": true,
+    "scope": "Native potion and victory-healing ordering; two algorithms; seeded mechanism probe",
+    "nativeGame": true,
+    "samples": [
+      {
+        "algorithm": "MonteCarlo",
+        "baselineHp": 106,
+        "finalHp": 156,
+        "HpChange": 56,
+        "HpLost": 0,
+        "hpGained": 56,
+        "Evaluated": 8,
+        "Victories": 8,
+        "measuredNoPotionWins": 3,
+        "measuredPotionWins": 5,
+        "ElapsedMs": 1553,
+        "finalVerifications": 1,
+        "contentCapStopChecked": true,
+        "contentCapEvaluated": 8,
+        "knownRecoveryChecks": 5,
+        "unknownRecoveryChecks": 0,
+        "fixedHealingEarlyStopChecked": true,
+        "fixedHealingFinalHp": 106,
+        "fixedHealingEvaluated": 1,
+        "StoppedOnMinimum": false,
+        "StoppedOnHealthTarget": true,
+        "executionCheckpoints": true,
+        "sourceCombatUnchanged": true
+      },
+      {
+        "algorithm": "TurnFrontier",
+        "baselineHp": 106,
+        "finalHp": 156,
+        "HpChange": 56,
+        "HpLost": 0,
+        "hpGained": 56,
+        "Evaluated": 8,
+        "Victories": 8,
+        "measuredNoPotionWins": 2,
+        "measuredPotionWins": 6,
+        "ElapsedMs": 1552,
+        "finalVerifications": 1,
+        "contentCapStopChecked": true,
+        "contentCapEvaluated": 8,
+        "knownRecoveryChecks": 3,
+        "unknownRecoveryChecks": 0,
+        "fixedHealingEarlyStopChecked": true,
+        "fixedHealingFinalHp": 106,
+        "fixedHealingEvaluated": 1,
+        "StoppedOnMinimum": false,
+        "StoppedOnHealthTarget": true,
+        "executionCheckpoints": true,
+        "sourceCombatUnchanged": true
+      }
+    ],
+    "testedDllSha256": "2d8be358e43c48a9a693dde93ab9a8ed34a311b8c435639e4b1455e99e921046",
+    "installedDllUnchanged": true,
+    "nativeScope": "Native game with coach and private integration mod"
+  },
+  "metadata": {
+    "MetadataChecks": 40,
+    "MissingPlayerRemainsUnknown": true,
+    "UnknownResultCached": true,
+    "NativeBattleExecuted": false,
+    "SpeedBenchmarkExecuted": false
+  },
+  "limitations": [
+    "The player-content domain does not prove arbitrary global Mod completeness.",
+    "Dynamic maximum-HP growth can remain unknown.",
+    "The frozen battle still has pending prefixes; loss 9 is not proved minimal.",
+    "Native elapsed times are observations under concurrent game load, not a speed comparison.",
+    "Player restart/loading and new live combat are not verified."
+  ],
+  "rawInputsPublished": false,
+  "delivery": {
+    "installedVersion": "0.7.68",
+    "previousVersion": "0.7.67",
+    "installOnly": true,
+    "rebuildDuringInstall": false,
+    "elapsedMs": 1526,
+    "installedPackageMatchesTestedDll": true,
+    "verifiedBackupFiles": 2,
+    "protectedFiles": 328,
+    "changedProtectedFiles": 0,
+    "playerRestartVerified": false
+  }
+}

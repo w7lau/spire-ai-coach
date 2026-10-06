@@ -80,10 +80,14 @@ internal static class HealthRecoveryIntegration
             var result = await Task.Run(() => pool.Analyze(request, LocalCapture.Installation(), _ => { }, CancellationToken.None));
             LocalWire.Write(Path.Combine(root, $"integration-healing-ranked-{algorithm}-private.json"), result);
             pool.DiscardSearch();
-            var unknownRequest = request with { Id = Guid.NewGuid().ToString("N"), StopOnZeroLoss = true };
-            var unknown = await Task.Run(() => pool.Analyze(unknownRequest, LocalCapture.Installation(), _ => { }, CancellationToken.None));
-            LocalWire.Write(Path.Combine(root, $"integration-healing-unknown-{algorithm}-private.json"), unknown);
-            foreach (var measured in new[] { baseline, result, unknown })
+            var capRequest = request with { Id = Guid.NewGuid().ToString("N"), StopOnZeroLoss = true };
+            var cap = await Task.Run(() => pool.Analyze(capRequest, LocalCapture.Installation(), _ => { }, CancellationToken.None));
+            LocalWire.Write(Path.Combine(root, $"integration-healing-cap-{algorithm}-private.json"), cap);
+            pool.DiscardSearch();
+            var minimumRequest = capRequest with { Id = Guid.NewGuid().ToString("N"), IncludePotions = false, InitialPlan = attacks };
+            var minimum = await Task.Run(() => pool.Analyze(minimumRequest, LocalCapture.Installation(), _ => { }, CancellationToken.None));
+            LocalWire.Write(Path.Combine(root, $"integration-healing-minimum-{algorithm}-private.json"), minimum);
+            foreach (var measured in new[] { baseline, result, cap, minimum })
                 if (measured.Status != "done" || measured.Best is not { Won: true, Dead: false, MaxHp: 250 } ||
                     measured.Timing?.Verifications != 1 || measured.Rejected != 0 || measured.Failure != null ||
                     measured.RecoveredFailures is { Length: > 0 } || !LocalSearchPolicy.HasExecutionPoints(measured))
@@ -93,10 +97,15 @@ internal static class HealthRecoveryIntegration
                 result.Best.Actions.Count(a => a.PotionSlot.HasValue) != 1 ||
                 !LocalSearchPolicy.Better(result.Best, baseline.Best) || result.StoppedEarly)
                 throw new InvalidOperationException("Native final-HP ordering flattened potion/victory healing");
-            if (unknown.Best!.Hp != result.Best.Hp || unknown.StoppedEarly || unknown.StoppedOnMinimum ||
-                unknown.HealthBounds is not { UnknownRecoveryChecks: > 0 } ||
-                unknown.MinimumLoss?.Certificate?.MaximumFinalHp != null || LocalSearchPolicy.HasMinimumProof(unknown))
-                throw new InvalidOperationException("Unknown native continuation falsely certified a healed optimum");
+            if (cap.Best!.Hp != result.Best.Hp || cap.StoppedEarly || cap.StoppedOnMinimum ||
+                cap.HealthBounds is not { KnownRecoveryChecks: > 0, ContentScoped: true } ||
+                LocalSearchPolicy.HasMinimumProof(cap))
+                throw new InvalidOperationException("Content healing cap flattened the candidate or falsely certified an optimum");
+            if (minimum.Best!.Hp != 106 || !minimum.StoppedEarly ||
+                !minimum.StoppedOnMinimum && !minimum.StoppedOnHealthTarget ||
+                minimum.HealthBounds is not { TargetAnalyses: 1, ContentScoped: true } ||
+                minimum.HealthTarget is not { TargetHp: 106, FullHealth: false })
+                throw new InvalidOperationException("A route reaching the fixed-healing HP bound did not stop early");
             if (LocalCapture.Fingerprint() != nativeBefore || capture.Capture(true)!.Fingerprint() != snapshot.Fingerprint())
                 throw new InvalidOperationException("Owned worker simulation changed the source combat");
             samples.Add(new { algorithm = algorithm.ToString(), baselineHp = baseline.Best.Hp,
@@ -105,8 +114,11 @@ internal static class HealthRecoveryIntegration
                 measuredNoPotionWins = result.Trials?.Count(t => t.Complete && t.Won && t.PotionsUsed == 0),
                 measuredPotionWins = result.Trials?.Count(t => t.Complete && t.Won && t.PotionsUsed == 1),
                 result.ElapsedMs, finalVerifications = result.Timing!.Verifications,
-                unknownRecoveryStopChecked = true, unknownRecoveryEvaluated = unknown.Evaluated,
-                unknownRecoveryChecks = unknown.HealthBounds.UnknownRecoveryChecks,
+                contentCapStopChecked = true, contentCapEvaluated = cap.Evaluated,
+                knownRecoveryChecks = cap.HealthBounds.KnownRecoveryChecks,
+                unknownRecoveryChecks = cap.HealthBounds.UnknownRecoveryChecks,
+                fixedHealingEarlyStopChecked = true, fixedHealingFinalHp = minimum.Best.Hp,
+                fixedHealingEvaluated = minimum.Evaluated, minimum.StoppedOnMinimum, minimum.StoppedOnHealthTarget,
                 executionCheckpoints = true, sourceCombatUnchanged = true });
             pool.DiscardSearch();
         }

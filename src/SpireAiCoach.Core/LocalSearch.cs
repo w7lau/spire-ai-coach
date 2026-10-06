@@ -276,7 +276,7 @@ public static class LocalSearchPolicy
             lines.Add(HealthTargetDescription(target));
         if (result.StoppedOnFirstWin && best is { Won: true, Dead: false })
             lines.Add("已按「找到获胜路线即返回」停止搜索，未继续优化损失或用药。");
-        if (HasMinimumProof(result)) lines.Add(MinimumProofDescription(best));
+        if (HasMinimumProof(result)) lines.Add(MinimumProofDescription(best, result.MinimumLoss?.Certificate?.ContentScoped == true));
         if (best.DamageSources is { } damage)
             lines.Add($"伤害来源：敌方 {damage.Enemy}，自身 {damage.Self}，来源未明 {damage.Unknown + damage.Unattributed}" +
                 (damage.AccountingMatches ? "。" : "（来源记录与扣血统计不一致）。"));
@@ -345,7 +345,7 @@ public static class LocalSearchPolicy
             lines.Add(HealthTargetDescription(target));
         if (result.StoppedOnFirstWin && best is { Won: true, Dead: false })
             lines.Add("已按「找到获胜路线即返回」停止搜索，未继续优化损失或用药。");
-        if (HasMinimumProof(result)) lines.Add(MinimumProofDescription(best));
+        if (HasMinimumProof(result)) lines.Add(MinimumProofDescription(best, result.MinimumLoss?.Certificate?.ContentScoped == true));
         if (!best.Won) lines.Add("尚未找到能打赢的路线，请继续优化或重新计算。");
         if (result.Status == "partial") lines.Add("部分搜索未完成，显示当前取得的路线。");
         lines.AddRange(CardGoalAdvice(result));
@@ -365,7 +365,8 @@ public static class LocalSearchPolicy
     public static string HealthTargetDescription(LocalHealthTarget target) =>
         $"已达到当前内容的生命目标（{(target.FullHealth ? "战后满血" : target.TargetHp + " 点生命")}），停止搜索；尚未证明全局最优。";
 
-    public static string MinimumProofDescription(LocalCandidate best) => best.NetHpLoss > 0 ?
+    public static string MinimumProofDescription(LocalCandidate best, bool contentScoped = false) => contentScoped ?
+        $"按当前玩家内容的回复边界，已达到最高战后生命 {best.Hp}（最低净损失 {best.NetHpLoss}）；其他外部动态效果未作全局最优证明。" : best.NetHpLoss > 0 ?
         $"已证明最低净损失为 {best.NetHpLoss}；同等战后生命下用药也已达下界。" :
         $"已证明最高战后生命为 {best.Hp}（生命净变化 {best.HpChange:+0;-0;0}）；同等战后生命下用药也已达下界。";
 
