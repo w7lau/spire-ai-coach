@@ -84,7 +84,8 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
         {
             AbstractModel[]? models = player == null ? null : CurrentModels(player);
             if (player != null) _sourceTypes = PlayerSources(player, models!).Select(m => m.GetType()).Distinct().ToArray();
-            if (player != null && request.StopOnZeroLoss && !request.StopOnFirstWin && !LocalSearchPolicy.HasSpecificGoal(request))
+            if (player != null && request.StopOnZeroLoss && !request.StopOnFirstWin &&
+                (!LocalSearchPolicy.HasSpecificGoal(request) || request.CardGoals is { Enabled: true, HpLossThreshold: null }))
             {
                 LocalHealthTarget CalculateTarget()
                 {

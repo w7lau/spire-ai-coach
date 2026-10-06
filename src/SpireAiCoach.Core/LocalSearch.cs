@@ -135,22 +135,25 @@ public static class LocalSearchPolicy
         request.StopOnFirstWin && WinningRouteFrom(candidate, request);
     public static bool CanStopAfterVictory(LocalCandidate? candidate, LocalSearchRequest request,
         LocalMinimumLossCertificate? certificate = null, LocalHealthTarget? healthTarget = null) => request.VerifyCandidate == null &&
-        (CanStop(candidate, request) || CanStopOnCardGoals(candidate, request) ||
+        (CanStop(candidate, request) || CanStopOnCardGoals(candidate, request, healthTarget) ||
             CanStopAtHealthTarget(candidate, request, healthTarget) || CanStopAtMinimum(candidate, request, certificate));
     public static bool CanStopAtHealthTarget(LocalCandidate? candidate, LocalSearchRequest request,
         LocalHealthTarget? target) => request.StopOnZeroLoss && !request.StopOnFirstWin && !HasSpecificGoal(request) &&
-        request.VerifyCandidate == null && target != null && target.StartingHp > 0 && target.TargetHp >= target.StartingHp &&
+        request.VerifyCandidate == null && ReachesHealthTarget(candidate, request, target);
+    private static bool ReachesHealthTarget(LocalCandidate? candidate, LocalSearchRequest request,
+        LocalHealthTarget? target) => target != null && target.StartingHp > 0 && target.TargetHp >= target.StartingHp &&
         WinningRouteFrom(candidate, request) && candidate!.StartingHp == target.StartingHp &&
         candidate.MaxHp > 0 && candidate.Hp <= candidate.MaxHp && target.Scope == LocalMinimumLossProof.Scope(request) &&
         (target.FullHealth ? FullHealthVictory(candidate) && candidate.NetHpLoss == 0 : candidate.Hp >= target.TargetHp);
-    public static bool CanStopOnCardGoals(LocalCandidate? candidate, LocalSearchRequest request) =>
+    public static bool CanStopOnCardGoals(LocalCandidate? candidate, LocalSearchRequest request,
+        LocalHealthTarget? healthTarget = null) =>
         request.StopOnZeroLoss && !request.StopOnFirstWin && request.VerifyCandidate == null &&
         request.CardGoals is { Enabled: true } goals &&
         candidate is { Won: true, Dead: false, Hp: > 0, Actions.Length: > 0,
             CardGoalOutcome: { ConsumableGoals: { } consumable } outcome } &&
         candidate.Actions[0].BeforeHash == request.NativeHash && consumable.Complete(goals, outcome) &&
         (goals.HpLossThreshold.HasValue ? goals.WithinThreshold(candidate) :
-            candidate.NetHpLoss == 0 && FullHealthVictory(candidate)) &&
+            candidate.NetHpLoss == 0 && FullHealthVictory(candidate) || ReachesHealthTarget(candidate, request, healthTarget)) &&
         (!request.TargetVictoryRounds.HasValue || candidate.Rounds <= request.TargetVictoryRounds.Value) &&
         (!request.TargetPotionUses.HasValue || candidate.Actions.Count(a => a.PotionSlot.HasValue) <= request.TargetPotionUses.Value) &&
         (!request.RequireKnownZeroEnemyDamage || candidate.DamageSources is { Complete: true, Enemy: 0 });
@@ -381,8 +384,10 @@ public static class LocalSearchPolicy
             yield return goals.WithinThreshold(best) ? $"净损血小于 {limit}，已优先比较补刀及使用次数。" :
                 $"尚未找到净损血小于 {limit} 的获胜路线，显示目前损血较少的方案。";
         yield return result.StoppedOnCardGoals ?
-            "当前消耗出牌及补刀目标已完成，损血符合设置，已停止搜索；补刀目标以当前活敌人数为上限，未继续寻找回收、复制或额外生成后的次数。" :
+            "当前一次性出牌及补刀目标已完成，生命符合设置，已停止搜索；补刀目标以当前活敌人数为上限，未继续寻找回收、复制或额外生成后的次数。" :
             "可选目标尚未证明最优；仅无伤或耗尽目标牌不会提前返回。";
+        if (result.StoppedOnCardGoals && goals.HpLossThreshold == null && result.HealthTarget is { } target)
+            yield return HealthTargetDescription(target);
     }
 
     public static string Describe(LocalAction action) => Describe(action, includeNativeTarget: true);

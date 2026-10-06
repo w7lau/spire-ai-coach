@@ -311,6 +311,61 @@ static class CardGoalTests
             Check(!LocalSearchPolicy.CanStopAfterVictory(good, request with { StopOnZeroLoss = false }), "Disabled stop option ignored");
             Check(!LocalSearchPolicy.CanStopAfterVictory(good, request with { VerifyCandidate = good }), "Verification interrupted by a goal");
         });
+        test("finite removed copies retain distinct successful completion through IPC", () =>
+        {
+            var request = new LocalSearchRequest("request", "snapshot", [], "root", 1, [], false,
+                CardGoals: new(PlayModelId: "mod:play", HpLossThreshold: 5));
+            LocalCandidate Winner(LocalConsumableGoalProgress progress) => Fulfilled(46) with
+            { CardGoalOutcome = new("mod:play", null, 2, 0, [new(2)], new(progress, null)) };
+            var complete = Winner(new(2, 2, 0, RemovedCopies: 2));
+            Check(LocalSearchPolicy.CanStopOnCardGoals(complete, request), "Native removal required an exhaust event");
+            Check(!LocalSearchPolicy.CanStopOnCardGoals(Winner(new(2, 1, 0, RemovedCopies: 2)), request),
+                "An unplayed removed copy supplied completion");
+            Check(!LocalSearchPolicy.CanStopOnCardGoals(Winner(new(2, 2, 0, RemovedCopies: 1)), request),
+                "An available copy was treated as consumed");
+            Check(!LocalSearchPolicy.CanStopOnCardGoals(Winner(new(2, 2, 1, RemovedCopies: 2)), request),
+                "Overlapping removal and exhaustion invented copies");
+            Check(JsonSerializer.Deserialize<LocalCandidate>(JsonSerializer.Serialize(complete))!.CardGoalOutcome!.ConsumableGoals ==
+                complete.CardGoalOutcome!.ConsumableGoals, "IPC lost native removal evidence");
+        });
+        test("fulfilled finite goals use the once calculated current content health target in both algorithms", () =>
+        {
+            foreach (var order in new[] { LocalSearchOrder.MonteCarlo, LocalSearchOrder.TurnFrontier })
+            foreach (bool skip in new[] { false, true })
+            {
+                var request = new LocalSearchRequest("request", "snapshot", [], "root", 1, [], false,
+                    SearchOrder: order, SkipFinalVerification: skip, CardGoals: Goals());
+                LocalHealthTarget Target(int hp = 50, bool full = false) =>
+                    new(LocalMinimumLossProof.Scope(request), 50, hp, full, Uncertain: true);
+                var win = Fulfilled(50);
+                Check(LocalSearchPolicy.CanStopAfterVictory(win, request, healthTarget: Target()) &&
+                    LocalSearchPolicy.CanStopOnCardGoals(win, request, Target()), "Finite completion still demanded unreachable full HP");
+                Check(!LocalSearchPolicy.CanStopAtHealthTarget(win, request, Target()), "Health alone bypassed the card goal");
+                Check(!LocalSearchPolicy.CanStopAfterVictory(win, request, healthTarget: Target(51)) &&
+                    LocalSearchPolicy.CanStopAfterVictory(win with { Hp = 51 }, request, healthTarget: Target(51)),
+                    "Fixed victory recovery was ignored");
+                Check(!LocalSearchPolicy.CanStopAfterVictory(win, request, healthTarget: Target(full: true)),
+                    "Detected repeatable recovery no longer required full health");
+                Check(!LocalSearchPolicy.CanStopAfterVictory(win, request, healthTarget: Target() with { Scope = "other" }) &&
+                    !LocalSearchPolicy.CanStopAfterVictory(win with { StartingHp = 49 }, request, healthTarget: Target()),
+                    "Stale health target supplied completion");
+                var incomplete = win with { CardGoalOutcome = win.CardGoalOutcome! with
+                    { ConsumableGoals = new(new(2, 1, 1), new(1, 1, 1)) } };
+                Check(!LocalSearchPolicy.CanStopAfterVictory(incomplete, request, healthTarget: Target()),
+                    "Health success displaced the unfinished second copy");
+                Check(!LocalSearchPolicy.CanStopAfterVictory(win with { Hp = 49 }, request, healthTarget: Target()) &&
+                    !LocalSearchPolicy.CanStopAfterVictory(win, request), "No allowance silently accepted HP loss or an absent target");
+                var paid = request with { CardGoals = Goals(5) };
+                Check(LocalSearchPolicy.CanStopAfterVictory(win with { Hp = 46 }, paid, healthTarget: Target(full: true)) &&
+                    !LocalSearchPolicy.CanStopAfterVictory(win with { Hp = 45 }, paid, healthTarget: Target()),
+                    "Health target changed the user's strict loss allowance");
+                var gated = request with { TargetVictoryRounds = 1, TargetPotionUses = 0, RequireKnownZeroEnemyDamage = true };
+                var goal = Target() with { Scope = LocalMinimumLossProof.Scope(gated) };
+                Check(!LocalSearchPolicy.CanStopAfterVictory(win, gated, healthTarget: goal), "Unknown enemy damage passed");
+                Check(LocalSearchPolicy.CanStopAfterVictory(win with { Rounds = 1, DamageSources = new(0, 0, 0, 0, true) },
+                    gated, healthTarget: goal), "Other completed goals prevented finite return");
+            }
+        });
         test("consumable card goals preserve strict affordable losses even after a zero loss incumbent", () =>
         {
             var request = new LocalSearchRequest("request", "snapshot", [], "root", 1, [], false, CardGoals: Goals(5));
