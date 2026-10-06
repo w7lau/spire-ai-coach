@@ -23,7 +23,8 @@ Both algorithms plan the whole battle from the current state without an API.
 - Prioritizes actual HP after combat, including healing above the starting HP. Equal-HP routes prefer preserving potions.
 - Configure concurrency, attempts, search time, turn limits, stopping conditions, potion use and card goals.
 - Inspect progress, routes and timing, or continue searching.
-- Early return accepts full HP after combat resolution or a certified maximum final HP with minimum potion use at that HP. Zero net loss alone does not prove maximum healing.
+- Early return accepts the current-content health target, full HP after combat resolution, or a certified maximum final HP. Zero net loss alone does not prove maximum healing.
+- A selected play goal can return after every current single-use copy has actually been played, combat is won and health meets the settings. This includes power cards removed from combat; repeatable cards keep searching.
 - Plan execution supports singleplayer and stops when the actual state diverges from the plan.
 
 To support different mods, local search aims to reuse underlying game rules and loaded mod hooks for plays and resolution, reducing per-card adapters.

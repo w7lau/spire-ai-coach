@@ -70,6 +70,7 @@ parser.add_argument('--route-feedback-focused-only', action='store_true')
 parser.add_argument('--recent-search-test', action='store_true', help='Frozen unseeded incident; preserve its trial/time/turn limits and report incomplete search honestly')
 parser.add_argument('--selection-paging-test', action='store_true')
 parser.add_argument('--card-goals-test', action='store_true')
+parser.add_argument('--finite-card-goals-test', action='store_true', help='Native one/two power-card copies and combined health-goal return in both algorithms')
 parser.add_argument('--finisher-targets-test', action='store_true', help='Five direct native Fatal eligibility and finite reservation cases; no route search or benchmark')
 parser.add_argument('--finisher-retention-test', action='store_true', help='Selected-finisher frozen incident, including previous route, with original budget and independent final verification')
 parser.add_argument('--finisher-retention-order', choices=['monte-carlo', 'turn-frontier'], help='Explicitly select one algorithm for the same frozen finisher regression; default checks both')
@@ -284,6 +285,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_SNAPSHOT_METADATA_TEST'] = '1' if args.snapshot_metadata_test else '0'
     env['SPIRE_LOCAL_SELECTION_PAGING_TEST'] = '1' if args.selection_paging_test else '0'
     env['SPIRE_LOCAL_CARD_GOALS_TEST'] = '1' if args.card_goals_test else '0'
+    env['SPIRE_LOCAL_FINITE_CARD_GOALS_TEST'] = '1' if args.finite_card_goals_test else '0'
     env['SPIRE_LOCAL_FINISHER_TARGETS_TEST'] = '1' if args.finisher_targets_test else '0'
     if args.selection_paging_test:
         env['SPIRE_LOCAL_SELECTION_MATRIX'] = '1'
@@ -364,7 +366,7 @@ with worker_lock(root):
     settings_data = json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}
     settings_data.update(volume_master=0, volume_bgm=0, volume_sfx=0, volume_ambience=0)
     settings.write_text(json.dumps(settings_data), encoding='utf-8')
-    if args.survival_test or args.card_goals_test or args.finisher_targets_test:
+    if args.survival_test or args.card_goals_test or args.finisher_targets_test or args.finite_card_goals_test:
         # Match the product worker's private tutorial state. A fresh headless
         # profile must not open the interactive combat tutorial during settlement.
         progress = settings.parent / 'modded/profile1/saves/progress.save'
@@ -372,7 +374,7 @@ with worker_lock(root):
         progress_data = json.loads(progress.read_text(encoding='utf-8-sig')) if progress.exists() else {'schema_version': 24}
         progress_data.update(enable_ftues=False, ftue_completed=['combat_rules_ftue'])
         progress.write_text(json.dumps(progress_data), encoding='utf-8')
-        if args.card_goals_test or args.finisher_targets_test:
+        if args.card_goals_test or args.finisher_targets_test or args.finite_card_goals_test:
             ordinary_progress = settings.parent / 'profile1/saves/progress.save'
             ordinary_progress.parent.mkdir(parents=True, exist_ok=True)
             ordinary_progress.write_text(json.dumps(progress_data), encoding='utf-8')
@@ -402,6 +404,10 @@ with worker_lock(root):
                 if (root / name).is_file():
                     shutil.copy2(root / name, args.results_dir / name)
         names = ['integration-replay-private.json', 'integration-replay-summary.json',
+                      'integration-finite-card-summary.json',
+                      *[f'integration-finite-card-{kind}-{order}-private.json'
+                        for kind in ['one-power', 'two-powers', 'fixed-recovery', 'allowed-loss', 'repeatable']
+                        for order in ['MonteCarlo', 'TurnFrontier']],
                      'integration-finisher-targets-summary.json', 'integration-goal-consumption-summary.json',
                      'integration-card-goals-summary.json', 'integration-card-goals-MonteCarlo-private.json',
                      'integration-card-goals-TurnFrontier-private.json',

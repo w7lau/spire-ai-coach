@@ -467,19 +467,23 @@ internal static class WorkerReuseTests
             await using var f = new Fixture();
             foreach (var algorithm in new[] { LocalSearchOrder.MonteCarlo, LocalSearchOrder.TurnFrontier })
             foreach (var skip in new[] { false, true })
+            foreach (bool contentHealth in new[] { false, true })
             {
-                var r = Request("card-goal-stop") with { SearchOrder = algorithm, StopOnZeroLoss = true,
-                    DataOnlyCombat = true, SkipFinalVerification = skip, CardGoals = new(null, "mod:finish", 5) };
+                var r = Request(contentHealth ? "card-goal-health" : "card-goal-stop") with { SearchOrder = algorithm, StopOnZeroLoss = true,
+                    DataOnlyCombat = true, SkipFinalVerification = skip, CardGoals = new(null, "mod:finish", contentHealth ? null : 5) };
                 var watch = Stopwatch.StartNew();
                 var result = await f.Pool.Analyze(r, f.Installation, _ => { }, CancellationToken.None);
                 Check(result.Status == "done" && result.StoppedEarly && result.StoppedOnCardGoals && !result.StoppedOnFirstWin &&
-                    result.Best is { Won: true, NetHpLoss: 4, CardGoalOutcome.Kills: 1 }, "Consumable goal waited for zero loss or minimum proof");
+                    result.Best is { Won: true, CardGoalOutcome.Kills: 1 } && result.Best.NetHpLoss == (contentHealth ? 0 : 4),
+                    "Consumable goal waited for full health or minimum proof");
+                Check(!contentHealth || result.HealthTarget?.TargetHp == 50 && result.Best!.Hp < result.Best.MaxHp,
+                    "Parent selection or verification lost the combined health target");
                 Check(result.MinimumLoss == null && !LocalSearchPolicy.HasMinimumProof(result) &&
                     result.Timing?.Verifications == (skip ? 0 : 1) && LocalSearchPolicy.HasExecutionPoints(result) &&
                     (!Received(Workers(f.Pool)[1], r, false) || result.Trace!.Spans.Any(s => s.Phase == "stop_search")) &&
                     watch.Elapsed < TimeSpan.FromSeconds(8),
                     "Peers ran their full budget, goal scope was lost or final route verification repeated");
-                Console.WriteLine($"  consumable-goal protocol evidence: algorithm={algorithm}; skip_verify={skip}; elapsed_ms={watch.ElapsedMilliseconds}; loss=4<5; kills=1; peers=2; verifications={result.Timing!.Verifications}; peer_budget_ms=10000; native_game=false");
+                Console.WriteLine($"  consumable-goal protocol evidence: algorithm={algorithm}; skip_verify={skip}; content_health={contentHealth}; elapsed_ms={watch.ElapsedMilliseconds}; kills=1; peers=2; verifications={result.Timing!.Verifications}; peer_budget_ms=10000; native_game=false");
             }
         });
         asyncTest("consumable goal stop rejects final verification that loses the real finishing blow", async () =>
@@ -491,6 +495,18 @@ internal static class WorkerReuseTests
                 await f.Pool.Analyze(Request("card-goal-mismatch") with { Workers = 1, StopOnZeroLoss = true,
                     DataOnlyCombat = true, CardGoals = new(null, "mod:finish", 5) }, f.Installation, _ => { }, CancellationToken.None);
                 throw new Exception("Verification removed the kill but the completed goal returned");
+            }
+            catch (CoachException ex) when (ex.Category == "local_verify_failed") { }
+        });
+        asyncTest("consumable goal stop rejects final verification below the current content health target", async () =>
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            await using var f = new Fixture();
+            try
+            {
+                await f.Pool.Analyze(Request("card-goal-health-mismatch") with { Workers = 1, StopOnZeroLoss = true,
+                    DataOnlyCombat = true, CardGoals = new(null, "mod:finish") }, f.Installation, _ => { }, CancellationToken.None);
+                throw new Exception("A verified route below the combined health target became usable");
             }
             catch (CoachException ex) when (ex.Category == "local_verify_failed") { }
         });
@@ -562,6 +578,9 @@ internal static class WorkerReuseTests
         if (request.VerifyCandidate == null && request.DebugEncounter?.StartsWith("card-goal", StringComparison.Ordinal) == true)
             candidate = candidate with { Hp = 46, HpLost = 4, CardGoalOutcome = new(null, "mod:finish", 0, 1,
                 [new(0, 1)], new(null, new(1, 1, 1))) };
+        if (request.DebugEncounter?.StartsWith("card-goal-health", StringComparison.Ordinal) == true)
+            candidate = candidate with { Hp = request.VerifyCandidate != null && request.DebugEncounter.EndsWith("mismatch") ? 49 : 50,
+                MaxHp = 80, HpLost = 0 };
         if (request.VerifyCandidate != null && request.DebugEncounter == "card-goal-mismatch")
             candidate = candidate with { CardGoalOutcome = candidate.CardGoalOutcome! with { Kills = 0,
                 ConsumableGoals = new(null, new(1, 0, 1)) } };
@@ -672,7 +691,9 @@ internal static class WorkerReuseTests
                         cancelled ? "cancelled" : request.VerifyCandidate == null ? "searched" : "done", "synthetic", 1, 0, timer.ElapsedMilliseconds,
                         cancelled || goal && !(manualStop && publishedWin) ? null : Candidate(request), RootBranches: 2,
                         Timing: new(Verifications: request.VerifyCandidate == null ? 0 : 1),
-                        MinimumLoss: minimum ? loss!.Observe(null) : null, StoppedEarly: goal, StoppedOnManualVictory: manualStop);
+                        MinimumLoss: minimum ? loss!.Observe(null) : null, StoppedEarly: goal, StoppedOnManualVictory: manualStop,
+                        HealthTarget: request.DebugEncounter?.StartsWith("card-goal-health", StringComparison.Ordinal) == true ?
+                            new(LocalMinimumLossProof.Scope(request), 50, 50, false) : null);
                     LocalWire.Write(Path.Combine(root, "result.json"), result);
                     if (cancelled && request.DebugEncounter == "cancel-errors") File.AppendAllText(Path.Combine(root, "game.log"), "[ERROR] synthetic native error\n");
                     if (minimum && request.Partition == 1 && request.DebugEncounter == "minimum-errors")

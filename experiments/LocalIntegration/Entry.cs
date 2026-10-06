@@ -122,6 +122,12 @@ public static class Entry
                 File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
                 return;
             }
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_FINITE_CARD_GOALS_TEST") == "1")
+            {
+                await FiniteCardGoalIntegration.Run(root, tree, pool, save);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_CARD_GOALS_TEST") == "1")
             {
                 await CardGoalIntegration.Run(root, tree, pool, save);

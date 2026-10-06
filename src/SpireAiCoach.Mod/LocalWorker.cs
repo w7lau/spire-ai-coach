@@ -370,7 +370,7 @@ public static class LocalWorker
                 HealthBounds: HealthStats(), Failure: failure,
                 Trials: status == "running" ? null : trials.ToArray(), CardGoals: request.CardGoals, MinimumLoss: minimumStatus,
                 StoppedOnFirstWin: stoppedEarly && !stoppedOnManualVictory && LocalSearchPolicy.CanStopAtFirstWin(best, request),
-                StoppedOnCardGoals: stoppedEarly && !stoppedOnManualVictory && LocalSearchPolicy.CanStopOnCardGoals(best, request),
+                StoppedOnCardGoals: stoppedEarly && !stoppedOnManualVictory && LocalSearchPolicy.CanStopOnCardGoals(best, request, recovery.HealthTarget),
                 StoppedOnMinimum: stoppedEarly && !stoppedOnManualVictory && !LocalSearchPolicy.CanStopAtHealthTarget(best, request, recovery.HealthTarget) &&
                     LocalSearchPolicy.RequiresMinimumConfirmation(best, request, minimumStatus?.Certificate),
                 StoppedOnManualVictory: stoppedOnManualVictory,
@@ -1201,8 +1201,8 @@ public static class LocalWorker
             Publish(best == null ? stoppedEarly || sharedExhausted || lossProofProbes > 0 ? "searched" : "unsupported" : request.DeferVerification ? "searched" : "done",
                 stoppedEarly ? stoppedOnManualVictory ? "已手动停止后续搜索，保留已取得的胜利候选。" : request.StopOnFirstWin ? best?.Won == true ?
                     "已找到获胜路线，停止后续搜索。" : "已停止其余搜索。" :
-                    request.CardGoals?.Enabled == true ? LocalSearchPolicy.CanStopOnCardGoals(best, request) ?
-                    "当前消耗目标已完成，损血符合设置，停止后续搜索。" : "已停止其余搜索。" :
+                    request.CardGoals?.Enabled == true ? LocalSearchPolicy.CanStopOnCardGoals(best, request, recovery.HealthTarget) ?
+                    "当前一次性出牌及补刀目标已完成，生命符合设置，停止后续搜索。" : "已停止其余搜索。" :
                     LocalSearchPolicy.CanStopAtHealthTarget(best, request, recovery.HealthTarget) ?
                     LocalSearchPolicy.HealthTargetDescription(recovery.HealthTarget!) :
                     LocalSearchPolicy.RequiresMinimumConfirmation(best, request, minimumStatus?.Certificate) ?

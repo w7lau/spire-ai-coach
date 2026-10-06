@@ -271,7 +271,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             if (manualVictory)
                 valid = valid.Where(r => LocalSearchPolicy.WinningRouteFrom(r.Best, request)).ToArray();
             if (Volatile.Read(ref consumableGoalReached) != 0)
-                valid = valid.Where(r => LocalSearchPolicy.CanStopOnCardGoals(r.Best, request)).ToArray();
+                valid = valid.Where(r => LocalSearchPolicy.CanStopOnCardGoals(r.Best, request, r.HealthTarget)).ToArray();
             if (Volatile.Read(ref healthTargetReached) != 0)
                 valid = valid.Where(r => LocalSearchPolicy.CanStopAtHealthTarget(r.Best, request, r.HealthTarget)).ToArray();
             if (valid.Length == 0)
@@ -384,7 +384,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 Message = goalReached.IsCancellationRequested ? (manualVictory ?
                     "已手动停止后续搜索，采用当前胜利路线；尚未证明最优。" : request.StopOnFirstWin ?
                     "已找到获胜路线，已停止全部后续搜索；未继续优化损失或用药。" : Volatile.Read(ref consumableGoalReached) != 0 ?
-                    "当前消耗出牌及补刀目标已完成，战斗获胜且损血符合设置，已停止全部后续搜索。" : Volatile.Read(ref healthTargetReached) != 0 ?
+                    "当前一次性出牌及补刀目标已完成，战斗获胜且生命符合设置，已停止全部后续搜索。" : Volatile.Read(ref healthTargetReached) != 0 ?
                     LocalSearchPolicy.HealthTargetDescription(best.HealthTarget!) : Volatile.Read(ref minimumGoalReached) != 0 ?
                     LocalSearchPolicy.MinimumProofDescription(best.Best!, minimumLoss?.Status.Certificate?.ContentScoped == true) + "已停止后续搜索。" :
                     "已找到战后满血获胜路线，已停止全部后续搜索。") +
@@ -428,14 +428,14 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 if (winner == null || goalReached.IsCancellationRequested ||
                     !LocalSearchPolicy.CanStopAfterVictory(winner.Best, request, minimumLoss?.Status.Certificate, winner.HealthTarget) ||
                     Interlocked.CompareExchange(ref goalWorker, index, -1) != -1) return;
-                Volatile.Write(ref consumableGoalReached, LocalSearchPolicy.CanStopOnCardGoals(winner.Best, request) ? 1 : 0);
+                Volatile.Write(ref consumableGoalReached, LocalSearchPolicy.CanStopOnCardGoals(winner.Best, request, winner.HealthTarget) ? 1 : 0);
                 bool healthReached = LocalSearchPolicy.CanStopAtHealthTarget(winner.Best, request, winner.HealthTarget);
                 Volatile.Write(ref healthTargetReached, healthReached ? 1 : 0);
                 Volatile.Write(ref minimumGoalReached, !healthReached && LocalSearchPolicy.RequiresMinimumConfirmation(winner.Best, request, minimumLoss?.Status.Certificate) ? 1 : 0);
                 victoryReturn?.CloseSearch();
                 goalReached.Cancel();
                 progress(request.StopOnFirstWin ? "已找到获胜路线，正在停止其余搜索并确认路线…" :
-                    Volatile.Read(ref consumableGoalReached) != 0 ? "消耗目标已完成且获胜，正在停止其余搜索并确认路线…" :
+                    Volatile.Read(ref consumableGoalReached) != 0 ? "一次性出牌及补刀目标已完成且获胜，正在停止其余搜索并确认路线…" :
                     healthReached ? "生命目标已达成且获胜，正在停止其余搜索并确认路线…" :
                     Volatile.Read(ref minimumGoalReached) != 0 ? $"已达到可证明的最高战后生命 {winner.Best!.Hp}，正在停止其余搜索并确认路线…" :
                     "已找到战后满血获胜路线，正在停止其余搜索并确认路线…");

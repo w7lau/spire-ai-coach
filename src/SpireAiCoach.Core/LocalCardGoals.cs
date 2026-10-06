@@ -106,12 +106,13 @@ public static class LocalCardGoalTactics
 // Finishers are capped by the current living enemies eligible for Fatal rewards;
 // playing the other goal still needs every available root copy once.
 public sealed record LocalConsumableGoalProgress(int Copies, int CompletedCopies, int ExhaustedCopies,
-    int? LivingEnemies = null, bool BattleEnded = false)
+    int? LivingEnemies = null, bool BattleEnded = false, int RemovedCopies = 0)
 {
     public int Target => LivingEnemies.HasValue ? Math.Min(Copies, LivingEnemies.Value) : Copies;
     public bool Complete => Copies > 0 && Target > 0 && CompletedCopies >= Target &&
         CompletedCopies <= Copies && ExhaustedCopies >= 0 && ExhaustedCopies <= Copies &&
-        (BattleEnded || ExhaustedCopies >= CompletedCopies);
+        RemovedCopies >= 0 && RemovedCopies <= Copies - ExhaustedCopies &&
+        (BattleEnded || ExhaustedCopies + RemovedCopies >= CompletedCopies);
 }
 public sealed record LocalConsumableCardGoals(LocalConsumableGoalProgress? Play,
     LocalConsumableGoalProgress? Finisher, string Scope = "current-consumable-copies-v1")

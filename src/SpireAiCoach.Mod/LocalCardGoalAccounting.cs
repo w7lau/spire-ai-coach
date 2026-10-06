@@ -3,6 +3,7 @@ using MegaCrit.Sts2.Core.Combat.History;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Models;
+using MegaCrit.Sts2.Core.Hooks;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
@@ -28,11 +29,11 @@ internal sealed class LocalCardGoalAccounting : IDisposable
     private int _plays, _kills, _stepPlays, _stepKills;
     private bool _won;
     private readonly List<LocalCardGoalStep> _steps = [];
-    private readonly HashSet<CardModel>? _playCopies, _finisherCopies;
     private readonly HashSet<CardModel>? _playGoalCopies, _finisherGoalCopies;
     private readonly int _eligibleLivingEnemies;
     private readonly HashSet<CardModel> _playedCopies = new(ReferenceEqualityComparer.Instance),
-        _killingCopies = new(ReferenceEqualityComparer.Instance), _exhaustedCopies = new(ReferenceEqualityComparer.Instance);
+        _killingCopies = new(ReferenceEqualityComparer.Instance), _exhaustedCopies = new(ReferenceEqualityComparer.Instance),
+        _consumableCopies = new(ReferenceEqualityComparer.Instance), _removedCopies = new(ReferenceEqualityComparer.Instance);
     private readonly List<(Creature Receiver, CardModel Source)> _pendingKills = [];
 
     public LocalCardGoalAccounting(Player player, LocalCardGoals? goals)
@@ -40,10 +41,22 @@ internal sealed class LocalCardGoalAccounting : IDisposable
         _player = player; _goals = goals;
         _eligibleLivingEnemies = string.IsNullOrEmpty(goals?.FinisherModelId) ? 0 :
             player.Creature.CombatState?.Enemies.Count(e => e.IsAlive && LocalFinisherEligibility.AllowsFatal(e)) ?? 0;
-        _playCopies = CurrentConsumableCopies(goals?.PlayModelId);
-        _finisherCopies = CurrentConsumableCopies(goals?.FinisherModelId);
-        _playGoalCopies = CurrentGoalCopies(goals?.PlayModelId);
-        _finisherGoalCopies = CurrentGoalCopies(goals?.FinisherModelId);
+        if (goals?.Enabled == true && player.PlayerCombatState != null)
+        {
+            if (!string.IsNullOrEmpty(goals.PlayModelId)) _playGoalCopies = new(ReferenceEqualityComparer.Instance);
+            if (!string.IsNullOrEmpty(goals.FinisherModelId)) _finisherGoalCopies = new(ReferenceEqualityComparer.Instance);
+            // One root pass. Native power cards leave combat instead of entering
+            // the exhaust pile; both are finite current-copy product targets.
+            foreach (var card in player.PlayerCombatState.AllPiles.Where(p => p.Type != PileType.Exhaust).SelectMany(p => p.Cards))
+            {
+                string model = card.Id.ToString();
+                bool selected = false;
+                if (model == goals.PlayModelId) { _playGoalCopies!.Add(card); selected = true; }
+                if (model == goals.FinisherModelId) { _finisherGoalCopies!.Add(card); selected = true; }
+                if (selected && (card.Type == CardType.Power || card.Keywords.Contains(CardKeyword.Exhaust) || card.ExhaustOnNextPlay))
+                    _consumableCopies.Add(card);
+            }
+        }
         if (goals?.Enabled == true)
         {
             if (_current != null) throw new InvalidOperationException("Native goal accounting already active");
@@ -64,6 +77,8 @@ internal sealed class LocalCardGoalAccounting : IDisposable
                 transpiler: new(AccessTools.Method(typeof(LocalCardGoalAccounting), nameof(ObservePlays))));
             harmony.Patch(AccessTools.Method(typeof(CombatHistory), nameof(CombatHistory.CardExhausted)),
                 postfix: new(AccessTools.Method(typeof(LocalCardGoalAccounting), nameof(Exhausted))));
+            harmony.Patch(AccessTools.Method(typeof(Hook), nameof(Hook.ModifyCardPlayResultLocation)),
+                postfix: new(AccessTools.Method(typeof(LocalCardGoalAccounting), nameof(ResultLocation))) { priority = Priority.Last });
             harmony.Patch(AccessTools.Method(typeof(CreatureCmd), nameof(CreatureCmd.Damage),
                 [typeof(PlayerChoiceContext), typeof(IEnumerable<Creature>), typeof(decimal), typeof(ValueProp),
                     typeof(Creature), typeof(CardModel), typeof(CardPlay)]),
@@ -105,6 +120,15 @@ internal sealed class LocalCardGoalAccounting : IDisposable
     {
         if (_current is { } ledger && ReferenceEquals(ledger._history, __instance)) ledger._exhaustedCopies.Add(card);
     }
+    private static void ResultLocation(CardModel __1, CardLocation __result)
+    {
+        if (_current is not { } ledger ||
+            ledger._playGoalCopies?.Contains(__1) != true && ledger._finisherGoalCopies?.Contains(__1) != true) return;
+        // Observe the already-computed native/Mod destination. Never call the
+        // getter or hooks again: GetResultLocationForCardPlay consumes a flag.
+        if (__result.pileType is PileType.None or PileType.Exhaust) ledger._consumableCopies.Add(__1);
+        else ledger._consumableCopies.Remove(__1);
+    }
     private static void BeforeDamage(IEnumerable<Creature> __1, CardModel? cardSource,
         out HashSet<Creature>? __state)
     {
@@ -144,13 +168,17 @@ internal sealed class LocalCardGoalAccounting : IDisposable
         foreach (var kill in _pendingKills.Where(k => k.Receiver.IsDead))
         { _kills++; _killingCopies.Add(kill.Source); }
         _pendingKills.Clear();
+        if (!_won && !_player.Creature.IsDead && _player.PlayerCombatState != null)
+            foreach (var card in _consumableCopies)
+                if ((_playedCopies.Contains(card) || _killingCopies.Contains(card)) && card.Pile == null)
+                    _removedCopies.Add(card);
         _steps.Add(new(_plays - _stepPlays, _kills - _stepKills));
         _stepPlays = _plays; _stepKills = _kills;
     }
 
     public LocalCardGoalOutcome? Snapshot() => _goals?.Enabled == true ?
         new(_goals.PlayModelId, _goals.FinisherModelId, _plays, _kills, _steps.ToArray(),
-            new(Progress(_playCopies, _playedCopies), Progress(_finisherCopies, _killingCopies, _eligibleLivingEnemies))) : null;
+            new(Progress(_playGoalCopies, _playedCopies), Progress(_finisherGoalCopies, _killingCopies, _eligibleLivingEnemies))) : null;
 
     public LocalGoalOpportunity? Opportunity()
     {
@@ -171,29 +199,18 @@ internal sealed class LocalCardGoalAccounting : IDisposable
             Stock(_finisherGoalCopies, _killingCopies, _goals.FinisherModelId, _eligibleLivingEnemies));
     }
 
-    private HashSet<CardModel>? CurrentGoalCopies(string? model) => string.IsNullOrEmpty(model) || _player.PlayerCombatState == null ? null :
-        new(_player.PlayerCombatState!.AllPiles.Where(p => p.Type != PileType.Exhaust).SelectMany(p => p.Cards)
-            .Where(c => c.Id.ToString() == model), ReferenceEqualityComparer.Instance);
-
     internal static int ExhaustSelectionPenalty(CardModel card) => _current is { } ledger &&
         (ledger._playGoalCopies?.Contains(card) == true && !ledger._playedCopies.Contains(card) &&
              ledger._playGoalCopies.Count(ledger._playedCopies.Contains) < ledger._playGoalCopies.Count ||
          ledger._finisherGoalCopies?.Contains(card) == true && !ledger._killingCopies.Contains(card) &&
              ledger._finisherGoalCopies.Count(ledger._killingCopies.Contains) < Math.Min(ledger._finisherGoalCopies.Count, ledger._eligibleLivingEnemies)) ? 180 : 0;
 
-    private HashSet<CardModel>? CurrentConsumableCopies(string? model)
-    {
-        if (string.IsNullOrEmpty(model) || _player.PlayerCombatState == null) return null;
-        var copies = _player.PlayerCombatState.AllPiles.Where(p => p.Type != PileType.Exhaust)
-            .SelectMany(p => p.Cards).Where(c => c.Id.ToString() == model).Distinct<CardModel>(ReferenceEqualityComparer.Instance).ToArray();
-        return copies.Length > 0 && copies.All(c => c.Keywords.Contains(CardKeyword.Exhaust)) ?
-            new(copies, ReferenceEqualityComparer.Instance) : null;
-    }
-
     private LocalConsumableGoalProgress? Progress(HashSet<CardModel>? copies, HashSet<CardModel> completed, int? enemies = null) =>
-        copies == null ? null : new(copies.Count, copies.Count(c => completed.Contains(c) &&
-            (_won && !_player.Creature.IsDead || _exhaustedCopies.Contains(c))),
-            copies.Count(_exhaustedCopies.Contains), enemies, BattleEnded: _won && !_player.Creature.IsDead);
+        copies == null || copies.Count == 0 || !copies.All(_consumableCopies.Contains) ? null :
+            new(copies.Count, copies.Count(c => completed.Contains(c) &&
+                (_won && !_player.Creature.IsDead || _exhaustedCopies.Contains(c) || _removedCopies.Contains(c))),
+                copies.Count(_exhaustedCopies.Contains), enemies, BattleEnded: _won && !_player.Creature.IsDead,
+                RemovedCopies: copies.Count(c => !_exhaustedCopies.Contains(c) && _removedCopies.Contains(c)));
 
     public bool Matches(LocalCardGoalOutcome? expected) => expected == null ? _goals?.Enabled != true :
         Snapshot() is { } actual && actual.PlayModelId == expected.PlayModelId &&

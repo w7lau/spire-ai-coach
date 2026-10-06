@@ -39,3 +39,8 @@ python experiments/LocalIntegration/run.py --workspace C:\path\owned-native-work
 # Mod replay checkpoint regression
 
 `SPIRE_LOCAL_MOD_REPLAY_TEST=1` uses the owned replay entry with a locally frozen four-action incident. `SPIRE_LOCAL_REPLAY`, `SPIRE_LOCAL_SEED_RESULT`, and `SPIRE_LOCAL_MOD_REPLAY_AFTER` identify ignored inputs. It compares the original native prediction against the exact live hash/history, validates both restore modes and ownership/missing-state rejection, then searches, independently verifies, and executes a complete native winner. Inputs, proc-state mutation, and all game commands stay inside the owned host; never include this observer or player inputs in the installed package.
+## 当前一次性副本目标验收
+
+`run.py --workspace <owned-native-probe-workspace> --finite-card-goals-test --results-dir <ignored-results-directory>` 检查真实能力牌打出后移出战斗的计数与提前返回：一张/两张当前副本、无回血、固定战后回血、明确损血额度及普通可重复牌的负例。两个算法均使用同一原生已完成路线，各做一次普通独立最终复核；这是有种子停止合同验收，不是搜索质量或速度基准。起点前的原生Akabeko保证有限攻击能完成夹具，未在冻结后改写战斗状态或敌方血量。
+
+先通过Update.ps1 -BuildOnly准备Mod；集成观察器用 `dotnet build experiments/LocalIntegration/LocalIntegration.csproj -c Release -p:GameDir=<game-directory> -p:BuildProjectReferences=false` 引用同一已准备DLL。观察器只进入所属隔离宿主，未包含在安装包中。完整证据见 [0.7.71验收](results/2026-10-06-finite-card-goals-0.7.71.json)。

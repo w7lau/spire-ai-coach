@@ -1,0 +1,326 @@
+{
+  "version": "0.7.71",
+  "gameVersion": "0.111.0",
+  "nativeModule": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
+  "validatedDllSha256": "ac58452dd7f31ed4935c02a70d554e47ecb9a98eb3ea278e0947b5733ee020a1",
+  "coreChecksPassed": 421,
+  "nativePassed": true,
+  "scope": "Seeded native power removal with one/two actual copies; no-recovery/fixed-recovery/strict allowance and repeatable negative cases; both algorithms independently replayed. No unseeded optimizer or arbitrary Mod proof.",
+  "fixture": "Owned native Royalties, upgraded Clash and Akabeko; Burning Blood only in fixed-recovery case; captured before combat. No enemy or combat-state rewrites.",
+  "search": {
+    "maxTrials": 2,
+    "budgetSeconds": 8,
+    "maxRounds": 4,
+    "workers": 1,
+    "skipFinalVerification": false
+  },
+  "samples": [
+    {
+      "case": "one-power",
+      "algorithm": "MonteCarlo",
+      "powerCopies": 1,
+      "trials": 1,
+      "elapsedMs": 31564,
+      "stoppedOnCardGoals": true,
+      "finalHp": 52,
+      "maxHp": 66,
+      "healthTarget": {
+        "StartingHp": 52,
+        "TargetHp": 52,
+        "FullHealth": false,
+        "Basis": "当前内容未检测到生命恢复调用，目标为不净损血",
+        "Uncertain": true
+      },
+      "progress": {
+        "Copies": 1,
+        "CompletedCopies": 1,
+        "ExhaustedCopies": 0,
+        "LivingEnemies": null,
+        "BattleEnded": true,
+        "RemovedCopies": 1,
+        "Target": 1,
+        "Complete": true
+      },
+      "independentVerifications": 1,
+      "nativeCheckpoints": 4,
+      "contentTargetAnalyses": 1,
+      "seeded": true,
+      "hostUnchanged": true
+    },
+    {
+      "case": "one-power",
+      "algorithm": "TurnFrontier",
+      "powerCopies": 1,
+      "trials": 1,
+      "elapsedMs": 1064,
+      "stoppedOnCardGoals": true,
+      "finalHp": 52,
+      "maxHp": 66,
+      "healthTarget": {
+        "StartingHp": 52,
+        "TargetHp": 52,
+        "FullHealth": false,
+        "Basis": "当前内容未检测到生命恢复调用，目标为不净损血",
+        "Uncertain": true
+      },
+      "progress": {
+        "Copies": 1,
+        "CompletedCopies": 1,
+        "ExhaustedCopies": 0,
+        "LivingEnemies": null,
+        "BattleEnded": true,
+        "RemovedCopies": 1,
+        "Target": 1,
+        "Complete": true
+      },
+      "independentVerifications": 1,
+      "nativeCheckpoints": 4,
+      "contentTargetAnalyses": 1,
+      "seeded": true,
+      "hostUnchanged": true
+    },
+    {
+      "case": "two-powers",
+      "algorithm": "MonteCarlo",
+      "powerCopies": 2,
+      "trials": 1,
+      "elapsedMs": 2665,
+      "stoppedOnCardGoals": true,
+      "finalHp": 52,
+      "maxHp": 66,
+      "healthTarget": {
+        "StartingHp": 52,
+        "TargetHp": 52,
+        "FullHealth": false,
+        "Basis": "当前内容未检测到生命恢复调用，目标为不净损血",
+        "Uncertain": true
+      },
+      "progress": {
+        "Copies": 2,
+        "CompletedCopies": 2,
+        "ExhaustedCopies": 0,
+        "LivingEnemies": null,
+        "BattleEnded": true,
+        "RemovedCopies": 2,
+        "Target": 2,
+        "Complete": true
+      },
+      "independentVerifications": 1,
+      "nativeCheckpoints": 5,
+      "contentTargetAnalyses": 1,
+      "seeded": true,
+      "hostUnchanged": true
+    },
+    {
+      "case": "two-powers",
+      "algorithm": "TurnFrontier",
+      "powerCopies": 2,
+      "trials": 1,
+      "elapsedMs": 1057,
+      "stoppedOnCardGoals": true,
+      "finalHp": 52,
+      "maxHp": 66,
+      "healthTarget": {
+        "StartingHp": 52,
+        "TargetHp": 52,
+        "FullHealth": false,
+        "Basis": "当前内容未检测到生命恢复调用，目标为不净损血",
+        "Uncertain": true
+      },
+      "progress": {
+        "Copies": 2,
+        "CompletedCopies": 2,
+        "ExhaustedCopies": 0,
+        "LivingEnemies": null,
+        "BattleEnded": true,
+        "RemovedCopies": 2,
+        "Target": 2,
+        "Complete": true
+      },
+      "independentVerifications": 1,
+      "nativeCheckpoints": 5,
+      "contentTargetAnalyses": 1,
+      "seeded": true,
+      "hostUnchanged": true
+    },
+    {
+      "case": "fixed-recovery",
+      "algorithm": "MonteCarlo",
+      "powerCopies": 2,
+      "trials": 1,
+      "elapsedMs": 1579,
+      "stoppedOnCardGoals": true,
+      "finalHp": 58,
+      "maxHp": 66,
+      "healthTarget": {
+        "StartingHp": 52,
+        "TargetHp": 58,
+        "FullHealth": false,
+        "Basis": "当前内容的固定战后生命增加",
+        "Uncertain": true
+      },
+      "progress": {
+        "Copies": 2,
+        "CompletedCopies": 2,
+        "ExhaustedCopies": 0,
+        "LivingEnemies": null,
+        "BattleEnded": true,
+        "RemovedCopies": 2,
+        "Target": 2,
+        "Complete": true
+      },
+      "independentVerifications": 1,
+      "nativeCheckpoints": 5,
+      "contentTargetAnalyses": 1,
+      "seeded": true,
+      "hostUnchanged": true
+    },
+    {
+      "case": "fixed-recovery",
+      "algorithm": "TurnFrontier",
+      "powerCopies": 2,
+      "trials": 1,
+      "elapsedMs": 1057,
+      "stoppedOnCardGoals": true,
+      "finalHp": 58,
+      "maxHp": 66,
+      "healthTarget": {
+        "StartingHp": 52,
+        "TargetHp": 58,
+        "FullHealth": false,
+        "Basis": "当前内容的固定战后生命增加",
+        "Uncertain": true
+      },
+      "progress": {
+        "Copies": 2,
+        "CompletedCopies": 2,
+        "ExhaustedCopies": 0,
+        "LivingEnemies": null,
+        "BattleEnded": true,
+        "RemovedCopies": 2,
+        "Target": 2,
+        "Complete": true
+      },
+      "independentVerifications": 1,
+      "nativeCheckpoints": 5,
+      "contentTargetAnalyses": 1,
+      "seeded": true,
+      "hostUnchanged": true
+    },
+    {
+      "case": "allowed-loss",
+      "algorithm": "MonteCarlo",
+      "powerCopies": 2,
+      "trials": 1,
+      "elapsedMs": 1318,
+      "stoppedOnCardGoals": true,
+      "finalHp": 52,
+      "maxHp": 66,
+      "healthTarget": null,
+      "progress": {
+        "Copies": 2,
+        "CompletedCopies": 2,
+        "ExhaustedCopies": 0,
+        "LivingEnemies": null,
+        "BattleEnded": true,
+        "RemovedCopies": 2,
+        "Target": 2,
+        "Complete": true
+      },
+      "independentVerifications": 1,
+      "nativeCheckpoints": 5,
+      "contentTargetAnalyses": 0,
+      "seeded": true,
+      "hostUnchanged": true
+    },
+    {
+      "case": "allowed-loss",
+      "algorithm": "TurnFrontier",
+      "powerCopies": 2,
+      "trials": 1,
+      "elapsedMs": 1054,
+      "stoppedOnCardGoals": true,
+      "finalHp": 52,
+      "maxHp": 66,
+      "healthTarget": null,
+      "progress": {
+        "Copies": 2,
+        "CompletedCopies": 2,
+        "ExhaustedCopies": 0,
+        "LivingEnemies": null,
+        "BattleEnded": true,
+        "RemovedCopies": 2,
+        "Target": 2,
+        "Complete": true
+      },
+      "independentVerifications": 1,
+      "nativeCheckpoints": 5,
+      "contentTargetAnalyses": 0,
+      "seeded": true,
+      "hostUnchanged": true
+    },
+    {
+      "case": "repeatable",
+      "algorithm": "MonteCarlo",
+      "powerCopies": 2,
+      "trials": 2,
+      "elapsedMs": 1324,
+      "stoppedOnCardGoals": false,
+      "finalHp": 52,
+      "maxHp": 66,
+      "healthTarget": {
+        "StartingHp": 52,
+        "TargetHp": 52,
+        "FullHealth": false,
+        "Basis": "当前内容未检测到生命恢复调用，目标为不净损血",
+        "Uncertain": true
+      },
+      "progress": null,
+      "independentVerifications": 1,
+      "nativeCheckpoints": 5,
+      "contentTargetAnalyses": 1,
+      "seeded": true,
+      "hostUnchanged": true
+    },
+    {
+      "case": "repeatable",
+      "algorithm": "TurnFrontier",
+      "powerCopies": 2,
+      "trials": 2,
+      "elapsedMs": 1306,
+      "stoppedOnCardGoals": false,
+      "finalHp": 52,
+      "maxHp": 66,
+      "healthTarget": {
+        "StartingHp": 52,
+        "TargetHp": 52,
+        "FullHealth": false,
+        "Basis": "当前内容未检测到生命恢复调用，目标为不净损血",
+        "Uncertain": true
+      },
+      "progress": null,
+      "independentVerifications": 1,
+      "nativeCheckpoints": 5,
+      "contentTargetAnalyses": 1,
+      "seeded": true,
+      "hostUnchanged": true
+    }
+  ],
+  "nativeMechanismRegression": {
+    "integration-finisher-targets-summary.json": {
+      "records": 6
+    },
+    "integration-goal-consumption-summary.json": {
+      "records": 5
+    }
+  },
+  "installation": {
+    "installedVersion": "0.7.71",
+    "previousVersion": "0.7.70",
+    "utc": "2026-10-06T15:30:10.5576149Z",
+    "sameValidatedDll": true,
+    "dllSha256": "ac58452dd7f31ed4935c02a70d554e47ecb9a98eb3ea278e0947b5733ee020a1",
+    "cacheCleanup": false,
+    "startedPlayerGame": false
+  }
+}
