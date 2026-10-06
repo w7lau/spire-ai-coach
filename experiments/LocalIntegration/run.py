@@ -72,6 +72,7 @@ parser.add_argument('--selection-paging-test', action='store_true')
 parser.add_argument('--card-goals-test', action='store_true')
 parser.add_argument('--finite-card-goals-test', action='store_true', help='Native one/two power-card copies and combined health-goal return in both algorithms')
 parser.add_argument('--escape-victory-test', action='store_true', help='Natural native escape, mixed kills and complete kills; both algorithms with final replay on/off')
+parser.add_argument('--escape-expected-layout', type=Path, help='Require the existing owned slot-0 layout to survive a Coach code generation change')
 parser.add_argument('--finisher-targets-test', action='store_true', help='Five direct native Fatal eligibility and finite reservation cases; no route search or benchmark')
 parser.add_argument('--finisher-retention-test', action='store_true', help='Selected-finisher frozen incident, including previous route, with original budget and independent final verification')
 parser.add_argument('--finisher-retention-order', choices=['monte-carlo', 'turn-frontier'], help='Explicitly select one algorithm for the same frozen finisher regression; default checks both')
@@ -293,6 +294,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_CARD_GOALS_TEST'] = '1' if args.card_goals_test else '0'
     env['SPIRE_LOCAL_FINITE_CARD_GOALS_TEST'] = '1' if args.finite_card_goals_test else '0'
     env['SPIRE_LOCAL_ESCAPE_TEST'] = '1' if args.escape_victory_test else '0'
+    env['SPIRE_ESCAPE_EXPECTED_LAYOUT'] = str(args.escape_expected_layout.resolve()) if args.escape_expected_layout else ''
     env['SPIRE_LOCAL_FINISHER_TARGETS_TEST'] = '1' if args.finisher_targets_test else '0'
     if args.selection_paging_test:
         env['SPIRE_LOCAL_SELECTION_MATRIX'] = '1'
@@ -411,7 +413,7 @@ with worker_lock(root):
                          *[f'integration-snapshot-metadata-private-{i}.json' for i in range(10)]]:
                 if (root / name).is_file():
                     shutil.copy2(root / name, args.results_dir / name)
-        names = ['integration-replay-private.json', 'integration-replay-summary.json',
+        names = ['integration-replay-private.json', 'integration-replay-summary.json', 'integration-success', 'integration-error.txt',
                       'integration-escape-summary.json',
                       *[f'integration-escape-{kind}-{order}-{skip}-private.json'
                         for kind in ['all-escape', 'mixed', 'defeated']

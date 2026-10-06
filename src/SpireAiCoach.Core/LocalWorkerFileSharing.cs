@@ -36,6 +36,9 @@ public static class LocalWorkerFileSharing
         if (File.Exists(target) && AlreadyShared(source, target)) return;
         if (File.Exists(target)) File.Delete(target);
         if (!CreateHardLink(target, source, IntPtr.Zero))
-            throw new IOException("无法共享游戏资源文件（需要同盘 NTFS）；未回退为复制整套资源。", Marshal.GetLastWin32Error());
+        {
+            var error = Marshal.GetLastWin32Error();
+            throw new IOException($"无法共享游戏资源文件（{Path.GetFileName(source)}，Windows {error}：{new System.ComponentModel.Win32Exception(error).Message}）；未回退为复制整套资源。", error);
+        }
     }
 }

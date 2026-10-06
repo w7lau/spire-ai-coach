@@ -40,6 +40,19 @@ internal static class EscapeVictoryIntegration
         CombatManager.Instance.CombatEnded += Ended;
         CombatManager.Instance.CombatWon += Won;
         var samples = new List<object>();
+        object? layoutProof = null;
+        var expectedLayout = System.Environment.GetEnvironmentVariable("SPIRE_ESCAPE_EXPECTED_LAYOUT");
+        string CodeHash(string directory) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(
+            Directory.EnumerateFiles(Path.Combine(directory, "game", "mods"), "SpireAiCoach.dll", SearchOption.AllDirectories).Single())));
+        string? previousCode = null;
+        if (!string.IsNullOrEmpty(expectedLayout))
+        {
+            expectedLayout = Path.GetFullPath(expectedLayout);
+            if (!expectedLayout.StartsWith(Path.GetFullPath(Path.Combine(root, ".spire-ai-coach-workers")) + Path.DirectorySeparatorChar,
+                StringComparison.OrdinalIgnoreCase) || !File.Exists(Path.Combine(expectedLayout, ".coach-worker")))
+                throw new InvalidOperationException("Expected layout must be an owned worker of this test host");
+            previousCode = CodeHash(expectedLayout);
+        }
         try
         {
             foreach (string kind in new[] { "all-escape", "mixed", "defeated" })
@@ -81,6 +94,22 @@ internal static class EscapeVictoryIntegration
                     DebugEncounter = encounter.Id.Entry
                 };
                 LocalWire.Write(Path.Combine(root, $"integration-escape-{kind}-root-private.json"), request);
+                if (layoutProof == null)
+                {
+                    var before = LocalCapture.Fingerprint();
+                    await Task.Run(() => pool.Prepare(LocalCapture.Installation(), 8, CancellationToken.None));
+                    var workers = (Array)typeof(LocalWorkerPool).GetField("_workers", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic)!.GetValue(pool)!;
+                    string RootAt(int i) => (string)workers.GetValue(i)!.GetType().GetProperty("Root")!.GetValue(workers.GetValue(i))!;
+                    var currentCode = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(typeof(LocalWorkerPool).Assembly.Location)));
+                    bool reused = !string.IsNullOrEmpty(expectedLayout) && RootAt(0) == expectedLayout;
+                    if (before != LocalCapture.Fingerprint() || pool.Resources().Ready != 8 ||
+                        Enumerable.Range(0, 8).Any(i => CodeHash(RootAt(i)) != currentCode) ||
+                        !string.IsNullOrEmpty(expectedLayout) && (!reused || previousCode == currentCode))
+                        throw new InvalidOperationException("Eight native lanes did not preserve the expected old layout and prepare the new code");
+                    layoutProof = new { ready = 8, previousLayoutReused = reused, previousCodeSha256 = previousCode,
+                        currentCodeSha256 = currentCode, allEightCodeCopiesMatched = true,
+                        sourceFingerprintUnchanged = true, cacheRemoved = false, codeGenerationRestarted = true };
+                }
                 var plan = new List<LocalAction>();
                 while (!CombatManager.Instance.IsOverOrEnding)
                 {
@@ -160,7 +189,7 @@ internal static class EscapeVictoryIntegration
                     }
                 }
                 LocalWire.Write(Path.Combine(root, "integration-escape-summary.json"), new {
-                    version = typeof(LocalWorker).Assembly.GetName().Version!.ToString(3), passed = samples.Count == 12, encounter = encounter.Id.Entry, samples,
+                    version = typeof(LocalWorker).Assembly.GetName().Version!.ToString(3), passed = samples.Count == 12, encounter = encounter.Id.Entry, layoutProof, samples,
                     scope = "Seeded natural native escape/mixed kill/complete kill; both algorithms with final replay on/off. No unseeded search performance or arbitrary Mod claim." });
             }
         }

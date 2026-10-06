@@ -751,8 +751,9 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
 
         public async Task Ensure(string directory, int index, LocalInstallation installation, CancellationToken token, LocalTimeline? timeline = null)
         {
-            var signature = typeof(LocalWorkerPool).Assembly.ManifestModule.ModuleVersionId + "|" +
-                installation.GameDirectory + "|" + Path.GetFullPath(directory) + "|" + string.Join("|", installation.ModDirectories) + "|" + installation.MinimalWorkerBootstrap + "|" + installation.LimitRuntimeThreads;
+            var layoutScope = installation.GameDirectory + "|" + Path.GetFullPath(directory) + "|" +
+                string.Join("|", installation.ModDirectories) + "|" + installation.MinimalWorkerBootstrap + "|" + installation.LimitRuntimeThreads;
+            var signature = typeof(LocalWorkerPool).Assembly.ManifestModule.ModuleVersionId + "|" + layoutScope;
             var configuration = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(signature)))[..16];
             Task preparation;
             bool reuse;
@@ -783,7 +784,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                         // A retired preparation may still be unwinding file work.
                         // Drain it before touching this lane's installation again.
                         if (previous != null) try { await previous; } catch (Exception) { }
-                        try { await Prepare(directory, index, installation, configuration, identity, preparationToken, timeline); }
+                        try { await Prepare(directory, index, installation, layoutScope, identity, preparationToken, timeline); }
                         catch
                         {
                             lock (_lifecycle) if (ReferenceEquals(_generation, generation)) StopLocked("准备失败");
@@ -802,7 +803,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             token.ThrowIfCancellationRequested();
         }
 
-        private async Task Prepare(string directory, int index, LocalInstallation installation, string configuration,
+        private async Task Prepare(string directory, int index, LocalInstallation installation, string layoutScope,
             string identity, CancellationToken token, LocalTimeline? timeline)
         {
             token.ThrowIfCancellationRequested();
@@ -811,18 +812,19 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             _runtimeLog = new();
             // NTFS hardlinks require one volume. Keep tiny launch trees beside the installation, never in it.
             var sharedRoot = Path.Combine(Directory.GetParent(installation.GameDirectory)!.FullName, ".spire-ai-coach-workers");
-            Root = Path.GetFullPath(Path.Combine(sharedRoot, configuration, "worker-" + index));
-            if (Root.StartsWith(Path.GetFullPath(installation.GameDirectory) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            if (Path.GetFullPath(sharedRoot).StartsWith(Path.GetFullPath(installation.GameDirectory) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Worker must not be inside game installation");
-            if (Directory.Exists(Root) && Directory.EnumerateFileSystemEntries(Root).Any() && !File.Exists(Path.Combine(Root, ".coach-worker")))
-                throw new IOException("Refusing an unowned worker directory");
-            Directory.CreateDirectory(Root);
-            lock (_lifecycle)
+            var layout = LocalWorkerLayout.Acquire(sharedRoot, layoutScope, index, token);
+            try
             {
-                token.ThrowIfCancellationRequested();
-                _lock = new FileStream(Path.Combine(Root, ".lock"), FileMode.OpenOrCreate, System.IO.FileAccess.ReadWrite, FileShare.None);
+                lock (_lifecycle)
+                {
+                    token.ThrowIfCancellationRequested();
+                    Root = layout.Root;
+                    _lock = layout.Lock;
+                }
             }
-            File.WriteAllText(Path.Combine(Root, ".coach-worker"), "SpireAiCoach shared local worker v2");
+            catch { layout.Lock.Dispose(); throw; }
             var game = Path.Combine(Root, "game");
             Directory.CreateDirectory(game);
             foreach (var source in Directory.EnumerateFiles(installation.GameDirectory))
