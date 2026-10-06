@@ -9,6 +9,7 @@ public static class ModEntry
     private static CoachOverlay? _overlay;
     public static void Initialize()
     {
+        LocalModReplay.Install();
         if (LocalWorker.TryStart()) return;
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_INTEGRATION") != null) return;
         if (_overlay != null) return;

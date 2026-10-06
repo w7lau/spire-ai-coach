@@ -52,6 +52,7 @@ public static class LocalWorker
     private static string? _assetsRequest;
     private static LocalTimeline? _timeline;
     private static int _traceWorker, _traceRoute, _traceStep, _restoreDepth;
+    internal static bool InOwnedRestore => _restoreDepth > 0 && _activeRequest != null && _root.Length > 0;
     private static string _traceStage = "search";
     private static IDisposable? Trace(string phase, string detail = "", int depth = 1) =>
         _timeline?.Measure(_traceWorker, _traceStage, phase, detail, _traceRoute, _traceStep, depth);
@@ -1398,6 +1399,7 @@ public static class LocalWorker
             var reader = new PacketReader(); reader.Reset(request.Replay);
             var replay = reader.Read<CombatReplay>();
             var run = RunState.FromSerializable(replay.serializableRun);
+            LocalModReplay.Restore(request.ModReplay, run);
             decoding?.Dispose();
             using var setup = Trace("setup", depth: 2);
             await RunManager.Instance.SetUpSavedSingleplayer(run, replay.serializableRun);
@@ -1500,6 +1502,7 @@ public static class LocalWorker
             using var fingerprint = Trace("fingerprint", depth: 2);
             if (!completedReplayProbe)
             {
+                LocalModReplay.ValidateCurrent(request.ModReplay, run.Players);
                 var actual = IsTerminal(player) ? null : LocalCapture.Fingerprint();
                 if (actual != request.NativeHash)
                 {

@@ -58,6 +58,14 @@ public static class Entry
             }
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_REPLAY") is { Length: > 0 } replayPath)
             {
+                if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_MOD_REPLAY_TEST") == "1")
+                {
+                    await ModReplayIntegration.Run(root, tree, LocalWire.Read<LocalSearchRequest>(replayPath),
+                        System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT")!,
+                        System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_MOD_REPLAY_AFTER")!);
+                    File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                    return;
+                }
                 await ReplayIntegration.Run(root, pool, replayPath, System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_REPLAY_GAME")!);
                 File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
                 return;

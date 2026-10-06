@@ -20,7 +20,8 @@ public static class LocalSearchRecovery
     public static bool NeedsCompatibilityPass(LocalSearchRequest request, IEnumerable<LocalSearchResult> results)
     {
         var lanes = results.ToArray();
-        return request.DataOnlyCombat && lanes.Any(Failed) && !lanes.Any(Usable);
+        return request.DataOnlyCombat && lanes.Any(Failed) && !lanes.Any(Usable) &&
+            !lanes.All(r => r.Failure?.Category == "local_mod_replay" && r.Evaluated == 0 && r.RootBranches == 0);
     }
 
     public static bool NeedsReplayValidation(IEnumerable<LocalSimulationFailure> failures) =>

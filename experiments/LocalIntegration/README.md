@@ -32,3 +32,6 @@ python experiments/LocalIntegration/run.py --workspace C:\path\owned-native-work
 另建含旋风斩和四张放血的人工牌组，捕获放血后的 68 HP 局面，检查后台胜利后燃烧之血回血至 74 HP，而前台仍保持 68 HP。该断言针对本合成场景的原生遗物效果，不是通用奖励计算规则。
 
 该测试验证前后台通信、重放、搜索、进程复用及只读边界，不证明全部 Mod 私有状态已恢复，不包含实际窗口内按钮点击或布局验收。
+# Mod replay checkpoint regression
+
+`SPIRE_LOCAL_MOD_REPLAY_TEST=1` uses the owned replay entry with a locally frozen four-action incident. `SPIRE_LOCAL_REPLAY`, `SPIRE_LOCAL_SEED_RESULT`, and `SPIRE_LOCAL_MOD_REPLAY_AFTER` identify ignored inputs. It compares the original native prediction against the exact live hash/history, validates both restore modes and ownership/missing-state rejection, then searches, independently verifies, and executes a complete native winner. Inputs, proc-state mutation, and all game commands stay inside the owned host; never include this observer or player inputs in the installed package.

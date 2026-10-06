@@ -9,7 +9,7 @@ namespace SpireAiCoach.Mod;
 public sealed record LocalExecutionCard(uint Instance, string ModelId, string Name);
 public sealed record LocalExecutionEnemy(uint? Instance, int Hp, int Block);
 public sealed record LocalExecutionState(int Round, int Hp, int MaxHp, int Block, int Energy, int Stars,
-    LocalExecutionCard[] Hand, LocalExecutionEnemy[] Enemies)
+    LocalExecutionCard[] Hand, LocalExecutionEnemy[] Enemies, LocalRelicReplayField[]? ModFields = null)
 {
     internal static LocalExecutionState? Capture()
     {
@@ -21,7 +21,8 @@ public sealed record LocalExecutionState(int Round, int Hp, int MaxHp, int Block
             return new(state!.RoundNumber, player.Creature.CurrentHp, player.Creature.MaxHp, player.Creature.Block,
                 pcs.Energy, pcs.Stars, pcs.Hand.Cards.Select(c =>
                     new LocalExecutionCard(NetCombatCard.FromModel(c).CombatCardIndex, c.Id.ToString(), c.Title)).ToArray(),
-                state.Enemies.Select(e => new LocalExecutionEnemy(e.CombatId, e.CurrentHp, e.Block)).ToArray());
+                state.Enemies.Select(e => new LocalExecutionEnemy(e.CombatId, e.CurrentHp, e.Block)).ToArray(),
+                LocalModReplay.Read(state.Players));
         }
         catch { return null; } // A diagnostic failure must not replace the execution's original outcome.
     }

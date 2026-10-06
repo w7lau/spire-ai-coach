@@ -86,6 +86,13 @@ public static class LocalCapture
 
     public static string Fingerprint()
     {
+        var native = NativeFingerprint();
+        var state = CombatManager.Instance.DebugOnlyGetState()!;
+        return LocalModReplayCheckpoint.Fingerprint(native, LocalModReplay.Read(state.Players));
+    }
+
+    internal static string NativeFingerprint()
+    {
         using var measuring = LocalWorker.MeasureMethod("LocalCapture.Fingerprint");
         var state = CombatManager.Instance.DebugOnlyGetState() ?? throw new InvalidOperationException("No combat");
         bool reuse = LocalWorker.ReuseFingerprintBuffer && !_writerInUse;
@@ -145,6 +152,7 @@ public static class LocalCapture
         if (replay == null)
             throw new CoachException("local_replay", "这场战斗没有可用的原生重放记录，请在下一场战斗重试。");
         var before = Fingerprint();
+        var modReplay = LocalModReplay.Capture(replay, state.Players);
         var eventEntry = LocalEventReplay.Capture(player);
         var packet = new PacketWriter();
         replay.Serialize(packet);
@@ -155,7 +163,7 @@ public static class LocalCapture
             TargetLabels: state.Enemies.Where(e => e.IsAlive && e.CombatId.HasValue)
                 .OrderBy(e => e.GetCreatureNode()?.GlobalPosition.X ?? float.MaxValue)
                 .Select((e, index) => new { Id = e.CombatId!.Value, Label = $"从左到右第 {index + 1} 个敌人「{e.Name}」" })
-                .ToDictionary(e => e.Id, e => e.Label), History: History(), EventEntry: eventEntry);
+                .ToDictionary(e => e.Id, e => e.Label), History: History(), EventEntry: eventEntry, ModReplay: modReplay);
     }
 
     public static LocalInstallation Installation() => new(

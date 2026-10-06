@@ -1,0 +1,33 @@
+{
+  "version": "0.7.67",
+  "core_tests": {
+    "passed": 408,
+    "total": 408
+  },
+  "dll_sha256": "12d266e2b363bb9a79b963ada7f63bd89c4d7d1b46a7268d4c12be30c67a3d7b",
+  "same_dll_in_native_host": true,
+  "native": {
+    "exact_live_divergence_reproduced": true,
+    "initial_ordinal": 1,
+    "current_ordinal": 2,
+    "native_clone_ordinal": 0,
+    "ordinary_and_numeric_root_restored": true,
+    "missing_or_changed_checkpoint_rejected": true,
+    "root_checks_kept_same_pid": true,
+    "isolated_host_unchanged_by_worker_checks": true,
+    "restoration_outside_owned_worker_rejected": true,
+    "independently_verified_winner": true,
+    "executed_steps": 174,
+    "expected_steps": 174,
+    "final_hp": 39,
+    "expected_hp": 39,
+    "ordinary_native_execution_completed": true
+  },
+  "protected_files_checked": 1023,
+  "protected_files_changed": 0,
+  "direct_rng_writes": false,
+  "player_save_edits": false,
+  "arbitrary_mod_state_compatibility_claimed": false,
+  "global_optimality_claimed": false,
+  "installed": false
+}
