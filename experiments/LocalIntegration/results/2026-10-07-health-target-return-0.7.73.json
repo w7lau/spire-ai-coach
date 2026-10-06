@@ -1,0 +1,79 @@
+{
+  "version": "0.7.73",
+  "gameVersion": "0.111.0",
+  "nativeModule": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
+  "dllSha256": "19a056679a6cd3a4f11ba37845442efaf7018d9fc382627fb34e09d60b4c6331",
+  "coreChecksPassed": 426,
+  "nativePassed": true,
+  "source": "Frozen local incident with original mods and native root; exact native route from the incident is seeded, with no HP or RNG edits.",
+  "abstractDispatchProbes": [
+    {
+      "kind": "NoRecoverySource",
+      "activeRecovery": false,
+      "uncertain": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "RecoverySource",
+      "activeRecovery": true,
+      "uncertain": false,
+      "callbackExecuted": false
+    }
+  ],
+  "samples": [
+    {
+      "algorithm": "MonteCarlo",
+      "Evaluated": 1,
+      "ElapsedMs": 41801,
+      "StoppedOnHealthTarget": true,
+      "StartingHp": 78,
+      "Hp": 79,
+      "MaxHp": 92,
+      "HpChange": 1,
+      "TargetHp": 79,
+      "FullHealth": false,
+      "Basis": "当前内容的固定战后生命增加",
+      "Uncertain": true,
+      "targetAnalyses": 1,
+      "targetAnalysisMs": 40.4277,
+      "UnknownReason": "",
+      "checkpoints": 20,
+      "verifications": 1,
+      "seeded": true,
+      "nativeRootAndStateRngHistoryMatched": true
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "Evaluated": 1,
+      "ElapsedMs": 2824,
+      "StoppedOnHealthTarget": true,
+      "StartingHp": 78,
+      "Hp": 79,
+      "MaxHp": 92,
+      "HpChange": 1,
+      "TargetHp": 79,
+      "FullHealth": false,
+      "Basis": "当前内容的固定战后生命增加",
+      "Uncertain": true,
+      "targetAnalyses": 1,
+      "targetAnalysisMs": 8.6971,
+      "UnknownReason": "",
+      "checkpoints": 20,
+      "verifications": 1,
+      "seeded": true,
+      "nativeRootAndStateRngHistoryMatched": true
+    }
+  ],
+  "scope": "Read-only abstract-dispatch metadata probes plus seeded exact frozen native plus-one victory in both algorithms with ordinary independent replay. No unseeded speed or global optimality claim.",
+  "install": {
+    "status": "installed",
+    "version": "0.7.73",
+    "previousVersion": "0.7.72",
+    "utc": "2026-10-06T17:09:46.5870119Z",
+    "sameValidatedDll": true,
+    "dllSha256": "19a056679a6cd3a4f11ba37845442efaf7018d9fc382627fb34e09d60b4c6331",
+    "backupsVerified": true,
+    "cacheCleanup": false,
+    "startedOrStoppedPlayerGame": false
+  }
+}
