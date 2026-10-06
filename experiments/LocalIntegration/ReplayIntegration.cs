@@ -111,6 +111,12 @@ public static class ReplayIntegration
             await SummonPresentationIntegration.Run(root, pool, request with { MaxRounds = original.MaxRounds }, installation);
             return;
         }
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_HEALTH_TARGET_RETURN_TEST") == "1")
+        {
+            await HealthTargetReturnIntegration.Run(root, pool, request with { MaxRounds = original.MaxRounds }, installation,
+                System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT")!);
+            return;
+        }
         if (System.Environment.GetEnvironmentVariable("SPIRE_COACH_RECOVERY_AUDIT") == "1")
         {
             installation = installation with { GameDirectory = Path.Combine(root, "game") };

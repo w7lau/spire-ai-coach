@@ -117,8 +117,8 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                 var effect = DescribeContent(type);
                 if (effect.Uncertain)
                 {
-                    if (HealthTarget != null) HealthTarget = HealthTarget with { FullHealth = true,
-                        Basis = "当前玩家效果包含尚未解析的动态调用，目标为战后满血", Uncertain = true };
+                    // The current-content target is a user-selected estimate.
+                    // An unknown ceiling cannot replace it with another target.
                     return new(null, "当前玩家效果的辅助调用尚未完整解析：" + (effect.UncertainAt ?? type.FullName), ContentScoped: true);
                 }
                 active |= effect.ActiveRecovery; growth |= effect.DynamicMaxHp;
@@ -140,9 +140,6 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                     if (effect.VictoryMaxHpGains > 0) maxHp += Math.Max(0, owner.DynamicVars.MaxHp.BaseValue) * effect.VictoryMaxHpGains;
                 }
             }
-            if (HealthTarget != null && (active || growth) && !HealthTarget.FullHealth)
-                HealthTarget = HealthTarget with { FullHealth = true, TargetHp = player.Creature.MaxHp,
-                    Basis = "当前内容或其生成效果可恢复生命，目标为战后满血", Uncertain = true };
             if (growth) return new(null, "当前玩家内容存在可重复或动态生命上限增加", ContentScoped: true);
             if (heal + maxHp > long.MaxValue || player.Creature.MaxHp + maxHp > int.MaxValue)
                 return new(null, "当前内容回复上界溢出", ContentScoped: true);
@@ -324,9 +321,13 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                      called.Name == "GetValue" && !typeof(FieldInfo).IsAssignableFrom(declaring))) Unknown(called, method);
                 if (own || declaring.Assembly != Native && !framework)
                 {
-                    if (called is MethodInfo virtualCall && virtualCall.IsVirtual && !virtualCall.IsFinal && !own)
+                    if (called is MethodInfo virtualCall && virtualCall.IsVirtual && !virtualCall.IsFinal &&
+                        (!own || virtualCall.IsAbstract))
                     {
-                        var candidates = declaring.Namespace?.StartsWith("BaseLib.Utils.Patching", StringComparison.Ordinal) == true ?
+                        // A held source calling its own abstract base dispatches
+                        // to its concrete override. The abstract slot has no IL.
+                        var candidates = own ? new[] { type } :
+                            declaring.Namespace?.StartsWith("BaseLib.Utils.Patching", StringComparison.Ordinal) == true ?
                             declaring.Assembly.GetTypes().Where(t => !t.IsAbstract && declaring.IsAssignableFrom(t)) :
                             _sourceTypes.Where(declaring.IsAssignableFrom);
                         var implementations = candidates.SelectMany(t =>
@@ -334,7 +335,7 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                             t.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
                                 .Where(m => m.GetBaseDefinition() == virtualCall.GetBaseDefinition())).Distinct().ToArray();
                         foreach (var implementation in implementations) queue.Enqueue((implementation, terminal, false));
-                        if (implementations.Length == 0 && !typeof(AbstractModel).IsAssignableFrom(declaring)) Unknown(called);
+                        if (implementations.Length == 0 && (own || !typeof(AbstractModel).IsAssignableFrom(declaring))) Unknown(called);
                         if (!called.IsAbstract) queue.Enqueue((called, terminal, false));
                     }
                     else queue.Enqueue((called, terminal, false));

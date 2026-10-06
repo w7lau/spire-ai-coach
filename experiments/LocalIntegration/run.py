@@ -77,6 +77,7 @@ parser.add_argument('--finisher-retention-order', choices=['monte-carlo', 'turn-
 parser.add_argument('--followup-test', action='store_true', help='Short synthetic native return-to-hand/topdeck ordering probe; no full search')
 parser.add_argument('--recovery-audit', action='store_true', help='Inspect one frozen root and its actual loaded Mod callbacks; no route search or play')
 parser.add_argument('--health-audit', action='store_true', help='Also check low-level HP writes and nested healing in the owned worker')
+parser.add_argument('--health-target-return-test', action='store_true', help='Frozen plus-one native victory and abstract callback dispatch; both algorithms and independent replay')
 
 parser.add_argument('--discard-test', action='store_true', help='Short native discard/Sly/resource/selection probe; no full search')
 parser.add_argument('--summon-presentation-test', action='store_true', help='Only the frozen incident first enemy turn; compare ordinary and scene-free native states')
@@ -117,6 +118,8 @@ if args.recovery_audit and not args.replay:
     parser.error('--recovery-audit requires --replay')
 if args.health_audit and not args.recovery_audit:
     parser.error('--health-audit requires --recovery-audit')
+if args.health_target_return_test and (not args.replay or not args.seed_result or not args.game):
+    parser.error('--health-target-return-test requires frozen --replay, same-root --seed-result and --game')
 if args.recent_search_test and (not args.replay or args.seed_result or args.recorded_replay):
     parser.error('--recent-search-test requires an unseeded --replay')
 if args.route_feedback_focused_only and not args.route_feedback_test:
@@ -299,6 +302,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_MECHANICS'] = '1' if args.mechanics else '0'
     env['SPIRE_LOCAL_ENEMY_TEST'] = '1' if args.enemy_test else '0'
     env['SPIRE_LOCAL_TRANSPORT_TEST'] = '1' if args.transport_reuse_test else '0'
+    env['SPIRE_LOCAL_HEALTH_TARGET_RETURN_TEST'] = '1' if args.health_target_return_test else '0'
     env['SPIRE_LOCAL_RUNTIME_TEST'] = '1' if args.runtime_failure_test else '0'
     env['SPIRE_LOCAL_ENEMY_CASES'] = args.enemy_cases or ''
     env['SPIRE_LOCAL_ENEMY_ROUNDS'] = str(args.enemy_rounds)
@@ -499,6 +503,10 @@ with worker_lock(root):
         if args.enemy_test:
             names = ['integration-enemy-summary.json', 'integration-enemy-catalogue.json',
                      'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.health_target_return_test:
+            names = ['integration-health-target-return-summary.json', 'integration-success', 'integration-error.txt',
+                     'integration-health-target-return-MonteCarlo-private.json', 'integration-health-target-return-TurnFrontier-private.json',
+                     'integration-stdout.log', 'integration-game.log']
         if args.transport_reuse_test:
             names = ['integration-transport-summary.json', 'integration-success', 'integration-error.txt',
                      'integration-stdout.log', 'integration-game.log']
