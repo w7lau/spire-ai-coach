@@ -13,14 +13,15 @@ public static class LocalSearchRecovery
     // A failure before a decision can invalidate the entire bootstrap. A later
     // route exception retires its own lane; healthy isolated processes keep running.
     public static bool AbortPass(LocalSearchRequest request, LocalSearchResult result) =>
-        request.DataOnlyCombat && Failed(result) && result.Evaluated == 0 && result.RootBranches == 0 && !Usable(result);
+        request.DataOnlyCombat && Failed(result) && result.Failure?.Category != "local_ipc" &&
+        result.Evaluated == 0 && result.RootBranches == 0 && !Usable(result);
 
     // Never discard completed native candidates just because another lane failed.
     // Keep failed-owner proof rejection and final candidate checks in their owners.
     public static bool NeedsCompatibilityPass(LocalSearchRequest request, IEnumerable<LocalSearchResult> results)
     {
         var lanes = results.ToArray();
-        return request.DataOnlyCombat && lanes.Any(Failed) && !lanes.Any(Usable) &&
+        return request.DataOnlyCombat && lanes.Any(r => Failed(r) && r.Failure?.Category != "local_ipc") && !lanes.Any(Usable) &&
             !lanes.All(r => r.Failure?.Category == "local_mod_replay" && r.Evaluated == 0 && r.RootBranches == 0);
     }
 

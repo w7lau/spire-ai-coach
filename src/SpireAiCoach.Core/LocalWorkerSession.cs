@@ -18,7 +18,7 @@ public static class LocalWorkerSession
     public static bool Cancelled(string root, LocalSearchRequest request)
     {
         var path = Path.Combine(root, "stop-search.json");
-        return File.Exists(path) && LocalWire.Read<LocalSearchStop>(path) is { Cancel: true } stop && stop.Matches(request);
+        return LocalWire.TryRead<LocalSearchStop>(path, out var stop) && stop.Cancel && stop.Matches(request);
     }
 
     // Call only at a settled native boundary, never inside an unfinished command.
@@ -34,7 +34,7 @@ public static class LocalWorkerSession
         var path = Path.Combine(root, "idle.json");
         while (alive() && timer.Elapsed < timeout)
         {
-            if (File.Exists(path) && LocalWire.Read<LocalWorkerIdle>(path).Matches(request, generation)) return true;
+            if (LocalWire.TryRead<LocalWorkerIdle>(path, out var idle) && idle.Matches(request, generation)) return true;
             await Task.Delay(25);
         }
         return false;

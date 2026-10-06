@@ -71,6 +71,23 @@ internal static class WorkerReuseTests
 
     public static void Register(Action<string, Action> test, Action<string, Func<Task>> asyncTest)
     {
+        asyncTest("both algorithms retain native owners through a six second busy result publication", async () =>
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            await using var f = new Fixture();
+            await f.Pool.Prepare(f.Installation, 2, CancellationToken.None);
+            var before = Workers(f.Pool).Take(2).Select(w => (w.Process!.Id, w.Generation)).ToArray();
+            foreach (var algorithm in new[] { LocalSearchOrder.MonteCarlo, LocalSearchOrder.TurnFrontier })
+            {
+                var request = Request("busy-result") with { SearchOrder = algorithm, DataOnlyCombat = true, BudgetSeconds = 10 };
+                var result = await f.Pool.Analyze(request, f.Installation, _ => { }, CancellationToken.None);
+                Check(result.Status == "done" && result.Best is { Won: true } && result.RecoveredFailures is not { Length: > 0 },
+                    "Publication pressure became a native failure");
+                Check(before.SequenceEqual(Workers(f.Pool).Take(2).Select(w => (w.Process!.Id, w.Generation))) &&
+                    !result.Trace!.Spans.Any(s => s.Phase is "retire" or "fallback" or "rebuild"),
+                    "Algorithm switch or busy polling replaced a healthy owned process");
+            }
+        });
         test("worker reuse stop and idle acknowledgements reject stale requests and generations", () =>
         {
             var r = Request(); var stop = new LocalSearchStop(r.Id, r.SnapshotId, r.NativeHash, Cancel: true);
@@ -543,7 +560,12 @@ internal static class WorkerReuseTests
                     // The synthetic root is ready before its simulated search.
                     // Native admission listens to this same scoped progress/result.
                     LocalWire.Write(Path.Combine(root, "result.json"), new LocalSearchResult(request.Id, request.SnapshotId,
-                        "running", "synthetic root ready", 0, 0, 0, null, RootBranches: 2));
+                        "running", "synthetic root ready", 0, 0, 0, null, RootBranches: 2), operation =>
+                        {
+                            if (operation == "Write" && request.DebugEncounter == "busy-result" && request.Partition == 0 && request.VerifyCandidate == null)
+                                Thread.Sleep(6000); // Synthetic producer stalls after acquiring the real publication lease.
+                            return null;
+                        });
                     using var client = request.TurnWorkPipe == null ? null : new LocalTurnWorkClient(request);
                     using var loss = request.MinimumLossPipe == null ? null : new LocalMinimumLossClient(request);
                     bool minimum = request.DebugEncounter?.StartsWith("minimum-", StringComparison.Ordinal) == true && request.VerifyCandidate == null;

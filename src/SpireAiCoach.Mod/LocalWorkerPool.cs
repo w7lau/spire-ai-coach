@@ -516,9 +516,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                         }
                         var preview = telemetry?.Latest;
                         var previewPath = Path.Combine(worker.Root, "progress.json");
-                        if (File.Exists(previewPath))
+                        if (LocalWire.TryRead<LocalProgress>(previewPath, out var filePreview))
                         {
-                            var filePreview = LocalWire.Read<LocalProgress>(previewPath);
                             if (preview == null || filePreview.Sequence > preview.Sequence) preview = filePreview;
                         }
                         if (preview != null)
@@ -532,9 +531,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                                 Sequence = preview.Sequence + (verifying ? 2_000_000 : fallback == null ? 0 : 1_000_000) }); }
                         }
                         var file = Path.Combine(worker.Root, "result.json");
-                        if (File.Exists(file))
+                        if (LocalWire.TryRead<LocalSearchResult>(file, out var result))
                         {
-                            var result = LocalWire.Read<LocalSearchResult>(file);
                             if (result.Id == command.Id && result.SnapshotId == request.SnapshotId)
                             {
                                 lastResult = result;
@@ -631,7 +629,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     if (!verifying) minimumLoss?.RejectOwner(index);
                     worker.Stop("模拟中断：" + ex.Message, timeline, index);
                     return new(request.Id, request.SnapshotId, "failed", ex is CoachException ? ex.Message :
-                        $"本地进程准备失败（{ex.GetType().Name}）：{ex.Message}", 0, 0, 0, null,
+                        $"本地进程准备失败（{ex.GetType().Name}）：{ex.Message}", lastResult?.Evaluated ?? 0, 0, 0, null,
+                        RootBranches: Math.Max(lastResult?.RootBranches ?? 0, Volatile.Read(ref rootBranches[index])),
                         Failure: LocalSimulationFailure.Capture(ex, index, verifying ? "verify" : "search"));
                 }
 

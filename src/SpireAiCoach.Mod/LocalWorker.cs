@@ -254,8 +254,7 @@ public static class LocalWorker
             CheckCancellation();
             if (request.VerifyCandidate != null) return false;
             var path = Path.Combine(_root, "stop-search.json");
-            if (!File.Exists(path)) return false;
-            var command = LocalWire.Read<LocalSearchStop>(path);
+            if (!LocalWire.TryRead<LocalSearchStop>(path, out var command)) return false;
             if (!command.Matches(request)) return false;
             stoppedOnManualVictory |= command.UseWinningRoute;
             return true;

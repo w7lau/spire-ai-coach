@@ -28,6 +28,7 @@ parser.add_argument('--replay', type=Path)
 parser.add_argument('--game', type=Path)
 parser.add_argument('--mods', type=Path)
 parser.add_argument('--seed-result', type=Path)
+parser.add_argument('--transport-reuse-test', action='store_true', help='Frozen native algorithm switching with a six-second owned publication stall')
 parser.add_argument('--speed-benchmark', action='store_true')
 parser.add_argument('--visual-benchmark', action='store_true')
 parser.add_argument('--checkpoint', action='store_true')
@@ -94,6 +95,8 @@ parser.add_argument('--enemy-seed', help='Create a new synthetic run through nat
 parser.add_argument('--enemy-character', help='Native character model ID for a new owned synthetic run')
 parser.add_argument('--enemy-seeds', help='Comma-separated native run seeds for a bounded variant sweep in one owned host')
 args = parser.parse_args()
+if args.transport_reuse_test and (not args.replay or not args.game or args.seed_result):
+    parser.error('--transport-reuse-test requires a frozen --replay and --game without an answer seed')
 if args.snapshot_metadata_test and (not args.replay or not args.seed_result or args.recorded_replay):
     parser.error('--snapshot-metadata-test requires a frozen --replay and --seed-result')
 if args.passive_factory_test and (not args.replay or not args.seed_result or args.recorded_replay):
@@ -288,6 +291,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_FALLBACK'] = '1' if args.fallback else '0'
     env['SPIRE_LOCAL_MECHANICS'] = '1' if args.mechanics else '0'
     env['SPIRE_LOCAL_ENEMY_TEST'] = '1' if args.enemy_test else '0'
+    env['SPIRE_LOCAL_TRANSPORT_TEST'] = '1' if args.transport_reuse_test else '0'
     env['SPIRE_LOCAL_ENEMY_CASES'] = args.enemy_cases or ''
     env['SPIRE_LOCAL_ENEMY_ROUNDS'] = str(args.enemy_rounds)
     env['SPIRE_LOCAL_ENEMY_FAST_ONLY'] = '1' if args.enemy_fast_only else '0'
@@ -483,6 +487,9 @@ with worker_lock(root):
         if args.enemy_test:
             names = ['integration-enemy-summary.json', 'integration-enemy-catalogue.json',
                      'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.transport_reuse_test:
+            names = ['integration-transport-summary.json', 'integration-success', 'integration-error.txt',
+                     'integration-stdout.log', 'integration-game.log']
         for name in names:
             if (root / name).is_file():
                 shutil.copy2(root / name, args.results_dir / name)

@@ -435,10 +435,38 @@ public static class LocalWire
 {
     public static T Read<T>(string path)
     {
-        using var lease = new FileLease(path);
-        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-        return JsonSerializer.Deserialize<T>(stream) ?? throw new InvalidDataException("Local worker returned empty data");
+        byte[] bytes;
+        using (var lease = new FileLease(path)) bytes = Snapshot(path);
+        return Decode<T>(bytes);
     }
+
+    // Polling must not wait behind a writer or hold its publication lock while
+    // constructing a large candidate/trace. Busy/missing is not a game failure.
+    // Malformed published JSON still fails; no partial or stale value is invented.
+    public static bool TryRead<T>(string path, [System.Diagnostics.CodeAnalysis.MaybeNullWhen(false)] out T value)
+    {
+        value = default;
+        if (!File.Exists(path)) return false;
+        byte[] bytes;
+        using (var lease = new FileLease(path, poll: true))
+        {
+            if (!lease.Acquired) return false;
+            try { bytes = Snapshot(path); }
+            catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException) { return false; }
+        }
+        value = Decode<T>(bytes);
+        return true;
+    }
+
+    private static byte[] Snapshot(string path)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        var bytes = new byte[checked((int)stream.Length)];
+        stream.ReadExactly(bytes);
+        return bytes;
+    }
+    private static T Decode<T>(byte[] bytes) => JsonSerializer.Deserialize<T>(bytes) ??
+        throw new InvalidDataException("Local worker returned empty data");
     public static void Write<T>(string path, T value, Func<string, IDisposable?>? measure = null)
     {
         string json;
@@ -472,15 +500,21 @@ public static class LocalWire
     private sealed class FileLease : IDisposable
     {
         private readonly Mutex _mutex;
-        public FileLease(string path)
+        public bool Acquired { get; }
+        public FileLease(string path, bool poll = false)
         {
             var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Path.GetFullPath(path).ToUpperInvariant()));
             _mutex = new Mutex(false, "SpireAiCoach-ipc-" + Convert.ToHexString(hash));
-            bool acquired;
-            try { acquired = _mutex.WaitOne(TimeSpan.FromSeconds(5)); }
-            catch (AbandonedMutexException) { acquired = true; }
-            if (!acquired) { _mutex.Dispose(); throw new IOException("Local IPC file is busy"); }
+            try { Acquired = _mutex.WaitOne(poll ? TimeSpan.Zero : TimeSpan.FromSeconds(5)); }
+            catch (AbandonedMutexException) { Acquired = true; }
+            if (!Acquired)
+            {
+                _mutex.Dispose();
+                if (!poll) throw new LocalIpcBusyException(path);
+            }
         }
-        public void Dispose() { _mutex.ReleaseMutex(); _mutex.Dispose(); }
+        public void Dispose() { if (Acquired) { _mutex.ReleaseMutex(); _mutex.Dispose(); } }
     }
 }
+
+public sealed class LocalIpcBusyException(string path) : IOException("Local IPC file is busy: " + Path.GetFileName(path));

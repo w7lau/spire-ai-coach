@@ -28,6 +28,7 @@ public static class Entry
         if (root == null) return;
         if (System.Environment.GetEnvironmentVariable("SPIRE_COACH_WORKER") is { } worker)
         {
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_TRANSPORT_TEST") == "1") TransportPressureProbe.Install(worker);
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_ENEMY_TEST") == "1") EnemyProbeObserver.Install(worker);
             return;
         }
