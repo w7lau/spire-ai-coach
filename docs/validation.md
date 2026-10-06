@@ -6,7 +6,7 @@
 - 实际模组IL与反射确认未知点为CardUpgradeRuneBase<Stardust>.IsAvailableForPlayer对抽象IsAvailableForCharacter的callvirt，具体StardustUpgradeRune实现存在。原扫描把自身抽象槽直接入队，没有方法体导致未知。通用解析现在绑定实际来源的具体override；无法解析仍保留未知，不执行回调或按名字猜效果。生命目标也不再受严格上界的保守分支覆盖。
 - Update.ps1 -BuildOnly完成 **426/426** 核心检查，Mod和隔离观察器构建0警告/错误。只读元数据用例确认具体无回复实现无未知、具体生命写入实现被识别；初版测试类未继承模型导致扫描object.GetType，修正夹具为实际RelicModel后重新检查，没有放宽断言。
 - **两算法实际冻结原生路线验收通过**：给定00:38的20步原生胜利路线，各在第一次候选达到78→79时标记StoppedOnHealthTarget，TargetHp=79、FullHealth=false，最终79/92；均完成一次普通独立复放，合计40个完整状态/RNG/历史检查点匹配。目标分析各1次，抽象调用未知原因消失。目标仍有Uncertain标记，表示存在全局模组的不确定性，不是阻止返回或最优证明。首次含冷启动41.801秒，复用后2.824秒；这是有种子停止及复核验收，不是未引导搜索速度或任意模组兼容保证。
-- 准备DLL与原生宿主DLL的SHA256一致：`19a056679a6cd3a4f11ba37845442efaf7018d9fc382627fb34e09d60b4c6331`。[脱敏证据](../experiments/LocalIntegration/results/2026-10-07-health-target-return-0.7.73.json)。01:01调用Update.ps1 -InstallOnly被游戏运行检查拒绝；**0.7.73仅已准备，尚未安装**，原0.7.72及其他会话所属实例不受影响。准备包及通过验证的证据保留，正常退出游戏后可直接InstallOnly安装同包；不停止玩家游戏或清理缓存。实战加载后的行为仍待观察。
+- 准备DLL与原生宿主DLL的SHA256一致：`19a056679a6cd3a4f11ba37845442efaf7018d9fc382627fb34e09d60b4c6331`。[脱敏证据](../experiments/LocalIntegration/results/2026-10-07-health-target-return-0.7.73.json)。01:01首次InstallOnly被游戏运行检查拒绝，准备包及通过验证的证据保留。01:09玩家正常退出后，通过Update.ps1 -InstallOnly将同一原生验收包从0.7.72安装为 **0.7.73**，约1.59秒；安装DLL哈希与准备及原生宿主一致，旧文件备份已核对。未重复构建或验收，不停止/启动玩家游戏或清理缓存，其他会话实例保持原样。实战加载后的行为仍待观察。
 
 ## 0.7.72 原生日志错误的及时处理与实例复用（2026-10-07）
 
