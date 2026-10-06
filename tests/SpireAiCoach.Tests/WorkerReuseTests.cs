@@ -89,7 +89,10 @@ internal static class WorkerReuseTests
                     "The original logged error or healthy native candidate was lost");
                 Check(bad.HasExited && lanes[1].Process == null && lanes[0].Process!.Id == healthy &&
                     watch.Elapsed < TimeSpan.FromSeconds(4) && result.Trace!.Spans.Count(s => s.Phase == "retire") == 1 &&
-                    !result.Trace.Spans.Any(s => s.Phase == "fallback"), "Runtime error spent the full budget or retired a healthy peer");
+                    !result.Trace.Spans.Any(s => s.Phase == "fallback"),
+                    $"Runtime retirement: algorithm={algorithm}; elapsed_ms={watch.ElapsedMilliseconds}; bad_exited={bad.HasExited}; bad_slot_pid={lanes[1].Process?.Id}; " +
+                    $"healthy_pid={lanes[0].Process?.Id}; expected_healthy_pid={healthy}; events=" +
+                    System.Text.Json.JsonSerializer.Serialize(result.Trace!.Spans.Where(s => s.Phase is "retire" or "rebuild" or "fallback")));
                 var recorded = LocalWire.Read<LocalSearchResult>(Path.Combine(lanes[1].Root, "last-data-failure.json"));
                 Check(recorded.Failure == failure && recorded.Best == null, "Persisted error evidence differs from the returned failure");
                 var next = await f.Pool.Analyze(Request() with { SearchOrder = algorithm }, f.Installation, _ => { }, CancellationToken.None);

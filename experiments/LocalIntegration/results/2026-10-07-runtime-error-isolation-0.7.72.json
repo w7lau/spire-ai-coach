@@ -1,0 +1,58 @@
+{
+  "version": "0.7.72",
+  "samples": [
+    {
+      "algorithm": "MonteCarlo",
+      "failedOwner": 1,
+      "failureCount": 1,
+      "detectionMs": 273.5512999999992,
+      "healthyPidAndGenerationRetained": true,
+      "onlyFailedOwnerRebuilt": true,
+      "failedSteps": 17,
+      "recoveredSteps": 17,
+      "ordinaryNativeReplays": 2,
+      "fallback": false
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "failedOwner": 1,
+      "failureCount": 1,
+      "detectionMs": 253.96699999999998,
+      "healthyPidAndGenerationRetained": true,
+      "onlyFailedOwnerRebuilt": true,
+      "failedSteps": 22,
+      "recoveredSteps": 22,
+      "ordinaryNativeReplays": 2,
+      "fallback": false
+    },
+    {
+      "loneFailureRejected": true,
+      "failureCount": 1,
+      "newCompatibilityProcesses": 0
+    }
+  ],
+  "passed": true,
+  "scope": "Frozen incident; bounded owned native search; native log injection after a real action; independent ordinary replay",
+  "dll_sha256": "732d914c83bde1253d43d69e1c45ae44fda249ff158636f43bb675362ed82186",
+  "zip_sha256": "c9d8bf9e610f050eb20f91aca4ce51539cce5c01a95bbf906a3572a68834909b",
+  "native_success_marker": true,
+  "independent_replay_checkpoints": 78,
+  "core_checks_passed": 426,
+  "same_dll_in_build_package_and_native_host": true,
+  "original_inputs_routes_logs_and_native_assets_excluded": true,
+  "limitation": "Bounded owned native processing checks; does not repair the external rune choice-stack conflict or prove eight-worker performance",
+  "combined_card_goal_regression": {
+    "cases_passed": 10,
+    "independent_replay_checkpoints": 48,
+    "seeded": true
+  },
+  "installation": {
+    "version": "0.7.72",
+    "same_verified_dll": true,
+    "previous_version": "0.7.71",
+    "protected_files": 715,
+    "changed_protected_files": 0,
+    "cache_cleanup": false,
+    "started_or_stopped_player": false
+  }
+}
