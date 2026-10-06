@@ -253,5 +253,18 @@
     "supersededIntermediatePackage": "0.7.74",
     "reason": "Concurrent installed resource repair was merged before final delivery; duplicate development layout owner removed."
   },
-  "scope": "Eight owned native instances prepared; 12 seeded natural escape/mixed-kill/full-kill cases and three saturated-resource/configuration/cancellation cases with same-root +1 HP target and ordinary independent replay. No unseeded search speed, arbitrary Mod compatibility, or global optimality claim."
+  "scope": "Eight owned native instances prepared; 12 seeded natural escape/mixed-kill/full-kill cases and three saturated-resource/configuration/cancellation cases with same-root +1 HP target and ordinary independent replay. No unseeded search speed, arbitrary Mod compatibility, or global optimality claim.",
+  "install": {
+    "status": "installed",
+    "version": "0.7.75",
+    "previousVersion": "0.7.74",
+    "utc": "2026-10-06T18:56:54.2704187Z",
+    "dllSha256": "a69e0f0d06060f0546dc525ee0cc0bfd27373fc10c45520cbb59156b613efc1b",
+    "sameValidatedDll": true,
+    "backupsVerified": true,
+    "cacheCleanup": false,
+    "startedOrStoppedPlayerGame": false,
+    "protectedFiles": 717,
+    "protectedFileBytesChanged": 0
+  }
 }
