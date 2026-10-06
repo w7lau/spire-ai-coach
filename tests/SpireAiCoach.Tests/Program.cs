@@ -33,6 +33,7 @@ DisplayBranchTests.Register(Test, AsyncTest);
 EventEntryTests.Register(Test);
 NativeOverheadTests.Register(Test, AsyncTest);
 ProgressTransportTests.Register(Test, AsyncTest);
+RuntimeLogTests.Register(Test);
 LocalWirePollingTests.Register(Test, AsyncTest);
 WorkerReuseTests.Register(Test, AsyncTest);
 ReplayFailureTests.Register(Test, AsyncTest);

@@ -10,10 +10,19 @@ public static class LocalSearchRecovery
     private static bool Failed(LocalSearchResult r) => r.Status is "failed" or "unsupported" or "partial";
     private static bool Usable(LocalSearchResult r) => r.Status is "searched" or "done" or "partial" && r.Best != null;
 
+    private static bool CompatibilityFailure(LocalSearchResult r) =>
+        Failed(r) && r.Failure?.Category is not ("local_ipc" or "local_runtime");
+
+    public static bool OnlyLocalFailures(IEnumerable<LocalSimulationFailure> failures)
+    {
+        var reasons = failures.ToArray();
+        return reasons.Length > 0 && reasons.All(f => f.Category is "local_ipc" or "local_runtime");
+    }
+
     // A failure before a decision can invalidate the entire bootstrap. A later
     // route exception retires its own lane; healthy isolated processes keep running.
     public static bool AbortPass(LocalSearchRequest request, LocalSearchResult result) =>
-        request.DataOnlyCombat && Failed(result) && result.Failure?.Category != "local_ipc" &&
+        request.DataOnlyCombat && CompatibilityFailure(result) &&
         result.Evaluated == 0 && result.RootBranches == 0 && !Usable(result);
 
     // Never discard completed native candidates just because another lane failed.
@@ -21,7 +30,7 @@ public static class LocalSearchRecovery
     public static bool NeedsCompatibilityPass(LocalSearchRequest request, IEnumerable<LocalSearchResult> results)
     {
         var lanes = results.ToArray();
-        return request.DataOnlyCombat && lanes.Any(r => Failed(r) && r.Failure?.Category != "local_ipc") && !lanes.Any(Usable) &&
+        return request.DataOnlyCombat && lanes.Any(CompatibilityFailure) && !lanes.Any(Usable) &&
             !lanes.All(r => r.Failure?.Category == "local_mod_replay" && r.Evaluated == 0 && r.RootBranches == 0);
     }
 

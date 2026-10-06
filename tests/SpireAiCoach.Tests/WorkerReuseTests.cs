@@ -71,6 +71,46 @@ internal static class WorkerReuseTests
 
     public static void Register(Action<string, Action> test, Action<string, Func<Task>> asyncTest)
     {
+        asyncTest("logged native errors stop only their owner promptly and retain the exact failure across both algorithms", async () =>
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            await using var f = new Fixture();
+            foreach (var algorithm in new[] { LocalSearchOrder.MonteCarlo, LocalSearchOrder.TurnFrontier })
+            {
+                await f.Pool.Prepare(f.Installation, 2, CancellationToken.None);
+                var lanes = Workers(f.Pool); int healthy = lanes[0].Process!.Id;
+                using var bad = Process.GetProcessById(lanes[1].Process!.Id);
+                var request = Request("runtime-peer") with { DataOnlyCombat = true, SearchOrder = algorithm, BudgetSeconds = 10 };
+                var watch = Stopwatch.StartNew();
+                var result = await f.Pool.Analyze(request, f.Installation, _ => { }, CancellationToken.None);
+                var failure = result.RecoveredFailures!.Single();
+                Check(result.Status == "partial" && result.Best is { Won: true } && failure.Category == "local_runtime" &&
+                    failure.Worker == 1 && failure.Message.Contains("synthetic choice context") && failure.Stack.Contains("Native.AfterShuffle"),
+                    "The original logged error or healthy native candidate was lost");
+                Check(bad.HasExited && lanes[1].Process == null && lanes[0].Process!.Id == healthy &&
+                    watch.Elapsed < TimeSpan.FromSeconds(4) && result.Trace!.Spans.Count(s => s.Phase == "retire") == 1 &&
+                    !result.Trace.Spans.Any(s => s.Phase == "fallback"), "Runtime error spent the full budget or retired a healthy peer");
+                var recorded = LocalWire.Read<LocalSearchResult>(Path.Combine(lanes[1].Root, "last-data-failure.json"));
+                Check(recorded.Failure == failure && recorded.Best == null, "Persisted error evidence differs from the returned failure");
+                var next = await f.Pool.Analyze(Request() with { SearchOrder = algorithm }, f.Installation, _ => { }, CancellationToken.None);
+                Check(next.Status == "done" && lanes[0].Process!.Id == healthy &&
+                    next.Trace!.Spans.Count(s => s.Phase == "rebuild") == 1, "A later search rebuilt healthy resources");
+            }
+        });
+        asyncTest("a lone logged native error preserves structured rejection without starting compatibility searches", async () =>
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            await using var f = new Fixture();
+            var request = Request("runtime-all") with { DataOnlyCombat = true, Workers = 1, BudgetSeconds = 10 };
+            try { await f.Pool.Analyze(request, f.Installation, _ => { }, CancellationToken.None); throw new Exception("Logged error accepted"); }
+            catch (CoachException ex) when (ex.Category == "local_runtime")
+            {
+                var failure = ((LocalSimulationFailure[])ex.Data["local_failures"]!).Single();
+                Check(failure.Worker == 0 && failure.Stack.Contains("Native.AfterShuffle"), "Native log rejection lost its cause");
+                Check(!((LocalTrace)ex.Data["local_trace"]!).Spans.Any(s => s.Phase == "fallback"), "Native log error restarted a full search");
+            }
+            Check(f.Pool.Resources().Starts == 1, "Runtime rejection launched a compatibility process");
+        });
         asyncTest("both algorithms retain native owners through a six second busy result publication", async () =>
         {
             if (!OperatingSystem.IsWindows()) return;
@@ -394,7 +434,7 @@ internal static class WorkerReuseTests
                 await Until(() => control.CanRequest, "Synthetic provisional victory missing");
                 Check(control.TryRequest(), "Manual request rejected");
                 try { await task; throw new Exception("Invalid provisional victory became usable"); }
-                catch (CoachException ex) when (ex.Category is "local_failed" or "local_verify_failed") { }
+                catch (CoachException ex) when (ex.Category is "local_failed" or "local_verify_failed" or "local_runtime") { }
                 Check(!control.CanRequest && !Directory.EnumerateFiles(f.Root, "request.json", SearchOption.AllDirectories)
                     .Select(LocalWire.Read<LocalSearchRequest>).Any(x => x.Id.Contains("-regular", StringComparison.Ordinal)),
                     "Manual stop triggered a fresh compatibility search");
@@ -598,9 +638,19 @@ internal static class WorkerReuseTests
                         delay = request.Partition == 0 ? 600 : 10000;
                     bool manual = request.DebugEncounter?.StartsWith("manual-win", StringComparison.Ordinal) == true;
                     if (manual && request.VerifyCandidate == null || request.DebugEncounter == "manual-win-verify-slow") delay = 10000;
+                    bool runtimeError = request.VerifyCandidate == null &&
+                        (request.DebugEncounter == "runtime-all" || request.DebugEncounter == "runtime-peer" && request.Partition == 1);
+                    if (runtimeError) delay = 10000;
+                    if (request.DebugEncounter == "runtime-peer" && request.Partition == 0 && request.VerifyCandidate == null) delay = 1400;
                     var timer = Stopwatch.StartNew(); bool cancelled = false, goal = false, manualStop = false, publishedWin = false;
+                    bool errorLogged = false;
                     while (timer.ElapsedMilliseconds < delay)
                     {
+                        if (runtimeError && !errorLogged && timer.ElapsedMilliseconds >= 600)
+                        {
+                            File.AppendAllText(Path.Combine(root, "game.log"), "[ERROR] synthetic choice context mismatch\n   at Native.AfterShuffle()\n");
+                            errorLogged = true;
+                        }
                         if (manual && request.VerifyCandidate == null && request.Partition == 0 && !publishedWin && timer.ElapsedMilliseconds >= 600)
                         {
                             publishedWin = true;

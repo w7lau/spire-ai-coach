@@ -29,6 +29,7 @@ parser.add_argument('--game', type=Path)
 parser.add_argument('--mods', type=Path)
 parser.add_argument('--seed-result', type=Path)
 parser.add_argument('--transport-reuse-test', action='store_true', help='Frozen native algorithm switching with a six-second owned publication stall')
+parser.add_argument('--runtime-failure-test', action='store_true', help='Native logged-error isolation, prompt retirement and healthy resource reuse')
 parser.add_argument('--speed-benchmark', action='store_true')
 parser.add_argument('--visual-benchmark', action='store_true')
 parser.add_argument('--checkpoint', action='store_true')
@@ -175,6 +176,8 @@ if args.bootstrap_reverse and not args.bootstrap_benchmark:
 if args.visual_benchmark and (not args.replay or not args.seed_result or args.speed_benchmark):
     parser.error('--visual-benchmark requires --replay and --seed-result, without --speed-benchmark')
 root = args.workspace.resolve()
+if args.runtime_failure_test and (not args.replay or not args.game or args.seed_result):
+    parser.error('--runtime-failure-test requires an unseeded frozen --replay and --game')
 if not (root / '.spire-native-probe-owner').is_file() or not (root / 'fixture.json').is_file():
     raise ValueError('Prepare an owned synthetic NativeProbe workspace first')
 with worker_lock(root):
@@ -204,6 +207,8 @@ with worker_lock(root):
     if args.finisher_targets_test:
         (root / 'integration-finisher-targets-summary.json').unlink(missing_ok=True)
         (root / 'integration-goal-consumption-summary.json').unlink(missing_ok=True)
+    if args.runtime_failure_test:
+        (root / 'integration-runtime-summary.json').unlink(missing_ok=True)
     if args.resume_search_test:
         for name in ['integration-resume-search-summary.json', 'integration-resume-search-source-before-private.json',
                      *[f'integration-resume-search-source-after-{order}-private.json'
@@ -292,6 +297,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_MECHANICS'] = '1' if args.mechanics else '0'
     env['SPIRE_LOCAL_ENEMY_TEST'] = '1' if args.enemy_test else '0'
     env['SPIRE_LOCAL_TRANSPORT_TEST'] = '1' if args.transport_reuse_test else '0'
+    env['SPIRE_LOCAL_RUNTIME_TEST'] = '1' if args.runtime_failure_test else '0'
     env['SPIRE_LOCAL_ENEMY_CASES'] = args.enemy_cases or ''
     env['SPIRE_LOCAL_ENEMY_ROUNDS'] = str(args.enemy_rounds)
     env['SPIRE_LOCAL_ENEMY_FAST_ONLY'] = '1' if args.enemy_fast_only else '0'
@@ -490,6 +496,11 @@ with worker_lock(root):
         if args.transport_reuse_test:
             names = ['integration-transport-summary.json', 'integration-success', 'integration-error.txt',
                      'integration-stdout.log', 'integration-game.log']
+        if args.runtime_failure_test:
+            names = ['integration-runtime-summary.json', 'integration-success', 'integration-error.txt',
+                     'integration-stdout.log', 'integration-game.log',
+                     *[f'integration-runtime-{order}-{phase}-private.json'
+                       for order in ('MonteCarlo', 'TurnFrontier') for phase in ('failure', 'recovery')]]
         for name in names:
             if (root / name).is_file():
                 shutil.copy2(root / name, args.results_dir / name)

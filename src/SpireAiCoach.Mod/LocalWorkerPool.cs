@@ -107,6 +107,13 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             // a verification failure must not restart all full-budget searches.
             origin.Import(ex.Data["local_trace"] as LocalTrace);
             var failures = ex.Data["local_failures"] as LocalSimulationFailure[] ?? [];
+            if (LocalSearchRecovery.OnlyLocalFailures(failures))
+            {
+                var cause = failures.FirstOrDefault(f => f.Category == "local_runtime") ?? failures[0];
+                var error = new CoachException(cause.Category!, cause.Message);
+                foreach (var key in ex.Data.Keys) error.Data[key] = ex.Data[key];
+                throw error;
+            }
             if (failures.FirstOrDefault(f => f.Category == "local_event_entry") is { } entryFailure)
             {
                 var error = new CoachException("local_event_entry", entryFailure.Message);
@@ -504,6 +511,14 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     {
                         cancellation.ThrowIfCancellationRequested();
                         passFailure.ThrowIfCancellationRequested();
+                        if (worker.RuntimeFailure(index, verifying ? "verify" : "search") is { } runtimeFailure)
+                        {
+                            var failed = new LocalSearchResult(request.Id, request.SnapshotId, "failed", runtimeFailure.Message,
+                                lastResult?.Evaluated ?? 0, 0, 0, null,
+                                RootBranches: Math.Max(lastResult?.RootBranches ?? 0, Volatile.Read(ref rootBranches[index])),
+                                Failure: runtimeFailure);
+                            return RejectRuntime(failed, runtimeFailure);
+                        }
                         if (!verifying) TryStopUsingFinishedWinner();
                         if (!verifying && goalReached.IsCancellationRequested && stopping == null)
                         {
@@ -561,13 +576,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                                     result = result with { Timing = (result.Timing ?? new()) with { StartupMs = preparation.ElapsedMilliseconds } };
                                     if (worker.Process?.HasExited == false)
                                     { worker.Process.Refresh(); result = result with { WorkerMemoryBytes = worker.Process.PrivateMemorySize64 }; }
-                                    if (worker.GameErrors())
-                                    {
-                                        if (!verifying) minimumLoss?.RejectOwner(index);
-                                        RememberFailure(result);
-                                        worker.Stop("模拟报告运行错误", timeline, index);
-                                        return result with { Status = "failed", Best = null, Message = "后台游戏报告运行错误，未采用该进程的结果。" };
-                                    }
+                                    if (worker.RuntimeFailure(index, verifying ? "verify" : "search") is { } finalFailure)
+                                        return RejectRuntime(result, finalFailure);
                                     if (result.Status is not ("done" or "searched") && !(rootProbe && result.Status == "restored"))
                                     {
                                         if (!verifying) minimumLoss?.RejectOwner(index);
@@ -634,14 +644,29 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                         Failure: LocalSimulationFailure.Capture(ex, index, verifying ? "verify" : "search"));
                 }
 
+                LocalSearchResult RejectRuntime(LocalSearchResult result, LocalSimulationFailure failure)
+                {
+                    if (!verifying) minimumLoss?.RejectOwner(index);
+                    var failed = result with { Status = "failed", Best = null, Failure = failure, Message = failure.Message };
+                    timeline.Add(new(index, verifying ? "verify" : "search", "runtime_error", failure.Message, timeline.ElapsedMs, 0));
+                    RememberFailure(failed);
+                    worker.Stop("模拟报告运行错误", timeline, index);
+                    return failed;
+                }
+
                 void RememberFailure(LocalSearchResult failed)
                 {
                     if (!command.DataOnlyCombat) return;
-                    LocalWire.Write(Path.Combine(worker.Root, "last-data-failure.json"), failed);
-                    // Keep the failing frozen input, not a later request overwriting request.json.
-                    LocalWire.Write(Path.Combine(worker.Root, "last-data-failure-request.json"), command);
-                    var log = Path.Combine(worker.Root, "game.log");
-                    if (File.Exists(log)) File.Copy(log, Path.Combine(worker.Root, "last-data-failure.log"), true);
+                    try
+                    {
+                        LocalWire.Write(Path.Combine(worker.Root, "last-data-failure.json"), failed);
+                        // Keep the failing frozen input, not a later request overwriting request.json.
+                        LocalWire.Write(Path.Combine(worker.Root, "last-data-failure-request.json"), command);
+                        var log = Path.Combine(worker.Root, "game.log");
+                        if (File.Exists(log)) File.Copy(log, Path.Combine(worker.Root, "last-data-failure.log"), true);
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    { timeline.Add(new(index, "diagnostics", "failure_record", ex.Message, timeline.ElapsedMs, 0)); }
                 }
             }
         }
@@ -708,7 +733,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
         }
         private FileStream? _lock;
         private string? _configuration;
-        private long _logPosition;
+        private LocalRuntimeLog _runtimeLog = new();
         private int _starts;
         private long _changed;
         private string _detail = "尚未准备";
@@ -783,7 +808,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             token.ThrowIfCancellationRequested();
             using var preparation = timeline?.Measure(index, "prepare", "prepare");
             using var files = timeline?.Measure(index, "prepare", "files", depth: 1);
-            _logPosition = 0;
+            _runtimeLog = new();
             // NTFS hardlinks require one volume. Keep tiny launch trees beside the installation, never in it.
             var sharedRoot = Path.Combine(Directory.GetParent(installation.GameDirectory)!.FullName, ".spire-ai-coach-workers");
             Root = Path.GetFullPath(Path.Combine(sharedRoot, configuration, "worker-" + index));
@@ -886,27 +911,17 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 using var stopping = timeline?.Measure(index, "main", "cancel_request", depth: 1);
                 LocalWire.Write(Path.Combine(Root, "stop-search.json"),
                     new LocalSearchStop(command.Id, command.SnapshotId, command.NativeHash, Cancel: true));
-                if (await WaitIdle(command, timeline, index) && !GameErrors() && !File.Exists(Path.Combine(Root, "fatal.txt"))) return;
+                if (await WaitIdle(command, timeline, index) && RuntimeFailure(index) == null && !File.Exists(Path.Combine(Root, "fatal.txt"))) return;
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException or JsonException) { }
             Stop("取消后未能确认安全清理", timeline, index);
         }
 
-        public bool GameErrors()
+        public LocalSimulationFailure? RuntimeFailure(int index, string stage = "search")
         {
             var path = Path.Combine(Root, "game.log");
             using var stream = new FileStream(path, FileMode.Open, System.IO.FileAccess.Read, FileShare.ReadWrite);
-            if (_logPosition > stream.Length) _logPosition = 0;
-            stream.Position = _logPosition;
-            using var reader = new StreamReader(stream);
-            string? line;
-            bool failed = false;
-            while ((line = reader.ReadLine()) != null)
-                failed |= line.Contains("[ERROR]", StringComparison.Ordinal) ||
-                    line.StartsWith("System.", StringComparison.Ordinal) && line.Contains("Exception:", StringComparison.Ordinal) ||
-                    line.Contains("ERROR: FATAL:", StringComparison.Ordinal);
-            _logPosition = stream.Position;
-            return failed;
+            return _runtimeLog.Read(stream, index, stage);
         }
 
         private static void CopyFile(string source, string target, CancellationToken token)
