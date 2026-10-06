@@ -24,6 +24,7 @@ HealthTargetTests.Register(Test, AsyncTest);
 ManualVictoryReturnTests.Register(Test);
 SelectionSpaceTests.Register(Test);
 SearchEvidenceTests.Register(Test);
+CombatOutcomeTests.Register(Test);
 
 CardGoalTests.Register(Test);
 FollowupTests.Register(Test);

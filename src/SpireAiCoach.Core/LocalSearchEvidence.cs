@@ -7,7 +7,8 @@ public sealed record LocalSearchEvidence(string Conclusion, string StopReason,
     int RoundLimitHits, int ActionLimitHits, int TimeLimitHits, int PagedChoiceObservations,
     int PagedReplayBranches, int UnconfirmedEnds, int PrunedPrefixes, int SimulationErrors,
     bool AttemptLimitReached, bool TimeLimitReached, bool GoalStopped, bool ExcludedActions,
-    bool IndependentVerification, int MaxRounds, int MaxActionsPerRound, bool IncludePotions, bool ManualStopped = false)
+    bool IndependentVerification, int MaxRounds, int MaxActionsPerRound, bool IncludePotions, bool ManualStopped = false,
+    int TerminalEscapes = 0)
 {
     public string Description => Conclusion switch
     {
@@ -37,7 +38,8 @@ public sealed record LocalSearchEvidence(string Conclusion, string StopReason,
             reports.Sum(e => e.PagedChoiceObservations), reports.Sum(e => e.PagedReplayBranches),
             reports.Sum(e => e.UnconfirmedEnds), reports.Sum(e => e.PrunedPrefixes), errors,
             reports.Any(e => e.AttemptLimitReached), reports.Any(e => e.TimeLimitReached),
-            !manualStopped && reports.Any(e => e.GoalStopped), excluded, verified, request.MaxRounds, request.MaxDepth, request.IncludePotions, manualStopped);
+            !manualStopped && reports.Any(e => e.GoalStopped), excluded, verified, request.MaxRounds, request.MaxDepth, request.IncludePotions, manualStopped,
+            reports.Sum(e => e.TerminalEscapes));
         return merged.Classify(selected.Best);
     }
 
@@ -70,6 +72,7 @@ public sealed class LocalSearchAudit
 {
     public int TerminalWins { get; private set; }
     public int TerminalLosses { get; private set; }
+    public int TerminalEscapes { get; private set; }
     public int UnconfirmedEnds { get; private set; }
     public int RoundLimitHits { get; set; }
     public int ActionLimitHits { get; set; }
@@ -82,6 +85,7 @@ public sealed class LocalSearchAudit
     {
         if (candidate.Won && !candidate.Dead) TerminalWins++;
         else if (candidate.Dead) TerminalLosses++;
+        else if (ended && candidate.CombatOutcome is { Settled: true, Escaped: true }) TerminalEscapes++;
         else if (ended) UnconfirmedEnds++;
     }
 
@@ -97,6 +101,7 @@ public sealed class LocalSearchAudit
         return new LocalSearchEvidence("unknown", "", covered, pending, TerminalWins, TerminalLosses,
             RoundLimitHits, ActionLimitHits, TimeLimitHits, PagedChoiceObservations, PagedReplayBranches,
             UnconfirmedEnds, pruned, SimulationErrors, evaluated >= request.MaxNodes, timeReached, goalStopped && !manualStopped,
-            request.ExcludedModels is { Length: > 0 }, verified, request.MaxRounds, request.MaxDepth, request.IncludePotions, manualStopped).Classify(best);
+            request.ExcludedModels is { Length: > 0 }, verified, request.MaxRounds, request.MaxDepth, request.IncludePotions, manualStopped,
+            TerminalEscapes).Classify(best);
     }
 }

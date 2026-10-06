@@ -73,6 +73,12 @@ public static class Entry
                 return;
             }
             var save = JsonSerializer.Deserialize(File.ReadAllText(Path.Combine(root, "fixture.json")), JsonSerializationUtility.GetTypeInfo<SerializableRun>())!;
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_ESCAPE_TEST") == "1")
+            {
+                await EscapeVictoryIntegration.Run(root, tree, pool, save);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_ENEMY_TEST") == "1")
             {
                 await EnemyCompatibilityIntegration.Run(root, tree, save);

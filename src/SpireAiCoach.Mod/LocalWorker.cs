@@ -37,6 +37,7 @@ public static class LocalWorker
     }
     private static bool _combatSettled;
     private static bool _combatWon;
+    private static CombatState? _outcomeState;
     private static IReadOnlyDictionary<uint, string>? _targetLabels;
     private static bool _includePotions;
     private static bool _fastNativeWaits;
@@ -444,9 +445,9 @@ public static class LocalWorker
                     var health = recordedHealth!.Snapshot();
                     best = new(recordedActions.ToArray(), player.Creature.CurrentHp, health.HpLost,
                         CombatManager.Instance.DebugOnlyGetState()!.Enemies.Sum(e => Math.Max(0, e.CurrentHp)), player.Gold,
-                        player.Creature.MaxHp, _combatWon && !player.Creature.IsDead, player.Creature.IsDead, false,
+                        player.Creature.MaxHp, Outcome().Won(player.Creature.IsDead), player.Creature.IsDead, false,
                         Rounds: recordedActions.Select(a => a.Round).Distinct().Count(), StartingHp: startHp,
-                        DamageSources: recordedDamage!.Snapshot(health.HpLost), HealthChanges: health);
+                        DamageSources: recordedDamage!.Snapshot(health.HpLost), HealthChanges: health, CombatOutcome: Outcome());
                     // Experimental terminal status is deliberately excluded from the product pool's
                     // acceptable results; this cannot become a displayed/executable empty plan.
                     await Cleanup();
@@ -1059,7 +1060,8 @@ public static class LocalWorker
                         using (Trace("completed-route", terminalDigest)) { }
                     }
                     var state = CombatManager.Instance.DebugOnlyGetState();
-                    var won = _combatWon && !player.Creature.IsDead;
+                    var outcome = Outcome();
+                    var won = outcome.Won(player.Creature.IsDead);
                     var endTurnRisk = !IsTerminal(player) ? LocalTacticalPreview.Capture(player, []).EndTurnHpLossHint : (double?)null;
                     var health = healthAccounting.Snapshot();
                     recovery.ValidateObserved(health);
@@ -1069,12 +1071,12 @@ public static class LocalWorker
                         // Extra rewards remain unknown; the explicit zero-loss switch does not depend on them.
                         RewardCoverageKnown: false,
                         Rounds: actions.Select(a => a.Round).Distinct().Count(),
-                        StopReason: won ? "胜利结算完成" : player.Creature.IsDead ? "玩家死亡" :
+                        StopReason: won ? "胜利结算完成" : player.Creature.IsDead ? "玩家死亡" : outcome.Settled && outcome.Escaped ? "敌人逃跑，未全部击败" :
                             string.IsNullOrEmpty(stop) ? "战斗结束但未确认胜利" : stop, Decisions: decisions.ToArray(), StartingHp: startingHp,
                         Continuation: continuationPoints?.ToArray(), ContinuationFromSearch: continuationPoints != null,
                         DamageSources: damageSources.Snapshot(health.HpLost), RolloutStyle: _rolloutStyle,
                         InitialEnemyHp: initialEnemyHp, EndTurnHpLossHint: endTurnRisk, CardGoalOutcome: cardGoalCounts.Snapshot(),
-                        HealthChanges: health);
+                        HealthChanges: health, CombatOutcome: outcome);
                     audit.Outcome(candidate, IsTerminal(player));
                     if (turnTask != null && stop == "达到时间预算")
                         turns!.ReturnInterrupted(turnTask, TurnHint(player, startingHp, actions));
@@ -1082,7 +1084,8 @@ public static class LocalWorker
                         throw new InvalidOperationException("Exact native search prefix terminated early");
                     if (proofSteps != null)
                     {
-                        ObserveMinimum(new(startingHp, proofSteps.ToArray(), candidate.Hp, candidate.Won, candidate.Dead));
+                        ObserveMinimum(new(startingHp, proofSteps.ToArray(), candidate.Hp, candidate.Won, candidate.Dead,
+                            outcome.Settled && outcome.Escaped));
                     }
                     bool completeAttempt = LocalSearchRecovery.CompleteTrial(turnProbed, cut, covered,
                         fullRollout, IsTerminal(player), stop == "达到时间预算");
@@ -1366,7 +1369,9 @@ public static class LocalWorker
             CheckCancellation();
             var enemyHp = CombatManager.Instance.DebugOnlyGetState()?.Enemies.Sum(e => Math.Max(0, e.CurrentHp)) ?? 0;
             var health = healthAccounting.Snapshot();
-            if ((_combatWon && !player.Creature.IsDead) != candidate.Won || player.Creature.IsDead != candidate.Dead ||
+            var outcome = Outcome();
+            if (outcome.Won(player.Creature.IsDead) != candidate.Won || player.Creature.IsDead != candidate.Dead ||
+                candidate.CombatOutcome != null && !outcome.Matches(candidate.CombatOutcome) ||
                 player.Creature.CurrentHp != candidate.Hp || health.HpLost != candidate.HpLost || enemyHp != candidate.EnemyHp ||
                 player.Gold != candidate.Gold || player.Creature.MaxHp != candidate.MaxHp ||
                 candidate.DamageSources != null && damageSources.Snapshot(health.HpLost) != candidate.DamageSources ||
@@ -1384,7 +1389,7 @@ public static class LocalWorker
         if (RunManager.Instance.IsInProgress) RunManager.Instance.CleanUp();
         NGame.Instance!.RootSceneContainer.SetCurrentScene(new Control());
         await Frame(); await Frame();
-        _combatSettled = false; _combatWon = false;
+        _combatSettled = false; _combatWon = false; _outcomeState = null;
     }
 
     private static async Task WaitAssets()
@@ -1463,6 +1468,7 @@ public static class LocalWorker
                 using (Trace("event_entry", "进入事件战斗", depth: 3)) await LocalEventReplay.Restore(request.EventEntry, run);
             }
             finally { SaveManager.Instance.PrefsSave.FastMode = originalFastMode; }
+            _outcomeState = CombatManager.Instance.DebugOnlyGetState();
             var player = LocalContext.GetMe(run)!;
             await StableOrTerminal(player);
             scene?.Dispose();
@@ -1717,6 +1723,15 @@ public static class LocalWorker
 
     private static bool IsTerminal(Player player) => !CombatManager.Instance.IsStarting &&
         (player.Creature.IsDead || CombatManager.Instance.IsOverOrEnding);
+
+    private static LocalCombatOutcome Outcome()
+    {
+        var state = _outcomeState ?? CombatManager.Instance.DebugOnlyGetState() ??
+            throw new InvalidOperationException("缺少原生战斗结算状态。");
+        return new(_combatSettled, _combatWon, state.EscapedCreatures.Where(c => c.Side == CombatSide.Enemy)
+            .Select(c => new LocalEscapedEnemy(c.CombatId, c.ModelId.ToString(), c.CurrentHp))
+            .OrderBy(c => c.CombatId).ToArray());
+    }
 
     private static async Task EndTurn(Player player)
     {

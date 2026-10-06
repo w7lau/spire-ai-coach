@@ -11,7 +11,7 @@ public sealed record LocalLossProofStep(LocalAction Action, LocalAction[] Legal,
     LocalChoiceDecision[] Choices, LocalHealthEnvelope? After = null, bool CompleteLegal = true,
     LocalTurnHint? BeforeHint = null, LocalTurnHint? AfterHint = null, int? AfterRound = null);
 public sealed record LocalLossProofTrial(int StartingHp, LocalLossProofStep[] Steps,
-    int Hp, bool Won = false, bool Dead = false);
+    int Hp, bool Won = false, bool Dead = false, bool Escaped = false);
 public sealed record LocalMinimumLossCertificate(string Scope, int StartingHp,
     int MinimumNetHpLoss, int MinimumPotionsUsed, int? MaximumFinalHp = null, bool ContentScoped = false);
 public sealed record LocalLossProofTarget(int NetHpLoss, int PotionsUsed, int? FinalHp = null);
@@ -75,7 +75,7 @@ public sealed class LocalMinimumLossProof(LocalSearchRequest request, int capaci
     public void Observe(LocalLossProofTrial trial)
     {
         if (_invalid.Length > 0 || trial.Steps.Length == 0) return;
-        if (trial.StartingHp <= 0 || trial.Hp < 0 || trial.Won && trial.Dead ||
+        if (trial.StartingHp <= 0 || trial.Hp < 0 || trial.Won && (trial.Dead || trial.Escaped) ||
             trial.Steps[0].Action.BeforeHash != request.NativeHash ||
             _startingHp.HasValue && _startingHp != trial.StartingHp || request.ExcludedModels is { Length: > 0 })
         { Invalidate("Proof trial does not match the complete frozen root"); return; }
@@ -126,9 +126,9 @@ public sealed class LocalMinimumLossProof(LocalSearchRequest request, int capaci
             Recalculate(node);
             if (_invalid.Length > 0) return;
         }
-        if (trial.Won || trial.Dead)
+        if (trial.Won || trial.Dead || trial.Escaped)
         {
-            var terminal = trial.Dead ? new Floor(int.MaxValue, 0) :
+            var terminal = trial.Dead || trial.Escaped ? new Floor(int.MaxValue, 0) :
                 new Floor(trial.StartingHp - trial.Hp, potions);
             for (var parent = node; parent != null; parent = parent.Parent)
                 if (parent.Own.CompareTo(terminal) > 0)

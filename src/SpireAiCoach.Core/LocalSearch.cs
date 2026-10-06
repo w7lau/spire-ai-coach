@@ -60,7 +60,7 @@ public sealed record LocalCandidate(LocalAction[] Actions, int Hp, int HpLost, i
     LocalDecision[]? Decisions = null, int? StartingHp = null, bool ContinuationFromSearch = false,
     LocalDamageSources? DamageSources = null, LocalRolloutStyle RolloutStyle = LocalRolloutStyle.Balanced,
     int? InitialEnemyHp = null, double? EndTurnHpLossHint = null, LocalCardGoalOutcome? CardGoalOutcome = null,
-    LocalHealthChanges? HealthChanges = null)
+    LocalHealthChanges? HealthChanges = null, LocalCombatOutcome? CombatOutcome = null)
 {
     // Gross HP costs remain useful diagnostics, but healing and victory hooks are part of the goal.
     public int? NetHpLoss => StartingHp.HasValue ? Math.Max(0, StartingHp.Value - Hp) : null;
@@ -255,7 +255,7 @@ public static class LocalSearchPolicy
         var lines = new List<string> { best.Won ? "本地整场战斗 · 已找到获胜路线" : "本地整场战斗 · 尚未找到获胜路线", result.Message,
             $"启用 {result.Workers} 路，评估 {result.Evaluated} 条路线，其中 {result.Victories} 条获胜，不支持 {result.Rejected}。",
             best.StartingHp is { } initial ?
-                $"{(best.Won ? "预测战后生命" : "已模拟到的生命")} {initial} → {best.Hp}/{best.MaxHp}；生命净变化 {best.HpChange:+0;-0;0}{(best.Won ? "（包含战中、战后回血）" : "（战斗尚未完成）")}。" :
+                $"{(best.CombatOutcome?.Settled == true || best.Won ? "预测战后生命" : "已模拟到的生命")} {initial} → {best.Hp}/{best.MaxHp}；生命净变化 {best.HpChange:+0;-0;0}{(best.CombatOutcome?.Settled == true || best.Won ? "（包含战中、战后回血）" : "（战斗尚未完成）")}。" :
                 $"{(best.Won ? "预测战后生命" : "已模拟到的生命")} {best.Hp}/{best.MaxHp}。",
             $"过程累计扣血 {best.HpLost}" + (best.HealthChanges is { } health ? $"，已恢复或增加生命 {health.HpGained}" :
                 best.StartingHp is { } start ? $"，已恢复或增加生命 {Math.Max(0, best.Hp - start + best.HpLost)}" : "") +
@@ -263,7 +263,7 @@ public static class LocalSearchPolicy
         if (result.Evidence is { } evidence)
         {
             lines.Insert(1, evidence.Description);
-            lines.Add($"原生终局：获胜 {evidence.TerminalWins}，死亡 {evidence.TerminalLosses}；回合上限 {evidence.RoundLimitHits}，操作上限 {evidence.ActionLimitHits}，时间中断 {evidence.TimeLimitHits}。" +
+            lines.Add($"原生终局：获胜 {evidence.TerminalWins}，死亡 {evidence.TerminalLosses}，有敌人逃跑 {evidence.TerminalEscapes}；回合上限 {evidence.RoundLimitHits}，操作上限 {evidence.ActionLimitHits}，时间中断 {evidence.TimeLimitHits}。" +
                 $"分页选牌观察 {evidence.PagedChoiceObservations} 次，重放中补交 {evidence.PagedReplayBranches} 个选牌前缀（提交数含去重前重复，不代表已完成搜索）。");
         }
         if (result.SearchProgress is { } saved)
@@ -295,7 +295,9 @@ public static class LocalSearchPolicy
             lines.Add(FullHealthVictory(best) ?
                 "已达到战后满血目标；其他收益和最短路线未证明最优。" :
                 $"战后净损失为 0，但仍差 {Math.Max(0, best.MaxHp - best.Hp)} 点生命才满血；不满足满血提前返回条件。");
-        if (!best.Won) lines.Add("以下仅为已模拟的部分路线，不代表能打赢本次战斗。停止原因：" + best.StopReason);
+        if (best.CombatOutcome is { Escaped: true } outcome)
+            lines.Add($"有 {outcome.EscapedEnemies.Length} 个敌人逃跑，未全部击败，不计为获胜路线。停止原因：" + best.StopReason);
+        else if (!best.Won) lines.Add("以下仅为已模拟的部分路线，不代表能打赢本次战斗。停止原因：" + best.StopReason);
         if (best.Dead) lines.Add("注意：目前找到的路线仍会死亡，不能保证存活。");
         if (result.Work is { } work) lines.Add($"分支分工：领取 {work.Claimed} 项任务，合并 {work.DuplicateOffers} 次重复提交。");
         if (result.WorkerLimit > 0) lines.Add($"本次使用 {result.Workers} 路计算，并发上限 {result.WorkerLimit}。");
@@ -337,8 +339,10 @@ public static class LocalSearchPolicy
         if (result.Best is not { } best) return result.Evidence?.Description ?? result.Message;
         var lines = new List<string>
         {
-            best.Won ? $"预计获胜 · {best.Rounds} 回合" : "战斗尚未打完，以下是部分路线。",
-            $"{(best.Won ? "预计战后生命" : "当前模拟生命")} {best.Hp}/{best.MaxHp}" +
+            best.CombatOutcome is { Escaped: true } outcome ?
+                $"有 {outcome.EscapedEnemies.Length} 个敌人逃跑，未全部击败 · {(outcome.Settled ? "战斗已结束" : "战斗尚未打完")}" :
+                best.Won ? $"预计获胜 · {best.Rounds} 回合" : "战斗尚未打完，以下是部分路线。",
+            $"{(best.CombatOutcome?.Settled == true || best.Won ? "预计战后生命" : "当前模拟生命")} {best.Hp}/{best.MaxHp}" +
                 (best.HpChange is { } change ? $" · 生命净变化 {change:+0;-0;0}（含回血）" : "")
         };
         if (result.Evidence is { } evidence) lines.Insert(0, evidence.Description);
