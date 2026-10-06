@@ -1,5 +1,11 @@
 # 设计与合同
 
+## 0.7.76 损失证明回报精简
+
+LocalMinimumLossBroker仍按原顺序领取并租用精确原生前缀；实际领取的完整任务单独放在Reply.Focus。默认启用CompactMinimumLossReplies时，响应内重复的Status.Focus候选列表省略为null，目标、证书、未知原因与贡献者状态保持。父进程Status仍保留完整候选列表，最终结果从父进程取得完整诊断；没有管道的本地证明仍用完整Status调度。此选项只改变通信数据，不能改变合法域、任务序列、剪枝规则、胜利排序、RNG/Mod重放、取消或独立复核。
+
+MinimumLossRequests及MinimumLossReplyBytes统计每个接收者实际收到的证明回报，合并时逐实例相加。旧请求缺少选项时默认精简，旧结果缺少统计时按0读取。
+
 ## 0.7.75 逃跑与击败的终局判定
 
 原生 CombatWon 表示战斗按胜利流程结束，也可能包含敌人逃跑。所属实例读取本次 CombatState.EscapedCreatures 的实际敌方记录，保留原生 CombatId、模型和剩余生命；不靠显示名、意图、场上敌人数或剩余血量推断逃跑。起点恢复保留本次状态引用，历史重放中的逃跑同样参与终局判定，清理后释放。

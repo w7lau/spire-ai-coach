@@ -28,4 +28,4 @@ public sealed record LocalHealthTarget(string Scope, int StartingHp, int TargetH
 public sealed record LocalHealthBoundStats(int Pruned = 0, int KnownRecoveryChecks = 0,
     int UnknownRecoveryChecks = 0, int SharedIncumbentUpdates = 0, string UnknownReason = "",
     int TargetAnalyses = 0, double TargetAnalysisMs = 0, int MethodBodyReads = 0, bool ContentScoped = false,
-    int LossProofProbes = 0);
+    int LossProofProbes = 0, int MinimumLossRequests = 0, long MinimumLossReplyBytes = 0);

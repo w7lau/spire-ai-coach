@@ -237,7 +237,8 @@ public static class LocalWorker
         }
         LocalHealthBoundStats HealthStats() => new(boundPruned, knownRecoveryChecks, unknownRecoveryChecks,
             sharedIncumbentUpdates, unknownRecoveryReason, recovery.TargetAnalysisCount,
-            recovery.TargetAnalysisElapsedMs, recovery.MethodBodyReads, recovery.ContentScoped, lossProofProbes);
+            recovery.TargetAnalysisElapsedMs, recovery.MethodBodyReads, recovery.ContentScoped, lossProofProbes,
+            minimumClient?.Requests ?? 0, minimumClient?.ReceivedBytes ?? 0);
         LocalHealthEnvelope Envelope(Player p, int hp, IReadOnlyList<LocalAction> line, LocalHealthChanges? observed = null)
         {
             var allowance = recovery.Estimate(p);

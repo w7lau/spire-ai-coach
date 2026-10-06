@@ -15,6 +15,7 @@ public sealed class LocalMinimumLossBroker : IDisposable
     private readonly LocalMinimumLossProof _proof;
     private readonly string _scope;
     private readonly int _maximum;
+    private readonly bool _compactReplies;
     private readonly HashSet<int> _submitted = [], _confirmed = [];
     private readonly Dictionary<int, string> _claims = [];
     private readonly CancellationTokenSource _stop = new();
@@ -26,6 +27,7 @@ public sealed class LocalMinimumLossBroker : IDisposable
     {
         if (maximum is < 1 or > 16) throw new ArgumentOutOfRangeException(nameof(maximum));
         _maximum = maximum; _scope = LocalMinimumLossProof.Scope(request); _proof = new(request);
+        _compactReplies = request.CompactMinimumLossReplies;
         _listener = Task.Run(Listen);
     }
     public LocalMinimumLossStatus Status
@@ -79,7 +81,9 @@ public sealed class LocalMinimumLossBroker : IDisposable
                                 !_claims.ContainsValue(LocalTurnSearch.HistoryKey(f.Prefix)));
                             if (focus != null) _claims.Add(c.Owner, LocalTurnSearch.HistoryKey(focus.Prefix));
                         }
-                        reply = new(Status, Focus: focus);
+                        // The exact leased task travels in Reply.Focus. The full
+                        // candidate list stays authoritative on the parent.
+                        reply = new(_compactReplies ? Status with { Focus = null } : Status, Focus: focus);
                     }
                 }
                 await writer.WriteLineAsync(JsonSerializer.Serialize(reply));
@@ -107,6 +111,8 @@ public sealed class LocalMinimumLossClient : IDisposable
     private readonly StreamWriter _writer;
     private readonly string _scope;
     private readonly int _owner;
+    public int Requests { get; private set; }
+    public long ReceivedBytes { get; private set; }
     public LocalMinimumLossStatus Status { get; private set; } = new();
     public LocalMinimumLossClient(LocalSearchRequest request)
     {
@@ -128,6 +134,7 @@ public sealed class LocalMinimumLossClient : IDisposable
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(2));
         _writer.WriteLineAsync(command.AsMemory(), deadline.Token).GetAwaiter().GetResult();
         var response = _reader.ReadLineAsync(deadline.Token).AsTask().GetAwaiter().GetResult() ?? throw new IOException("Loss proof broker closed");
+        Requests++; ReceivedBytes += Encoding.UTF8.GetByteCount(response);
         var reply = JsonSerializer.Deserialize<LocalMinimumLossBroker.Reply>(response) ?? throw new InvalidDataException("Empty loss proof reply");
         if (reply.Error != null) throw new InvalidDataException(reply.Error);
         Status = reply.Status; return reply;

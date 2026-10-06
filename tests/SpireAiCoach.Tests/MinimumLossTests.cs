@@ -18,6 +18,41 @@ internal static class MinimumLossTests
     }
     public static void Register(Action<string, Action> test, Action<string, Func<Task>> asyncTest)
     {
+        asyncTest("compact proof replies retain exact claim order target certificates and final diagnostics", async () =>
+        {
+            (string[] Claims, string[] Statuses, long Bytes) Run(bool compact)
+            {
+                var r = Request() with { CompactMinimumLossReplies = compact };
+                using var broker = new LocalMinimumLossBroker(r, 1);
+                using var client = new LocalMinimumLossClient(r with { MinimumLossPipe = broker.PipeName });
+                var legal = Enumerable.Range(1, 20).Select(i => Move(i)).ToArray();
+                var hint = new LocalTurnHint(50, 50, 100, 100, MaximumFurtherHpGain: 0);
+                LocalLossProofTrial Trial(LocalAction a, bool won = false) =>
+                    new(50, [new(a, legal, [], Bound(r, 38), BeforeHint: hint)], 38, Won: won);
+                var claims = new List<string>(); var statuses = new List<string>();
+                void Status() => statuses.Add(System.Text.Json.JsonSerializer.Serialize(client.Status with { Focus = null }));
+                client.Observe(Trial(legal[0], true)); Status();
+                Check((client.Status.Focus == null) == compact, "Only the duplicated wire focus list may be omitted");
+                for (int i = 1; i < legal.Length; i++)
+                {
+                    var focus = client.TakeFocus() ?? throw new Exception("Missing native proof claim");
+                    claims.Add(LocalTurnSearch.HistoryKey(focus.Prefix));
+                    Check(focus.SearchRound == 1 && focus.Hint == hint, "The exact claimed task must stay complete");
+                    client.Observe(Trial(focus.Prefix[0])); Status();
+                }
+                Check(client.TakeFocus() == null, "Complete domains must stop claiming work");
+                broker.ConfirmOwner(0);
+                Check(broker.Status is { Confirmed: true, Certificate.MinimumNetHpLoss: 12, Focus.Length: 0 },
+                    "The parent must retain full authoritative proof diagnostics");
+                return (claims.ToArray(), statuses.ToArray(), client.ReceivedBytes);
+            }
+            var full = Run(false); var compact = Run(true);
+            Check(full.Claims.SequenceEqual(compact.Claims) && full.Statuses.SequenceEqual(compact.Statuses),
+                "Compacting replies cannot change task order bounds or target updates");
+            Check(compact.Bytes < full.Bytes / 2, "Unused task lists must account for a measurable payload reduction");
+            await Task.CompletedTask;
+        });
+
         test("short loss proofs stop at irreversible HP bounds and preserve healing and cheaper potion alternatives", () =>
         {
             var r = Request(); var target = new LocalLossProofTarget(9, 1, 41);

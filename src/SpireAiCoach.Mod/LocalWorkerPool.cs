@@ -360,7 +360,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     string.Join("；", results.Select(r => r.HealthBounds?.UnknownReason).Where(r => !string.IsNullOrEmpty(r)).Distinct()),
                     results.Sum(r => r.HealthBounds?.TargetAnalyses ?? 0), results.Sum(r => r.HealthBounds?.TargetAnalysisMs ?? 0),
                     results.Sum(r => r.HealthBounds?.MethodBodyReads ?? 0), results.Any(r => r.HealthBounds?.ContentScoped == true),
-                    results.Sum(r => r.HealthBounds?.LossProofProbes ?? 0)),
+                    results.Sum(r => r.HealthBounds?.LossProofProbes ?? 0), results.Sum(r => r.HealthBounds?.MinimumLossRequests ?? 0),
+                    results.Sum(r => r.HealthBounds?.MinimumLossReplyBytes ?? 0)),
                 Work = workStats,
                 TurnSearch = request.SearchOrder != LocalSearchOrder.TurnFrontier ? null : new(
                     results.Sum(r => r.TurnSearch?.Probes ?? 0), results.Sum(r => r.TurnSearch?.BoundPruned ?? 0),

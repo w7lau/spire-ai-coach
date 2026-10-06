@@ -31,6 +31,9 @@ parser.add_argument('--seed-result', type=Path)
 parser.add_argument('--transport-reuse-test', action='store_true', help='Frozen native algorithm switching with a six-second owned publication stall')
 parser.add_argument('--runtime-failure-test', action='store_true', help='Native logged-error isolation, prompt retirement and healthy resource reuse')
 parser.add_argument('--resource-reuse-test', action='store_true', help='Actual saturated NTFS SDK, owned disk-tree reuse and native configuration/algorithm switching')
+parser.add_argument('--proof-reply-test', action='store_true', help='Compare full and compact proof replies without changing search behavior')
+parser.add_argument('--proof-reply-reverse', action='store_true', help='Reverse the proof-reply comparison case order')
+parser.add_argument('--proof-reply-nodes', type=int, help='Use a fixed completed-trial count in the reply comparison')
 parser.add_argument('--speed-benchmark', action='store_true')
 parser.add_argument('--visual-benchmark', action='store_true')
 parser.add_argument('--checkpoint', action='store_true')
@@ -213,6 +216,11 @@ with worker_lock(root):
     for name in ['integration-success', 'integration-error.txt', 'integration-result.json',
                  'integration-algorithm-private.json', 'integration-algorithm-summary.json']:
         (root / name).unlink(missing_ok=True)
+    if args.proof_reply_test:
+        (root / 'integration-proof-reply-summary.json').unlink(missing_ok=True)
+        for order in ['MonteCarlo', 'TurnFrontier']:
+            for variant in ['baseline', 'compact']:
+                (root / f'integration-proof-reply-{order}-{variant}-private.json').unlink(missing_ok=True)
     if args.finisher_targets_test:
         (root / 'integration-finisher-targets-summary.json').unlink(missing_ok=True)
         (root / 'integration-goal-consumption-summary.json').unlink(missing_ok=True)
@@ -316,6 +324,9 @@ with worker_lock(root):
     env['SPIRE_LOCAL_HEALTH_TARGET_RETURN_TEST'] = '1' if args.health_target_return_test else '0'
     env['SPIRE_LOCAL_RUNTIME_TEST'] = '1' if args.runtime_failure_test else '0'
     env['SPIRE_LOCAL_RESOURCE_REUSE_TEST'] = '1' if args.resource_reuse_test else '0'
+    env['SPIRE_LOCAL_PROOF_REPLY_TEST'] = '1' if args.proof_reply_test else '0'
+    env['SPIRE_LOCAL_PROOF_REPLY_REVERSE'] = '1' if args.proof_reply_reverse else '0'
+    env['SPIRE_LOCAL_PROOF_REPLY_NODES'] = str(args.proof_reply_nodes) if args.proof_reply_nodes else ''
     env['SPIRE_LOCAL_ENEMY_CASES'] = args.enemy_cases or ''
     env['SPIRE_LOCAL_ENEMY_ROUNDS'] = str(args.enemy_rounds)
     env['SPIRE_LOCAL_ENEMY_FAST_ONLY'] = '1' if args.enemy_fast_only else '0'
@@ -401,7 +412,7 @@ with worker_lock(root):
         try:
             # Each comparison retains the full product search budget. Several
             # resident-pool samples need a larger outer harness timeout.
-            process.wait(timeout=2400 if args.enemy_test else 600 if args.escape_victory_test else 390 if args.route_feedback_test else
+            process.wait(timeout=2400 if args.enemy_test else 480 if args.proof_reply_test else 600 if args.escape_victory_test else 390 if args.route_feedback_test else
                          max(300, 90 + 75 * len(args.search_cases.split(','))) if args.search_cases else 300)
         except subprocess.TimeoutExpired:
             process.kill()
@@ -535,6 +546,11 @@ with worker_lock(root):
                      'integration-stdout.log', 'integration-game.log',
                      *[f'integration-runtime-{order}-{phase}-private.json'
                        for order in ('MonteCarlo', 'TurnFrontier') for phase in ('failure', 'recovery')]]
+        if args.proof_reply_test:
+            names = ['integration-proof-reply-summary.json', 'integration-success', 'integration-error.txt',
+                     'integration-stdout.log', 'integration-game.log',
+                     *[f'integration-proof-reply-{order}-{variant}-private.json'
+                       for order in ('MonteCarlo', 'TurnFrontier') for variant in ('baseline', 'compact')]]
         for name in names:
             if (root / name).is_file():
                 shutil.copy2(root / name, args.results_dir / name)

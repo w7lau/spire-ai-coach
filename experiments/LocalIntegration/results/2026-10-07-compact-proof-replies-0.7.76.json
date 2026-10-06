@@ -1,0 +1,289 @@
+{
+  "kind": "sanitized-compact-proof-replies-native-comparison",
+  "version": "0.7.76",
+  "core_tests": "437/437",
+  "native_dll_sha256": "774adc6d73525c4ada32277b6bb07cb0ab9e331fe52da0d4036b3e51714d8968",
+  "package_sha256": "d5dcd8ed0d6d2bd2384d66f07e03988bc94821bde8df7084f4103234fc81d085",
+  "scope": "Current 0.7.75 algorithm; same unseeded frozen battle; one owned worker; 64 trials/60 seconds/64 rounds; no observer model or new pruning",
+  "transport_semantics": "Only duplicated Status.Focus is omitted; leased Reply.Focus and parent full Status are unchanged; exact claim/target/certificate sequence tested",
+  "rounds": [
+    {
+      "reverse": false,
+      "samples": [
+        {
+          "algorithm": "MonteCarlo",
+          "compact": false,
+          "hp": 44,
+          "potions": 2,
+          "wins": 4,
+          "loss_probes": 321,
+          "proof_nodes": 3092,
+          "messages": 754,
+          "reply_bytes": 13407061,
+          "reply_total_ms": 1598.359,
+          "mean_reply_ms": 2.12,
+          "elapsed_ms": 70005,
+          "rejected": 0,
+          "recovered_failures": 0,
+          "independent_ordinary_replays": 1,
+          "root_matched": true,
+          "stopped_on_minimum": false,
+          "confirmed_contributors": true
+        },
+        {
+          "algorithm": "MonteCarlo",
+          "compact": true,
+          "hp": 44,
+          "potions": 2,
+          "wins": 4,
+          "loss_probes": 424,
+          "proof_nodes": 4002,
+          "messages": 992,
+          "reply_bytes": 834928,
+          "reply_total_ms": 1064.473,
+          "mean_reply_ms": 1.073,
+          "elapsed_ms": 61731,
+          "rejected": 0,
+          "recovered_failures": 0,
+          "independent_ordinary_replays": 1,
+          "root_matched": true,
+          "stopped_on_minimum": false,
+          "confirmed_contributors": true
+        },
+        {
+          "algorithm": "TurnFrontier",
+          "compact": false,
+          "hp": 44,
+          "potions": 2,
+          "wins": 14,
+          "loss_probes": 288,
+          "proof_nodes": 4794,
+          "messages": 683,
+          "reply_bytes": 11865820,
+          "reply_total_ms": 1503.065,
+          "mean_reply_ms": 2.201,
+          "elapsed_ms": 61673,
+          "rejected": 0,
+          "recovered_failures": 0,
+          "independent_ordinary_replays": 1,
+          "root_matched": true,
+          "stopped_on_minimum": false,
+          "confirmed_contributors": true
+        },
+        {
+          "algorithm": "TurnFrontier",
+          "compact": true,
+          "hp": 42,
+          "potions": 2,
+          "wins": 9,
+          "loss_probes": 256,
+          "proof_nodes": 4476,
+          "messages": 608,
+          "reply_bytes": 478893,
+          "reply_total_ms": 1197.04,
+          "mean_reply_ms": 1.969,
+          "elapsed_ms": 62227,
+          "rejected": 0,
+          "recovered_failures": 0,
+          "independent_ordinary_replays": 1,
+          "root_matched": true,
+          "stopped_on_minimum": false,
+          "confirmed_contributors": true
+        }
+      ]
+    },
+    {
+      "reverse": true,
+      "samples": [
+        {
+          "algorithm": "TurnFrontier",
+          "compact": true,
+          "hp": 44,
+          "potions": 0,
+          "wins": 24,
+          "loss_probes": 381,
+          "proof_nodes": 5774,
+          "messages": 900,
+          "reply_bytes": 748332,
+          "reply_total_ms": 1222.03,
+          "mean_reply_ms": 1.358,
+          "elapsed_ms": 67324,
+          "rejected": 0,
+          "recovered_failures": 0,
+          "independent_ordinary_replays": 1,
+          "root_matched": true,
+          "stopped_on_minimum": false,
+          "confirmed_contributors": true
+        },
+        {
+          "algorithm": "TurnFrontier",
+          "compact": false,
+          "hp": 44,
+          "potions": 0,
+          "wins": 23,
+          "loss_probes": 368,
+          "proof_nodes": 5604,
+          "messages": 870,
+          "reply_bytes": 16155665,
+          "reply_total_ms": 1609.869,
+          "mean_reply_ms": 1.85,
+          "elapsed_ms": 61645,
+          "rejected": 0,
+          "recovered_failures": 0,
+          "independent_ordinary_replays": 1,
+          "root_matched": true,
+          "stopped_on_minimum": false,
+          "confirmed_contributors": true
+        },
+        {
+          "algorithm": "MonteCarlo",
+          "compact": true,
+          "hp": 44,
+          "potions": 2,
+          "wins": 4,
+          "loss_probes": 356,
+          "proof_nodes": 3417,
+          "messages": 834,
+          "reply_bytes": 683755,
+          "reply_total_ms": 1087.025,
+          "mean_reply_ms": 1.303,
+          "elapsed_ms": 62072,
+          "rejected": 0,
+          "recovered_failures": 0,
+          "independent_ordinary_replays": 1,
+          "root_matched": true,
+          "stopped_on_minimum": false,
+          "confirmed_contributors": true
+        },
+        {
+          "algorithm": "MonteCarlo",
+          "compact": false,
+          "hp": 44,
+          "potions": 2,
+          "wins": 4,
+          "loss_probes": 359,
+          "proof_nodes": 3433,
+          "messages": 841,
+          "reply_bytes": 15370420,
+          "reply_total_ms": 1570.977,
+          "mean_reply_ms": 1.868,
+          "elapsed_ms": 61846,
+          "rejected": 0,
+          "recovered_failures": 0,
+          "independent_ordinary_replays": 1,
+          "root_matched": true,
+          "stopped_on_minimum": false,
+          "confirmed_contributors": true
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "8 independent native ordinary replays passed; one worker instead of the original eight.",
+    "Search order, pruning, scoring and recovery/escape rules are unchanged. Lower per-reply overhead is established in these paired samples, not a global combat speed percentage.",
+    "No nine-HP global optimum certificate; all searches retain the original 60-second budget.",
+    "Negative state-cap pruning stayed on codex/native-state-proof and is absent from this release.",
+    "One full-budget forward TurnFrontier sample reached 42 HP with compact replies versus 44 baseline. Reversed full-budget and both fixed-work pairs matched; do not claim unconditional route-quality improvement.",
+    "Fixed-work tests cap completed trials at four and do not replace full-budget samples; first cases include cold preparation."
+  ],
+  "fixed_work_rounds": [
+    {
+      "reverse": false,
+      "samples": [
+        {
+          "algorithm": "MonteCarlo",
+          "compact": false,
+          "evaluated": 4,
+          "hp": 44,
+          "potions": 2,
+          "reply_ms": 117.496,
+          "elapsed_ms": 15518,
+          "same_actions": true,
+          "independent_ordinary_replay": true
+        },
+        {
+          "algorithm": "MonteCarlo",
+          "compact": true,
+          "evaluated": 4,
+          "hp": 44,
+          "potions": 2,
+          "reply_ms": 47.891,
+          "elapsed_ms": 4359,
+          "same_actions": true,
+          "independent_ordinary_replay": true
+        },
+        {
+          "algorithm": "TurnFrontier",
+          "compact": false,
+          "evaluated": 4,
+          "hp": 42,
+          "potions": 2,
+          "reply_ms": 82.367,
+          "elapsed_ms": 6391,
+          "same_actions": true,
+          "independent_ordinary_replay": true
+        },
+        {
+          "algorithm": "TurnFrontier",
+          "compact": true,
+          "evaluated": 4,
+          "hp": 42,
+          "potions": 2,
+          "reply_ms": 62.48,
+          "elapsed_ms": 6367,
+          "same_actions": true,
+          "independent_ordinary_replay": true
+        }
+      ]
+    },
+    {
+      "reverse": true,
+      "samples": [
+        {
+          "algorithm": "MonteCarlo",
+          "compact": true,
+          "evaluated": 4,
+          "hp": 44,
+          "potions": 2,
+          "reply_ms": 17.809,
+          "elapsed_ms": 3093,
+          "same_actions": true,
+          "independent_ordinary_replay": true
+        },
+        {
+          "algorithm": "MonteCarlo",
+          "compact": false,
+          "evaluated": 4,
+          "hp": 44,
+          "potions": 2,
+          "reply_ms": 19.99,
+          "elapsed_ms": 2824,
+          "same_actions": true,
+          "independent_ordinary_replay": true
+        },
+        {
+          "algorithm": "TurnFrontier",
+          "compact": true,
+          "evaluated": 4,
+          "hp": 42,
+          "potions": 2,
+          "reply_ms": 108.858,
+          "elapsed_ms": 12400,
+          "same_actions": true,
+          "independent_ordinary_replay": true
+        },
+        {
+          "algorithm": "TurnFrontier",
+          "compact": false,
+          "evaluated": 4,
+          "hp": 42,
+          "potions": 2,
+          "reply_ms": 76.191,
+          "elapsed_ms": 5861,
+          "same_actions": true,
+          "independent_ordinary_replay": true
+        }
+      ]
+    }
+  ]
+}
