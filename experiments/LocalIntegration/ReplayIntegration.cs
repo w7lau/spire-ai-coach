@@ -56,6 +56,12 @@ public static class ReplayIntegration
         // Frozen execution controls retain the same startup; bootstrap has its own paired
         // cold measurements. Ordinary integration fixtures use the product's default.
         var installation = new LocalInstallation(game, directories, MinimalWorkerBootstrap: false);
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_RESOURCE_REUSE_TEST") == "1")
+        {
+            await ResourceReuseIntegration.Run(root, pool, request with { MaxRounds = original.MaxRounds }, installation,
+                System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT")!);
+            return;
+        }
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_RUNTIME_TEST") == "1")
         {
             await RuntimeFailureIntegration.Run(root, pool, request with { MaxRounds = original.MaxRounds }, installation);

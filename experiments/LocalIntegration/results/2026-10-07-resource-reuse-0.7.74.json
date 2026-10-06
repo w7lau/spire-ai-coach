@@ -1,0 +1,78 @@
+{
+  "version": "0.7.74",
+  "passed": true,
+  "saturatedSources": 1,
+  "saturatedFile": "release_info.json",
+  "isolatedSourceCopiedExactly": true,
+  "saturatedSourceLinksBefore": 1024,
+  "saturatedSourceLinksAfter": 1024,
+  "sourceIdentityAndMetadataUnchanged": true,
+  "saturatedSourceLinksUnchanged": true,
+  "algorithmSwitchKeptPidAndGeneration": true,
+  "configurationChangeRestartedProcessAndReusedDiskTree": true,
+  "cancelledPreparationRetainedLeaseUntilDrained": true,
+  "stalePrivateModRemoved": true,
+  "obsoleteThreadOverrideRemoved": true,
+  "samples": [
+    {
+      "algorithm": "MonteCarlo",
+      "ordinary": false,
+      "Evaluated": 1,
+      "Won": true,
+      "Hp": 79,
+      "MaxHp": 92,
+      "checkpoints": 20,
+      "independentOrdinaryReplay": true,
+      "ElapsedMs": 14550,
+      "StoppedOnHealthTarget": true,
+      "fallback": false
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "ordinary": false,
+      "Evaluated": 1,
+      "Won": true,
+      "Hp": 79,
+      "MaxHp": 92,
+      "checkpoints": 20,
+      "independentOrdinaryReplay": true,
+      "ElapsedMs": 2063,
+      "StoppedOnHealthTarget": true,
+      "fallback": false
+    },
+    {
+      "algorithm": "MonteCarlo",
+      "ordinary": true,
+      "Evaluated": 1,
+      "Won": true,
+      "Hp": 79,
+      "MaxHp": 92,
+      "checkpoints": 20,
+      "independentOrdinaryReplay": true,
+      "ElapsedMs": 11613,
+      "StoppedOnHealthTarget": true,
+      "fallback": false
+    }
+  ],
+  "scope": "Native SDK with one tiny isolated metadata copy saturated to 1024 links; original native executable/runtime/PCK; frozen seeded route in both algorithms; independent ordinary replay; configuration-change restart. Shared global link counts are not a fixture assertion. No unseeded speed or current-combat optimality claim.",
+  "game_version": "v0.111.0",
+  "core_checks_passed": 432,
+  "dll_sha256": "e09f6971d28429e70308c625192cabcf8873045c15480495aedc8d4ea21b5ff0",
+  "incident": {
+    "observed_coach_version": "0.7.73",
+    "windows_error": 1142,
+    "sdk_top_files_at_1024_links": 9,
+    "legacy_configuration_groups": 244,
+    "stage": "resource preparation before native search"
+  },
+  "installation": {
+    "status": "installed",
+    "version": "0.7.74",
+    "previous_version": "0.7.73",
+    "dll_sha256": "e09f6971d28429e70308c625192cabcf8873045c15480495aedc8d4ea21b5ff0",
+    "backups_verified": true,
+    "cache_cleanup": false,
+    "started_player": false,
+    "utc": "2026-10-06T18:06:06.3245812Z"
+  }
+}

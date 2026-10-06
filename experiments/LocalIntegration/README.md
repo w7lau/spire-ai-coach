@@ -2,7 +2,7 @@
 
 此测试 Mod 只在带 NativeProbe 所有权标记的私有游戏副本中运行，不安装到玩家游戏目录。默认加载合成 `fixture.json`，经正常地图入口进入战斗，在开局、出牌后和下一回合三个点调用与面板相同的 LocalCapture / LocalWorkerPool API，验证搜索及宿主状态不变。另测取消和错误根指纹拒绝。后台仍加载真实 HextechRunes / RitsuLib；真实故障重放只在显式传入冻结记录时运行。
 
-需要先按 NativeProbe 文档准备人工牌组及私有工作目录。宿主副本独立；后台通过同盘 NTFS 硬链接共享游戏资源，配置、Mod、存档和日志各自独立。版本变化会新建 worker 缓存。测试不直接读取或修改玩家存档。
+需要先按 NativeProbe 文档准备人工牌组及私有工作目录。宿主副本独立；后台通过同盘 NTFS 硬链接共享游戏资源，配置、Mod、存档和日志各自独立。版本变化需要重新加载代码，但优先租用已释放的所属资源目录；不再必然增加一套SDK链接。测试不直接读取或修改玩家存档。
 
 ```powershell
 dotnet build experiments/LocalIntegration/LocalIntegration.csproj -c Release '-p:GameDir=R:\SteamLibrary\steamapps\common\Slay the Spire 2'
@@ -12,6 +12,8 @@ python experiments/LocalIntegration/run.py --workspace C:\path\owned-native-work
 默认每进程/每阶段最多评估 6 条路线；`--quick` 改为 2 条，其余恢复、取消、偏差检查不变。`integration-result.json` 保存各阶段结果，成功还需 `integration-success` 文件及退出码为 0；失败详情在 `integration-error.txt`，引擎日志另外保留。测试 DLL 不进入正式安装包。
 
 定向用例：
+
+- `--resource-reuse-test --replay <private-request.json> --seed-result <same-root-result.json> --game <installed-game> --mods <matching-frozen-mods>`：只将实际SDK的微小release_info.json元数据复制到所属私有宿主，EXE/PCK/运行库仍是原SDK；预热两路后把私有元数据固定到1024个NTFS链接，确认新链接返回1142。检查两算法切换保持进程/代次，以及bootstrap/线程配置变化后重启进程但保留磁盘资源。仅在所属文件准备阶段暂停一次私有Mod复制，取消后锁须保持到任务退出；不暂停或修改原生战斗效果。注入的私有过期Mod目录须被移除，线程override须按当前配置更新。三次给定原生路线另行普通独立复放，SDK源文件身份/元数据及该独立文件的链接数保持；测试结束删除本次额外测试别名。共享SDK的全局链接数可能受其他会话影响，不能作为本夹具的不变断言。此例是资源准备与有种子复核验收，不是未引导算法性能或截图当前战斗的最优证明。
 
 - `--runtime-failure-test --replay <private-request.json> --game <installed-game> --mods <matching-frozen-mods>`：两种算法在两个所属实例中各进行最多2条/20秒的有限搜索。仅在精确所有权保护的测试Mod中，于真实原生动作结算后输出一次原生Error；检查父进程及时退役该拥有者、保留原始消息/栈及健康实例候选，随后只重建失败实例并复用健康进程/代次。每个采用的候选另在普通场景完整独立复放。单实例错误负例须返回结构化拒绝且不启动普通兼容搜索。此检查验证处理路径，不改变原生规则，也不冒充符文异步冲突已修复或完整八路性能基准。
 

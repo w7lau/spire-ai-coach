@@ -731,7 +731,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 catch (Exception ex) when (ex is InvalidOperationException or System.ComponentModel.Win32Exception) { return 0; }
             }
         }
-        private FileStream? _lock;
+        private LocalWorkerDirectory? _storage;
+        private LocalWorkerDirectory? _retiredStorage;
         private string? _configuration;
         private LocalRuntimeLog _runtimeLog = new();
         private int _starts;
@@ -789,6 +790,12 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                             lock (_lifecycle) if (ReferenceEquals(_generation, generation)) StopLocked("准备失败");
                             throw;
                         }
+                        finally
+                        {
+                            // Finish file work before making this retired directory
+                            // available to any other pool, including on startup failure.
+                            lock (_lifecycle) { _retiredStorage?.Dispose(); _retiredStorage = null; }
+                        }
                     });
                     // A cancelled caller can leave no waiter. Still observe faults;
                     // the preparation itself owns its failure cleanup.
@@ -811,18 +818,22 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             _runtimeLog = new();
             // NTFS hardlinks require one volume. Keep tiny launch trees beside the installation, never in it.
             var sharedRoot = Path.Combine(Directory.GetParent(installation.GameDirectory)!.FullName, ".spire-ai-coach-workers");
-            Root = Path.GetFullPath(Path.Combine(sharedRoot, configuration, "worker-" + index));
-            if (Root.StartsWith(Path.GetFullPath(installation.GameDirectory) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            var storageKey = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(
+                installation.GameDirectory + "|" + Path.GetFullPath(directory))))[..16];
+            var preferred = Root.StartsWith(Path.GetFullPath(sharedRoot) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+                ? Root : Path.Combine(sharedRoot, storageKey, "worker-" + index);
+            if (preferred.StartsWith(Path.GetFullPath(installation.GameDirectory) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                 throw new InvalidOperationException("Worker must not be inside game installation");
-            if (Directory.Exists(Root) && Directory.EnumerateFileSystemEntries(Root).Any() && !File.Exists(Path.Combine(Root, ".coach-worker")))
-                throw new IOException("Refusing an unowned worker directory");
-            Directory.CreateDirectory(Root);
+            bool reusedFiles;
             lock (_lifecycle)
             {
                 token.ThrowIfCancellationRequested();
-                _lock = new FileStream(Path.Combine(Root, ".lock"), FileMode.OpenOrCreate, System.IO.FileAccess.ReadWrite, FileShare.None);
+                _storage = LocalWorkerDirectory.Acquire(sharedRoot, preferred, token);
+                Root = _storage.Root;
+                reusedFiles = _storage.Reused;
             }
-            File.WriteAllText(Path.Combine(Root, ".coach-worker"), "SpireAiCoach shared local worker v2");
+            timeline?.Add(new(index, "prepare", reusedFiles ? "reuse_files" : "allocate_files",
+                reusedFiles ? "复用已释放的游戏资源目录" : "建立游戏资源链接", timeline.ElapsedMs, 0));
             var game = Path.Combine(Root, "game");
             Directory.CreateDirectory(game);
             foreach (var source in Directory.EnumerateFiles(installation.GameDirectory))
@@ -830,13 +841,14 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     ShareFile(source, Path.Combine(game, Path.GetFileName(source)), token);
             foreach (var source in Directory.EnumerateDirectories(installation.GameDirectory, "data_sts2_*"))
                 ShareTree(source, Path.Combine(game, Path.GetFileName(source)), token);
-            for (var i = 0; i < installation.ModDirectories.Length; i++)
-                CopyTree(installation.ModDirectories[i], Path.Combine(game, "mods", "loaded-" + i), token);
+            RefreshMods(installation.ModDirectories, game, configuration, identity, token);
             if (installation.LimitRuntimeThreads)
                 File.WriteAllText(Path.Combine(game, "override.cfg"), "[threading]\nworker_pool/max_threads=2\n");
+            else File.Delete(Path.Combine(game, "override.cfg"));
             var roaming = Path.Combine(Root, "Roaming");
             var local = Path.Combine(Root, "Local");
             var settings = Path.Combine(roaming, "SlayTheSpire2", "default", "1");
+            ValidatePrivateTree(roaming); ValidatePrivateTree(local);
             Directory.CreateDirectory(settings); Directory.CreateDirectory(local);
             File.WriteAllText(Path.Combine(settings, "settings.save"), "{\"volume_master\":0,\"volume_bgm\":0,\"volume_sfx\":0,\"volume_ambience\":0,\"skip_intro_logo\":true,\"mod_settings\":{\"mods_enabled\":true,\"mod_list\":[]}}");
             // Read-only mods need not mark a run as gameplay-modded. The native
@@ -936,12 +948,54 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             LocalWorkerFileSharing.Share(source, target, token);
         private static void ShareTree(string source, string target, CancellationToken token)
         {
+            if (Directory.Exists(target) && (File.GetAttributes(target) & FileAttributes.ReparsePoint) != 0)
+                throw new LocalWorkerResourceException("Linked worker game directories are not supported");
             Directory.CreateDirectory(target);
             foreach (var file in Directory.EnumerateFiles(source)) ShareFile(file, Path.Combine(target, Path.GetFileName(file)), token);
             foreach (var child in Directory.EnumerateDirectories(source))
             {
                 if ((File.GetAttributes(child) & FileAttributes.ReparsePoint) != 0) throw new IOException("Linked game directories are not supported");
                 ShareTree(child, Path.Combine(target, Path.GetFileName(child)), token);
+            }
+        }
+
+        private void RefreshMods(string[] sources, string game, string configuration, string identity, CancellationToken token)
+        {
+            var stamp = Path.Combine(Root, "configuration.txt");
+            var mods = Path.Combine(game, "mods");
+            if (File.Exists(stamp) && File.ReadAllText(stamp) == configuration)
+            {
+                for (var i = 0; i < sources.Length; i++) CopyTree(sources[i], Path.Combine(mods, "loaded-" + i), token);
+                return;
+            }
+            // A different Mod set/bootstrap/DLL must never inherit stale loaded-N
+            // assemblies. Refresh just the private Mod copies, retaining SDK aliases,
+            // diagnostic logs and isolated user-data directories.
+            var staged = Path.GetFullPath(Path.Combine(Root, "mods-" + identity));
+            ValidatePrivateTree(staged); ValidatePrivateTree(mods);
+            for (var i = 0; i < sources.Length; i++) CopyTree(sources[i], Path.Combine(staged, "loaded-" + i), token);
+            if (sources.Length == 0) Directory.CreateDirectory(staged);
+            token.ThrowIfCancellationRequested();
+            ValidatePrivateTree(staged); ValidatePrivateTree(mods);
+            if (Directory.Exists(mods)) Directory.Delete(mods, true);
+            Directory.Move(staged, mods);
+            File.WriteAllText(stamp, configuration);
+        }
+
+        private void ValidatePrivateTree(string path)
+        {
+            var full = Path.GetFullPath(path);
+            if (!full.StartsWith(Root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                throw new LocalWorkerResourceException("Private worker path is outside its owned directory");
+            for (var parent = full; !string.Equals(parent, Root, StringComparison.OrdinalIgnoreCase); parent = Path.GetDirectoryName(parent)!)
+                if ((Directory.Exists(parent) || File.Exists(parent)) && (File.GetAttributes(parent) & FileAttributes.ReparsePoint) != 0)
+                    throw new LocalWorkerResourceException("Linked private worker paths are not supported");
+            if (!Directory.Exists(full)) return;
+            foreach (var child in Directory.EnumerateFileSystemEntries(full))
+            {
+                if ((File.GetAttributes(child) & FileAttributes.ReparsePoint) != 0)
+                    throw new LocalWorkerResourceException("Linked private worker files are not supported");
+                if (Directory.Exists(child)) ValidatePrivateTree(child);
             }
         }
         private static void CopyTree(string source, string target, CancellationToken token)
@@ -988,7 +1042,15 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             }
             catch (InvalidOperationException) { }
             Process?.Dispose(); Process = null;
-            _lock?.Dispose(); _lock = null;
+            if (_storage is { } storage)
+            {
+                _storage = null;
+                // Cancellation can interrupt a waiter while its file operation is
+                // still unwinding. Keep the lease until that preparation exits,
+                // so another pool cannot adopt a directory still being changed.
+                if (_preparation is { IsCompleted: false }) _retiredStorage = storage;
+                else storage.Dispose();
+            }
         }
     }
 }
