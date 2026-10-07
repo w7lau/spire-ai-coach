@@ -15,7 +15,7 @@ public sealed record LocalProgressBest(int Route, int Hp, int MaxHp, int? Starti
 public sealed record LocalProgress(string Id, string SnapshotId, int Worker, int Workers, long Sequence,
     int Route, int Evaluated, int MaxNodes, int Victories, long ElapsedMs, int BudgetSeconds,
     string Phase, LocalSimState? State, LocalSimEvent[] Events, string Status = "running", int TurnProbes = 0, int BoundPruned = 0,
-    int RootBranches = 0, LocalProgressBest? Best = null);
+    int RootBranches = 0, LocalProgressBest? Best = null, int Pass = 0);
 
 public sealed class LocalProgressBook(string id, string snapshotId)
 {
@@ -23,15 +23,21 @@ public sealed class LocalProgressBook(string id, string snapshotId)
         progress.Where(p => p.Best != null).OrderByDescending(p => p.Best!.Hp)
             .ThenBy(p => p.Best!.Potions).ThenBy(p => p.Best!.Rounds).FirstOrDefault();
     private readonly SortedDictionary<int, LocalProgress> _latest = new();
+    private int _pass;
     public IReadOnlyDictionary<int, LocalProgress> Latest => _latest;
     public bool Accept(LocalProgress progress)
     {
         if (progress.Id != id || progress.SnapshotId != snapshotId || progress.Worker < 0 || progress.Worker >= progress.Workers ||
-            progress.Workers is < 1 or > 16 || (_latest.TryGetValue(progress.Worker, out var old) && old.Sequence >= progress.Sequence)) return false;
+            progress.Workers is < 1 or > 16 || progress.Pass < _pass ||
+            (progress.Pass == _pass && _latest.TryGetValue(progress.Worker, out var old) && old.Sequence >= progress.Sequence)) return false;
+        if (progress.Pass > _pass) { _latest.Clear(); _pass = progress.Pass; }
         _latest[progress.Worker] = progress;
         return true;
     }
     public static double BudgetUsed(LocalProgress progress) => Math.Clamp(100d * progress.ElapsedMs / Math.Max(1000, progress.BudgetSeconds * 1000), 0, 100);
+    public static string Activity(LocalProgress progress) => !string.IsNullOrWhiteSpace(progress.Phase) ? progress.Phase :
+        progress.Status switch { "failed" => "本次试走失败", "cancelled" => "已取消计算",
+            "done" or "searched" => "搜索已结束，正在汇总路线", "unsupported" => "此路线无法完成", _ => "正在准备路线" };
     public static string Overview(LocalProgress progress) => $"搜索分组 {progress.Worker + 1} · {progress.Phase} · 路线 {progress.Route} · " +
         $"评估 {progress.Evaluated}/{progress.MaxNodes} · 获胜 {progress.Victories}" +
         (progress.TurnProbes > 0 || progress.BoundPruned > 0 ? $" · 回合探查 {progress.TurnProbes} · 剪枝 {progress.BoundPruned}" : "");

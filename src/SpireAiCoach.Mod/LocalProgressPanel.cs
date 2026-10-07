@@ -87,7 +87,9 @@ public sealed class LocalProgressPanel
     {
         if (_book == null) return;
         int victories = _book.Latest.Values.Sum(p => p.Victories);
-        _caption.Text = victories > 0 ? $"已找到 {victories} 条获胜路线 · 继续寻找更好的出牌" : "寻找损伤更低的路线…";
+        var latest = _book.Latest.Values.FirstOrDefault();
+        _caption.Text = (victories > 0 ? $"已找到 {victories} 条获胜路线 · " : "") +
+            (latest == null ? "正在准备路线…" : LocalProgressBook.Activity(latest));
         var best = LocalProgressBook.BestVictory(_book.Latest.Values)?.Best;
         _best.Text = best == null ? "" : $"获胜候选 · 战后生命 {best.Hp}/{best.MaxHp}" +
             (best.HpChange is { } change ? $" · 生命净变化 {change:+0;-0;0}" : "");
@@ -105,9 +107,9 @@ public sealed class LocalProgressPanel
             _enemyHp.MaxValue = Math.Max(1, state.Enemies.Sum(e => Math.Max(0, e.MaxHp))); _enemyHp.Value = enemyHp;
             _enemies.Text = $"敌方剩余生命 {enemyHp}";
         }
-        else { _hp.Value = _enemyHp.Value = 0; _health.Text = "等待此路线开始…"; _enemies.Text = ""; }
+        else { _hp.Value = _enemyHp.Value = 0; _health.Text = LocalProgressBook.Activity(progress); _enemies.Text = ""; }
         var last = progress.Events.LastOrDefault();
-        _action.Text = last == null ? "" : $"第 {last.Round} 回合 · {LocalRouteMap.ShortAction(last.Action)}";
+        _action.Text = last == null ? LocalProgressBook.Activity(progress) : $"第 {last.Round} 回合 · {LocalRouteMap.ShortAction(last.Action)}";
         _action.TooltipText = last?.Action ?? "";
         _changes.Text = last?.Changes ?? ""; _changes.TooltipText = _changes.Text;
         if (_details.Visible) RenderDetails();

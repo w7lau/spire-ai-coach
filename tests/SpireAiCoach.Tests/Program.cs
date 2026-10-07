@@ -876,6 +876,23 @@ Test("progress reports measured damage block energy powers and hand changes", ()
     Check(change.Contains("易伤 2") && change.Contains("手牌"));
     Check(LocalProgressBook.StateText(after).Contains("生命 77/80"));
 });
+Test("compatibility progress replaces failed pass candidates and rejects late old lanes", () =>
+{
+    var book = new LocalProgressBook("job", "snapshot");
+    var native = new LocalProgress("job", "snapshot", 0, 4, 10, 5, 4, 64, 4, 8000, 60, "试走", null, [],
+        Best: new(1, 73, 100, 74, 3, 0));
+    Check(book.Accept(native) && book.Accept(native with { Worker = 1 }));
+    var regular = native with { Pass = 1, Sequence = 1, Phase = "兼容模式 · 准备计算", Best = null, Victories = 0 };
+    Check(!book.Accept(regular with { Id = "foreign" }) && book.Latest.Count == 2);
+    Check(!book.Accept(regular with { Worker = 4 }) && book.Latest.Count == 2);
+    Check(book.Accept(regular) && book.Latest.Count == 1 && LocalProgressBook.BestVictory(book.Latest.Values) == null);
+    Check(!book.Accept(native with { Worker = 1, Sequence = 99 }) && !book.Accept(regular));
+    Check(book.Accept(regular with { Worker = 1, Phase = "兼容模式 · 复核最终候选" }));
+    Check(LocalProgressBook.Activity(book.Latest[0]) == "兼容模式 · 准备计算");
+    Check(LocalProgressBook.Activity(regular with { Phase = "", Status = "searched" }).Contains("汇总"));
+    var legacy = JsonSerializer.Deserialize<LocalProgress>(JsonSerializer.Serialize(native))!;
+    Check(legacy.Pass == 0);
+});
 Test("progress victory summaries retain net healing and missing summaries across protocol versions", () =>
 {
     var progress = new LocalProgress("job", "snapshot", 0, 4, 3, 2, 1, 64, 1, 2000, 60, "搜索", null, [],

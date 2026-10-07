@@ -136,7 +136,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 throw error;
             }
             bool validateRoot = LocalSearchRecovery.NeedsReplayValidation(failures);
-            progress(validateRoot ? "正在用一个实例核对战斗起点…" : "首次计算未完成，正在重新计算…");
+            progress(validateRoot ? "正在用一个实例核对战斗起点…" : "原生试走未完成，正在切换兼容模式…");
             origin.Add(new(-1, "main", "fallback", ex.Category + ": " + ex.Message, origin.ElapsedMs, 0));
             var regular = request with { Id = request.Id + "-regular", DataOnlyCombat = false, DataOnlyRun = false,
                 ExperimentalNativeData = false, InitialTrace = origin.Snapshot() };
@@ -146,7 +146,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 result = await AnalyzePass(regular, installation with { MinimalWorkerBootstrap = false }, progress, cancellation,
                     // A compatibility pass restarts each worker's sequence; keep it above
                     // the first pass's search/refinement/verification offsets in the UI.
-                    simulationProgress == null ? null : p => simulationProgress(p with { Id = request.Id, Sequence = p.Sequence + 4_000_000 }),
+                    simulationProgress == null ? null : p => simulationProgress(p with { Id = request.Id, Sequence = p.Sequence + 4_000_000,
+                        Pass = 1, Phase = "兼容模式 · " + p.Phase }),
                     victoryReturn, ObserveWinner, validateRoot);
             }
             catch (CoachException failed)

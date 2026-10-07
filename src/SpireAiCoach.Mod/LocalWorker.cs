@@ -1199,7 +1199,7 @@ public static class LocalWorker
             else if (stoppedEarly) Progress("已停止搜索，等待返回路线", force: true, status: "searched");
             else if (best == null) Progress(lossProofProbes > 0 ? "局部损失证明已回传" : sharedExhausted ? "已完成分工" : "未取得可用路线", force: true,
                 status: sharedExhausted || lossProofProbes > 0 ? "searched" : "unsupported");
-            else Progress("搜索完成 · 等待最终候选复核", force: true, status: "searched");
+            else Progress(request.SkipFinalVerification ? "搜索完成 · 正在汇总路线" : "搜索完成 · 等待最终候选复核", force: true, status: "searched");
             await Cleanup();
             session?.Dispose();
             Publish(best == null ? stoppedEarly || sharedExhausted || lossProofProbes > 0 ? "searched" : "unsupported" : request.DeferVerification ? "searched" : "done",

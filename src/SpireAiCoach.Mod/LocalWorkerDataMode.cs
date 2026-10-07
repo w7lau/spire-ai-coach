@@ -13,6 +13,7 @@ using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Models.Encounters;
 using MegaCrit.Sts2.Core.Models.Monsters;
+using MegaCrit.Sts2.Core.Models.Powers;
 using MegaCrit.Sts2.Core.Nodes.Combat;
 using MegaCrit.Sts2.Core.Nodes.Cards;
 using MegaCrit.Sts2.Core.Nodes;
@@ -69,6 +70,9 @@ internal static class LocalWorkerDataMode
         Prefix(typeof(CardPileCmd), nameof(CardPileCmd.GetTweenForCardsChangingPiles), nameof(PilePresentation),
             [typeof(IEnumerable<CardPileAddResult>), typeof(bool)]);
         Prefix(typeof(CardModel), "PlayPowerCardFlyVfx", nameof(PresentationTask));
+        var boulder = AccessTools.Method(typeof(RollingBoulderPower), nameof(RollingBoulderPower.AfterPlayerTurnStart));
+        harmony.Patch(AccessTools.Method(boulder.GetCustomAttribute<AsyncStateMachineAttribute>()!.StateMachineType, "MoveNext"),
+            transpiler: new(AccessTools.Method(typeof(LocalWorkerDataMode), nameof(BoulderPresentation))));
         Prefix(typeof(NGame), nameof(NGame.ScreenShake), nameof(PresentationVoid));
         foreach (var factory in typeof(NDamageNumVfx).GetMethods().Where(m => m.Name == nameof(NDamageNumVfx.Create)))
             harmony.Patch(factory, prefix: new(AccessTools.Method(typeof(LocalWorkerDataMode), nameof(DamageVisual))));
@@ -414,6 +418,21 @@ internal static class LocalWorkerDataMode
     }
     private static bool PresentationIsOn() => Active || TestMode.IsOn;
     private static bool PresentationIsOff() => !Active && TestMode.IsOff;
+    private static IEnumerable<CodeInstruction> BoulderPresentation(IEnumerable<CodeInstruction> instructions)
+    {
+        var code = instructions.ToArray();
+        var test = AccessTools.PropertyGetter(typeof(TestMode), nameof(TestMode.IsOn));
+        var damage = AccessTools.Method(typeof(RollingBoulderPower), "DoDamage");
+        // The native numeric branch owns damage and the common amount increase.
+        // A scene-free worker cannot attach the VFX whose signals own that damage.
+        // Select the existing branch only here; never toggle global TestMode.
+        if (code.Count(c => c.Calls(test)) != 1 || code.Count(c => c.Calls(damage)) != 1 ||
+            code.Count(c => c.operand is MethodInfo m && m.DeclaringType == typeof(NRollingBoulderVfx) && m.Name == "Create") != 1)
+            throw new InvalidOperationException("Native boulder presentation boundary changed");
+        foreach (var instruction in code)
+            yield return instruction.Calls(test) ? new CodeInstruction(instruction) {
+                operand = AccessTools.Method(typeof(LocalWorkerDataMode), nameof(PresentationIsOn)) } : instruction;
+    }
     private static IEnumerable<CodeInstruction> TransformPresentation(IEnumerable<CodeInstruction> instructions)
     {
         var on = AccessTools.PropertyGetter(typeof(TestMode), nameof(TestMode.IsOn));

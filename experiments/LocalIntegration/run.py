@@ -72,6 +72,7 @@ parser.add_argument('--visual-factory-test', action='store_true')
 parser.add_argument('--route-feedback-test', action='store_true')
 parser.add_argument('--route-feedback-focused-only', action='store_true')
 parser.add_argument('--recent-search-test', action='store_true', help='Frozen unseeded incident; preserve its trial/time/turn limits and report incomplete search honestly')
+parser.add_argument('--startup-preparation-test', action='store_true', help='Real idle-menu UI warmup, native worker reuse and exploration phase lifecycle')
 parser.add_argument('--selection-paging-test', action='store_true')
 parser.add_argument('--card-goals-test', action='store_true')
 parser.add_argument('--finite-card-goals-test', action='store_true', help='Native one/two power-card copies and combined health-goal return in both algorithms')
@@ -245,6 +246,8 @@ with worker_lock(root):
     if args.recent_search_test:
         for name in ['integration-recent-search-summary.json', 'integration-recent-search-private.json']:
             (root / name).unlink(missing_ok=True)
+    if args.startup_preparation_test:
+        (root / 'integration-startup-preparation-summary.json').unlink(missing_ok=True)
     if args.finisher_retention_test:
         for name in ['integration-finisher-retention-summary.json',
                      *[f'integration-finisher-retention-{order}-private.json' for order in ('MonteCarlo', 'TurnFrontier')]]:
@@ -389,6 +392,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_ROUTE_FEEDBACK_TEST'] = '1' if args.route_feedback_test else '0'
     env['SPIRE_LOCAL_ROUTE_FEEDBACK_FOCUSED_ONLY'] = '1' if args.route_feedback_focused_only else '0'
     env['SPIRE_LOCAL_RECENT_SEARCH_TEST'] = '1' if args.recent_search_test else '0'
+    env['SPIRE_LOCAL_STARTUP_PREPARATION_TEST'] = '1' if args.startup_preparation_test else '0'
     settings = root / 'Roaming/SlayTheSpire2/default/1/settings.save'
     settings_data = json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}
     settings_data.update(volume_master=0, volume_bgm=0, volume_sfx=0, volume_ambience=0)
@@ -495,6 +499,9 @@ with worker_lock(root):
         if args.recent_search_test:
             names = ['integration-recent-search-summary.json', 'integration-recent-search-private.json',
                      'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.startup_preparation_test:
+            names = ['integration-startup-preparation-summary.json', 'integration-success', 'integration-error.txt',
+                     'integration-stdout.log', 'integration-game.log']
         if args.finisher_retention_test:
             names = ['integration-finisher-retention-summary.json',
                      *[f'integration-finisher-retention-{order}-private.json' for order in ('MonteCarlo', 'TurnFrontier')],

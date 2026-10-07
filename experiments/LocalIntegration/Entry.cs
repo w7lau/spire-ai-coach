@@ -31,6 +31,7 @@ public static class Entry
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_RUNTIME_TEST") == "1") RuntimeFailureProbe.Install(worker);
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_TRANSPORT_TEST") == "1") TransportPressureProbe.Install(worker);
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_ENEMY_TEST") == "1") EnemyProbeObserver.Install(worker);
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_RULE_STALL_PROBE") == "1") RuleStallProbe.Install(worker);
             return;
         }
         if (!File.Exists(Path.Combine(root, ".spire-native-probe-owner")) ||
@@ -51,6 +52,12 @@ public static class Entry
             await NGame.Instance.GameStartupComplete;
             await Frame(); await Frame();
             while (NAssetLoader.Instance.IsProcessing()) await Frame();
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_STARTUP_PREPARATION_TEST") == "1")
+            {
+                await StartupPreparationIntegration.Run(root, tree);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
             SaveManager.Instance.PrefsSave.FastMode = FastModeType.Instant;
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_PRESENTATION_SMOKE") == "1")
             {

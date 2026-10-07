@@ -10,12 +10,22 @@ internal static class RecentSearchIntegration
     public static async Task Run(string root, LocalWorkerPool pool, LocalSearchRequest original,
         LocalSearchRequest request, LocalInstallation installation)
     {
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_RULE_STALL_PROBE") == "1")
+        {
+            installation = installation with { ModDirectories = installation.ModDirectories.Append(
+                Path.Combine(root, "game", "mods", "SpireLocalIntegration")).ToArray() };
+            request = request with { LoadedMods = request.LoadedMods.Append(
+                $"SpireLocalIntegration:0.0.1:{typeof(Entry).Assembly.ManifestModule.ModuleVersionId}").Order(StringComparer.Ordinal).ToArray() };
+        }
         if (original.InitialPlan is { Length: > 0 } || original.VerifyCandidate != null || original.RecordedReplayProbe != null)
             throw new InvalidOperationException("Recent-search regression requires an unseeded frozen request");
         request = request with { MaxRounds = original.MaxRounds, InitialPlan = null, VerifyCandidate = null,
             RecordedReplayProbe = null, Partition = 0, Partitions = 1, TimelineOrigin = 0, InitialTrace = null,
             TurnWorkPipe = null, SearchWorkPipe = null, ProgressPipe = null, MinimumLossPipe = null };
-        var result = await Task.Run(() => pool.Analyze(request, installation, _ => { }, CancellationToken.None));
+        using var observing = new CancellationTokenSource();
+        var result = await Task.Run(() => pool.Analyze(request, installation, _ => { }, observing.Token,
+            System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_RULE_STALL_PROBE") != "1" ? null : p =>
+            { if (p.Status == "failed") observing.Cancel(); }));
         LocalWire.Write(Path.Combine(root, "integration-recent-search-private.json"), result);
         var failures = result.RecoveredFailures?.Length ?? 0;
         LocalWire.Write(Path.Combine(root, "integration-recent-search-summary.json"), new

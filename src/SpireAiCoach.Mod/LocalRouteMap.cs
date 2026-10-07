@@ -16,7 +16,8 @@ internal sealed class LocalRouteMap
     private readonly Color _cyan = new("69d9e1"), _green = new("82e7b1"), _purple = new("aa96ed"), _red = new("df8290");
     private bool _active;
     private int _selected;
-    private sealed record Row(int Worker, LocalSimEvent[] Events, int? Hp, int Round, bool Victory, bool Stopped);
+    private int _pass;
+    private sealed record Row(int Worker, LocalSimEvent[] Events, int? Hp, int Round, bool Victory, bool Stopped, string Activity);
 
     public LocalRouteMap()
     {
@@ -37,6 +38,8 @@ internal sealed class LocalRouteMap
     }
     public void Accept(LocalProgress progress)
     {
+        if (progress.Pass > _pass)
+        { _recent.Clear(); _order.Clear(); _latest.Clear(); _pass = progress.Pass; }
         _latest[progress.Worker] = progress;
         var key = (progress.Worker, progress.Route);
         if (!_recent.ContainsKey(key))
@@ -54,7 +57,7 @@ internal sealed class LocalRouteMap
     public void SetActive(bool active) { _active = active; UpdatePulse(); View.QueueRedraw(); }
     public void Clear()
     {
-        SetActive(false); _recent.Clear(); _order.Clear(); _latest.Clear(); _selected = 0;
+        SetActive(false); _recent.Clear(); _order.Clear(); _latest.Clear(); _selected = 0; _pass = 0;
         View.CustomMinimumSize = new Vector2(0, 100); View.QueueRedraw();
     }
     private void UpdatePulse()
@@ -68,13 +71,13 @@ internal sealed class LocalRouteMap
         if (winner?.Best is { } best)
         {
             _recent.TryGetValue((winner.Worker, best.Route), out var trace);
-            rows.Add(new(winner.Worker, trace ?? [], best.Hp, best.Rounds, true, true));
+            rows.Add(new(winner.Worker, trace ?? [], best.Hp, best.Rounds, true, true, "获胜候选"));
         }
         var visible = _latest.Values.Take(7).ToList();
         if (_latest.TryGetValue(_selected, out var selected) && visible.All(p => p.Worker != _selected))
         { if (visible.Count == 7) visible.RemoveAt(6); visible.Add(selected); }
         rows.AddRange(visible.Select(p => new Row(p.Worker, p.Events, p.State?.Hp,
-            p.State?.Round ?? 0, false, p.Status != "running" || p.State is { Hp: <= 0 })));
+            p.State?.Round ?? 0, false, p.Status != "running" || p.State is { Hp: <= 0 }, LocalProgressBook.Activity(p))));
         return rows;
     }
     private void Draw()
@@ -91,7 +94,7 @@ internal sealed class LocalRouteMap
         {
             View.DrawArc(new Vector2(30, 44), 11, 0, Mathf.Tau, 32, _cyan with { A = .3f }, 1.5f, true);
             View.DrawCircle(new Vector2(30, 44), 4, _cyan);
-            View.DrawString(font, new Vector2(53, 49), "等待第一条路线…", fontSize: 15, modulate: CoachTheme.Muted);
+            View.DrawString(font, new Vector2(53, 49), "正在准备计算资源…", fontSize: 15, modulate: CoachTheme.Muted);
             return;
         }
         float end = width - 100;
@@ -108,7 +111,7 @@ internal sealed class LocalRouteMap
             View.DrawLine(new Vector2(split - 16, y), new Vector2(end, y), tint with { A = .08f }, 8, true);
             View.DrawLine(new Vector2(split - 16, y), new Vector2(end, y), tint with { A = .55f }, 1.5f, true);
             if (events.Length == 0)
-                View.DrawString(font, new Vector2(split, y - 9), row.Victory ? "获胜候选" : "等待出牌…", fontSize: 12, modulate: tint);
+                View.DrawString(font, new Vector2(split, y - 9), row.Activity, fontSize: 12, modulate: tint);
             for (int n = 0; n < events.Length; n++)
             {
                 float x = events.Length == 1 ? split : Mathf.Lerp(split, end - 17, n / (float)(events.Length - 1));

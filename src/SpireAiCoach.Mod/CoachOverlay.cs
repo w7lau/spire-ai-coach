@@ -57,6 +57,9 @@ public sealed class CoachOverlay
     private CancellationTokenSource? _execution;
     private readonly CancellationTokenSource _lifetime = new();
     private string? _preparedCombat;
+    private bool _preparedStartup;
+    private long _idlePreparationAfter;
+    private Task? _preparation;
     private Button _execute = null!;
     private Button _stopExecution = null!;
     private LocalContinuation? _continuation;
@@ -482,23 +485,7 @@ public sealed class CoachOverlay
             _resources.Text = $"计算资源 · {resources.Ready} 路可复用" +
                 (resources.Preparing > 0 ? $" · {resources.Preparing} 路准备中" : "");
             _resources.TooltipText = resources.LastChange + "\n先准备首路，其余实例分批加载；手动并发保持所选数量，自动模式按需增加，可用实例会复用。";
-            // Finish run/room loading before background games compete for CPU.
-            // This changes warmup timing, not configured calculation concurrency.
-            var preparationScope = snapshot is { CanAdvise: true } && LocalCapture.Stable() ? snapshot.CombatId : null;
-            if (preparationScope != null && _preparedCombat != preparationScope && _request == null && !_executing &&
-                MegaCrit.Sts2.Core.Runs.RunManager.Instance.NetService.Type == MegaCrit.Sts2.Core.Multiplayer.Game.NetGameType.Singleplayer &&
-                System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_INTEGRATION") == null)
-            {
-                _preparedCombat = preparationScope;
-                var installation = LocalCapture.Installation();
-                var workers = (int)_localWorkers.Value;
-                _ = Task.Run(async () =>
-                {
-                    try { await _localPool.Prepare(installation, workers, _lifetime.Token); }
-                    catch (OperationCanceledException) { }
-                    catch (Exception ex) { GD.Print($"[SpireAiCoach] preparation failed: {ex.GetType().Name}"); }
-                });
-            }
+            PrepareLocalResources(snapshot);
         }
         catch (Exception ex)
         {
@@ -511,6 +498,42 @@ public sealed class CoachOverlay
             _execute.Disabled = true;
             _continueOptimize.Disabled = true;
         }
+    }
+
+    private void PrepareLocalResources(CombatSnapshot? snapshot)
+    {
+        if (_request != null || _executing || _preparation is { IsCompleted: false } ||
+            System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_INTEGRATION") != null) return;
+        var game = MegaCrit.Sts2.Core.Nodes.NGame.Instance;
+        if (game == null || !game.GameStartupComplete.IsCompletedSuccessfully ||
+            MegaCrit.Sts2.Core.Nodes.NAssetLoader.Instance.IsProcessing())
+        { _idlePreparationAfter = 0; return; }
+        var run = MegaCrit.Sts2.Core.Runs.RunManager.Instance;
+        if (!run.IsInProgress)
+        {
+            if (_preparedStartup) return;
+            long now = System.Environment.TickCount64;
+            if (_idlePreparationAfter == 0) _idlePreparationAfter = now + 1500;
+            if (now < _idlePreparationAfter) return;
+            _preparedStartup = true;
+        }
+        else
+        {
+            _idlePreparationAfter = 0;
+            if (snapshot is not { CanAdvise: true } || !LocalCapture.Stable() || _preparedCombat == snapshot.CombatId ||
+                run.NetService.Type != MegaCrit.Sts2.Core.Multiplayer.Game.NetGameType.Singleplayer) return;
+            _preparedCombat = snapshot.CombatId;
+        }
+        // Read game paths/loaded Mods on the main thread. The same pool owns one
+        // preparation per lane; entering combat or switching algorithms joins it.
+        var installation = LocalCapture.Installation();
+        int workers = (int)_localWorkers.Value;
+        _preparation = Task.Run(async () =>
+        {
+            try { await _localPool.Prepare(installation, workers, _lifetime.Token); }
+            catch (OperationCanceledException) { }
+            catch (Exception ex) { GD.Print($"[SpireAiCoach] preparation failed: {ex.GetType().Name}: {ex.Message}"); }
+        });
     }
 
     private void RefreshPreview()

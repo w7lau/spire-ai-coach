@@ -586,8 +586,15 @@ public static class ReplayIntegration
         var result = await Task.Run(() => pool.Analyze(request, installation, _ => { }, CancellationToken.None));
         LocalWire.Write(Path.Combine(root, "integration-replay-private.json"), result);
         if (result.Status != "done" || result.Best == null || result.Rejected != 0 ||
-            result.Best.Continuation?.Length != result.Best.Actions.Length || result.Timing?.Verifications != 1)
+            result.Best.Continuation?.Length != result.Best.Actions.Length ||
+            (request.VerifyCandidate == null ? result.Timing?.Verifications != 1 : result.Timing?.Verifications is not >= 1))
             throw new InvalidOperationException("Incident replay did not complete every lane with a verified route: " + result.Message);
+        // Explicit verification starts with a completed candidate; the pool may
+        // independently check its selected result again. Both are real replays.
+        if (request.VerifyCandidate is { Continuation: { } checkpoints } expected &&
+            (!result.Best.Continuation!.SequenceEqual(checkpoints) ||
+             JsonSerializer.Serialize(result.Best.Actions) != JsonSerializer.Serialize(expected.Actions)))
+            throw new InvalidOperationException("Ordinary replay changed frozen native checkpoints or action history");
         LocalWire.Write(Path.Combine(root, "integration-replay-summary.json"), new
         {
             result.Status, result.Evaluated, result.Rejected, result.Victories, result.ElapsedMs, result.Timing,

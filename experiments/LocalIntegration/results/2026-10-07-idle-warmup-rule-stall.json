@@ -1,0 +1,113 @@
+{
+  "schema": 1,
+  "scope": "One frozen native incident; no answer seed for either algorithm; explicit one-worker replay. Additional first-five-trials mechanic fixture and idle-menu UI/resource check.",
+  "version": "0.7.80",
+  "game_sdk": "v0.111.0",
+  "coach_module": "3ffe8eec-09e8-48e7-a19c-424f2471cd48",
+  "dll_sha256": "a1b562e3eef7f97e0394053cf93f2adc51625d44f5e62dc46e2cabfb0983972a",
+  "core_checks": {
+    "passed": 461,
+    "total": 461
+  },
+  "original_limits": {
+    "max_trials": 64,
+    "budget_seconds": 60,
+    "max_rounds": 64,
+    "workers_requested": 8,
+    "workers_used_in_bounded_regression": 1
+  },
+  "baseline_0_7_79": {
+    "request": {
+      "Status": "done",
+      "Evaluated": 34,
+      "Victories": 34,
+      "ElapsedMs": 142242,
+      "SearchElapsedMs": 65789,
+      "recoveredFailures": 1,
+      "foundVictory": true
+    },
+    "failed_pass_completed_victories": 4,
+    "failure_phase": "round 2 end, route 5, step 12",
+    "failure_message": "后台规则执行超时，停止这组计算。",
+    "round_end_ms": 8008.1623
+  },
+  "turn_frontier_0_7_80": {
+    "Status": "done",
+    "Evaluated": 64,
+    "Victories": 64,
+    "ElapsedMs": 49210,
+    "SearchElapsedMs": 21954,
+    "recoveredFailures": 0,
+    "foundVictory": true,
+    "round_end_ms": 8.27349999999933,
+    "route_5_completed": true
+  },
+  "monte_carlo_0_7_80": {
+    "Status": "done",
+    "Evaluated": 63,
+    "Victories": 63,
+    "ElapsedMs": 52004,
+    "SearchElapsedMs": 21417,
+    "recoveredFailures": 0,
+    "foundVictory": true,
+    "stopped_at_health_target": true,
+    "starting_hp": 74,
+    "final_hp": 74
+  },
+  "ordinary_scene_verification": {
+    "fixture_trials": 5,
+    "victories": 5,
+    "verifications": 1,
+    "verified_steps": 17,
+    "rounds": 3,
+    "recovered_failures": 0,
+    "boulder_played_before_round_3": true,
+    "expected_native_state_rng_history_and_settlement_match": true
+  },
+  "idle_menu": {
+    "version": "0.7.80",
+    "module": "3ffe8eec-09e8-48e7-a19c-424f2471cd48",
+    "idleMenu": true,
+    "warmupMs": 21740,
+    "warmed": {
+      "Ready": 2,
+      "Preparing": 0,
+      "Starts": 2,
+      "LastChange": "首次准备"
+    },
+    "reused": {
+      "Ready": 2,
+      "Preparing": 0,
+      "Starts": 2,
+      "LastChange": "首次准备"
+    },
+    "repeatedPolls": 8,
+    "phaseRestartClearsOldVictory": true,
+    "lateProgressRejected": true,
+    "finishPreserved": true,
+    "nativeStateUnchanged": true
+  },
+  "limitations": [
+    "These are isolated native checks, not a live player-session run or a global-optimality proof.",
+    "Frozen search timings include explicitly recorded one-worker configuration and should not be extrapolated to all encounters or concurrency settings."
+  ],
+  "privacy": {
+    "raw_inputs_native_assets_decompiled_il_saves_and_keys_excluded": true
+  },
+  "full_checkpoint_comparison": {
+    "native_search_points": 34,
+    "ordinary_replay_points": 34,
+    "complete_arrays_equal": true,
+    "actions_and_choices_equal": true,
+    "independent_native_replays": 2,
+    "starting_hp": 74,
+    "final_hp": 74,
+    "status": "done"
+  },
+  "installation": {
+    "version": "0.7.80",
+    "exact_tested_dll_installed": true,
+    "script": "Update.ps1 -InstallOnly",
+    "player_game_not_started_or_stopped": true
+  }
+}
