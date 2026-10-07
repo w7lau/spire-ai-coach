@@ -12,13 +12,22 @@ public sealed record LocalPoolResources(int Ready, int Preparing, int Starts, st
 public sealed class LocalWorkerPool(string directory) : IDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
-    private readonly Worker[] _workers = Enumerable.Range(0, 16).Select(_ => new Worker()).ToArray();
+    private readonly Worker[] _workers = CreateWorkers();
     private bool _disposed;
     private LocalTrace? _lastPreparation;
+    private LocalTimeline? _preparingTimeline;
     private readonly object _resumeGate = new();
     private LocalSearchSession? _pausedSearch;
     private long _resumeGeneration;
     private readonly LocalReplayFailureMemo _replayFailures = new();
+
+    private static Worker[] CreateWorkers()
+    {
+        // Bound file/launch bursts; engine/Mod initialization remains parallel.
+        // The lanes retain this semaphore until their tracked preparation exits.
+        var startupSlots = new SemaphoreSlim(2, 2);
+        return Enumerable.Range(0, 16).Select(_ => new Worker(startupSlots)).ToArray();
+    }
 
     public bool CanResume(LocalSearchRequest request)
     { lock (_resumeGate) return _pausedSearch is { Pending: > 0 } saved && saved.Matches(request); }
@@ -61,16 +70,22 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
         try
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
-            // Manual concurrency is already an explicit resource choice. Start
-            // those preparations together; automatic mode still warms only one.
-            preparation = Enumerable.Range(0, LocalConcurrency.PrewarmCount(configured))
-                .Select(index => _workers[index].Ensure(directory, index, installation, token, timeline)).ToArray();
+            _preparingTimeline = timeline;
+            // Track every chosen lane now so analysis joins its preparation.
+            // Launch the root lane first; peers need not wait for its engine.
+            var first = _workers[0].Ensure(directory, 0, installation, token, timeline);
+            preparation = new[] { first }.Concat(Enumerable.Range(1, LocalConcurrency.PrewarmCount(configured) - 1)
+                .Select(index => _workers[index].Ensure(directory, index, installation, token, timeline, _workers[0].Launched))).ToArray();
         }
         finally { _gate.Release(); }
         // Ensure owns and reuses a lane's in-flight preparation. A calculation
         // may join it immediately instead of queuing behind the entire warmup.
         try { await Task.WhenAll(preparation); }
-        finally { _lastPreparation = timeline.Snapshot(); }
+        finally
+        {
+            _lastPreparation = timeline.Snapshot();
+            Interlocked.CompareExchange(ref _preparingTimeline, null, timeline);
+        }
     }
 
     public async Task<LocalSearchResult> Analyze(LocalSearchRequest request, LocalInstallation installation,
@@ -225,7 +240,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             bool manualVictory = Volatile.Read(ref manualVictoryReached) != 0;
             // The warmup gate does not wait for engine startup. Import its
             // completed startup spans now, clipped to this calculation only.
-            timeline.Import(_lastPreparation, queueStart, timeline.ElapsedMs);
+            timeline.Import(_preparingTimeline?.Snapshot() ?? _lastPreparation, queueStart, timeline.ElapsedMs);
             cancellation.ThrowIfCancellationRequested();
             if (System.Environment.GetEnvironmentVariable("SPIRE_COACH_RECOVERY_AUDIT") == "1" &&
                 results.Count == 1 && results[0].Status == "audited")
@@ -707,11 +722,13 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GlobalMemoryStatusEx([In, Out] MemoryStatus status);
 
-    internal sealed class Worker : IDisposable
+    internal sealed class Worker(SemaphoreSlim startupSlots) : IDisposable
     {
         private readonly object _lifecycle = new();
         private CancellationTokenSource? _generation;
         private Task? _preparation;
+        private TaskCompletionSource? _launched;
+        internal Task Launched { get { lock (_lifecycle) return _launched?.Task ?? Task.CompletedTask; } }
         private bool _disposed;
         public string Generation { get; private set; } = "";
         public string Root { get; private set; } = "";
@@ -751,7 +768,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             }
         }
 
-        public async Task Ensure(string directory, int index, LocalInstallation installation, CancellationToken token, LocalTimeline? timeline = null)
+        public async Task Ensure(string directory, int index, LocalInstallation installation, CancellationToken token,
+            LocalTimeline? timeline = null, Task? startAfter = null)
         {
             var signature = typeof(LocalWorkerPool).Assembly.ManifestModule.ModuleVersionId + "|" +
                 installation.GameDirectory + "|" + Path.GetFullPath(directory) + "|" + string.Join("|", installation.ModDirectories) + "|" + installation.MinimalWorkerBootstrap + "|" + installation.LimitRuntimeThreads;
@@ -780,14 +798,27 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                     Generation = Guid.NewGuid().ToString("N");
                     var identity = Generation;
                     _configuration = configuration;
+                    var launched = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                    _launched = launched;
+                    _ = launched.Task.ContinueWith(t => { _ = t.Exception; }, CancellationToken.None,
+                        TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
                     _preparation = Task.Run(async () =>
                     {
                         // A retired preparation may still be unwinding file work.
                         // Drain it before touching this lane's installation again.
                         if (previous != null) try { await previous; } catch (Exception) { }
-                        try { await Prepare(directory, index, installation, configuration, identity, preparationToken, timeline); }
-                        catch
+                        try
                         {
+                            if (startAfter != null)
+                            {
+                                using var priority = timeline?.Measure(index, "prepare", "await_first_launch", depth: 1);
+                                await startAfter.WaitAsync(preparationToken);
+                            }
+                            await Prepare(directory, index, installation, configuration, identity, preparationToken, timeline);
+                        }
+                        catch (Exception ex)
+                        {
+                            launched.TrySetException(ex);
                             lock (_lifecycle) if (ReferenceEquals(_generation, generation)) StopLocked("准备失败");
                             throw;
                         }
@@ -814,6 +845,10 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             string identity, CancellationToken token, LocalTimeline? timeline)
         {
             token.ThrowIfCancellationRequested();
+            StartupSlot launchSlot;
+            using (timeline?.Measure(index, "prepare", "startup_queue", depth: 1))
+                launchSlot = await StartupSlot.Acquire(startupSlots, token);
+            using var releaseLaunch = launchSlot;
             using var preparation = timeline?.Measure(index, "prepare", "prepare");
             using var files = timeline?.Measure(index, "prepare", "files", depth: 1);
             _runtimeLog = new();
@@ -880,14 +915,25 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             start.Environment.Remove("SPIRE_NATIVE_PROBE_ROOT");
             token.ThrowIfCancellationRequested();
             files?.Dispose();
+            ProcessPriorityClass? originalPriority = null;
             lock (_lifecycle)
             {
                 // Dispose/Stop can race file preparation, but never a new launch.
                 token.ThrowIfCancellationRequested();
                 start.Environment["SPIRE_COACH_STARTUP_ORIGIN"] = LocalTimeline.Timestamp.ToString(System.Globalization.CultureInfo.InvariantCulture);
                 using (timeline?.Measure(index, "prepare", "launch", depth: 1)) Process = IsolatedProcess.Start(start);
+                if (index == 0)
+                {
+                    // IsolatedProcess creates every lane below normal. Boost only
+                    // the root's cold load, then restore its original search priority.
+                    try { originalPriority = Process.PriorityClass; Process.PriorityClass = ProcessPriorityClass.Normal; }
+                    catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+                    { timeline?.Add(new(index, "prepare", "startup_priority_unavailable", ex.GetType().Name, timeline.ElapsedMs, 0)); }
+                }
                 _starts++; _changed = LocalTimeline.Timestamp;
+                _launched?.TrySetResult();
             }
+            launchSlot.Dispose();
             var timer = Stopwatch.StartNew();
             using var engine = timeline?.Measure(index, "prepare", "engine", depth: 1);
             while (!File.Exists(Path.Combine(Root, "ready")))
@@ -895,6 +941,14 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 token.ThrowIfCancellationRequested();
                 if (Process.HasExited || timer.Elapsed.TotalSeconds > 90) throw new IOException("Worker startup failed or timed out");
                 await Task.Delay(250, token);
+            }
+            if (originalPriority is { } priority)
+            {
+                lock (_lifecycle)
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (Process?.HasExited == false) Process.PriorityClass = priority;
+                }
             }
             try
             {
@@ -904,6 +958,14 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Text.Json.JsonException)
             { /* Optional startup diagnostics never invalidate a ready worker. */ }
+        }
+
+        private sealed class StartupSlot(SemaphoreSlim slots) : IDisposable
+        {
+            private SemaphoreSlim? _slots = slots;
+            public static async Task<StartupSlot> Acquire(SemaphoreSlim slots, CancellationToken token)
+            { await slots.WaitAsync(token); return new(slots); }
+            public void Dispose() => Interlocked.Exchange(ref _slots, null)?.Release();
         }
 
         public async Task<bool> WaitIdle(LocalSearchRequest command, LocalTimeline? timeline = null, int index = 0)
@@ -1036,6 +1098,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             if (_generation != null || Process != null)
             { _retirement = reason; _detail = reason; _changed = LocalTimeline.Timestamp; }
             _generation?.Cancel(); _generation?.Dispose(); _generation = null;
+            _launched?.TrySetCanceled();
             Generation = "";
             try
             {

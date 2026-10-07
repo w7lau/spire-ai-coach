@@ -38,14 +38,20 @@ internal static class WorkerReuseTests
         public readonly string Root = Path.GetFullPath(Path.Combine("work", "worker-reuse-" + Guid.NewGuid().ToString("N")));
         public readonly LocalInstallation Installation;
         public readonly LocalWorkerPool Pool;
-        public Fixture(bool failStartup = false)
+        public Fixture(bool failStartup = false, bool holdStartup = false)
         {
             var game = Path.Combine(Root, "synthetic-installation"); Directory.CreateDirectory(game);
             foreach (var source in Directory.EnumerateFiles(AppContext.BaseDirectory))
                 if (Path.GetExtension(source) is ".dll" or ".json") File.Copy(source, Path.Combine(game, Path.GetFileName(source)));
             File.Copy(Path.Combine(AppContext.BaseDirectory, "SpireAiCoach.Tests.exe"), Path.Combine(game, "SlayTheSpire2.exe"));
-            LocalWire.Write(Path.Combine(game, "synthetic-worker.json"), new { test_apphost = true, fail_startup = failStartup });
+            LocalWire.Write(Path.Combine(game, "synthetic-worker.json"), new { test_apphost = true, fail_startup = failStartup,
+                startup_release = holdStartup ? Path.Combine(Root, "startup-release") : null });
             Installation = new(game, []); Pool = new(Path.Combine(Root, "pool"));
+        }
+        public void ReleaseStartup(int index)
+        {
+            var release = Path.Combine(Root, "startup-release"); Directory.CreateDirectory(release);
+            File.WriteAllText(Path.Combine(release, index.ToString()), "allow synthetic readiness");
         }
         public async ValueTask DisposeAsync()
         {
@@ -71,6 +77,67 @@ internal static class WorkerReuseTests
 
     public static void Register(Action<string, Action> test, Action<string, Func<Task>> asyncTest)
     {
+        asyncTest("cold prewarming prioritizes the root while peer engines load in parallel and preserves normal hot reuse", async () =>
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            await using var f = new Fixture(holdStartup: true);
+            var lanes = Workers(f.Pool);
+            var warming = f.Pool.Prepare(f.Installation, 8, CancellationToken.None);
+            await Until(() => lanes.Take(8).All(w => w.Process != null), "Engine loading remained serialized behind readiness");
+            Check(f.Pool.Resources() is { Starts: 8, Preparing: 8 } && lanes[0].Process!.PriorityClass == ProcessPriorityClass.Normal &&
+                lanes.Skip(1).Take(7).All(w => w.Process!.PriorityClass == ProcessPriorityClass.BelowNormal) &&
+                lanes.Skip(1).Take(7).All(w => w.Process!.StartTime >= lanes[0].Process!.StartTime),
+                "First launch order or owned cold peer priority was lost: " + JsonSerializer.Serialize(f.Pool.Resources()) + " " +
+                string.Join(";", lanes.Take(8).Select((w, index) => $"{index}:{w.Process!.PriorityClass}:{w.Process.StartTime:O}")));
+            var searching = f.Pool.Analyze(Request("goal") with { Workers = 8, StopOnFirstWin = true, IncludePotions = true },
+                f.Installation, _ => { }, CancellationToken.None);
+            f.ReleaseStartup(0);
+            await Until(() => f.Pool.Resources().Ready == 1, "The root did not become independently ready");
+            Check(f.Pool.Resources() is { Ready: 1, Starts: 8 } && !warming.IsCompleted,
+                "Engine loading blocked independent root readiness");
+            int rootPid = lanes[0].Process!.Id;
+            var result = await searching;
+            Check(result.Status == "done" && result.Best is { Won: true } && result.Timing?.Verifications == 1 &&
+                lanes[0].Process!.Id == rootPid && !warming.IsCompleted && f.Pool.Resources().Starts == 8 &&
+                result.Trace!.Spans.Any(s => s.Worker == 0 && s.Stage == "prepare" && s.Phase == "engine"),
+                "Root search waited for all cold peers, skipped verification or duplicated a launch");
+            for (int index = 1; index < 8; index++) f.ReleaseStartup(index);
+            await warming.WaitAsync(TimeSpan.FromSeconds(30));
+            var identities = lanes.Take(8).Select(w => (w.Process!.Id, w.Generation)).ToArray();
+            await f.Pool.Prepare(f.Installation, 8, CancellationToken.None);
+            Check(f.Pool.Resources() is { Ready: 8, Preparing: 0, Starts: 8 } &&
+                identities.SequenceEqual(lanes.Take(8).Select(w => (w.Process!.Id, w.Generation))) &&
+                lanes.Take(8).All(w => File.ReadAllLines(Path.Combine(w.Root, "launches.txt")).Length == 1 &&
+                    w.Process!.PriorityClass == ProcessPriorityClass.BelowNormal),
+                "Manual count, generation reuse or exactly-once launch was lost");
+        });
+        asyncTest("retiring a queued cold lane never launches it and a later preparation reuses its healthy peers", async () =>
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            await using var f = new Fixture(holdStartup: true);
+            var lanes = Workers(f.Pool);
+            var slots = (SemaphoreSlim)typeof(LocalWorkerPool.Worker).GetFields(BindingFlags.NonPublic | BindingFlags.Instance)
+                .Single(field => field.FieldType == typeof(SemaphoreSlim)).GetValue(lanes[0])!;
+            await slots.WaitAsync(); await slots.WaitAsync();
+            var warming = f.Pool.Prepare(f.Installation, 8, CancellationToken.None);
+            var queued = lanes[7];
+            try
+            {
+                Check(f.Pool.Resources() is { Preparing: 8, Starts: 0 }, "A cold launch bypassed occupied launch slots");
+                queued.Stop("synthetic queued retirement");
+                await queued.DrainPreparation();
+                Check(queued.Root == "" && queued.Process == null && queued.ResourceState().Starts == 0,
+                    "Cancelled queue acquired storage or launched a child");
+            }
+            finally { slots.Release(2); }
+            for (int index = 0; index < 8; index++) f.ReleaseStartup(index);
+            await Cancelled(warming);
+            var healthy = lanes.Take(8).Where(w => !ReferenceEquals(w, queued)).Select(w => (w, w.Process!.Id, w.Generation)).ToArray();
+            await f.Pool.Prepare(f.Installation, 8, CancellationToken.None);
+            Check(f.Pool.Resources() is { Ready: 8, Starts: 8 } &&
+                healthy.All(saved => saved.w.Process!.Id == saved.Id && saved.w.Generation == saved.Generation),
+                "Queue cancellation leaked a slot or rebuilt healthy peers");
+        });
         asyncTest("logged native errors stop only their owner promptly and retain the exact failure across both algorithms", async () =>
         {
             if (!OperatingSystem.IsWindows()) return;
@@ -340,6 +407,9 @@ internal static class WorkerReuseTests
         {
             if (!OperatingSystem.IsWindows()) return;
             await using var f = new Fixture();
+            // The stop latency must exclude process/assembly startup; native
+            // cold-start latency has its own owned integration measurement.
+            await f.Pool.Prepare(f.Installation, 2, CancellationToken.None);
             foreach (var algorithm in new[] { LocalSearchOrder.MonteCarlo, LocalSearchOrder.TurnFrontier })
             foreach (var scenario in new[] { "minimum-goal", "minimum-late-proof" })
             {
@@ -604,6 +674,11 @@ internal static class WorkerReuseTests
         if (configuration.RootElement.GetProperty("fail_startup").GetBoolean()) return 86;
         File.AppendAllText(Path.Combine(root, "launches.txt"), Environment.ProcessId + Environment.NewLine);
         File.WriteAllText(Path.Combine(root, "game.log"), "synthetic test worker\n");
+        if (configuration.RootElement.TryGetProperty("startup_release", out var release) && release.ValueKind == JsonValueKind.String)
+        {
+            var permit = Path.Combine(release.GetString()!, Environment.GetEnvironmentVariable("SPIRE_COACH_WORKER_INDEX")!);
+            while (!File.Exists(permit)) await Task.Delay(10);
+        }
         await Task.Delay(650); File.WriteAllText(Path.Combine(root, "ready"), "synthetic ready");
         var generation = Environment.GetEnvironmentVariable("SPIRE_COACH_WORKER_GENERATION")!;
         using var owner = LocalWorkerOwner.Open(); string? previous = null;

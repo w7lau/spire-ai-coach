@@ -1,5 +1,9 @@
 # Owned worker startup comparison
 
+The summary separates instance 0 readiness, all-instance readiness, hot preparation and process/generation reuse. Append `first-route` after the frozen request/result arguments to run a seeded production search during prewarming and measure its independently verified victory. This measures startup and return latency for a fixed known route, not unseeded search quality. Compare the old and prepared DLLs with the same frozen Mod bytes, SDK, runtime limits and machine state; retain owned disk layouts and caches.
+
+Run the seven-argument frozen-prefix check separately from `first-route`: goal cancellation can legitimately retire a busy peer that cannot acknowledge safe cleanup. The latency case retains this production behavior; hot PID/generation reuse and all-worker native prefixes belong to the separate prewarm-only case. Executable action and offer fields remain exact; algorithm ranking `Preference` fields are excluded from action identity.
+
 This bounded harness calls the production `LocalWorkerPool.Prepare` path and disposes its own workers. It does not start, stop or execute actions in the player's game. Use a stable machine state with the player's game exited for performance comparisons; startup wall time and parallel phase totals are separate measurements.
 
 Build through `scripts/Update.ps1 -BuildOnly` before native validation. Build this harness against the installed game, then confirm its `SpireAiCoach.dll` SHA256 equals the prepared package; if rebuilding changes Git assembly metadata, copy the exact prepared DLL into the harness output before running. Run from the repository root with:

@@ -1,0 +1,124 @@
+{
+  "date": "2026-10-07",
+  "version": "0.7.79",
+  "dll_sha256": "177ae6f9be4b3a44d5e5a497de5fe443fe31f97dad03ae9780122e064d42ccbb",
+  "game_sdk_mvid": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
+  "core_checks": {
+    "passed": 460,
+    "total": 460
+  },
+  "comparison": {
+    "players_game_exited": true,
+    "same_six_frozen_gameplay_and_library_mods": true,
+    "same_13_step_known_victory": true,
+    "same_runtime_limits": true,
+    "cold_processes_with_owned_disk_layout_reuse": true,
+    "baseline_078": {
+      "wall_ms": 30828.9921,
+      "first_worker_ready_ms": 29651.2597,
+      "first_verified_route_ms": 42715.3042,
+      "hot_prepare_ms": null,
+      "reused_all_processes_and_generations": null
+    },
+    "accepted_079": {
+      "wall_ms": 34959.4901,
+      "first_worker_ready_ms": 22587.3846,
+      "first_verified_route_ms": 35627.9719,
+      "hot_prepare_ms": null,
+      "reused_all_processes_and_generations": null
+    },
+    "first_ready_reduction_percent": 23.82,
+    "first_verified_route_reduction_percent": 16.59,
+    "all_ready_increase_ms": 4130.5
+  },
+  "discarded_two_engine_start_limit": {
+    "installed": false,
+    "wall_ms": 105989.4333,
+    "first_worker_ready_ms": 24540.8264,
+    "first_verified_route_ms": 36410.666,
+    "hot_prepare_ms": null,
+    "reused_all_processes_and_generations": null
+  },
+  "native_acceptance": {
+    "first_route_independent_replays": 1,
+    "first_route_steps": 13,
+    "prefix_steps": 104,
+    "samples": [
+      {
+        "index": 0,
+        "order": "MonteCarlo",
+        "ElapsedMs": 4132,
+        "steps": 13,
+        "identicalNativeStateRngHistoryAndHealth": true
+      },
+      {
+        "index": 1,
+        "order": "TurnFrontier",
+        "ElapsedMs": 4439,
+        "steps": 13,
+        "identicalNativeStateRngHistoryAndHealth": true
+      },
+      {
+        "index": 2,
+        "order": "MonteCarlo",
+        "ElapsedMs": 4249,
+        "steps": 13,
+        "identicalNativeStateRngHistoryAndHealth": true
+      },
+      {
+        "index": 3,
+        "order": "TurnFrontier",
+        "ElapsedMs": 4326,
+        "steps": 13,
+        "identicalNativeStateRngHistoryAndHealth": true
+      },
+      {
+        "index": 4,
+        "order": "MonteCarlo",
+        "ElapsedMs": 4225,
+        "steps": 13,
+        "identicalNativeStateRngHistoryAndHealth": true
+      },
+      {
+        "index": 5,
+        "order": "TurnFrontier",
+        "ElapsedMs": 4438,
+        "steps": 13,
+        "identicalNativeStateRngHistoryAndHealth": true
+      },
+      {
+        "index": 6,
+        "order": "MonteCarlo",
+        "ElapsedMs": 4242,
+        "steps": 13,
+        "identicalNativeStateRngHistoryAndHealth": true
+      },
+      {
+        "index": 7,
+        "order": "TurnFrontier",
+        "ElapsedMs": 4309,
+        "steps": 13,
+        "identicalNativeStateRngHistoryAndHealth": true
+      }
+    ],
+    "all_native_state_rng_history_health_equal": true,
+    "warm_preparation": {
+      "wall_ms": 36188.6301,
+      "first_worker_ready_ms": 22778.419,
+      "first_verified_route_ms": null,
+      "hot_prepare_ms": 0.2697,
+      "reused_all_processes_and_generations": true
+    }
+  },
+  "installation": {
+    "status": "done",
+    "installed_dll_matches_accepted": true,
+    "player_game_started_or_stopped_by_agent": false,
+    "worker_cache_deleted": false
+  },
+  "limitations": [
+    "One frozen-route latency comparison; not an unseeded search-quality or whole-battle speed claim.",
+    "All eight instances ready slightly later; hot worker reuse and original per-lane budgets remain.",
+    "Existing shutdown engine resource diagnostics are not a zero-error engine guarantee."
+  ]
+}

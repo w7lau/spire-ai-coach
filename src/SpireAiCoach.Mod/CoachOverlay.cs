@@ -481,7 +481,7 @@ public sealed class CoachOverlay
             var resources = _localPool.Resources();
             _resources.Text = $"计算资源 · {resources.Ready} 路可复用" +
                 (resources.Preparing > 0 ? $" · {resources.Preparing} 路准备中" : "");
-            _resources.TooltipText = resources.LastChange + "\n手动并发提前准备所选数量，自动模式按需增加；可用实例会复用。";
+            _resources.TooltipText = resources.LastChange + "\n先准备首路，其余实例分批加载；手动并发保持所选数量，自动模式按需增加，可用实例会复用。";
             // Finish run/room loading before background games compete for CPU.
             // This changes warmup timing, not configured calculation concurrency.
             var preparationScope = snapshot is { CanAdvise: true } && LocalCapture.Stable() ? snapshot.CombatId : null;
