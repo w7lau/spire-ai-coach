@@ -4,6 +4,7 @@ using MegaCrit.Sts2.Core.Entities.Relics;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Commands;
 using MegaCrit.Sts2.Core.GameActions.Multiplayer;
+using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Models;
 using SpireAiCoach.Core;
 using SpireAiCoach.Mod;
@@ -30,15 +31,51 @@ internal static class HealthTargetReturnIntegration
         public override Task AfterPlayerTurnStartLate(PlayerChoiceContext context, Player player) =>
             Owner.PlayerCombatState!.TurnNumber > 1 ? Task.CompletedTask : CreatureCmd.Heal(Owner.Creature, 1, true);
     }
+    private abstract class PileSource : RelicModel
+    {
+        public override RelicRarity Rarity => RelicRarity.Common;
+        protected static async Task TransformCard(CardModel card)
+        { await Task.Yield(); await CardCmd.Transform(card, card, default); }
+    }
+    private sealed class ExternalAsyncCombatTransform : PileSource
+    {
+        public async Task Entry(PlayerChoiceContext context, Player player)
+        {
+            var cards = (await CardSelectCmd.FromHand(context, player, default, null, this)).ToList();
+            for (int i = 0; i < cards.Count; i++) await TransformCard(cards[i]);
+        }
+    }
+    private sealed class ExternalAsyncUnknownTransform : PileSource
+    { public async Task Entry(CardModel card) { await TransformCard(card); } }
+    private sealed class CombatPileSource : PileSource
+    { public void Entry(CardModel card) { _ = CardPileCmd.Add(card, PileType.Hand, CardPilePosition.Top, this, false); } }
+    private sealed class DeckPileSource : PileSource
+    { public void Entry(CardModel card) { _ = CardPileCmd.Add(card, PileType.Deck, CardPilePosition.Top, this, false); } }
+    private sealed class UnknownPileSource : PileSource
+    { public void Entry(CardModel card, PileType pile) { _ = CardPileCmd.Add(card, pile, CardPilePosition.Top, this, false); } }
+    private sealed class DeckLocationSource : PileSource
+    { public CardLocation Entry() => new(Owner, PileType.Deck, CardPilePosition.Top); }
+    private sealed class UnknownLocationSource : PileSource
+    {
+        private readonly CardLocation _location;
+        public UnknownLocationSource() { _location = default; }
+        public CardLocation ModifyCardPlayResultLocationFixture(CardLocation original) => _location;
+    }
+    private sealed class ExternalPileRecovery : PileSource
+    {
+        public override Task AfterCardChangedPiles(CardModel card, PileType oldPile, AbstractModel? clonedBy) =>
+            card.Pile?.Type == PileType.Deck ? CreatureCmd.Heal(Owner.Creature, 1, true) : Task.CompletedTask;
+    }
 
     public static async Task Run(string root, LocalWorkerPool pool, LocalSearchRequest frozen, LocalInstallation installation, string seedPath)
     {
         var seed = LocalWire.Read<LocalSearchResult>(seedPath).Best ?? throw new InvalidOperationException("Frozen native win missing");
-        if (!LocalSearchPolicy.WinningRouteFrom(seed, frozen) || seed.HpChange != 1 || seed.Hp >= seed.MaxHp)
-            throw new InvalidOperationException("This native fixture requires a same-root, non-full, plus-one victory");
+        if (!LocalSearchPolicy.WinningRouteFrom(seed, frozen) || seed.HpChange is not (0 or 1) || seed.Hp >= seed.MaxHp)
+            throw new InvalidOperationException("This native fixture requires a same-root, non-full, zero-loss or plus-one victory");
         var estimatorType = typeof(LocalWorker).Assembly.GetType("SpireAiCoach.Mod.LocalRecoveryEstimator", true)!;
         var metadata = Activator.CreateInstance(estimatorType, frozen)!;
         var describe = estimatorType.GetMethod("DescribeContent", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        var readContent = estimatorType.GetMethod("ReadContent", BindingFlags.Instance | BindingFlags.NonPublic)!;
         var probes = new List<object>();
         foreach (var type in new[] { typeof(NoRecoverySource), typeof(RecoverySource) })
         {
@@ -69,6 +106,49 @@ internal static class HealthTargetReturnIntegration
         if (!(bool)externalEffect.GetType().GetProperty("ActiveRecovery")!.GetValue(externalEffect)!)
             throw new InvalidOperationException("External callback was incorrectly given a native phase proof");
         probes.Add(new { kind = nameof(ExternalTurnSource), activeRecovery = true, externalCallbackRetained = true, callbackExecuted = false });
+        var periapt = typeof(AbstractModel).Assembly.GetType("MegaCrit.Sts2.Core.Models.Relics.DarkstonePeriapt", true)!;
+        foreach (bool combatOnly in new[] { false, true })
+        {
+            var instance = Activator.CreateInstance(estimatorType, frozen)!;
+            estimatorType.GetField("_combatPileEventsOnly", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(instance, combatOnly);
+            var effect = readContent.Invoke(instance, [periapt, true])!;
+            bool active = (bool)effect.GetType().GetProperty("ActiveRecovery")!.GetValue(effect)!;
+            if (active == combatOnly) throw new InvalidOperationException("Native permanent-deck condition ignored its producer domain");
+            probes.Add(new { kind = periapt.Name, combatOnly, activeRecovery = active, callbackExecuted = false });
+        }
+        foreach (var type in new[] { typeof(CombatPileSource), typeof(DeckPileSource), typeof(UnknownPileSource), typeof(DeckLocationSource), typeof(UnknownLocationSource) })
+        {
+            var instance = Activator.CreateInstance(estimatorType, frozen)!;
+            var effect = describe.Invoke(instance, [type])!;
+            bool changesDeck = (bool)effect.GetType().GetProperty("MayChangeDeck")!.GetValue(effect)!;
+            if (changesDeck != (type != typeof(CombatPileSource)))
+                throw new InvalidOperationException("Permanent-deck event producer was classified incorrectly: " + type.Name);
+            probes.Add(new { kind = type.Name, changesDeck, callbackExecuted = false });
+        }
+        foreach (string name in new[] { "Begone", "Charge", "Compact", "Guards", "Seance" })
+        {
+            var type = typeof(AbstractModel).Assembly.GetType("MegaCrit.Sts2.Core.Models.Cards." + name, true)!;
+            var instance = Activator.CreateInstance(estimatorType, frozen)!;
+            var effect = describe.Invoke(instance, [type])!;
+            if ((bool)effect.GetType().GetProperty("MayChangeDeck")!.GetValue(effect)!)
+                throw new InvalidOperationException("Native combat-card transformation was mistaken for a permanent-deck producer: " + name);
+            probes.Add(new { kind = name, changesDeck = false, callbackExecuted = false });
+        }
+        var helperMetadata = Activator.CreateInstance(estimatorType, frozen)!;
+        foreach (var type in new[] { typeof(ExternalAsyncCombatTransform), typeof(ExternalAsyncUnknownTransform) })
+        {
+            var effect = describe.Invoke(helperMetadata, [type])!;
+            bool changesDeck = (bool)effect.GetType().GetProperty("MayChangeDeck")!.GetValue(effect)!;
+            if (changesDeck != (type == typeof(ExternalAsyncUnknownTransform)))
+                throw new InvalidOperationException("Async helper lost or borrowed its caller's card domain: " + type.Name);
+            probes.Add(new { kind = type.Name, changesDeck, callbackExecuted = false });
+        }
+        var externalPile = Activator.CreateInstance(estimatorType, frozen)!;
+        estimatorType.GetField("_combatPileEventsOnly", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(externalPile, true);
+        var externalPileEffect = readContent.Invoke(externalPile, [typeof(ExternalPileRecovery), true])!;
+        if (!(bool)externalPileEffect.GetType().GetProperty("ActiveRecovery")!.GetValue(externalPileEffect)!)
+            throw new InvalidOperationException("External pile callback was assigned a native event proof");
+        probes.Add(new { kind = nameof(ExternalPileRecovery), activeRecovery = true, callbackExecuted = false });
         foreach (var type in typeof(AbstractModel).Assembly.GetTypes().Where(t => !t.IsAbstract && typeof(PowerModel).IsAssignableFrom(t)))
         {
             var instance = Activator.CreateInstance(estimatorType, frozen)!;
@@ -98,7 +178,7 @@ internal static class HealthTargetReturnIntegration
                 result.Timing?.Verifications != 1 || !LocalSearchPolicy.HasExecutionPoints(result) ||
                 result.RecoveredFailures is { Length: > 0 } || result.HealthBounds?.TargetAnalyses != 1 ||
                 result.HealthBounds.UnknownReason?.Contains("IsAvailableForCharacter", StringComparison.Ordinal) == true)
-                throw new InvalidOperationException("Frozen plus-one victory did not return at its original content goal: " +
+                throw new InvalidOperationException("Frozen victory did not return at its original content goal: " +
                     System.Text.Json.JsonSerializer.Serialize(new { result.Status, result.Message, result.Evaluated,
                         result.StoppedOnHealthTarget, result.HealthTarget, result.HealthBounds, result.Best?.Hp }));
             samples.Add(new { algorithm = order.ToString(), result.Evaluated, result.ElapsedMs, result.StoppedOnHealthTarget,
@@ -110,7 +190,7 @@ internal static class HealthTargetReturnIntegration
         LocalWire.Write(Path.Combine(root, "integration-health-target-return-summary.json"), new
         {
             version = typeof(LocalWorker).Assembly.GetName().Version!.ToString(3), passed = true, probes, samples,
-            scope = "Read-only callback dispatch and future-turn metadata probes plus seeded exact frozen native plus-one victory in both algorithms with ordinary independent replay. No unseeded speed or global optimality claim."
+            scope = "Read-only callback, turn and pile-event metadata probes plus seeded exact frozen native zero-loss/plus-one victory in both algorithms with ordinary independent replay. No unseeded speed or global optimality claim."
         });
     }
 }

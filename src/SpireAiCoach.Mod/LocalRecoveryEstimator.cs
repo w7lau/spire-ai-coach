@@ -5,6 +5,7 @@ using System.Reflection.Emit;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Players;
+using MegaCrit.Sts2.Core.Entities.Cards;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Modding;
 using SpireAiCoach.Core;
@@ -20,11 +21,17 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
     private readonly Dictionary<Type, Proof> _proofs = [];
     private readonly Dictionary<MethodBase, LocalInstruction[]?> _bodies = [];
     private sealed record ContentEffects(bool ActiveRecovery, int VictoryHeals, int VictoryMaxHpGains,
-        bool Uncertain, Type[] Generated, bool DynamicMaxHp = false, bool UsesCardPool = false, string? UncertainAt = null);
+        bool Uncertain, Type[] Generated, bool DynamicMaxHp = false, bool UsesCardPool = false, string? UncertainAt = null,
+        bool MayChangeDeck = false, bool UsesCharacterPool = false);
     private readonly Dictionary<Type, ContentEffects> _content = [];
+    private readonly Dictionary<Type, ContentEffects> _targetContent = [];
+    private readonly Dictionary<Type, ContentEffects> _deckContent = [];
+    private readonly Dictionary<(MethodBase Method, MethodInfo? Event, string Input), LocalIlFacts.Result> _eventFacts = [];
     private LocalRecoveryAllowance? _allowance;
     private Type[] _sourceTypes = [];
     private int? _nextPlayerTurnNumber;
+    private bool _combatPileEventsOnly;
+    private string? _deckCapabilityReason;
     public LocalHealthTarget? HealthTarget { get; private set; }
     public string? SharedDirectory { get; set; }
     public int TargetAnalysisCount { get; private set; }
@@ -96,7 +103,11 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                 LocalHealthTarget CalculateTarget()
                 {
                     long started = Stopwatch.GetTimestamp(); TargetAnalysisCount++;
-                    try { return ContentTarget(player, models!); }
+                    try
+                    {
+                        _combatPileEventsOnly = !CanChangeDeck(player, PlayerSources(player, models!));
+                        return ContentTarget(player, models!);
+                    }
                     finally { TargetAnalysisElapsedMs = Stopwatch.GetElapsedTime(started).TotalMilliseconds; }
                 }
                 HealthTarget = SharedDirectory == null ? CalculateTarget() :
@@ -196,7 +207,7 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
         {
             if (!seen.Add(type)) continue;
             if (seen.Count > 128) { active = uncertain = true; break; }
-            var effect = DescribeContent(type);
+            var effect = ReadContent(type, targetOnly: true);
             active |= effect.ActiveRecovery; uncertain |= effect.Uncertain;
             foreach (var generated in effect.Generated) pending.Enqueue(generated);
             var owners = held.OfType<RelicModel>().Where(r => r.GetType() == type).ToArray();
@@ -220,17 +231,20 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
     // helpers and explicitly generated cards/powers. HasRelic/GetRelic references
     // do not activate absent relics. Unresolved calls remain an estimate, not a
     // claim that the player cannot possibly heal.
-    private ContentEffects DescribeContent(Type type)
+    private ContentEffects DescribeContent(Type type) => ReadContent(type, targetOnly: false);
+    private ContentEffects ReadContent(Type type, bool targetOnly) => ReadEffects(type, targetOnly, combatDeckScan: false);
+    private ContentEffects ReadEffects(Type type, bool targetOnly, bool combatDeckScan)
     {
-        if (_content.TryGetValue(type, out var cached)) return cached;
-        bool active = false, uncertain = false, growth = false, pool = false;
+        var cache = combatDeckScan ? _deckContent : targetOnly ? _targetContent : _content;
+        if (cache.TryGetValue(type, out var cached)) return cached;
+        bool active = false, uncertain = false, growth = false, pool = false, changesDeck = false, characterPool = false;
         string? uncertainAt = null;
         void Unknown(MethodBase method, MethodBase? caller = null)
         { uncertain = true; uncertainAt ??= (caller == null ? "" : caller.DeclaringType?.FullName + "." + caller.Name + " -> ") +
             method.DeclaringType?.FullName + "." + method.Name; }
         int heals = 0, gains = 0;
         var generated = new HashSet<Type>();
-        var queue = new Queue<(MethodBase Method, bool Terminal, bool Direct, bool FutureTurnStart)>();
+        var queue = new Queue<(MethodBase Method, bool Terminal, bool Direct, bool FutureTurnStart, MethodInfo? PileEvent, LocalIlFacts.Value[]? Input)>();
         var overrides = new HashSet<MethodInfo>();
         for (var owner = type; owner != null && owner != typeof(AbstractModel); owner = owner.BaseType)
         {
@@ -241,20 +255,26 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                 // Some powers expose a native effect entry point called by their
                 // owning model instead of a Hook override (e.g. resurrection).
                 if (!method.IsSpecialName && !method.IsVirtual && method.IsPublic)
-                { queue.Enqueue((method, false, false, false)); continue; }
+                { queue.Enqueue((method, false, false, false, null, null)); continue; }
                 if (!request.IncludePotions && typeof(PotionModel).IsAssignableFrom(type) && method.Name == "OnUse") continue;
                 if (method.IsSpecialName || !method.IsVirtual || method.GetBaseDefinition() == method ||
                     !overrides.Add(method.GetBaseDefinition()) || method.Name is "AfterObtained" or "BeforeRemoved" or "AfterRemoved") continue;
+                // Room-entry effects happen after this combat. Keep them in the
+                // strict recovery closure; they cannot produce an in-combat pile event.
+                if (combatDeckScan && method.DeclaringType?.Assembly == Native &&
+                    method.GetBaseDefinition().DeclaringType == typeof(AbstractModel) && method.Name is "BeforeRoomEntered" or "AfterRoomEntered") continue;
                 bool futureStart = method.DeclaringType?.Assembly == Native &&
                     method.GetBaseDefinition().DeclaringType == typeof(AbstractModel) &&
                     method.Name is "AfterPlayerTurnStart" or "AfterPlayerTurnStartEarly" or "AfterPlayerTurnStartLate";
-                queue.Enqueue((method, method.Name is "AfterCombatVictory" or "AfterCombatEnd", true, futureStart));
+                var pileEvent = method.GetBaseDefinition().DeclaringType == typeof(AbstractModel) &&
+                    method.Name == "AfterCardChangedPiles" ? method : null;
+                queue.Enqueue((method, method.Name is "AfterCombatVictory" or "AfterCombatEnd", true, futureStart, pileEvent, null));
             }
         }
-        var seen = new HashSet<(MethodBase, bool, bool, bool)>();
+        var seen = new HashSet<(MethodBase, bool, bool, bool, MethodInfo?, string)>();
         while (queue.TryDequeue(out var entry))
         {
-            if (!seen.Add(entry)) continue;
+            if (!seen.Add((entry.Method, entry.Terminal, entry.Direct, entry.FutureTurnStart, entry.PileEvent, InputKey(entry.Input)))) continue;
             var sourceOwner = entry.Method.DeclaringType;
             while (sourceOwner?.DeclaringType != null) sourceOwner = sourceOwner.DeclaringType;
             if (sourceOwner != null && typeof(RelicModel).IsAssignableFrom(sourceOwner) &&
@@ -263,23 +283,45 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                  entry.Method.Name.StartsWith("Before", StringComparison.Ordinal) ||
                  entry.Method.DeclaringType != sourceOwner)) continue;
             if (seen.Count > 512) { active = true; Unknown(entry.Method); break; }
-            var (method, terminal, direct, futureTurnStart) = entry;
+            var (method, terminal, direct, futureTurnStart, pileEvent, input) = entry;
             var patches = Harmony.GetPatchInfo(method);
             if (patches != null)
                 foreach (var patch in patches.Prefixes.Concat(patches.Postfixes).Concat(patches.Finalizers).Concat(patches.Transpilers)
                     .Where(p => !OurPatch(p.owner)))
-                { futureTurnStart = false; queue.Enqueue((patch.PatchMethod, false, false, false)); }
+                { futureTurnStart = false; pileEvent = null; input = null; queue.Enqueue((patch.PatchMethod, false, false, false, null, null)); }
             var state = method.GetCustomAttribute<AsyncStateMachineAttribute>()?.StateMachineType ??
                 method.GetCustomAttribute<IteratorStateMachineAttribute>()?.StateMachineType;
             if (state?.GetMethod("MoveNext", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) is { } move)
-                queue.Enqueue((move, terminal, direct, futureTurnStart));
+                queue.Enqueue((move, terminal, direct, futureTurnStart, pileEvent, input));
             var code = Body(method);
             if (code == null) { Unknown(method); continue; }
             var reachable = futureTurnStart && method.DeclaringType?.Assembly == Native && _nextPlayerTurnNumber is { } nextTurn ?
                 FutureTurnInstructions(method, code, nextTurn) : null;
+            var facts = EventFacts(method, code, pileEvent, input);
+            bool combatBatch = CombatTransformationBatch(method, code, facts);
+            if (method is MethodInfo modifier && modifier.Name.StartsWith("ModifyCardPlayResult", StringComparison.Ordinal) &&
+                (modifier.ReturnType == typeof(CardLocation) || modifier.ReturnType.IsGenericType &&
+                 modifier.ReturnType.GetGenericTypeDefinition() == typeof(ValueTuple<,>) && modifier.ReturnType.GetGenericArguments()[0] == typeof(PileType)))
+                changesDeck |= !facts.Complete || facts.Return.Tag is not ("play-result" or "pile-result") ||
+                    facts.Return.Numbers == null || facts.Return.Numbers.Any(v => v == (int)PileType.Deck);
+            if (targetOnly && _combatPileEventsOnly && pileEvent != null && method.DeclaringType?.Assembly == Native && facts.Complete)
+                reachable = facts.Reachable;
             for (int i = 0; i < code.Length; i++)
             {
                 if (reachable != null && !reachable[i]) continue;
+                if (code[i].Operand is FieldInfo written && written.FieldType == typeof(PileType) &&
+                    (code[i].Code == OpCodes.Stfld || code[i].Code == OpCodes.Stsfld) &&
+                    written.DeclaringType?.IsDefined(typeof(CompilerGeneratedAttribute), false) != true)
+                {
+                    var values = facts.Complete && facts.Writes.TryGetValue(i, out var value) ? value.Numbers : null;
+                    changesDeck |= values == null || values.Any(v => v == (int)PileType.Deck);
+                }
+                if (code[i].Code == OpCodes.Stobj && code[i].Operand is Type writtenType &&
+                    writtenType.Assembly == Native && writtenType.Name == "CardLocation")
+                {
+                    var value = facts.Complete && facts.Writes.TryGetValue(i, out var writtenValue) ? writtenValue : LocalIlFacts.Value.Unknown;
+                    changesDeck |= value.Tag != "play-result" || value.Numbers == null || value.Numbers.Any(v => v == (int)PileType.Deck);
+                }
                 // Relevant patch builders can name the HP API they insert.
                 // Arbitrary display patch names do not invalidate every source.
                 if (method.DeclaringType?.Assembly != Native && code[i].Operand is string api &&
@@ -291,6 +333,9 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                 { active = true; growth |= field.Name == "_maxHp"; }
                 if (code[i].Operand is not MethodBase called) continue;
                 var declaring = called.DeclaringType!;
+                var arguments = facts.Complete && facts.Calls.TryGetValue(i, out var atCall) ? atCall : null;
+                changesDeck |= !(combatBatch && called.DeclaringType?.FullName == "MegaCrit.Sts2.Core.Commands.CardCmd" &&
+                    called.Name == "Transform" && arguments?.FirstOrDefault()?.Tag == "local-transformations") && CallCanChangeDeck(called, arguments);
                 // Native command rewrites are global Mod behavior, outside the
                 // selected held-player-source domain. Patches on the concrete
                 // source callbacks/helpers are read when those methods are queued.
@@ -307,6 +352,7 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                     (HpWrites.Contains(called.Name) || called.Name is "set_CurrentHp" or "set_MaxHp"))
                 { active = true; growth |= called.Name.Contains("MaxHp", StringComparison.Ordinal); }
                 if (typeof(CardPoolModel).IsAssignableFrom(declaring) || called.Name == "get_CardPool") pool = true;
+                if (called.Name == "get_CardPool" && typeof(CharacterModel).IsAssignableFrom(declaring)) characterPool = true;
                 if (called.IsGenericMethod && (declaring == typeof(ModelDb) || declaring.FullName == "MegaCrit.Sts2.Core.Commands.PowerCmd" && called.Name == "Apply"))
                     foreach (var argument in called.GetGenericArguments())
                         if (!argument.IsAbstract && (typeof(CardModel).IsAssignableFrom(argument) || typeof(PowerModel).IsAssignableFrom(argument) ||
@@ -347,15 +393,235 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                             declaring.IsInterface ? t.GetInterfaceMap(declaring).TargetMethods :
                             t.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
                                 .Where(m => m.GetBaseDefinition() == virtualCall.GetBaseDefinition())).Distinct().ToArray();
-                        foreach (var implementation in implementations) queue.Enqueue((implementation, terminal, false, false));
+                        foreach (var implementation in implementations) queue.Enqueue((implementation, terminal, false, false, null, arguments));
                         if (implementations.Length == 0 && (own || !typeof(AbstractModel).IsAssignableFrom(declaring))) Unknown(called);
-                        if (!called.IsAbstract) queue.Enqueue((called, terminal, false, false));
+                        if (!called.IsAbstract) queue.Enqueue((called, terminal, false, false, null, arguments));
                     }
-                    else queue.Enqueue((called, terminal, false, false));
+                    else queue.Enqueue((called, terminal, false, false, null, arguments));
                 }
             }
         }
-        return _content[type] = new(active, heals, gains, uncertain, generated.ToArray(), growth, pool, uncertainAt);
+        return cache[type] = new(active, heals, gains, uncertain, generated.ToArray(), growth, pool, uncertainAt, changesDeck, characterPool);
+    }
+
+    private bool CanChangeDeck(Player player, AbstractModel[] held)
+    {
+        var pending = new Queue<Type>(held.Select(m => m.GetType()).Distinct());
+        var seen = new HashSet<Type>(); bool characterPool = false;
+        while (pending.TryDequeue(out var type))
+        {
+            if (!seen.Add(type)) continue;
+            if (seen.Count > 256) return true;
+            if (typeof(CardPoolModel).IsAssignableFrom(type))
+            {
+                var pool = ModelDb.AllCardPools.FirstOrDefault(p => p.GetType() == type);
+                if (pool == null) return true;
+                foreach (var card in pool.AllCards) pending.Enqueue(card.GetType());
+                continue;
+            }
+            var effect = ReadEffects(type, targetOnly: false, combatDeckScan: true);
+            if (effect.Uncertain || effect.MayChangeDeck)
+            { _deckCapabilityReason = type.FullName + (effect.Uncertain ? ": " + effect.UncertainAt : ": permanent deck may change"); return true; }
+            foreach (var generated in effect.Generated) pending.Enqueue(generated);
+            if (effect.UsesCharacterPool && !characterPool)
+            {
+                characterPool = true;
+                foreach (var card in player.Character.CardPool.AllCards) pending.Enqueue(card.GetType());
+            }
+        }
+        return false;
+    }
+
+    private static string InputKey(LocalIlFacts.Value[]? input) => input == null ? "root" :
+        string.Join(";", input.Select(v => (v.Tag ?? "?") + ":" + (v.Numbers == null ? "?" : string.Join(",", v.Numbers))));
+
+    private LocalIlFacts.Result EventFacts(MethodBase method, LocalInstruction[] code, MethodInfo? pileEvent, LocalIlFacts.Value[]? input = null)
+    {
+        var key = (method, pileEvent, InputKey(input));
+        if (_eventFacts.TryGetValue(key, out var cached)) return cached;
+        var asyncOwner = method.DeclaringType?.DeclaringType?.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+            .FirstOrDefault(m => m.GetCustomAttribute<AsyncStateMachineAttribute>()?.StateMachineType == method.DeclaringType);
+        bool NoForeignPatch(MethodBase inspected)
+        {
+            var patches = Harmony.GetPatchInfo(inspected);
+            return patches == null || !patches.Prefixes.Concat(patches.Postfixes).Concat(patches.Transpilers)
+                .Concat(patches.Finalizers).Any(p => !OurPatch(p.owner));
+        }
+        var root = pileEvent ?? asyncOwner ?? method;
+        var wrapper = asyncOwner == null ? null : Body(asyncOwner);
+        var stateWrites = wrapper?.Select((i, n) => (i, n)).Where(p => p.i.Code == OpCodes.Stfld &&
+            p.i.Operand is FieldInfo f && f.DeclaringType == method.DeclaringType && f.Name == "<>1__state").ToArray();
+        bool completionPath = asyncOwner != null && NoForeignPatch(method) &&
+            method.DeclaringType!.IsDefined(typeof(CompilerGeneratedAttribute), false) && stateWrites is { Length: 1 } &&
+            stateWrites[0].n > 0 && LocalIlFacts.Integer(wrapper![stateWrites[0].n - 1]) == -1 &&
+            wrapper.Any(i => i.Operand is MethodInfo m && m.DeclaringType?.Namespace == "System.Runtime.CompilerServices" &&
+                m.DeclaringType.Name.StartsWith("AsyncTaskMethodBuilder", StringComparison.Ordinal) && m.Name == "Start" &&
+                m.IsGenericMethod && m.GetGenericArguments().Contains(method.DeclaringType));
+        bool nativePlay = completionPath && asyncOwner?.DeclaringType?.Assembly == Native && NoForeignPatch(asyncOwner);
+        var parameters = root.GetParameters();
+        bool pileModifier = root.Name.StartsWith("ModifyCardPlayResult", StringComparison.Ordinal) ||
+            root.Name.StartsWith("AfterModifyingCardPlayResult", StringComparison.Ordinal);
+        LocalIlFacts.Value Argument(int index)
+        {
+            if (!method.IsStatic && index == 0) return new(Tag: "frame");
+            int n = index - (method.IsStatic ? 0 : 1);
+            if (method != root || n < 0 || n >= parameters.Length) return LocalIlFacts.Value.Unknown;
+            if (input != null && index < input.Length) return parameters[n].ParameterType.IsByRef ? LocalIlFacts.Value.Unknown : input[index];
+            var parameterType = parameters[n].ParameterType.IsByRef ? parameters[n].ParameterType.GetElementType() : parameters[n].ParameterType;
+            if (pileModifier && parameterType?.Assembly == Native && parameterType.Name == "CardLocation")
+                return new([0, 1, 2, 3, 4, 5], "play-result");
+            return parameters[n].ParameterType == typeof(CardModel) && pileEvent != null ? new(Tag: "event-card") :
+                parameters[n].ParameterType == typeof(PileType) && (pileEvent != null || pileModifier) ? new([0, 1, 2, 3, 4, 5]) : LocalIlFacts.Value.Unknown;
+        }
+        LocalIlFacts.Value Field(FieldInfo member, LocalIlFacts.Value receiver)
+        {
+            if (completionPath && receiver.Tag == "frame" && member.DeclaringType == method.DeclaringType && member.Name == "<>1__state")
+                return LocalIlFacts.Value.Number(-1);
+            if (nativePlay && asyncOwner?.Name == "OnPlay" && receiver.Tag == "frame" && member.Name == "<>4__this" &&
+                typeof(CardModel).IsAssignableFrom(member.FieldType)) return new(Tag: "combat-card");
+            if (receiver.Tag == "frame" && member.DeclaringType == method.DeclaringType &&
+                parameters.Any(p => p.Name == member.Name && p.ParameterType == member.FieldType))
+            {
+                int n = Array.FindIndex(parameters, p => p.Name == member.Name && p.ParameterType == member.FieldType) + (root.IsStatic ? 0 : 1);
+                if (completionPath && input != null && n < input.Length) return input[n];
+                if (member.FieldType == typeof(CardModel) && pileEvent != null) return new(Tag: "event-card");
+                if (member.FieldType == typeof(PileType) && (pileEvent != null || pileModifier)) return new([0, 1, 2, 3, 4, 5]);
+            }
+            if (receiver.Tag is "pile-result" or "play-result" && member.FieldType == typeof(PileType))
+                return new(receiver.Numbers);
+            return LocalIlFacts.Value.Unknown;
+        }
+        LocalIlFacts.Value Call(MethodBase called, LocalIlFacts.Value[] args)
+        {
+            if (completionPath && called.DeclaringType?.Namespace == "System.Runtime.CompilerServices" &&
+                called.DeclaringType.Name.StartsWith("TaskAwaiter", StringComparison.Ordinal) && called.Name == "get_IsCompleted")
+                return LocalIlFacts.Value.Number(1); // Analyze the equivalent post-completion path; handlers remain independent.
+            if (called.DeclaringType?.FullName == "MegaCrit.Sts2.Core.Commands.CardSelectCmd" && called.Name == "FromHand")
+                return new(Tag: "combat-selection-task");
+            if (called.DeclaringType?.FullName == "MegaCrit.Sts2.Core.Commands.CardSelectCmd" && called.Name == "FromCombatPile")
+            {
+                int n = Array.FindIndex(called.GetParameters(), p => p.ParameterType == typeof(CardPile));
+                if (n >= 0 && n < args.Length && args[n].Tag == "combat-pile") return new(Tag: "combat-selection-task");
+            }
+            if (called.Name == "GetAwaiter" && args.FirstOrDefault()?.Tag == "combat-selection-task") return new(Tag: "combat-selection-await");
+            if (called.Name == "GetResult" && args.FirstOrDefault()?.Tag == "combat-selection-await") return new(Tag: "combat-cards");
+            if (called.DeclaringType == typeof(Enumerable) && called.Name is "First" or "FirstOrDefault" && args.FirstOrDefault()?.Tag == "combat-cards")
+                return new(Tag: "combat-card");
+            if (called.DeclaringType == typeof(Enumerable) && called.Name is "ToList" or "ToArray" && args.FirstOrDefault()?.Tag == "combat-cards")
+                return new(Tag: "combat-cards");
+            if (called.DeclaringType == typeof(Enumerable) && called.Name == "Where" && args.FirstOrDefault()?.Tag == "combat-cards")
+                return new(Tag: "combat-cards");
+            if (called.DeclaringType?.Namespace == "System.Collections.Generic" && called.Name == "GetEnumerator" &&
+                args.FirstOrDefault()?.Tag == "combat-cards") return new(Tag: "combat-card-enumerator");
+            if (called.DeclaringType?.Namespace == "System.Collections.Generic" && called.Name == "get_Current" &&
+                args.FirstOrDefault()?.Tag == "combat-card-enumerator") return new(Tag: "combat-card");
+            if (called.DeclaringType?.Namespace == "System.Collections.Generic" && called.Name == "get_Item" &&
+                args.FirstOrDefault()?.Tag == "combat-cards") return new(Tag: "combat-card");
+            if (called.IsConstructor && called.DeclaringType?.FullName == "MegaCrit.Sts2.Core.Entities.Cards.CardTransformation" &&
+                args.FirstOrDefault()?.Tag == "combat-card") return new(Tag: "combat-transformation");
+            if (called.IsConstructor && called.GetParameters().Length == 0 && called.DeclaringType?.IsGenericType == true &&
+                called.DeclaringType.GetGenericTypeDefinition() == typeof(List<>) &&
+                called.DeclaringType.GetGenericArguments()[0].FullName == "MegaCrit.Sts2.Core.Entities.Cards.CardTransformation")
+                return new(Tag: "local-transformations");
+            if (called.IsConstructor && called.DeclaringType?.IsGenericType == true &&
+                called.DeclaringType.GetGenericTypeDefinition() == typeof(ValueTuple<,>) &&
+                called.DeclaringType.GetGenericArguments()[0] == typeof(PileType))
+                return new(args.FirstOrDefault()?.Numbers, "pile-result");
+            if (called.IsConstructor && called.DeclaringType?.Assembly == Native && called.DeclaringType.Name == "CardLocation")
+            {
+                int n = Array.FindIndex(called.GetParameters(), p => p.ParameterType == typeof(PileType));
+                return new(n >= 0 && n < args.Length ? args[n].Numbers : null, "play-result");
+            }
+            if (called is MethodInfo modifier && modifier.Name.StartsWith("ModifyCardPlayResult", StringComparison.Ordinal) &&
+                modifier.ReturnType.IsGenericType && modifier.ReturnType.GetGenericTypeDefinition() == typeof(ValueTuple<,>) &&
+                modifier.ReturnType.GetGenericArguments()[0] == typeof(PileType))
+            {
+                var implementations = modifier.IsVirtual && !modifier.IsFinal ? _sourceTypes.Where(t => modifier.DeclaringType!.IsAssignableFrom(t))
+                    .SelectMany(t => t.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                        .Where(m => m.GetBaseDefinition() == modifier.GetBaseDefinition())).Distinct().ToArray() : [modifier];
+                LocalIlFacts.Value? value = null;
+                foreach (var implementation in implementations)
+                {
+                    var body = Body(implementation);
+                    var result = body == null ? LocalIlFacts.Value.Unknown : EventFacts(implementation, body, null).Return;
+                    value = value == null ? result : LocalIlFacts.Value.Join(value, result);
+                }
+                return value ?? LocalIlFacts.Value.Unknown;
+            }
+            if (called.DeclaringType == typeof(CardModel) && called.Name == "get_Pile" && args.FirstOrDefault()?.Tag == "event-card")
+                return new(Tag: "event-pile");
+            if (called.DeclaringType == typeof(CardModel) && called.Name == "get_Pile" && args.FirstOrDefault()?.Tag == "combat-card")
+                return new(Tag: "combat-pile");
+            if (called.DeclaringType == typeof(CardPile) && called.Name == "get_Type" && args.FirstOrDefault()?.Tag == "event-pile")
+                return new([0, 1, 2, 3, 4, 5]);
+            if (called.DeclaringType == typeof(CardPile) && called.Name == "get_Cards" && args.FirstOrDefault()?.Tag == "combat-pile")
+                return new(Tag: "combat-cards");
+            if (called.DeclaringType == typeof(PlayerCombatState) && called is MethodInfo info && info.ReturnType == typeof(CardPile))
+                return new(Tag: "combat-pile");
+            if (called.DeclaringType == typeof(PileTypeExtensions) && called.Name == "GetPile" &&
+                args.FirstOrDefault()?.Numbers is { Length: > 0 } values && values.All(v => v >= 0 && v < (int)PileType.Deck))
+                return new(Tag: "combat-pile");
+            return LocalIlFacts.Value.Unknown;
+        }
+        var handlers = method.GetMethodBody()?.ExceptionHandlingClauses.SelectMany(c =>
+            c.Flags == ExceptionHandlingClauseOptions.Filter ? new[] { (c.HandlerOffset, 1), (c.FilterOffset, 1) } :
+            new[] { (c.HandlerOffset, c.Flags == ExceptionHandlingClauseOptions.Clause ? 1 : 0) });
+        // A recursive modifier cannot supply its own return proof.
+        _eventFacts[key] = new(Enumerable.Repeat(true, code.Length).ToArray(), [], [], LocalIlFacts.Value.Unknown, false);
+        return _eventFacts[key] = LocalIlFacts.Read(code, Argument, Field, Call, handlers);
+    }
+
+    private static bool CombatTransformationBatch(MethodBase method, LocalInstruction[] code, LocalIlFacts.Result facts)
+    {
+        if (method.DeclaringType?.Assembly != Native || !facts.Complete) return false;
+        foreach (var write in facts.Writes.Where(p => p.Value.Tag == "local-transformations"))
+            if (code[write.Key].Code != OpCodes.Stfld || code[write.Key].Operand is not FieldInfo member ||
+                member.DeclaringType != method.DeclaringType || !member.DeclaringType.IsDefined(typeof(CompilerGeneratedAttribute), false)) return false;
+        foreach (var invocation in facts.Calls.Where(p => p.Value.Any(v => v.Tag == "local-transformations")))
+        {
+            var called = (MethodBase)code[invocation.Key].Operand!;
+            if (called.DeclaringType?.FullName == "MegaCrit.Sts2.Core.Commands.CardCmd" && called.Name == "Transform") continue;
+            if (called.DeclaringType?.IsGenericType == true && called.DeclaringType.GetGenericTypeDefinition() == typeof(List<>) &&
+                called.Name == "Add" && invocation.Value.Length == 2 && invocation.Value[1].Tag == "combat-transformation") continue;
+            return false; // An escaped list or unknown insertion cannot certify its old-card domain.
+        }
+        return true;
+    }
+
+    private static bool CallCanChangeDeck(MethodBase method, LocalIlFacts.Value[]? arguments)
+    {
+        var owner = method.DeclaringType;
+        // The certified native generation commands reject non-combat piles.
+        if (owner?.FullName == "MegaCrit.Sts2.Core.Commands.CardPileCmd" &&
+            method.Name is "AddGeneratedCardToCombat" or "AddGeneratedCardsToCombat") return false;
+        if (owner?.FullName == "MegaCrit.Sts2.Core.Commands.CardCmd" && method.Name.StartsWith("Transform", StringComparison.Ordinal) &&
+            method.GetParameters().FirstOrDefault()?.ParameterType == typeof(CardModel) && arguments?.FirstOrDefault()?.Tag == "combat-card") return false;
+        if (method is MethodInfo callback && callback.GetBaseDefinition().DeclaringType == typeof(AbstractModel) &&
+            callback.Name == "AfterCardChangedPiles") return true; // Explicit dispatch can supply a deck card.
+        if (owner?.FullName == "MegaCrit.Sts2.Core.Commands.CardCmd" &&
+            (method.Name.StartsWith("Obtain", StringComparison.Ordinal) || method.Name.StartsWith("Transform", StringComparison.Ordinal) ||
+             method.Name.StartsWith("Remove", StringComparison.Ordinal)) ||
+            owner == typeof(CardPile) && method.Name is "AddInternal" or "RemoveInternal") return true;
+        var parameters = method.GetParameters();
+        for (int n = 0; n < parameters.Length; n++)
+        {
+            int index = n + (method.IsStatic || method.IsConstructor ? 0 : 1);
+            if (parameters[n].ParameterType == typeof(PileType))
+            {
+                var values = arguments != null && index < arguments.Length ? arguments[index].Numbers : null;
+                // Opaque forwarding is examined at its eventual native writer.
+                // Tuple construction also writes a play-result destination.
+                bool boundary = owner?.FullName == "MegaCrit.Sts2.Core.Commands.CardPileCmd" && method.Name == "Add" ||
+                    method.IsConstructor && (owner == typeof(CardLocation) || owner?.IsGenericType == true &&
+                        owner.GetGenericTypeDefinition() == typeof(ValueTuple<,>) && owner.GetGenericArguments()[0] == typeof(PileType));
+                if (owner == typeof(PileTypeExtensions) && method.Name == "GetPile") continue; // A pile query is not a mutation.
+                if (method.IsConstructor && !boundary) continue; // Nullable/comparison containers do not move a card.
+                if (values?.Any(v => v == (int)PileType.Deck) == true || boundary && values == null) return true;
+            }
+            if (owner?.FullName == "MegaCrit.Sts2.Core.Commands.CardPileCmd" && method.Name == "Add" && parameters[n].ParameterType == typeof(CardPile) &&
+                (arguments == null || index >= arguments.Length || arguments[index].Tag != "combat-pile")) return true;
+        }
+        return false;
     }
 
     private static bool[] FutureTurnInstructions(MethodBase method, LocalInstruction[] code, int nextTurn)
@@ -441,7 +707,11 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                 return new { Type = t.FullName, proof.Unknown, proof.UnknownAt, proof.VictoryHeals,
                     proof.VictoryMaxHpGains, References = proof.References.Select(r => r.FullName).ToArray(),
                     Content = new { content.ActiveRecovery, content.VictoryHeals, content.VictoryMaxHpGains,
-                        content.Uncertain, content.UncertainAt, Generated = content.Generated.Select(g => g.FullName).ToArray() } };
+                        content.Uncertain, content.UncertainAt, content.MayChangeDeck,
+                        Generated = content.Generated.Select(g => g.FullName).ToArray() },
+                    Target = ReadContent(t, targetOnly: true).ActiveRecovery,
+                    CombatPileEventsOnly = _combatPileEventsOnly,
+                    DeckCapabilityReason = _deckCapabilityReason };
             }).ToArray();
     }
 

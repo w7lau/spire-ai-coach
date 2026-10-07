@@ -26,6 +26,7 @@ SelectionSpaceTests.Register(Test);
 SearchEvidenceTests.Register(Test);
 CombatOutcomeTests.Register(Test);
 MethodReachabilityTests.Register(Test);
+IlFactsTests.Register(Test);
 
 CardGoalTests.Register(Test);
 FollowupTests.Register(Test);

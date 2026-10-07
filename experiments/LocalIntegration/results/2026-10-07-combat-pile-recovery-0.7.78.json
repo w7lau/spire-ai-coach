@@ -1,0 +1,294 @@
+{
+  "version": "0.7.78",
+  "passed": true,
+  "dll_sha256": "3999e9f2a58149d404c63435f92f3baa6462859755a90e3d0b0bf683b0f70717",
+  "zip_sha256": "0cd25abe935956ba9db1a10823b320fc2b1fcaf01e98ec1cebd975d405569642",
+  "native_module": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
+  "core_checks": {
+    "passed": 458,
+    "total": 458
+  },
+  "baseline": {
+    "version": "0.7.77",
+    "starting_hp": 52,
+    "starting_max_hp": 75,
+    "final_hp": 52,
+    "final_max_hp": 75,
+    "hp_lost": 0,
+    "hp_gained": 0,
+    "max_hp_gained": 0,
+    "evaluated": 177,
+    "victories": 177,
+    "elapsed_ms": 63090,
+    "full_health_required": true,
+    "health_target_stop": false,
+    "owned_read_only_root_audit_unchanged": true
+  },
+  "metadata_probes": [
+    {
+      "kind": "NoRecoverySource",
+      "activeRecovery": false,
+      "uncertain": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "RecoverySource",
+      "activeRecovery": true,
+      "uncertain": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "BloodVial",
+      "nextTurn": null,
+      "activeRecovery": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "BloodVial",
+      "nextTurn": 1,
+      "activeRecovery": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "BloodVial",
+      "nextTurn": 2,
+      "activeRecovery": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "BloodVial",
+      "nextTurn": 3,
+      "activeRecovery": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "ExternalTurnSource",
+      "activeRecovery": true,
+      "externalCallbackRetained": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "DarkstonePeriapt",
+      "combatOnly": false,
+      "activeRecovery": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "DarkstonePeriapt",
+      "combatOnly": true,
+      "activeRecovery": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "CombatPileSource",
+      "changesDeck": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "DeckPileSource",
+      "changesDeck": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "UnknownPileSource",
+      "changesDeck": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "DeckLocationSource",
+      "changesDeck": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "UnknownLocationSource",
+      "changesDeck": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "Begone",
+      "changesDeck": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "Charge",
+      "changesDeck": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "Compact",
+      "changesDeck": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "Guards",
+      "changesDeck": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "Seance",
+      "changesDeck": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "ExternalAsyncCombatTransform",
+      "changesDeck": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "ExternalAsyncUnknownTransform",
+      "changesDeck": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "ExternalPileRecovery",
+      "activeRecovery": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "IllusionPower",
+      "activeRecovery": true,
+      "futureRecoveryPreserved": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "ReattachPower",
+      "activeRecovery": true,
+      "futureRecoveryPreserved": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "RegenPower",
+      "activeRecovery": true,
+      "futureRecoveryPreserved": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "MockInvincibleOnDeathPower",
+      "activeRecovery": true,
+      "futureRecoveryPreserved": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "MockPreventDeathPower",
+      "activeRecovery": true,
+      "futureRecoveryPreserved": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "MockRevivePower",
+      "activeRecovery": true,
+      "futureRecoveryPreserved": true,
+      "callbackExecuted": false
+    }
+  ],
+  "native_samples": [
+    {
+      "algorithm": "MonteCarlo",
+      "Evaluated": 1,
+      "ElapsedMs": 46432,
+      "StoppedOnHealthTarget": true,
+      "StartingHp": 52,
+      "Hp": 52,
+      "MaxHp": 75,
+      "HpChange": 0,
+      "TargetHp": 52,
+      "FullHealth": false,
+      "Basis": "当前内容未检测到生命恢复调用，目标为不净损血",
+      "Uncertain": true,
+      "targetAnalyses": 1,
+      "targetAnalysisMs": 405.3585,
+      "UnknownReason": "当前玩家内容存在可重复或动态生命上限增加",
+      "checkpoints": 13,
+      "verifications": 1,
+      "seeded": true,
+      "nativeRootAndStateRngHistoryMatched": true,
+      "case": "zero_loss"
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "Evaluated": 1,
+      "ElapsedMs": 2322,
+      "StoppedOnHealthTarget": true,
+      "StartingHp": 52,
+      "Hp": 52,
+      "MaxHp": 75,
+      "HpChange": 0,
+      "TargetHp": 52,
+      "FullHealth": false,
+      "Basis": "当前内容未检测到生命恢复调用，目标为不净损血",
+      "Uncertain": true,
+      "targetAnalyses": 1,
+      "targetAnalysisMs": 178.2097,
+      "UnknownReason": "当前玩家内容存在可重复或动态生命上限增加",
+      "checkpoints": 13,
+      "verifications": 1,
+      "seeded": true,
+      "nativeRootAndStateRngHistoryMatched": true,
+      "case": "zero_loss"
+    },
+    {
+      "algorithm": "MonteCarlo",
+      "Evaluated": 1,
+      "ElapsedMs": 53915,
+      "StoppedOnHealthTarget": true,
+      "StartingHp": 37,
+      "Hp": 38,
+      "MaxHp": 103,
+      "HpChange": 1,
+      "TargetHp": 38,
+      "FullHealth": false,
+      "Basis": "当前内容的固定战后生命增加",
+      "Uncertain": true,
+      "targetAnalyses": 1,
+      "targetAnalysisMs": 253.2337,
+      "UnknownReason": "",
+      "checkpoints": 28,
+      "verifications": 1,
+      "seeded": true,
+      "nativeRootAndStateRngHistoryMatched": true,
+      "case": "plus_one"
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "Evaluated": 1,
+      "ElapsedMs": 3588,
+      "StoppedOnHealthTarget": true,
+      "StartingHp": 37,
+      "Hp": 38,
+      "MaxHp": 103,
+      "HpChange": 1,
+      "TargetHp": 38,
+      "FullHealth": false,
+      "Basis": "当前内容的固定战后生命增加",
+      "Uncertain": true,
+      "targetAnalyses": 1,
+      "targetAnalysisMs": 46.8248,
+      "UnknownReason": "",
+      "checkpoints": 28,
+      "verifications": 1,
+      "seeded": true,
+      "nativeRootAndStateRngHistoryMatched": true,
+      "case": "plus_one"
+    }
+  ],
+  "native_independent_replays": 4,
+  "native_execution_steps_matched": 82,
+  "recovered_failures": 0,
+  "proof_policy": {
+    "target_only": true,
+    "strict_recovery_ceiling_preserved": true,
+    "global_optimality_proven": false
+  },
+  "installation": {
+    "installed": true,
+    "version": "0.7.78",
+    "exact_native_validated_dll": true,
+    "source_package_harness_and_installed_hashes_match": true,
+    "elapsed_ms": 1845,
+    "game_stopped": false,
+    "worker_cache_cleaned": false,
+    "player_game_next_load_validation_pending": true
+  },
+  "scope": "Read-only callback, turn and pile-event metadata probes plus seeded exact frozen native zero-loss/plus-one victory in both algorithms with ordinary independent replay. No unseeded speed or global optimality claim.",
+  "engine_exit_resource_diagnostics_present": true
+}

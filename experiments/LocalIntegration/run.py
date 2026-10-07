@@ -83,7 +83,7 @@ parser.add_argument('--finisher-retention-order', choices=['monte-carlo', 'turn-
 parser.add_argument('--followup-test', action='store_true', help='Short synthetic native return-to-hand/topdeck ordering probe; no full search')
 parser.add_argument('--recovery-audit', action='store_true', help='Inspect one frozen root and its actual loaded Mod callbacks; no route search or play')
 parser.add_argument('--health-audit', action='store_true', help='Also check low-level HP writes and nested healing in the owned worker')
-parser.add_argument('--health-target-return-test', action='store_true', help='Frozen plus-one native victory and abstract callback dispatch; both algorithms and independent replay')
+parser.add_argument('--health-target-return-test', action='store_true', help='Frozen zero-loss or plus-one native victory and callback metadata; both algorithms and independent replay')
 
 parser.add_argument('--discard-test', action='store_true', help='Short native discard/Sly/resource/selection probe; no full search')
 parser.add_argument('--summon-presentation-test', action='store_true', help='Only the frozen incident first enemy turn; compare ordinary and scene-free native states')
