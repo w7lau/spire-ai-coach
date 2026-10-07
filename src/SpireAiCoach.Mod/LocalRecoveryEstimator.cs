@@ -1,6 +1,7 @@
 using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Diagnostics;
+using System.Reflection.Emit;
 using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Players;
@@ -23,6 +24,7 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
     private readonly Dictionary<Type, ContentEffects> _content = [];
     private LocalRecoveryAllowance? _allowance;
     private Type[] _sourceTypes = [];
+    private int? _nextPlayerTurnNumber;
     public LocalHealthTarget? HealthTarget { get; private set; }
     public string? SharedDirectory { get; set; }
     public int TargetAnalysisCount { get; private set; }
@@ -83,6 +85,10 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
         try
         {
             AbstractModel[]? models = player == null ? null : CurrentModels(player);
+            // Search roots are already in the player's ready-to-play phase.
+            // Turn-start callbacks can next run only on a later player turn.
+            if (player?.PlayerCombatState?.TurnNumber is > 0 and < int.MaxValue)
+                _nextPlayerTurnNumber = player.PlayerCombatState.TurnNumber + 1;
             if (player != null) _sourceTypes = PlayerSources(player, models!).Select(m => m.GetType()).Distinct().ToArray();
             if (player != null && request.StopOnZeroLoss && !request.StopOnFirstWin &&
                 (!LocalSearchPolicy.HasSpecificGoal(request) || request.CardGoals is { Enabled: true, HpLossThreshold: null }))
@@ -224,7 +230,7 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
             method.DeclaringType?.FullName + "." + method.Name; }
         int heals = 0, gains = 0;
         var generated = new HashSet<Type>();
-        var queue = new Queue<(MethodBase Method, bool Terminal, bool Direct)>();
+        var queue = new Queue<(MethodBase Method, bool Terminal, bool Direct, bool FutureTurnStart)>();
         var overrides = new HashSet<MethodInfo>();
         for (var owner = type; owner != null && owner != typeof(AbstractModel); owner = owner.BaseType)
         {
@@ -235,14 +241,17 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                 // Some powers expose a native effect entry point called by their
                 // owning model instead of a Hook override (e.g. resurrection).
                 if (!method.IsSpecialName && !method.IsVirtual && method.IsPublic)
-                { queue.Enqueue((method, false, false)); continue; }
+                { queue.Enqueue((method, false, false, false)); continue; }
                 if (!request.IncludePotions && typeof(PotionModel).IsAssignableFrom(type) && method.Name == "OnUse") continue;
                 if (method.IsSpecialName || !method.IsVirtual || method.GetBaseDefinition() == method ||
                     !overrides.Add(method.GetBaseDefinition()) || method.Name is "AfterObtained" or "BeforeRemoved" or "AfterRemoved") continue;
-                queue.Enqueue((method, method.Name is "AfterCombatVictory" or "AfterCombatEnd", true));
+                bool futureStart = method.DeclaringType?.Assembly == Native &&
+                    method.GetBaseDefinition().DeclaringType == typeof(AbstractModel) &&
+                    method.Name is "AfterPlayerTurnStart" or "AfterPlayerTurnStartEarly" or "AfterPlayerTurnStartLate";
+                queue.Enqueue((method, method.Name is "AfterCombatVictory" or "AfterCombatEnd", true, futureStart));
             }
         }
-        var seen = new HashSet<(MethodBase, bool, bool)>();
+        var seen = new HashSet<(MethodBase, bool, bool, bool)>();
         while (queue.TryDequeue(out var entry))
         {
             if (!seen.Add(entry)) continue;
@@ -254,19 +263,23 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                  entry.Method.Name.StartsWith("Before", StringComparison.Ordinal) ||
                  entry.Method.DeclaringType != sourceOwner)) continue;
             if (seen.Count > 512) { active = true; Unknown(entry.Method); break; }
-            var (method, terminal, direct) = entry;
-            var state = method.GetCustomAttribute<AsyncStateMachineAttribute>()?.StateMachineType ??
-                method.GetCustomAttribute<IteratorStateMachineAttribute>()?.StateMachineType;
-            if (state?.GetMethod("MoveNext", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) is { } move)
-                queue.Enqueue((move, terminal, direct));
+            var (method, terminal, direct, futureTurnStart) = entry;
             var patches = Harmony.GetPatchInfo(method);
             if (patches != null)
                 foreach (var patch in patches.Prefixes.Concat(patches.Postfixes).Concat(patches.Finalizers).Concat(patches.Transpilers)
-                    .Where(p => !OurPatch(p.owner))) queue.Enqueue((patch.PatchMethod, false, false));
+                    .Where(p => !OurPatch(p.owner)))
+                { futureTurnStart = false; queue.Enqueue((patch.PatchMethod, false, false, false)); }
+            var state = method.GetCustomAttribute<AsyncStateMachineAttribute>()?.StateMachineType ??
+                method.GetCustomAttribute<IteratorStateMachineAttribute>()?.StateMachineType;
+            if (state?.GetMethod("MoveNext", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic) is { } move)
+                queue.Enqueue((move, terminal, direct, futureTurnStart));
             var code = Body(method);
             if (code == null) { Unknown(method); continue; }
+            var reachable = futureTurnStart && method.DeclaringType?.Assembly == Native && _nextPlayerTurnNumber is { } nextTurn ?
+                FutureTurnInstructions(method, code, nextTurn) : null;
             for (int i = 0; i < code.Length; i++)
             {
+                if (reachable != null && !reachable[i]) continue;
                 // Relevant patch builders can name the HP API they insert.
                 // Arbitrary display patch names do not invalidate every source.
                 if (method.DeclaringType?.Assembly != Native && code[i].Operand is string api &&
@@ -334,15 +347,55 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                             declaring.IsInterface ? t.GetInterfaceMap(declaring).TargetMethods :
                             t.GetMethods(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
                                 .Where(m => m.GetBaseDefinition() == virtualCall.GetBaseDefinition())).Distinct().ToArray();
-                        foreach (var implementation in implementations) queue.Enqueue((implementation, terminal, false));
+                        foreach (var implementation in implementations) queue.Enqueue((implementation, terminal, false, false));
                         if (implementations.Length == 0 && (own || !typeof(AbstractModel).IsAssignableFrom(declaring))) Unknown(called);
-                        if (!called.IsAbstract) queue.Enqueue((called, terminal, false));
+                        if (!called.IsAbstract) queue.Enqueue((called, terminal, false, false));
                     }
-                    else queue.Enqueue((called, terminal, false));
+                    else queue.Enqueue((called, terminal, false, false));
                 }
             }
         }
         return _content[type] = new(active, heals, gains, uncertain, generated.ToArray(), growth, pool, uncertainAt);
+    }
+
+    private static bool[] FutureTurnInstructions(MethodBase method, LocalInstruction[] code, int nextTurn)
+    {
+        bool Call(int at, Type owner, string name) => at >= 0 &&
+            code[at].Code is var op && (op == OpCodes.Call || op == OpCodes.Callvirt) &&
+            code[at].Operand is MethodInfo called && called.DeclaringType == owner && called.Name == name;
+        bool? Taken(int at)
+        {
+            // Exact native owner -> combat state -> turn number expression.
+            // Other receivers, helpers and unresolved comparisons stay reachable.
+            if (at < 4 || !Call(at - 2, typeof(PlayerCombatState), "get_TurnNumber") ||
+                !Call(at - 3, typeof(Player), "get_PlayerCombatState") ||
+                !(Call(at - 4, typeof(RelicModel), "get_Owner") || Call(at - 4, typeof(CardModel), "get_Owner"))) return null;
+            // Only an initial read-only gate supplies this range. An earlier
+            // command/helper/write might change the turn; never infer through it.
+            for (int i = 0; i < at - 4; i++)
+            {
+                if (code[i].Code == OpCodes.Stfld || code[i].Code == OpCodes.Stsfld || code[i].Code == OpCodes.Calli) return null;
+                if (code[i].Operand is MethodBase &&
+                    !(Call(i, typeof(RelicModel), "get_Owner") || Call(i, typeof(CardModel), "get_Owner") ||
+                      Call(i, typeof(Player), "get_PlayerCombatState") || Call(i, typeof(PlayerCombatState), "get_TurnNumber"))) return null;
+            }
+            int? limit = code[at - 1].Code.Value switch {
+                var value when value == OpCodes.Ldc_I4_M1.Value => -1,
+                var value when value >= OpCodes.Ldc_I4_0.Value && value <= OpCodes.Ldc_I4_8.Value => value - OpCodes.Ldc_I4_0.Value,
+                var value when value == OpCodes.Ldc_I4.Value && code[at - 1].Operand is int number => number,
+                var value when value == OpCodes.Ldc_I4_S.Value && code[at - 1].Operand is sbyte number => number,
+                _ => null };
+            if (limit == null || nextTurn <= limit.Value) return null;
+            var branch = code[at].Code;
+            if (branch == OpCodes.Ble || branch == OpCodes.Ble_S || branch == OpCodes.Blt || branch == OpCodes.Blt_S ||
+                branch == OpCodes.Beq || branch == OpCodes.Beq_S) return false;
+            if (branch == OpCodes.Bgt || branch == OpCodes.Bgt_S || branch == OpCodes.Bge || branch == OpCodes.Bge_S ||
+                branch == OpCodes.Bne_Un || branch == OpCodes.Bne_Un_S) return true;
+            return null;
+        }
+        var handlers = method.GetMethodBody()?.ExceptionHandlingClauses.SelectMany(c =>
+            c.Flags == ExceptionHandlingClauseOptions.Filter ? new[] { c.HandlerOffset, c.FilterOffset } : new[] { c.HandlerOffset });
+        return LocalMethodBody.Reachable(code, Taken, handlers);
     }
 
     private LocalInstruction[]? Body(MethodBase method)

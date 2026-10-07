@@ -66,4 +66,42 @@ public static class LocalMethodBody
     public static bool HasBackwardJump(IEnumerable<LocalInstruction> code) => code.Any(i =>
         (i.Code.FlowControl is FlowControl.Branch or FlowControl.Cond_Branch) &&
         (i.Operand is int target && target <= i.Offset || i.Operand is int[] targets && targets.Any(t => t <= i.Offset)));
+
+    // Unknown conditions keep both paths. Exception handlers are independent
+    // roots, so excluding a guarded block cannot hide a handler's effects.
+    public static bool[] Reachable(LocalInstruction[] code, Func<int, bool?> branchTaken,
+        IEnumerable<int>? handlerOffsets = null)
+    {
+        var reachable = new bool[code.Length];
+        var positions = code.Select((instruction, index) => (instruction.Offset, index)).ToDictionary(p => p.Offset, p => p.index);
+        var pending = new Queue<int>();
+        if (code.Length > 0) pending.Enqueue(0);
+        void Target(int offset)
+        {
+            if (positions.TryGetValue(offset, out var position)) pending.Enqueue(position);
+            else for (int i = 0; i < code.Length; i++) pending.Enqueue(i);
+        }
+        foreach (var offset in handlerOffsets ?? []) Target(offset);
+        while (pending.TryDequeue(out var index))
+        {
+            if (index >= code.Length || reachable[index]) continue;
+            reachable[index] = true;
+            var instruction = code[index];
+            if (instruction.Code.FlowControl is FlowControl.Return or FlowControl.Throw) continue;
+            if (instruction.Code.FlowControl == FlowControl.Branch && instruction.Operand is int jump)
+            { Target(jump); continue; }
+            if (instruction.Code.FlowControl == FlowControl.Cond_Branch)
+            {
+                bool? taken = branchTaken(index);
+                if (taken != false)
+                {
+                    if (instruction.Operand is int branch) Target(branch);
+                    else if (instruction.Operand is int[] branches) foreach (int offset in branches) Target(offset);
+                }
+                if (taken == true) continue;
+            }
+            pending.Enqueue(index + 1);
+        }
+        return reachable;
+    }
 }

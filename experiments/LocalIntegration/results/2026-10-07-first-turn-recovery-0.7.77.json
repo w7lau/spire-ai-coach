@@ -1,0 +1,153 @@
+{
+  "version": "0.7.77",
+  "passed": true,
+  "dll_sha256": "6cb929f781df086625110ab4146104b83956ee8d37123720dcb36a7c466699e3",
+  "zip_sha256": "3c48a51e634046bfc4328e33e5fe1eb35988707ac9a8ea27ed994b0fa85e8fa2",
+  "native_module": "73b63ee0-6c0a-47bb-b0d1-b21f6d94222e",
+  "core_checks": {
+    "passed": 442,
+    "total": 442
+  },
+  "baseline": {
+    "version": "0.7.76",
+    "starting_hp": 37,
+    "starting_max_hp": 102,
+    "final_hp": 38,
+    "final_max_hp": 103,
+    "hp_lost": 0,
+    "hp_gained": 1,
+    "max_hp_gained": 1,
+    "full_health_required": true,
+    "health_target_stop": false,
+    "owned_read_only_root_audit_unchanged": true
+  },
+  "metadata_probes": [
+    {
+      "kind": "NoRecoverySource",
+      "activeRecovery": false,
+      "uncertain": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "RecoverySource",
+      "activeRecovery": true,
+      "uncertain": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "BloodVial",
+      "nextTurn": null,
+      "activeRecovery": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "BloodVial",
+      "nextTurn": 1,
+      "activeRecovery": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "BloodVial",
+      "nextTurn": 2,
+      "activeRecovery": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "BloodVial",
+      "nextTurn": 3,
+      "activeRecovery": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "ExternalTurnSource",
+      "activeRecovery": true,
+      "externalCallbackRetained": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "IllusionPower",
+      "activeRecovery": true,
+      "futureRecoveryPreserved": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "ReattachPower",
+      "activeRecovery": true,
+      "futureRecoveryPreserved": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "RegenPower",
+      "activeRecovery": true,
+      "futureRecoveryPreserved": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "MockInvincibleOnDeathPower",
+      "activeRecovery": true,
+      "futureRecoveryPreserved": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "MockPreventDeathPower",
+      "activeRecovery": true,
+      "futureRecoveryPreserved": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "MockRevivePower",
+      "activeRecovery": true,
+      "futureRecoveryPreserved": true,
+      "callbackExecuted": false
+    }
+  ],
+  "native_samples": [
+    {
+      "algorithm": "MonteCarlo",
+      "Evaluated": 1,
+      "ElapsedMs": 33255,
+      "StoppedOnHealthTarget": true,
+      "StartingHp": 37,
+      "Hp": 38,
+      "MaxHp": 103,
+      "HpChange": 1,
+      "TargetHp": 38,
+      "FullHealth": false,
+      "Basis": "当前内容的固定战后生命增加",
+      "Uncertain": true,
+      "targetAnalyses": 1,
+      "targetAnalysisMs": 48.1867,
+      "UnknownReason": "",
+      "checkpoints": 28,
+      "verifications": 1,
+      "seeded": true,
+      "nativeRootAndStateRngHistoryMatched": true
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "Evaluated": 1,
+      "ElapsedMs": 1835,
+      "StoppedOnHealthTarget": true,
+      "StartingHp": 37,
+      "Hp": 38,
+      "MaxHp": 103,
+      "HpChange": 1,
+      "TargetHp": 38,
+      "FullHealth": false,
+      "Basis": "当前内容的固定战后生命增加",
+      "Uncertain": true,
+      "targetAnalyses": 1,
+      "targetAnalysisMs": 9.4317,
+      "UnknownReason": "",
+      "checkpoints": 28,
+      "verifications": 1,
+      "seeded": true,
+      "nativeRootAndStateRngHistoryMatched": true
+    }
+  ],
+  "installation": {
+    "version": "0.7.77",
+    "installed_same_verified_dll": true
+  },
+  "scope": "Owned exact frozen plus-one victory seeded in both algorithms, with ordinary independent native replay and read-only callback metadata. No unseeded search speed or global optimality claim."
+}

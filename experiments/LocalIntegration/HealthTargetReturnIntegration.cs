@@ -1,6 +1,9 @@
 using System.Reflection;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Relics;
+using MegaCrit.Sts2.Core.Entities.Players;
+using MegaCrit.Sts2.Core.Commands;
+using MegaCrit.Sts2.Core.GameActions.Multiplayer;
 using MegaCrit.Sts2.Core.Models;
 using SpireAiCoach.Core;
 using SpireAiCoach.Mod;
@@ -21,6 +24,12 @@ internal static class HealthTargetReturnIntegration
     { protected override void Apply(Creature creature) { } }
     private sealed class RecoverySource : AbstractSource<int>
     { protected override void Apply(Creature creature) => creature.SetCurrentHpInternal(10); }
+    private sealed class ExternalTurnSource : RelicModel
+    {
+        public override RelicRarity Rarity => RelicRarity.Common;
+        public override Task AfterPlayerTurnStartLate(PlayerChoiceContext context, Player player) =>
+            Owner.PlayerCombatState!.TurnNumber > 1 ? Task.CompletedTask : CreatureCmd.Heal(Owner.Creature, 1, true);
+    }
 
     public static async Task Run(string root, LocalWorkerPool pool, LocalSearchRequest frozen, LocalInstallation installation, string seedPath)
     {
@@ -40,6 +49,37 @@ internal static class HealthTargetReturnIntegration
                 throw new InvalidOperationException("Abstract dispatch metadata did not resolve the concrete callback: " + type.Name + ": " +
                     effect.GetType().GetProperty("UncertainAt")!.GetValue(effect));
             probes.Add(new { kind = type.Name, activeRecovery = Flag("ActiveRecovery"), uncertain = Flag("Uncertain"), callbackExecuted = false });
+        }
+        // Use the installed native async body. A missing future-turn context must
+        // keep the heal, while ready-to-play roots cannot repeat its first-turn heal.
+        var bloodVial = typeof(AbstractModel).Assembly.GetType("MegaCrit.Sts2.Core.Models.Relics.BloodVial", true)!;
+        foreach (int? nextTurn in new int?[] { null, 1, 2, 3 })
+        {
+            var instance = Activator.CreateInstance(estimatorType, frozen)!;
+            estimatorType.GetField("_nextPlayerTurnNumber", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(instance, nextTurn);
+            var effect = describe.Invoke(instance, [bloodVial])!;
+            bool active = (bool)effect.GetType().GetProperty("ActiveRecovery")!.GetValue(effect)!;
+            if (active != (nextTurn is null or <= 1) || (bool)effect.GetType().GetProperty("Uncertain")!.GetValue(effect)!)
+                throw new InvalidOperationException("Native first-turn callback was classified outside its reachable phase");
+            probes.Add(new { kind = bloodVial.Name, nextTurn, activeRecovery = active, callbackExecuted = false });
+        }
+        var external = Activator.CreateInstance(estimatorType, frozen)!;
+        estimatorType.GetField("_nextPlayerTurnNumber", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(external, 2);
+        var externalEffect = describe.Invoke(external, [typeof(ExternalTurnSource)])!;
+        if (!(bool)externalEffect.GetType().GetProperty("ActiveRecovery")!.GetValue(externalEffect)!)
+            throw new InvalidOperationException("External callback was incorrectly given a native phase proof");
+        probes.Add(new { kind = nameof(ExternalTurnSource), activeRecovery = true, externalCallbackRetained = true, callbackExecuted = false });
+        foreach (var type in typeof(AbstractModel).Assembly.GetTypes().Where(t => !t.IsAbstract && typeof(PowerModel).IsAssignableFrom(t)))
+        {
+            var instance = Activator.CreateInstance(estimatorType, frozen)!;
+            var effect = describe.Invoke(instance, [type])!;
+            if (!(bool)effect.GetType().GetProperty("ActiveRecovery")!.GetValue(effect)!) continue;
+            var future = Activator.CreateInstance(estimatorType, frozen)!;
+            estimatorType.GetField("_nextPlayerTurnNumber", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(future, 2);
+            var futureEffect = describe.Invoke(future, [type])!;
+            if (!(bool)futureEffect.GetType().GetProperty("ActiveRecovery")!.GetValue(futureEffect)!)
+                throw new InvalidOperationException("Future turn context hid an active native power: " + type.FullName);
+            probes.Add(new { kind = type.Name, activeRecovery = true, futureRecoveryPreserved = true, callbackExecuted = false });
         }
         var samples = new List<object>();
         foreach (var order in new[] { LocalSearchOrder.MonteCarlo, LocalSearchOrder.TurnFrontier })
@@ -70,7 +110,7 @@ internal static class HealthTargetReturnIntegration
         LocalWire.Write(Path.Combine(root, "integration-health-target-return-summary.json"), new
         {
             version = typeof(LocalWorker).Assembly.GetName().Version!.ToString(3), passed = true, probes, samples,
-            scope = "Read-only abstract-dispatch metadata probes plus seeded exact frozen native plus-one victory in both algorithms with ordinary independent replay. No unseeded speed or global optimality claim."
+            scope = "Read-only callback dispatch and future-turn metadata probes plus seeded exact frozen native plus-one victory in both algorithms with ordinary independent replay. No unseeded speed or global optimality claim."
         });
     }
 }
