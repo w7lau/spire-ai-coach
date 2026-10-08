@@ -32,6 +32,7 @@ public static class Entry
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_TRANSPORT_TEST") == "1") TransportPressureProbe.Install(worker);
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_ENEMY_TEST") == "1") EnemyProbeObserver.Install(worker);
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_RULE_STALL_PROBE") == "1") RuleStallProbe.Install(worker);
+            if (System.Environment.GetEnvironmentVariable("SPIRE_COACH_RECOVERY_AUDIT") == "1") RecoveryTargetProbe.Install(worker);
             return;
         }
         if (!File.Exists(Path.Combine(root, ".spire-native-probe-owner")) ||

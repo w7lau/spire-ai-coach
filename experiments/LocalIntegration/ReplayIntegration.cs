@@ -131,6 +131,10 @@ public static class ReplayIntegration
         if (System.Environment.GetEnvironmentVariable("SPIRE_COACH_RECOVERY_AUDIT") == "1")
         {
             installation = installation with { GameDirectory = Path.Combine(root, "game") };
+            installation = installation with { ModDirectories = installation.ModDirectories.Append(
+                Path.Combine(root, "game", "mods", "SpireLocalIntegration")).ToArray() };
+            request = request with { LoadedMods = request.LoadedMods.Append(
+                $"SpireLocalIntegration:0.0.1:{typeof(Entry).Assembly.ManifestModule.ModuleVersionId}").Order(StringComparer.Ordinal).ToArray() };
             request = request with { Workers = 1, AdaptiveWorkers = false };
             try { await Task.Run(() => pool.Analyze(request, installation, _ => { }, CancellationToken.None)); }
             catch (CoachException ex) when (ex.Category == "local_audit_complete")
@@ -143,6 +147,8 @@ public static class ReplayIntegration
                 }).ToArray();
             if (auditFiles.Length != 1) throw new InvalidOperationException("One current native recovery audit was not produced");
             File.Copy(auditFiles[0], Path.Combine(root, "integration-recovery-audit.json"), true);
+            File.Copy(Path.Combine(Path.GetDirectoryName(auditFiles[0])!, "target-sources-audit.json"),
+                Path.Combine(root, "integration-target-sources-audit.json"), true);
             return;
         }
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_RECENT_SEARCH_TEST") == "1")

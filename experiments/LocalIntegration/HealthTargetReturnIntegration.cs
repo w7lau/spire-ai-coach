@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Reflection.Emit;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Relics;
 using MegaCrit.Sts2.Core.Entities.Players;
@@ -77,6 +78,38 @@ internal static class HealthTargetReturnIntegration
         var describe = estimatorType.GetMethod("DescribeContent", BindingFlags.Instance | BindingFlags.NonPublic)!;
         var readContent = estimatorType.GetMethod("ReadContent", BindingFlags.Instance | BindingFlags.NonPublic)!;
         var probes = new List<object>();
+        // Exceed the real method traversal budget without executing effects.
+        // Unknown tail code must not manufacture healing; a known earlier HP
+        // write must remain visible even when a later helper chain is truncated.
+        foreach (bool recoveryBeforeLimit in new[] { false, true })
+        {
+            var assembly = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("OwnedRecoveryBudget" + recoveryBeforeLimit), AssemblyBuilderAccess.Run);
+            var builder = assembly.DefineDynamicModule("Probe").DefineType("BudgetSource", TypeAttributes.Public | TypeAttributes.Abstract, typeof(RelicModel));
+            var helpers = Enumerable.Range(0, 514).Select(i => builder.DefineMethod(i == 0 ? "Entry" : "Helper" + i,
+                i == 0 ? MethodAttributes.Public : MethodAttributes.Private | MethodAttributes.Static,
+                typeof(void), [typeof(Creature)])).ToArray();
+            for (int i = 0; i < helpers.Length; i++)
+            {
+                var il = helpers[i].GetILGenerator();
+                if (i == 0 && recoveryBeforeLimit)
+                {
+                    il.Emit(OpCodes.Ldarg_1); il.Emit(OpCodes.Ldc_I4_1);
+                    il.Emit(OpCodes.Callvirt, typeof(Creature).GetMethod(nameof(Creature.SetCurrentHpInternal))!);
+                }
+                if (i + 1 < helpers.Length) { il.Emit(i == 0 ? OpCodes.Ldarg_1 : OpCodes.Ldarg_0); il.Emit(OpCodes.Call, helpers[i + 1]); }
+                il.Emit(OpCodes.Ret);
+            }
+            var type = builder.CreateType()!;
+            var instance = Activator.CreateInstance(estimatorType, frozen)!;
+            var effect = readContent.Invoke(instance, [type, true])!;
+            bool active = (bool)effect.GetType().GetProperty("ActiveRecovery")!.GetValue(effect)!;
+            bool uncertain = (bool)effect.GetType().GetProperty("Uncertain")!.GetValue(effect)!;
+            if (active != recoveryBeforeLimit || !uncertain)
+                throw new InvalidOperationException("Method traversal limit changed known healing or invented an absent HP write: " +
+                    System.Text.Json.JsonSerializer.Serialize(new { recoveryBeforeLimit, active, uncertain,
+                        unknownAt = effect.GetType().GetProperty("UncertainAt")!.GetValue(effect) }));
+            probes.Add(new { kind = "BoundedMethodClosure", recoveryBeforeLimit, activeRecovery = active, uncertain, callbackExecuted = false });
+        }
         foreach (var type in new[] { typeof(NoRecoverySource), typeof(RecoverySource) })
         {
             var effect = describe.Invoke(metadata, [type])!;

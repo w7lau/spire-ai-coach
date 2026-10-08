@@ -1,0 +1,139 @@
+{
+  "schema": 1,
+  "version": "0.7.81",
+  "game_sdk": "v0.111.0",
+  "dll_sha256": "3f311739e03cd6a8678d488122a5365e77fe72ad7aceb7366fe1bb955ed4bce4",
+  "scope": "Frozen real incident; bounded current-content estimate remains uncertain; native seeded stop checks in both algorithms and one unseeded one-worker search. No global-optimality claim.",
+  "baseline": {
+    "version": "0.7.80",
+    "starting_hp": 67,
+    "max_hp": 75,
+    "first_observed_zero_loss_ms": 3211.2902,
+    "elapsed_ms": 61271,
+    "evaluated": 501,
+    "victories": 501,
+    "full_health_target": true,
+    "stopped_on_target": false,
+    "runtime_failures": 0
+  },
+  "cause": {
+    "type_limit": 128,
+    "cached_player_types_before_truncation": 128,
+    "recognized_recovery_in_those_types": false,
+    "colorless_pool_generated_types": 65,
+    "misclassified_limit_as_recovery": true
+  },
+  "core_checks": {
+    "passed": 461,
+    "total": 461,
+    "first_run": {
+      "passed": 460,
+      "total": 461,
+      "failure": "Existing first-win process timing assertion; retained evidence; deliberate full rerun passed without changing thresholds"
+    }
+  },
+  "method_limit_metadata": [
+    {
+      "kind": "BoundedMethodClosure",
+      "recoveryBeforeLimit": false,
+      "activeRecovery": false,
+      "uncertain": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "BoundedMethodClosure",
+      "recoveryBeforeLimit": true,
+      "activeRecovery": true,
+      "uncertain": true,
+      "callbackExecuted": false
+    }
+  ],
+  "seeded_native_stop_checks": [
+    {
+      "algorithm": "MonteCarlo",
+      "Evaluated": 1,
+      "ElapsedMs": 30727,
+      "StoppedOnHealthTarget": true,
+      "StartingHp": 67,
+      "Hp": 67,
+      "MaxHp": 75,
+      "HpChange": 0,
+      "TargetHp": 67,
+      "FullHealth": false,
+      "Basis": "内容分析触及数量上限，按已识别生命效果估计返回目标",
+      "Uncertain": true,
+      "targetAnalyses": 1,
+      "targetAnalysisMs": 216.8372,
+      "UnknownReason": "当前玩家内容存在可重复或动态生命上限增加",
+      "checkpoints": 21,
+      "verifications": 1,
+      "seeded": true,
+      "nativeRootAndStateRngHistoryMatched": true
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "Evaluated": 1,
+      "ElapsedMs": 1804,
+      "StoppedOnHealthTarget": true,
+      "StartingHp": 67,
+      "Hp": 67,
+      "MaxHp": 75,
+      "HpChange": 0,
+      "TargetHp": 67,
+      "FullHealth": false,
+      "Basis": "内容分析触及数量上限，按已识别生命效果估计返回目标",
+      "Uncertain": true,
+      "targetAnalyses": 1,
+      "targetAnalysisMs": 99.1632,
+      "UnknownReason": "当前玩家内容存在可重复或动态生命上限增加",
+      "checkpoints": 21,
+      "verifications": 1,
+      "seeded": true,
+      "nativeRootAndStateRngHistoryMatched": true
+    }
+  ],
+  "unseeded_native": {
+    "Status": "done",
+    "Evaluated": 24,
+    "Victories": 24,
+    "ElapsedMs": 33313,
+    "SearchElapsedMs": 11625,
+    "StoppedOnHealthTarget": true,
+    "HealthTarget": {
+      "Scope": "79E925FF160D0D0F005E9125CCE89EFDEE2624B3B792476798E39A691160307A",
+      "StartingHp": 67,
+      "TargetHp": 67,
+      "FullHealth": false,
+      "Basis": "内容分析触及数量上限，按已识别生命效果估计返回目标",
+      "Uncertain": true
+    },
+    "recoveredFailures": 0,
+    "best": {
+      "Won": true,
+      "Dead": false,
+      "StartingHp": 67,
+      "Hp": 67,
+      "MaxHp": 75,
+      "NetHpLoss": 0,
+      "EnemyHp": 0,
+      "Rounds": 4,
+      "StopReason": "胜利结算完成",
+      "steps": 29,
+      "choices": 3,
+      "potions": 0
+    }
+  },
+  "unseeded_first_zero_loss_is_final_trial": true,
+  "analysis_count": 1,
+  "analysis_limits_unchanged": true,
+  "strict_unknown_bound_retained": "当前玩家内容存在可重复或动态生命上限增加",
+  "installation": {
+    "version": "0.7.81",
+    "same_tested_dll_installed": true,
+    "script": "Update.ps1 -InstallOnly",
+    "game_not_started_or_stopped": true
+  },
+  "privacy": {
+    "raw_inputs_player_identifiers_logs_game_assets_saves_and_keys_excluded": true
+  }
+}

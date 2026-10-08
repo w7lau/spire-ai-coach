@@ -195,6 +195,7 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
         // The chosen policy estimates a goal from held content, even when global
         // Mod effects prevent a ceiling proof. Never feed this goal to Envelope.
         decimal heal = 0, maxHp = 0;
+        bool limited = false;
         bool active = false, uncertain = request.LoadedMods.Any(m => !m.StartsWith("sts2:", StringComparison.Ordinal) &&
             !m.StartsWith("SpireAiCoach:", StringComparison.Ordinal));
         // Global modifiers also touch enemy HP. The user's policy is a goal
@@ -206,7 +207,10 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
         while (pending.TryDequeue(out var type))
         {
             if (!seen.Add(type)) continue;
-            if (seen.Count > 128) { active = uncertain = true; break; }
+            // A bounded estimate can be incomplete without discovering a
+            // healing effect. Keep the known goal and its uncertainty; only
+            // actual HP calls may turn it into a full-health goal.
+            if (seen.Count > 128) { limited = uncertain = true; break; }
             var effect = ReadContent(type, targetOnly: true);
             active |= effect.ActiveRecovery; uncertain |= effect.Uncertain;
             foreach (var generated in effect.Generated) pending.Enqueue(generated);
@@ -223,6 +227,8 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
         decimal goal = Math.Min(player.Creature.MaxHp + maxHp, start + heal + maxHp);
         if (goal > int.MaxValue) { active = uncertain = true; goal = start; }
         return new(LocalMinimumLossProof.Scope(request), start, (int)decimal.Ceiling(goal), active,
+            limited ? active ? "检测到生命恢复，目标为战后满血；内容分析触及数量上限" :
+                "内容分析触及数量上限，按已识别生命效果估计返回目标" :
             active ? "检测到战中或动态生命恢复，目标为战后满血" : heal + maxHp > 0 ?
                 "当前内容的固定战后生命增加" : "当前内容未检测到生命恢复调用，目标为不净损血", uncertain);
     }
@@ -282,7 +288,7 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                 (entry.Method.Name.StartsWith("After", StringComparison.Ordinal) ||
                  entry.Method.Name.StartsWith("Before", StringComparison.Ordinal) ||
                  entry.Method.DeclaringType != sourceOwner)) continue;
-            if (seen.Count > 512) { active = true; Unknown(entry.Method); break; }
+            if (seen.Count > 512) { Unknown(entry.Method); break; }
             var (method, terminal, direct, futureTurnStart, pileEvent, input) = entry;
             var patches = Harmony.GetPatchInfo(method);
             if (patches != null)
