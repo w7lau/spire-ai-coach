@@ -16,6 +16,7 @@ void AsyncTest(string name, Func<Task> test) => tests.Add((name, test));
 TurnWorkTests.Register(Test, AsyncTest);
 ResumeSearchTests.Register(Test);
 MinimumLossTests.Register(Test, AsyncTest);
+CardGoalMinimumTests.Register(Test);
 HealthAccountingTests.Register(Test);
 FullHealthReturnTests.Register(Test);
 HealthRecoveryTests.Register(Test);

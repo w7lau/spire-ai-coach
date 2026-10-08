@@ -157,7 +157,13 @@ public sealed class LocalMinimumLossProof(LocalSearchRequest request, int capaci
             var prefix = Prefix(node);
             foreach (var key in node.Legal)
             {
-                if (node.Children.TryGetValue(key, out var child)) { queue.Enqueue(child); continue; }
+                if (node.Children.TryGetValue(key, out var child))
+                {
+                    // Resolved siblings need no more proof work. Do not let
+                    // them consume the bounded scan before open descendants.
+                    if (!child.Terminal && child.Minimum.CompareTo(target) < 0) queue.Enqueue(child);
+                    continue;
+                }
                 if (node.Hint == null || node.Round < 1) continue;
                 LocalAction[]? proposed = node.Actions.TryGetValue(key, out var action) ? [..prefix, action] :
                     node.Choices.TryGetValue(key, out var choice) && prefix.Length > 0 ?
@@ -165,7 +171,10 @@ public sealed class LocalMinimumLossProof(LocalSearchRequest request, int capaci
                 if (proposed != null) result.Add(new(proposed, node.Round, node.Hint));
                 if (result.Count >= 16) break;
             }
-            if (node.Legal.Count == 0 && node.Hint != null && node.Round > 0 && prefix.Length > 0)
+            // Fast exact replay can observe a single action without enumerating
+            // its whole native offer. Replay to that node, then expand the full
+            // offer; completed observed children do not close missing siblings.
+            if ((!node.Complete || node.Legal.Count == 0) && node.Hint != null && node.Round > 0 && prefix.Length > 0)
                 result.Add(new(prefix, node.Round, node.Hint));
         }
         return result.ToArray();

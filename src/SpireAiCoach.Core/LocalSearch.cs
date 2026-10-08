@@ -164,25 +164,40 @@ public static class LocalSearchPolicy
         request.StopOnFirstWin ? CanStopAtFirstWin(candidate, request) :
         request.CardGoals?.Enabled != true && CanStop(candidate, request.StopOnZeroLoss,
             request.TargetVictoryRounds, request.TargetPotionUses, request.RequireKnownZeroEnemyDamage);
+    // A bound over the full legal domain also bounds the subset satisfying a
+    // card goal. Keep explicit loss thresholds and stand-alone benchmarks on
+    // their original stopping policy; a candidate still has to finish its goals.
+    public static bool ShouldTrackMinimum(LocalSearchRequest request) => request.StopOnZeroLoss &&
+        !request.StopOnFirstWin && request.VerifyCandidate == null && request.ExcludedModels is not { Length: > 0 } &&
+        (!HasSpecificGoal(request) || request.CardGoals is { Enabled: true, HpLossThreshold: null });
+    private static bool CompletedCardGoals(LocalCandidate candidate, LocalCardGoals? goals) =>
+        goals is not { Enabled: true } || candidate.CardGoalOutcome is
+            { ConsumableGoals: { } consumable } outcome && consumable.Complete(goals, outcome) && (!goals.HpLossThreshold.HasValue || goals.WithinThreshold(candidate));
     public static bool CanStopAtMinimum(LocalCandidate? candidate, LocalSearchRequest request,
-        LocalMinimumLossCertificate? certificate) => request.StopOnZeroLoss && !request.StopOnFirstWin && !HasSpecificGoal(request) &&
+        LocalMinimumLossCertificate? certificate) => ShouldTrackMinimum(request) &&
         candidate is { Won: true, Dead: false, Hp: > 0, StartingHp: not null, Actions.Length: > 0 } && certificate != null &&
         candidate.Actions[0].BeforeHash == request.NativeHash &&
         certificate.Scope == LocalMinimumLossProof.Scope(request) && certificate.StartingHp == candidate.StartingHp &&
         ReachesHealthProof(candidate, certificate) &&
-        certificate.MinimumPotionsUsed == candidate.Actions.Count(a => a.PotionSlot.HasValue);
+        certificate.MinimumPotionsUsed == candidate.Actions.Count(a => a.PotionSlot.HasValue) &&
+        CompletedCardGoals(candidate, request.CardGoals) &&
+        (!request.TargetVictoryRounds.HasValue || candidate.Rounds <= request.TargetVictoryRounds.Value) &&
+        (!request.TargetPotionUses.HasValue || candidate.Actions.Count(a => a.PotionSlot.HasValue) <= request.TargetPotionUses.Value) &&
+        (!request.RequireKnownZeroEnemyDamage || candidate.DamageSources is { Complete: true, Enemy: 0 });
     public static bool RequiresMinimumConfirmation(LocalCandidate? candidate, LocalSearchRequest request,
         LocalMinimumLossCertificate? certificate) => !CanStop(candidate, request) && !CanStopOnCardGoals(candidate, request) &&
         CanStopAtMinimum(candidate, request, certificate);
     private static bool ReachesHealthProof(LocalCandidate candidate, LocalMinimumLossCertificate proof) =>
         proof.MinimumNetHpLoss == candidate.NetHpLoss &&
         (proof.MaximumFinalHp is { } maximum ? maximum == candidate.Hp : proof.MinimumNetHpLoss > 0);
-    public static bool HasMinimumProof(LocalSearchResult result) => result.CardGoals?.Enabled != true &&
-        result.Status == "done" && !result.StoppedOnFirstWin && !result.StoppedOnManualVictory && !result.StoppedOnHealthTarget &&
+    public static bool HasMinimumProof(LocalSearchResult result) =>
+        result.Status == "done" && !result.StoppedOnFirstWin && !result.StoppedOnManualVictory &&
+        !result.StoppedOnCardGoals && !result.StoppedOnHealthTarget &&
         result.Best is { Won: true, Dead: false, Hp: > 0, StartingHp: not null } best &&
         result.MinimumLoss is { Confirmed: true, Certificate: { } proof } &&
         proof.StartingHp == best.StartingHp && ReachesHealthProof(best, proof) &&
-        proof.MinimumPotionsUsed == best.Actions.Count(a => a.PotionSlot.HasValue);
+        proof.MinimumPotionsUsed == best.Actions.Count(a => a.PotionSlot.HasValue) &&
+        (result.CardGoals is not { Enabled: true } || result.CardGoals.HpLossThreshold == null && CompletedCardGoals(best, result.CardGoals));
     public static bool MeetsGoal(LocalCandidate? candidate, LocalSearchRequest request) =>
         CanStop(candidate, true, request.TargetVictoryRounds, request.TargetPotionUses, request.RequireKnownZeroEnemyDamage);
     public static bool BetterForGoal(LocalCandidate candidate, LocalCandidate? prior, LocalSearchRequest request)
@@ -387,7 +402,8 @@ public static class LocalSearchPolicy
         if (goals.HpLossThreshold is { } limit)
             yield return goals.WithinThreshold(best) ? $"净损血小于 {limit}，已优先比较补刀及使用次数。" :
                 $"尚未找到净损血小于 {limit} 的获胜路线，显示目前损血较少的方案。";
-        yield return result.StoppedOnCardGoals ?
+        yield return HasMinimumProof(result) ?
+            "当前一次性出牌及补刀目标已完成，战后生命及用药已达到证明界限；目标范围为当前副本及活敌人数。" : result.StoppedOnCardGoals ?
             "当前一次性出牌及补刀目标已完成，生命符合设置，已停止搜索；补刀目标以当前活敌人数为上限，未继续寻找回收、复制或额外生成后的次数。" :
             "可选目标尚未证明最优；仅无伤或耗尽目标牌不会提前返回。";
         if (result.StoppedOnCardGoals && goals.HpLossThreshold == null && result.HealthTarget is { } target)

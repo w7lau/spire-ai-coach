@@ -45,6 +45,8 @@ python experiments/LocalIntegration/run.py --workspace C:\path\owned-native-work
 `SPIRE_LOCAL_MOD_REPLAY_TEST=1` uses the owned replay entry with a locally frozen four-action incident. `SPIRE_LOCAL_REPLAY`, `SPIRE_LOCAL_SEED_RESULT`, and `SPIRE_LOCAL_MOD_REPLAY_AFTER` identify ignored inputs. It compares the original native prediction against the exact live hash/history, validates both restore modes and ownership/missing-state rejection, then searches, independently verifies, and executes a complete native winner. Inputs, proc-state mutation, and all game commands stay inside the owned host; never include this observer or player inputs in the installed package.
 ## 当前一次性副本目标验收
 
+`--card-goal-minimum-test --replay <private-request.json> --game <installed-game> --mods <matching-frozen-mods>`：复现60→59且需要打出当前一次性副本的冻结病例。采样与分支扩展均不注入已有答案，保留原八路/64条/60秒/64回合设置，要求最低损失1、战后生命上界59、药水下界0、实际目标完成、全部贡献者安全收尾确认及一次普通独立最终复放。只读证明树观察器仅安装在所属测试宿主，原始证明树、输入、路线、Mod和日志保存在忽略目录；不包含在安装包中。单个病例通过不能作为全部战斗速度或任意Mod兼容的结论。
+
 `--health-target-return-test --replay <frozen-request> --seed-result <same-root-native-win> --game <game-directory>` 检查当前内容固定+1生命目标不会被未知上界改成满血，并只读检查抽象来源分派后的无回复/生命写入识别。两个算法独立重放同一真实冻结胜利，各做一次普通最终复核；须按原冻结输入提供对应`--mods`，原生输入和完整结果保留在ignored目录。此为有种子目标停止验收，非搜索质量或性能基准，见 [0.7.73证据](results/2026-10-07-health-target-return-0.7.73.json)。
 
 `run.py --workspace <owned-native-probe-workspace> --finite-card-goals-test --results-dir <ignored-results-directory>` 检查真实能力牌打出后移出战斗的计数与提前返回：一张/两张当前副本、无回血、固定战后回血、明确损血额度及普通可重复牌的负例。两个算法均使用同一原生已完成路线，各做一次普通独立最终复核；这是有种子停止合同验收，不是搜索质量或速度基准。起点前的原生Akabeko保证有限攻击能完成夹具，未在冻结后改写战斗状态或敌方血量。

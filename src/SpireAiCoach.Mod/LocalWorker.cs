@@ -206,8 +206,7 @@ public static class LocalWorker
         string unknownRecoveryReason = "";
         var recovery = new LocalRecoveryEstimator(request);
         var proofChoicesPolicy = new LocalTurnSearch(request.Partition);
-        bool trackMinimum = request.StopOnZeroLoss && !request.StopOnFirstWin && request.VerifyCandidate == null &&
-            !LocalSearchPolicy.HasSpecificGoal(request) && request.ExcludedModels is not { Length: > 0 };
+        bool trackMinimum = LocalSearchPolicy.ShouldTrackMinimum(request);
         var minimumProof = trackMinimum && request.MinimumLossPipe == null ? new LocalMinimumLossProof(request) : null;
         LocalMinimumLossClient? minimumClient = null;
         LocalMinimumLossStatus? minimumStatus = null;
@@ -373,7 +372,9 @@ public static class LocalWorker
                 Trials: status == "running" ? null : trials.ToArray(), CardGoals: request.CardGoals, MinimumLoss: minimumStatus,
                 StoppedOnFirstWin: stoppedEarly && !stoppedOnManualVictory && LocalSearchPolicy.CanStopAtFirstWin(best, request),
                 StoppedOnCardGoals: stoppedEarly && !stoppedOnManualVictory && LocalSearchPolicy.CanStopOnCardGoals(best, request, recovery.HealthTarget),
-                StoppedOnMinimum: stoppedEarly && !stoppedOnManualVictory && !LocalSearchPolicy.CanStopAtHealthTarget(best, request, recovery.HealthTarget) &&
+                StoppedOnMinimum: stoppedEarly && !stoppedOnManualVictory &&
+                    !LocalSearchPolicy.CanStopOnCardGoals(best, request, recovery.HealthTarget) &&
+                    !LocalSearchPolicy.CanStopAtHealthTarget(best, request, recovery.HealthTarget) &&
                     LocalSearchPolicy.RequiresMinimumConfirmation(best, request, minimumStatus?.Certificate),
                 StoppedOnManualVictory: stoppedOnManualVictory,
                 HealthTarget: recovery.HealthTarget,

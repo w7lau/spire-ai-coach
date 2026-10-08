@@ -43,6 +43,7 @@ public static class Entry
 
     private static async void Run(string root)
     {
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_CARD_GOAL_MINIMUM_TEST") == "1") ProofTreeProbe.Install(root);
         var tree = (SceneTree)Engine.GetMainLoop();
         var records = new List<object>();
         using var pool = new LocalWorkerPool(Path.Combine(root, "integration-pool"));

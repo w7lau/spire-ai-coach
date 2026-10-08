@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -205,8 +205,7 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
             int manualVictoryReached = 0;
             LocalSearchResult? finishedWinner = null;
             int finishedWinnerWorker = -1;
-            using var minimumLoss = request.StopOnZeroLoss && !request.StopOnFirstWin && !LocalSearchPolicy.HasSpecificGoal(request) &&
-                request.ExcludedModels is not { Length: > 0 } ? new LocalMinimumLossBroker(request, count) : null;
+            using var minimumLoss = LocalSearchPolicy.ShouldTrackMinimum(request) ? new LocalMinimumLossBroker(request, count) : null;
             var rootBranches = new int[count];
             var starting = new int[count];
             bool shared = request.ShareSearchWork && (count > 1 || session != null) &&
@@ -363,7 +362,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 StoppedOnMinimum = !manualVictory && Volatile.Read(ref minimumGoalReached) != 0,
                 StoppedOnManualVictory = manualVictory,
                 StoppedOnHealthTarget = !manualVictory && Volatile.Read(ref healthTargetReached) != 0,
-                MinimumLoss = manualVictory || Volatile.Read(ref healthTargetReached) != 0 ? null : minimumLoss?.Status,
+                MinimumLoss = manualVictory || Volatile.Read(ref healthTargetReached) != 0 ||
+                    Volatile.Read(ref consumableGoalReached) != 0 ? null : minimumLoss?.Status,
                 Id = request.Id,
                 Trials = results.SelectMany(r => r.Trials ?? []).OrderBy(t => t.FinishedMs).ToArray(),
                 RecoveredFailures = results.Where(r => r.Status is "failed" or "unsupported" or "partial")
@@ -448,7 +448,8 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                 Volatile.Write(ref consumableGoalReached, LocalSearchPolicy.CanStopOnCardGoals(winner.Best, request, winner.HealthTarget) ? 1 : 0);
                 bool healthReached = LocalSearchPolicy.CanStopAtHealthTarget(winner.Best, request, winner.HealthTarget);
                 Volatile.Write(ref healthTargetReached, healthReached ? 1 : 0);
-                Volatile.Write(ref minimumGoalReached, !healthReached && LocalSearchPolicy.RequiresMinimumConfirmation(winner.Best, request, minimumLoss?.Status.Certificate) ? 1 : 0);
+                Volatile.Write(ref minimumGoalReached, Volatile.Read(ref consumableGoalReached) == 0 && !healthReached &&
+                    LocalSearchPolicy.RequiresMinimumConfirmation(winner.Best, request, minimumLoss?.Status.Certificate) ? 1 : 0);
                 victoryReturn?.CloseSearch();
                 goalReached.Cancel();
                 progress(request.StopOnFirstWin ? "已找到获胜路线，正在停止其余搜索并确认路线…" :
@@ -627,9 +628,11 @@ public sealed class LocalWorkerPool(string directory) : IDisposable
                                 if (!goalReached.IsCancellationRequested) progress($"正在计算 · 已启用 {Volatile.Read(ref launched)}/{count} 路 · 当前实例已评估 {result.Evaluated} 条路线");
                             }
                         }
-                        // Normally the native action settles and acknowledges within one poll.
-                        // A stuck callback must not hold the goal route until the search budget.
-                        if (stopping?.Elapsed.TotalSeconds >= 2)
+                        // Ordinary goal/manual stops may retire a slow peer. A minimum
+                        // certificate depends on its contributors finishing valid native
+                        // execution: let the current action settle within the existing
+                        // worker deadline rather than invalidating the proof after 2s.
+                        if (stopping?.Elapsed.TotalSeconds >= 2 && Volatile.Read(ref minimumGoalReached) == 0)
                         { minimumLoss?.RejectOwner(index); worker.Stop("停止搜索后未能确认安全清理", timeline, index); return Stopped(); }
                         if (worker.Process?.HasExited != false)
                             throw new CoachException("local_exit", "本次计算意外中断，请重试。");

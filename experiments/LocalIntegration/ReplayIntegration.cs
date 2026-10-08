@@ -56,6 +56,11 @@ public static class ReplayIntegration
         // Frozen execution controls retain the same startup; bootstrap has its own paired
         // cold measurements. Ordinary integration fixtures use the product's default.
         var installation = new LocalInstallation(game, directories, MinimalWorkerBootstrap: false);
+        if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_CARD_GOAL_MINIMUM_TEST") == "1")
+        {
+            await CardGoalMinimumIntegration.Run(root, pool, original, request, installation);
+            return;
+        }
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_PROGRESS_DISPLAY_TEST") == "1")
         {
             await ProgressDisplayIntegration.Run(root, pool, request, installation with { MinimalWorkerBootstrap = true });

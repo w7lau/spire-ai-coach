@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Reflection;
 using System.Text.Json;
 using SpireAiCoach.Core;
@@ -411,15 +411,19 @@ internal static class WorkerReuseTests
             // cold-start latency has its own owned integration measurement.
             await f.Pool.Prepare(f.Installation, 2, CancellationToken.None);
             foreach (var algorithm in new[] { LocalSearchOrder.MonteCarlo, LocalSearchOrder.TurnFrontier })
-            foreach (var scenario in new[] { "minimum-goal", "minimum-late-proof" })
+            foreach (var scenario in new[] { "minimum-goal", "minimum-late-proof", "minimum-delayed-settle" })
             {
                 var r = Request(scenario) with { SearchOrder = algorithm, StopOnZeroLoss = true };
+                var owners = Workers(f.Pool).Take(2).Select(w => (w.Process!.Id, w.Generation)).ToArray();
                 var watch = Stopwatch.StartNew();
                 var result = await f.Pool.Analyze(r, f.Installation, _ => { }, CancellationToken.None);
                 Check(result.Status == "done" && result.StoppedEarly && result.Best?.NetHpLoss == 12 &&
                     result.MinimumLoss is { Confirmed: true, Certificate.MinimumNetHpLoss: 12 }, "Positive minimum was not confirmed");
                 Check(result.Timing?.Verifications == 1 && result.Trace!.Spans.Any(s => s.Phase == "stop_search") &&
                     watch.Elapsed < TimeSpan.FromSeconds(8), "Peer waited for its full budget or repeated winner verification");
+                Check(owners.SequenceEqual(Workers(f.Pool).Take(2).Select(w => (w.Process!.Id, w.Generation))) &&
+                    !result.Trace!.Spans.Any(s => s.Phase is "retire" or "fallback" or "rebuild"),
+                    "Valid proof contributors were retired or restarted before settlement");
                 Check(LocalSearchPolicy.FormatAdvice(result).Contains("已证明最低净损失为 12"), "Advice hid the confirmed optimum");
                 Console.WriteLine($"  minimum-loss protocol evidence: algorithm={algorithm}; scenario={scenario}; loss=12; peers=2; elapsed_ms={watch.ElapsedMilliseconds}; confirmed={result.MinimumLoss!.Confirmed}; verifications={result.Timing!.Verifications}; peer_budget_ms=10000; native_game=false");
             }
@@ -636,7 +640,7 @@ internal static class WorkerReuseTests
     {
         var candidate = request.VerifyCandidate ?? new(
             [new(0, "synthetic", null, "fake", "", request.NativeHash)], 50, 0, 0, 0, 50, true, false, false, StartingHp: 50);
-        if (request.VerifyCandidate == null && request.DebugEncounter is "minimum-goal" or "minimum-errors" or "minimum-late-proof")
+        if (request.VerifyCandidate == null && request.DebugEncounter is "minimum-goal" or "minimum-errors" or "minimum-late-proof" or "minimum-delayed-settle")
             candidate = candidate with { Hp = 38, HpLost = 12, Actions = [MinimumLossTests.FirstTurn(request, request.Partition).Steps[0].Action] };
         if (request.VerifyCandidate == null && request.DebugEncounter is { } scenario &&
             (scenario.StartsWith("minimum-zero", StringComparison.Ordinal) || scenario.StartsWith("minimum-healed", StringComparison.Ordinal)))
@@ -764,6 +768,10 @@ internal static class WorkerReuseTests
                         }
                         await Task.Delay(15);
                     }
+                    // Model a native action already in progress when the proof stop arrives.
+                    // No final result/idle is published until its safe settlement completes.
+                    if (goal && !cancelled && minimum && request.Partition == 1 && request.DebugEncounter == "minimum-delayed-settle")
+                        await Task.Delay(3000);
                     if (task != null) { if (cancelled || goal) client!.ReturnInterrupted(task, new(50, 50, 100, 100)); else client!.Finish(task); }
                     var result = new LocalSearchResult(request.Id, request.SnapshotId,
                         cancelled ? "cancelled" : request.VerifyCandidate == null ? "searched" : "done", "synthetic", 1, 0, timer.ElapsedMilliseconds,
