@@ -902,6 +902,27 @@ Test("progress victory summaries retain net healing and missing summaries across
     Check(JsonSerializer.Deserialize<LocalProgress>(JsonSerializer.Serialize(progress with { Best = null }))!.Best == null);
     Check((copy.Best! with { Hp = 80 }).NetHpLoss == 7 && (copy.Best with { StartingHp = null }).NetHpLoss == null);
 });
+Test("progress counts remaining searches after the first lane finishes", () =>
+{
+    var completed = new LocalProgress("job", "snapshot", 0, 8, 20, 4, 7, 64, 7, 60000, 60,
+        "搜索完成 · 正在汇总路线", null, [new(5, 2, "打击", "伤害")], "searched", RootBranches: 13);
+    var lanes = Enumerable.Range(0, 8).Select(i => completed with { Worker = i,
+        Status = i < 6 ? "searched" : "running", Phase = i < 6 ? completed.Phase : "试走路线" }).ToArray();
+    var caption = LocalProgressBook.Caption(lanes);
+    Check(caption.Contains("已启用 8/8 路") && caption.Contains("搜索 2 路 · 准备 0 路 · 已结束 6 路"));
+    Check(caption.EndsWith("试走路线") && LocalProgressBook.LaneState(completed) == "已结束");
+    Check(!LocalProgressBook.Preparing(completed));
+});
+Test("progress distinguishes preparation from a dead trial that still owns a search", () =>
+{
+    var waiting = new LocalProgress("job", "snapshot", 0, 8, 0, 0, 0, 64, 0, 0, 60, "准备计算", null, []);
+    var lost = waiting with { Worker = 1, Sequence = 9, RootBranches = 13, Phase = "继续其他分支",
+        State = new(2, 0, 75, 0, 0, "", [], 0, []) };
+    Check(LocalProgressBook.Preparing(waiting) && LocalProgressBook.LaneState(waiting) == "准备中");
+    Check(!LocalProgressBook.Finished(lost) && !LocalProgressBook.Preparing(lost) && LocalProgressBook.LaneState(lost) == "搜索中");
+    Check(LocalProgressBook.Caption([waiting, lost]).Contains("搜索 1 路 · 准备 1 路 · 已结束 0 路"));
+    Check(LocalProgressBook.Finished(lost with { Status = "failed" }) && LocalProgressBook.LaneState(lost with { Status = "failed" }) == "失败");
+});
 Test("compact local advice preserves incomplete death and execution warnings while full details remain available", () =>
 {
     var action = new LocalAction(1, "STRIKE", 123, "打击", "左侧敌人", "hash", Round: 1);

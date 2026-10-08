@@ -17,7 +17,8 @@ internal sealed class LocalRouteMap
     private bool _active;
     private int _selected;
     private int _pass;
-    private sealed record Row(int Worker, LocalSimEvent[] Events, int? Hp, int Round, bool Victory, bool Stopped, string Activity);
+    private sealed record Row(int Worker, LocalSimEvent[] Events, int? Hp, int Round, bool Victory, bool Stopped,
+        string Activity, string LaneState, int Evaluated);
 
     public LocalRouteMap()
     {
@@ -71,13 +72,13 @@ internal sealed class LocalRouteMap
         if (winner?.Best is { } best)
         {
             _recent.TryGetValue((winner.Worker, best.Route), out var trace);
-            rows.Add(new(winner.Worker, trace ?? [], best.Hp, best.Rounds, true, true, "获胜候选"));
+            rows.Add(new(winner.Worker, trace ?? [], best.Hp, best.Rounds, true, true, "获胜候选", "获胜候选", 0));
         }
-        var visible = _latest.Values.Take(7).ToList();
-        if (_latest.TryGetValue(_selected, out var selected) && visible.All(p => p.Worker != _selected))
-        { if (visible.Count == 7) visible.RemoveAt(6); visible.Add(selected); }
-        rows.AddRange(visible.Select(p => new Row(p.Worker, p.Events, p.State?.Hp,
-            p.State?.Round ?? 0, false, p.Status != "running" || p.State is { Hp: <= 0 }, LocalProgressBook.Activity(p))));
+        // The accepted telemetry is already bounded to sixteen logical lanes.
+        // Keep completed lanes visible so their stopped pulse has an explanation.
+        rows.AddRange(_latest.Values.Select(p => new Row(p.Worker, p.Events, p.State?.Hp,
+            p.State?.Round ?? 0, false, LocalProgressBook.Finished(p), LocalProgressBook.Activity(p),
+            LocalProgressBook.LaneState(p), p.Evaluated)));
         return rows;
     }
     private void Draw()
@@ -133,8 +134,9 @@ internal sealed class LocalRouteMap
             }
             if (row.Victory) View.DrawArc(new Vector2(end + 1, y), 7, 0, Mathf.Tau, 24, _green, 2, true);
             else View.DrawCircle(new Vector2(end + 1, y), 3.5f, tint);
-            View.DrawString(font, new Vector2(end + 15, y - 3), row.Victory ? "获胜候选" : $"路线 {row.Worker + 1}", fontSize: 12, modulate: tint);
-            View.DrawString(font, new Vector2(end + 15, y + 14), row.Hp is { } hp ? $"{hp} HP · {row.Round} 回合" : "准备中", fontSize: 10, modulate: CoachTheme.Muted);
+            View.DrawString(font, new Vector2(end + 15, y - 3), row.Victory ? "获胜候选" : $"{row.Worker + 1}路 · {row.LaneState}", fontSize: 11, modulate: tint);
+            View.DrawString(font, new Vector2(end + 15, y + 14), !row.Victory && row.Stopped ? $"已评估 {row.Evaluated} 条" :
+                row.Hp is { } hp ? $"{hp} HP · {row.Round} 回合" : row.LaneState, fontSize: 10, modulate: CoachTheme.Muted);
         }
     }
     internal static string ShortAction(string action)

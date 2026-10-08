@@ -55,10 +55,10 @@ internal static class StartupPreparationIntegration
             var next = first with { Pass = 1, Sequence = 4_000_001, Victories = 0, Best = null, Phase = "兼容模式 · 准备计算" };
             panel.Accept(next);
             T Part<T>(string name) => (T)typeof(LocalProgressPanel).GetField(name, fields)!.GetValue(panel)!;
-            if (Part<Label>("_caption").Text != next.Phase || Part<Label>("_health").Text != next.Phase ||
+            if (!Part<Label>("_caption").Text.EndsWith(next.Phase) || Part<Label>("_health").Text != next.Phase ||
                 Part<Label>("_best").Text != "") throw new InvalidOperationException("Compatibility restart still shows stale victory or waiting for cards");
             panel.Accept(first with { Sequence = 99 });
-            if (Part<Label>("_caption").Text != next.Phase) throw new InvalidOperationException("Late old-pass progress replaced compatibility status");
+            if (!Part<Label>("_caption").Text.EndsWith(next.Phase)) throw new InvalidOperationException("Late old-pass progress replaced compatibility status");
             panel.Accept(next with { Sequence = next.Sequence + 1, Status = "searched", Phase = "搜索完成 · 正在汇总路线" });
             panel.Finish("计算完成", false);
             panel.Accept(next with { Sequence = next.Sequence + 2 });

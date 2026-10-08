@@ -1,0 +1,214 @@
+{
+  "date": "2026-10-08",
+  "original_version": "0.7.81",
+  "original_completed_at": "2026-10-08T08:08:46.452462+00:00",
+  "original": {
+    "ConfiguredWorkers": 8,
+    "WorkerLimit": 8,
+    "Workers": 8,
+    "Evaluated": 58,
+    "Victories": 57,
+    "ElapsedMs": 65081
+  },
+  "worker_evidence": [
+    {
+      "worker": 0,
+      "evaluated": 7,
+      "victories": 7,
+      "status": "searched",
+      "elapsed_ms": 64178,
+      "progress_transport": {
+        "pipe": false,
+        "fallback": "TaskCanceledException: A task was canceled."
+      }
+    },
+    {
+      "worker": 1,
+      "evaluated": 7,
+      "victories": 7,
+      "status": "searched",
+      "elapsed_ms": 63497,
+      "progress_transport": {
+        "pipe": true,
+        "fallback": null
+      }
+    },
+    {
+      "worker": 2,
+      "evaluated": 7,
+      "victories": 7,
+      "status": "searched",
+      "elapsed_ms": 63332,
+      "progress_transport": {
+        "pipe": true,
+        "fallback": null
+      }
+    },
+    {
+      "worker": 3,
+      "evaluated": 6,
+      "victories": 6,
+      "status": "searched",
+      "elapsed_ms": 63119,
+      "progress_transport": {
+        "pipe": true,
+        "fallback": null
+      }
+    },
+    {
+      "worker": 4,
+      "evaluated": 6,
+      "victories": 6,
+      "status": "searched",
+      "elapsed_ms": 63301,
+      "progress_transport": {
+        "pipe": true,
+        "fallback": null
+      }
+    },
+    {
+      "worker": 5,
+      "evaluated": 10,
+      "victories": 10,
+      "status": "searched",
+      "elapsed_ms": 63392,
+      "progress_transport": {
+        "pipe": true,
+        "fallback": null
+      }
+    },
+    {
+      "worker": 6,
+      "evaluated": 8,
+      "victories": 8,
+      "status": "searched",
+      "elapsed_ms": 62910,
+      "progress_transport": {
+        "pipe": true,
+        "fallback": null
+      }
+    },
+    {
+      "worker": 7,
+      "evaluated": 7,
+      "victories": 6,
+      "status": "searched",
+      "elapsed_ms": 63624,
+      "progress_transport": {
+        "pipe": false,
+        "fallback": "TaskCanceledException: A task was canceled."
+      }
+    }
+  ],
+  "original_ui_observation_not_recorded": true,
+  "native_baseline": {
+    "version": "0.7.81",
+    "requestedWorkers": 8,
+    "Workers": 8,
+    "Evaluated": 16,
+    "Victories": 16,
+    "updates": [
+      {
+        "worker": 0,
+        "count": 34
+      },
+      {
+        "worker": 1,
+        "count": 53
+      },
+      {
+        "worker": 2,
+        "count": 63
+      },
+      {
+        "worker": 3,
+        "count": 44
+      },
+      {
+        "worker": 4,
+        "count": 55
+      },
+      {
+        "worker": 5,
+        "count": 49
+      },
+      {
+        "worker": 6,
+        "count": 48
+      },
+      {
+        "worker": 7,
+        "count": 39
+      }
+    ],
+    "searchBenchmark": false,
+    "maximum_visible_lanes": 7,
+    "maximum_moving_lanes": 7,
+    "finish_lifecycle": null,
+    "all_eight_visible": null
+  },
+  "native_fixed": {
+    "version": "0.7.82",
+    "requestedWorkers": 8,
+    "Workers": 8,
+    "Evaluated": 16,
+    "Victories": 16,
+    "updates": [
+      {
+        "worker": 0,
+        "count": 33
+      },
+      {
+        "worker": 1,
+        "count": 33
+      },
+      {
+        "worker": 2,
+        "count": 33
+      },
+      {
+        "worker": 3,
+        "count": 32
+      },
+      {
+        "worker": 4,
+        "count": 39
+      },
+      {
+        "worker": 5,
+        "count": 35
+      },
+      {
+        "worker": 6,
+        "count": 40
+      },
+      {
+        "worker": 7,
+        "count": 39
+      }
+    ],
+    "searchBenchmark": false,
+    "maximum_visible_lanes": 8,
+    "maximum_moving_lanes": 8,
+    "finish_lifecycle": true,
+    "all_eight_visible": true
+  },
+  "validation": {
+    "core_passed": 463,
+    "core_total": 463,
+    "native_display_passed": true,
+    "probe_trials_per_lane": 2,
+    "probe_budget_seconds": 20,
+    "performance_comparison": false
+  },
+  "installation": {
+    "version": "0.7.82",
+    "dll_sha256": "c6f5b279054b8058ef60059d51882ae7ce8cf36b11344401cc0f8de8f83ea0ab",
+    "update_install_only": true
+  },
+  "limits": [
+    "Display probe uses shorter explicit limits; it is not a search-speed benchmark.",
+    "Original runtime does not record the UI state at the observation instant."
+  ],
+  "product_change_scope": "Bounded telemetry display only; scheduling, rules, goals, native state, checkpoints, ownership and execution gates unchanged."
+}

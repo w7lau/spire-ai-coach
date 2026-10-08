@@ -35,6 +35,26 @@ public sealed class LocalProgressBook(string id, string snapshotId)
         return true;
     }
     public static double BudgetUsed(LocalProgress progress) => Math.Clamp(100d * progress.ElapsedMs / Math.Max(1000, progress.BudgetSeconds * 1000), 0, 100);
+    // A losing trial is not the end of its worker: it may restore another branch.
+    public static bool Finished(LocalProgress progress) => progress.Status != "running";
+    public static bool Preparing(LocalProgress progress) => !Finished(progress) && progress.RootBranches <= 0 && progress.State == null;
+    public static string LaneState(LocalProgress progress) => progress.Status switch
+    {
+        "running" => Preparing(progress) ? "准备中" : "搜索中",
+        "failed" => "失败", "cancelled" => "已取消", "unsupported" or "partial" => "已停止", _ => "已结束"
+    };
+    public static string Caption(IEnumerable<LocalProgress> progress)
+    {
+        var lanes = progress.ToArray();
+        if (lanes.Length == 0) return "正在准备路线…";
+        int finished = lanes.Count(Finished), preparing = lanes.Count(Preparing);
+        int victories = lanes.Sum(p => p.Victories);
+        var active = lanes.FirstOrDefault(p => !Finished(p) && !Preparing(p)) ??
+            lanes.FirstOrDefault(p => !Finished(p)) ?? lanes[0];
+        return (victories > 0 ? $"已找到 {victories} 条获胜路线 · " : "") +
+            $"已启用 {lanes.Length}/{lanes.Max(p => p.Workers)} 路\n" +
+            $"搜索 {lanes.Length - finished - preparing} 路 · 准备 {preparing} 路 · 已结束 {finished} 路 · {Activity(active)}";
+    }
     public static string Activity(LocalProgress progress) => !string.IsNullOrWhiteSpace(progress.Phase) ? progress.Phase :
         progress.Status switch { "failed" => "本次试走失败", "cancelled" => "已取消计算",
             "done" or "searched" => "搜索已结束，正在汇总路线", "unsupported" => "此路线无法完成", _ => "正在准备路线" };

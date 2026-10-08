@@ -86,10 +86,7 @@ public sealed class LocalProgressPanel
     private void Render()
     {
         if (_book == null) return;
-        int victories = _book.Latest.Values.Sum(p => p.Victories);
-        var latest = _book.Latest.Values.FirstOrDefault();
-        _caption.Text = (victories > 0 ? $"已找到 {victories} 条获胜路线 · " : "") +
-            (latest == null ? "正在准备路线…" : LocalProgressBook.Activity(latest));
+        _caption.Text = LocalProgressBook.Caption(_book.Latest.Values);
         var best = LocalProgressBook.BestVictory(_book.Latest.Values)?.Best;
         _best.Text = best == null ? "" : $"获胜候选 · 战后生命 {best.Hp}/{best.MaxHp}" +
             (best.HpChange is { } change ? $" · 生命净变化 {change:+0;-0;0}" : "");

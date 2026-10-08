@@ -72,6 +72,7 @@ parser.add_argument('--visual-factory-test', action='store_true')
 parser.add_argument('--route-feedback-test', action='store_true')
 parser.add_argument('--route-feedback-focused-only', action='store_true')
 parser.add_argument('--recent-search-test', action='store_true', help='Frozen unseeded incident; preserve its trial/time/turn limits and report incomplete search honestly')
+parser.add_argument('--progress-display-test', action='store_true', help='Bounded eight-lane native telemetry and product route-map observation; not a search benchmark')
 parser.add_argument('--startup-preparation-test', action='store_true', help='Real idle-menu UI warmup, native worker reuse and exploration phase lifecycle')
 parser.add_argument('--selection-paging-test', action='store_true')
 parser.add_argument('--card-goals-test', action='store_true')
@@ -131,6 +132,8 @@ if args.resource_reuse_test and (not args.replay or not args.seed_result or not 
     parser.error('--resource-reuse-test requires frozen --replay, same-root --seed-result and --game')
 if args.recent_search_test and (not args.replay or args.seed_result or args.recorded_replay):
     parser.error('--recent-search-test requires an unseeded --replay')
+if args.progress_display_test and (not args.replay or not args.game or args.seed_result or args.recorded_replay):
+    parser.error('--progress-display-test requires an unseeded frozen --replay and --game')
 if args.route_feedback_focused_only and not args.route_feedback_test:
     parser.error('--route-feedback-focused-only requires --route-feedback-test')
 if args.route_feedback_test and (not args.replay or not args.seed_result or args.recorded_replay):
@@ -245,6 +248,9 @@ with worker_lock(root):
             (root / name).unlink(missing_ok=True)
     if args.recent_search_test:
         for name in ['integration-recent-search-summary.json', 'integration-recent-search-private.json']:
+            (root / name).unlink(missing_ok=True)
+    if args.progress_display_test:
+        for name in ['integration-progress-display-summary.json', 'integration-progress-display-private.json']:
             (root / name).unlink(missing_ok=True)
     if args.startup_preparation_test:
         (root / 'integration-startup-preparation-summary.json').unlink(missing_ok=True)
@@ -392,6 +398,7 @@ with worker_lock(root):
     env['SPIRE_LOCAL_ROUTE_FEEDBACK_TEST'] = '1' if args.route_feedback_test else '0'
     env['SPIRE_LOCAL_ROUTE_FEEDBACK_FOCUSED_ONLY'] = '1' if args.route_feedback_focused_only else '0'
     env['SPIRE_LOCAL_RECENT_SEARCH_TEST'] = '1' if args.recent_search_test else '0'
+    env['SPIRE_LOCAL_PROGRESS_DISPLAY_TEST'] = '1' if args.progress_display_test else '0'
     env['SPIRE_LOCAL_STARTUP_PREPARATION_TEST'] = '1' if args.startup_preparation_test else '0'
     settings = root / 'Roaming/SlayTheSpire2/default/1/settings.save'
     settings_data = json.loads(settings.read_text(encoding='utf-8-sig')) if settings.exists() else {}
@@ -498,6 +505,9 @@ with worker_lock(root):
                      'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
         if args.recent_search_test:
             names = ['integration-recent-search-summary.json', 'integration-recent-search-private.json',
+                     'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
+        if args.progress_display_test:
+            names = ['integration-progress-display-summary.json', 'integration-progress-display-private.json',
                      'integration-success', 'integration-error.txt', 'integration-stdout.log', 'integration-game.log']
         if args.startup_preparation_test:
             names = ['integration-startup-preparation-summary.json', 'integration-success', 'integration-error.txt',
