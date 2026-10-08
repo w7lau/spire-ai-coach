@@ -152,8 +152,11 @@ public static class ReplayIntegration
                 }).ToArray();
             if (auditFiles.Length != 1) throw new InvalidOperationException("One current native recovery audit was not produced");
             File.Copy(auditFiles[0], Path.Combine(root, "integration-recovery-audit.json"), true);
-            File.Copy(Path.Combine(Path.GetDirectoryName(auditFiles[0])!, "target-sources-audit.json"),
-                Path.Combine(root, "integration-target-sources-audit.json"), true);
+            var sourcesPath = Path.Combine(Path.GetDirectoryName(auditFiles[0])!, "target-sources-audit.json");
+            using (var sourceAudit = JsonDocument.Parse(File.ReadAllText(sourcesPath)))
+                if (sourceAudit.RootElement.GetProperty("Id").GetString() != request.Id)
+                    throw new InvalidOperationException("Recovery source metadata belongs to a different request");
+            File.Copy(sourcesPath, Path.Combine(root, "integration-target-sources-audit.json"), true);
             return;
         }
         if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_RECENT_SEARCH_TEST") == "1")

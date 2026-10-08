@@ -22,7 +22,7 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
     private readonly Dictionary<MethodBase, LocalInstruction[]?> _bodies = [];
     private sealed record ContentEffects(bool ActiveRecovery, int VictoryHeals, int VictoryMaxHpGains,
         bool Uncertain, Type[] Generated, bool DynamicMaxHp = false, bool UsesCardPool = false, string? UncertainAt = null,
-        bool MayChangeDeck = false, bool UsesCharacterPool = false);
+        bool MayChangeDeck = false, bool UsesCharacterPool = false, string[]? ExcludedCallbacks = null);
     private readonly Dictionary<Type, ContentEffects> _content = [];
     private readonly Dictionary<Type, ContentEffects> _targetContent = [];
     private readonly Dictionary<Type, ContentEffects> _deckContent = [];
@@ -195,7 +195,9 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
         // The chosen policy estimates a goal from held content, even when global
         // Mod effects prevent a ceiling proof. Never feed this goal to Envelope.
         decimal heal = 0, maxHp = 0;
-        bool limited = false;
+        bool limited = false, dynamicMaxHp = false;
+        var revivals = new List<(Type Type, LocalRevivalEstimate Rule)>();
+        var sources = new List<string>();
         bool active = false, uncertain = request.LoadedMods.Any(m => !m.StartsWith("sts2:", StringComparison.Ordinal) &&
             !m.StartsWith("SpireAiCoach:", StringComparison.Ordinal));
         // Global modifiers also touch enemy HP. The user's policy is a goal
@@ -212,7 +214,14 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
             // actual HP calls may turn it into a full-health goal.
             if (seen.Count > 128) { limited = uncertain = true; break; }
             var effect = ReadContent(type, targetOnly: true);
-            active |= effect.ActiveRecovery; uncertain |= effect.Uncertain;
+            uncertain |= effect.Uncertain; dynamicMaxHp |= effect.DynamicMaxHp;
+            if (effect.ExcludedCallbacks != null) sources.AddRange(effect.ExcludedCallbacks.Select(m => m + ": 房间进入回调已在起点前结算"));
+            if (effect.ActiveRecovery)
+            {
+                var revival = effect.Uncertain ? null : LocalRevivalEstimate.Read(type);
+                if (revival != null) revivals.Add((type, revival));
+                else { active = true; sources.Add(type.FullName + ": 可触发的战中或动态生命恢复"); }
+            }
             foreach (var generated in effect.Generated) pending.Enqueue(generated);
             var owners = held.OfType<RelicModel>().Where(r => r.GetType() == type).ToArray();
             if (owners.Length == 0 && (effect.VictoryHeals > 0 || effect.VictoryMaxHpGains > 0))
@@ -225,12 +234,19 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
         }
         int start = player.Creature.CurrentHp;
         decimal goal = Math.Min(player.Creature.MaxHp + maxHp, start + heal + maxHp);
+        foreach (var (type, rule) in revivals)
+        {
+            bool improves = rule.CanImprove(goal, player.Creature.MaxHp + maxHp, heal + maxHp, dynamicMaxHp);
+            active |= improves;
+            sources.Add(type.FullName + (improves ? ": 濒死回复仍可能提高目标血量" :
+                ": 濒死回复上限" + rule.MaximumHp(player.Creature.MaxHp + maxHp) + "，加已识别战后收益不能超过目标" + goal));
+        }
         if (goal > int.MaxValue) { active = uncertain = true; goal = start; }
         return new(LocalMinimumLossProof.Scope(request), start, (int)decimal.Ceiling(goal), active,
             limited ? active ? "检测到生命恢复，目标为战后满血；内容分析触及数量上限" :
                 "内容分析触及数量上限，按已识别生命效果估计返回目标" :
             active ? "检测到战中或动态生命恢复，目标为战后满血" : heal + maxHp > 0 ?
-                "当前内容的固定战后生命增加" : "当前内容未检测到生命恢复调用，目标为不净损血", uncertain);
+                "当前内容的固定战后生命增加" : "当前内容未识别到可提高战后血量的恢复，目标为不净损血", uncertain, sources.Take(32).ToArray());
     }
 
     // Small current-content scan. Read only concrete model callbacks, their own
@@ -249,6 +265,7 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
         { uncertain = true; uncertainAt ??= (caller == null ? "" : caller.DeclaringType?.FullName + "." + caller.Name + " -> ") +
             method.DeclaringType?.FullName + "." + method.Name; }
         int heals = 0, gains = 0;
+        var excluded = new List<string>();
         var generated = new HashSet<Type>();
         var queue = new Queue<(MethodBase Method, bool Terminal, bool Direct, bool FutureTurnStart, MethodInfo? PileEvent, LocalIlFacts.Value[]? Input)>();
         var overrides = new HashSet<MethodInfo>();
@@ -262,13 +279,15 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                 // owning model instead of a Hook override (e.g. resurrection).
                 if (!method.IsSpecialName && !method.IsVirtual && method.IsPublic)
                 { queue.Enqueue((method, false, false, false, null, null)); continue; }
-                if (!request.IncludePotions && typeof(PotionModel).IsAssignableFrom(type) && method.Name == "OnUse") continue;
+                if (!request.IncludePotions && typeof(PotionModel).IsAssignableFrom(type) && method.Name == "OnUse" &&
+                    !LocalRevivalEstimate.Automatic(type)) continue;
                 if (method.IsSpecialName || !method.IsVirtual || method.GetBaseDefinition() == method ||
                     !overrides.Add(method.GetBaseDefinition()) || method.Name is "AfterObtained" or "BeforeRemoved" or "AfterRemoved") continue;
                 // Room-entry effects happen after this combat. Keep them in the
                 // strict recovery closure; they cannot produce an in-combat pile event.
-                if (combatDeckScan && method.DeclaringType?.Assembly == Native &&
-                    method.GetBaseDefinition().DeclaringType == typeof(AbstractModel) && method.Name is "BeforeRoomEntered" or "AfterRoomEntered") continue;
+                if ((combatDeckScan || targetOnly) && method.DeclaringType?.Assembly == Native &&
+                    method.GetBaseDefinition().DeclaringType == typeof(AbstractModel) && method.Name is "BeforeRoomEntered" or "AfterRoomEntered")
+                { excluded.Add(method.DeclaringType.FullName + "." + method.Name); continue; }
                 bool futureStart = method.DeclaringType?.Assembly == Native &&
                     method.GetBaseDefinition().DeclaringType == typeof(AbstractModel) &&
                     method.Name is "AfterPlayerTurnStart" or "AfterPlayerTurnStartEarly" or "AfterPlayerTurnStartLate";
@@ -407,7 +426,7 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                 }
             }
         }
-        return cache[type] = new(active, heals, gains, uncertain, generated.ToArray(), growth, pool, uncertainAt, changesDeck, characterPool);
+        return cache[type] = new(active, heals, gains, uncertain, generated.ToArray(), growth, pool, uncertainAt, changesDeck, characterPool, excluded.ToArray());
     }
 
     private bool CanChangeDeck(Player player, AbstractModel[] held)

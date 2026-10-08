@@ -1,5 +1,6 @@
 using System.Reflection;
 using System.Reflection.Emit;
+using HarmonyLib;
 using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Entities.Relics;
 using MegaCrit.Sts2.Core.Entities.Players;
@@ -67,6 +68,8 @@ internal static class HealthTargetReturnIntegration
         public override Task AfterCardChangedPiles(CardModel card, PileType oldPile, AbstractModel? clonedBy) =>
             card.Pile?.Type == PileType.Deck ? CreatureCmd.Heal(Owner.Creature, 1, true) : Task.CompletedTask;
     }
+
+    private static void MetadataPrefix() { }
 
     public static async Task Run(string root, LocalWorkerPool pool, LocalSearchRequest frozen, LocalInstallation installation, string seedPath)
     {
@@ -194,6 +197,60 @@ internal static class HealthTargetReturnIntegration
                 throw new InvalidOperationException("Future turn context hid an active native power: " + type.FullName);
             probes.Add(new { kind = type.Name, activeRecovery = true, futureRecoveryPreserved = true, callbackExecuted = false });
         }
+        var planisphere = typeof(AbstractModel).Assembly.GetType("MegaCrit.Sts2.Core.Models.Relics.Planisphere", true)!;
+        var phaseInstance = Activator.CreateInstance(estimatorType, frozen)!;
+        var allPhases = describe.Invoke(phaseInstance, [planisphere])!;
+        var futurePhases = readContent.Invoke(phaseInstance, [planisphere, true])!;
+        if (!(bool)allPhases.GetType().GetProperty("ActiveRecovery")!.GetValue(allPhases)! ||
+            (bool)futurePhases.GetType().GetProperty("ActiveRecovery")!.GetValue(futurePhases)!)
+            throw new InvalidOperationException("Settled native room-entry healing still changes the combat return goal");
+        probes.Add(new { kind = "NativeRoomPhase", roomRecoveryPresent = true, futureRecovery = false, strictClosureRetained = true, callbackExecuted = false });
+
+        // An external override stays uncertain rather than receiving the native
+        // room phase rule. The generated callback is metadata only, never called.
+        var roomHook = typeof(AbstractModel).GetMethod("AfterRoomEntered")!;
+        var externalAssembly = AssemblyBuilder.DefineDynamicAssembly(new AssemblyName("OwnedExternalRoomRecovery"), AssemblyBuilderAccess.Run);
+        var externalBuilder = externalAssembly.DefineDynamicModule("Probe").DefineType("ExternalRoomRecovery", TypeAttributes.Public | TypeAttributes.Abstract, typeof(RelicModel));
+        var externalMethod = externalBuilder.DefineMethod(roomHook.Name, MethodAttributes.Public | MethodAttributes.Virtual,
+            roomHook.ReturnType, roomHook.GetParameters().Select(p => p.ParameterType).ToArray());
+        var roomIl = externalMethod.GetILGenerator();
+        roomIl.Emit(OpCodes.Ldnull); roomIl.Emit(OpCodes.Ldc_I4_1);
+        roomIl.Emit(OpCodes.Call, typeof(decimal).GetMethod("op_Implicit", [typeof(int)])!);
+        roomIl.Emit(OpCodes.Ldc_I4_1);
+        roomIl.Emit(OpCodes.Call, typeof(CreatureCmd).GetMethods().Single(m => m.Name == "Heal" && m.GetParameters().Length == 3));
+        roomIl.Emit(OpCodes.Ret); externalBuilder.DefineMethodOverride(externalMethod, roomHook);
+        var externalRoom = readContent.Invoke(Activator.CreateInstance(estimatorType, frozen)!, [externalBuilder.CreateType()!, true])!;
+        if (!(bool)externalRoom.GetType().GetProperty("ActiveRecovery")!.GetValue(externalRoom)!)
+            throw new InvalidOperationException("An external room callback was excluded using native phase semantics");
+        probes.Add(new { kind = "ExternalRoomPhase", futureRecovery = true, callbackExecuted = false });
+
+        var fairy = typeof(AbstractModel).Assembly.GetType("MegaCrit.Sts2.Core.Models.Potions.FairyInABottle", true)!;
+        var revivalType = typeof(LocalWorker).Assembly.GetType("SpireAiCoach.Mod.LocalRevivalEstimate", true)!;
+        var readRevival = revivalType.GetMethod("Read", BindingFlags.Static | BindingFlags.NonPublic)!;
+        var revival = readRevival.Invoke(null, [fairy]) ?? throw new InvalidOperationException("The native automatic death-recovery formula was not recognized");
+        var maximum = revivalType.GetMethod("MaximumHp")!;
+        var improves = revivalType.GetMethod("CanImprove", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        if ((decimal)maximum.Invoke(revival, [75m])! != 23m ||
+            (bool)improves.Invoke(revival, [74m, 75m, 0m, false])! ||
+            !(bool)improves.Invoke(revival, [10m, 75m, 0m, false])! ||
+            !(bool)improves.Invoke(revival, [74m, 75m, 0m, true])! ||
+            !(bool)improves.Invoke(revival, [74m, 75m, 52m, false])!)
+            throw new InvalidOperationException("Revival goal ignored starting HP, later recovery or dynamic max HP");
+        var passiveEffect = readContent.Invoke(Activator.CreateInstance(estimatorType, frozen with { IncludePotions = false })!, [fairy, true])!;
+        if (!(bool)passiveEffect.GetType().GetProperty("ActiveRecovery")!.GetValue(passiveEffect)!)
+            throw new InvalidOperationException("Disabling manual potions removed passive death recovery");
+        var harmony = new Harmony("SpireLocalIntegration.owned-revival-metadata");
+        var onUse = fairy.GetMethod("OnUse", BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)!;
+        try
+        {
+            harmony.Patch(onUse, prefix: new(typeof(HealthTargetReturnIntegration).GetMethod(nameof(MetadataPrefix), BindingFlags.Static | BindingFlags.NonPublic)!));
+            if (readRevival.Invoke(null, [fairy]) != null) throw new InvalidOperationException("Patched recovery received the original native revival cap");
+        }
+        finally { harmony.Unpatch(onUse, HarmonyPatchType.Prefix, harmony.Id); }
+        if (readRevival.Invoke(null, [fairy]) == null) throw new InvalidOperationException("Native recovery metadata was not restored");
+        probes.Add(new { kind = "NativeAutomaticRevival", maxHp = 75, conservativeRevivalCap = 23,
+            cannotImprove74 = true, canImprove10 = true, dynamicMaxHpRetained = true,
+            laterHealingRetained = true, passiveWithoutManualPotions = true, foreignPatchRetained = true, callbackExecuted = false });
         var samples = new List<object>();
         foreach (var order in new[] { LocalSearchOrder.MonteCarlo, LocalSearchOrder.TurnFrontier })
         {

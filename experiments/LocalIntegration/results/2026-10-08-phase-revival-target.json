@@ -1,0 +1,309 @@
+{
+  "version": "0.7.83",
+  "passed": true,
+  "nativeSdk": "v0.111.0",
+  "dllSha256": "92ee6692758d4feb89bc05072c85055dc2eeea096ba1c945567cc910a252fea6",
+  "coreTests": {
+    "passed": 464,
+    "total": 464
+  },
+  "observedIncident": {
+    "version": "0.7.81",
+    "startingHp": 74,
+    "startingMaxHp": 75,
+    "finalHp": 74,
+    "hpLost": 0,
+    "hpGained": 0,
+    "maxHpChange": 0,
+    "fullHealthGoal": true,
+    "stoppedOnHealthTarget": false,
+    "elapsedMs": 65081,
+    "evaluated": 58,
+    "victories": 57,
+    "workers": 8
+  },
+  "baselineReadonlyAudit": {
+    "version": "0.7.82",
+    "rootUnchanged": true,
+    "matchingRequestSourceMetadata": true,
+    "fullHealthGoal": true,
+    "playerRecoverySources": [
+      "native room-entry recovery",
+      "native automatic death recovery"
+    ],
+    "phaseAndFormulaReadFromNativeMetadata": true
+  },
+  "nativeMetadataProbes": [
+    {
+      "kind": "BoundedMethodClosure",
+      "recoveryBeforeLimit": false,
+      "activeRecovery": false,
+      "uncertain": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "BoundedMethodClosure",
+      "recoveryBeforeLimit": true,
+      "activeRecovery": true,
+      "uncertain": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "NoRecoverySource",
+      "activeRecovery": false,
+      "uncertain": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "RecoverySource",
+      "activeRecovery": true,
+      "uncertain": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "BloodVial",
+      "nextTurn": null,
+      "activeRecovery": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "BloodVial",
+      "nextTurn": 1,
+      "activeRecovery": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "BloodVial",
+      "nextTurn": 2,
+      "activeRecovery": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "BloodVial",
+      "nextTurn": 3,
+      "activeRecovery": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "ExternalTurnSource",
+      "activeRecovery": true,
+      "externalCallbackRetained": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "DarkstonePeriapt",
+      "combatOnly": false,
+      "activeRecovery": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "DarkstonePeriapt",
+      "combatOnly": true,
+      "activeRecovery": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "CombatPileSource",
+      "changesDeck": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "DeckPileSource",
+      "changesDeck": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "UnknownPileSource",
+      "changesDeck": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "DeckLocationSource",
+      "changesDeck": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "UnknownLocationSource",
+      "changesDeck": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "Begone",
+      "changesDeck": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "Charge",
+      "changesDeck": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "Compact",
+      "changesDeck": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "Guards",
+      "changesDeck": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "Seance",
+      "changesDeck": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "ExternalAsyncCombatTransform",
+      "changesDeck": false,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "ExternalAsyncUnknownTransform",
+      "changesDeck": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "ExternalPileRecovery",
+      "activeRecovery": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "IllusionPower",
+      "activeRecovery": true,
+      "futureRecoveryPreserved": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "ReattachPower",
+      "activeRecovery": true,
+      "futureRecoveryPreserved": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "RegenPower",
+      "activeRecovery": true,
+      "futureRecoveryPreserved": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "MockInvincibleOnDeathPower",
+      "activeRecovery": true,
+      "futureRecoveryPreserved": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "MockPreventDeathPower",
+      "activeRecovery": true,
+      "futureRecoveryPreserved": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "MockRevivePower",
+      "activeRecovery": true,
+      "futureRecoveryPreserved": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "NativeRoomPhase",
+      "roomRecoveryPresent": true,
+      "futureRecovery": false,
+      "strictClosureRetained": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "ExternalRoomPhase",
+      "futureRecovery": true,
+      "callbackExecuted": false
+    },
+    {
+      "kind": "NativeAutomaticRevival",
+      "maxHp": 75,
+      "conservativeRevivalCap": 23,
+      "cannotImprove74": true,
+      "canImprove10": true,
+      "dynamicMaxHpRetained": true,
+      "laterHealingRetained": true,
+      "passiveWithoutManualPotions": true,
+      "foreignPatchRetained": true,
+      "callbackExecuted": false
+    }
+  ],
+  "samples": [
+    {
+      "algorithm": "MonteCarlo",
+      "Evaluated": 1,
+      "ElapsedMs": 31268,
+      "StoppedOnHealthTarget": true,
+      "StartingHp": 74,
+      "Hp": 74,
+      "MaxHp": 75,
+      "HpChange": 0,
+      "TargetHp": 74,
+      "FullHealth": false,
+      "Basis": "内容分析触及数量上限，按已识别生命效果估计返回目标",
+      "Uncertain": true,
+      "targetAnalyses": 1,
+      "targetAnalysisMs": 243.1127,
+      "UnknownReason": "当前玩家内容存在可重复或动态生命上限增加",
+      "checkpoints": 65,
+      "verifications": 1,
+      "seeded": true,
+      "nativeRootAndStateRngHistoryMatched": true,
+      "sources": [
+        "MegaCrit.Sts2.Core.Models.Relics.DivineRight.AfterRoomEntered: 房间进入回调已在起点前结算",
+        "MegaCrit.Sts2.Core.Models.Relics.BronzeScales.AfterRoomEntered: 房间进入回调已在起点前结算",
+        "MegaCrit.Sts2.Core.Models.Relics.VenerableTeaSet.AfterRoomEntered: 房间进入回调已在起点前结算",
+        "MegaCrit.Sts2.Core.Models.Relics.Gorget.AfterRoomEntered: 房间进入回调已在起点前结算",
+        "MegaCrit.Sts2.Core.Models.Relics.Planisphere.AfterRoomEntered: 房间进入回调已在起点前结算",
+        "MegaCrit.Sts2.Core.Models.Potions.FairyInABottle: 濒死回复上限23，加已识别战后收益不能超过目标74"
+      ],
+      "originalNativeCheckpointsMatched": true,
+      "recoveredFailures": 0
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "Evaluated": 1,
+      "ElapsedMs": 3879,
+      "StoppedOnHealthTarget": true,
+      "StartingHp": 74,
+      "Hp": 74,
+      "MaxHp": 75,
+      "HpChange": 0,
+      "TargetHp": 74,
+      "FullHealth": false,
+      "Basis": "内容分析触及数量上限，按已识别生命效果估计返回目标",
+      "Uncertain": true,
+      "targetAnalyses": 1,
+      "targetAnalysisMs": 108.9647,
+      "UnknownReason": "当前玩家内容存在可重复或动态生命上限增加",
+      "checkpoints": 65,
+      "verifications": 1,
+      "seeded": true,
+      "nativeRootAndStateRngHistoryMatched": true,
+      "sources": [
+        "MegaCrit.Sts2.Core.Models.Relics.DivineRight.AfterRoomEntered: 房间进入回调已在起点前结算",
+        "MegaCrit.Sts2.Core.Models.Relics.BronzeScales.AfterRoomEntered: 房间进入回调已在起点前结算",
+        "MegaCrit.Sts2.Core.Models.Relics.VenerableTeaSet.AfterRoomEntered: 房间进入回调已在起点前结算",
+        "MegaCrit.Sts2.Core.Models.Relics.Gorget.AfterRoomEntered: 房间进入回调已在起点前结算",
+        "MegaCrit.Sts2.Core.Models.Relics.Planisphere.AfterRoomEntered: 房间进入回调已在起点前结算",
+        "MegaCrit.Sts2.Core.Models.Potions.FairyInABottle: 濒死回复上限23，加已识别战后收益不能超过目标74"
+      ],
+      "originalNativeCheckpointsMatched": true,
+      "recoveredFailures": 0
+    }
+  ],
+  "independentOrdinaryReplays": 2,
+  "nativeStepsVerified": 130,
+  "installation": {
+    "version": "0.7.83",
+    "localTime": "2026-10-08 17:20 +08:00",
+    "seconds": 0.97,
+    "throughUpdateInstallOnly": true,
+    "installedDllMatchesNativeAcceptedPackage": true
+  },
+  "scope": "Owned isolated native processes. Seeded return-gate and metadata regression checks; current six frozen Mods. Not an unseeded throughput or route-quality benchmark; no global optimality certificate. Unknown target tails and strict recovery ceiling remain unknown. No player game actions or cache cleanup.",
+  "limitations": [
+    "Godot preload and exit resource diagnostics remain in private logs.",
+    "Live next-session behavior has not yet been observed."
+  ]
+}

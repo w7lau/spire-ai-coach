@@ -72,6 +72,17 @@ static class HealthTargetTests
             Check(result.HealthTarget == null && !result.StoppedOnHealthTarget &&
                 !LocalSearchPolicy.CanStopAfterVictory(result.Best, r), "Missing legacy goal silently became zero");
         });
+        test("health return source evidence survives IPC without becoming a proof", () =>
+        {
+            var r = Request();
+            var target = Target(r) with { Sources = ["owned.room: settled before root", "owned.revival: cap 20 below target 52"] };
+            var result = new LocalSearchResult(r.Id, r.SnapshotId, "done", "", 1, 0, 1, Win(),
+                HealthTarget: target, StoppedOnHealthTarget: true);
+            var restored = JsonSerializer.Deserialize<LocalSearchResult>(JsonSerializer.Serialize(result))!;
+            Check(restored.HealthTarget?.Sources?.SequenceEqual(target.Sources!) == true, "Return evidence was lost in IPC");
+            Check(LocalSearchPolicy.CanStopAtHealthTarget(restored.Best, r, restored.HealthTarget), "Evidence changed the return gate");
+            Check(!LocalSearchPolicy.HasMinimumProof(restored), "Source evidence became a minimum-loss certificate");
+        });
         asyncTest("all search workers reuse one current-content calculation and invalidate another root", async () =>
         {
             string directory = Path.Combine(Path.GetTempPath(), "spire-health-target-" + Guid.NewGuid().ToString("N"));

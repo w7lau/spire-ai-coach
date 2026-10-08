@@ -22,7 +22,7 @@ public sealed record LocalRecoveryAllowance(long? MaximumFurtherHpGain, string R
 // A return objective inferred once from the frozen player's content. It is NOT
 // a recovery ceiling and must never certify optimality or prune a branch.
 public sealed record LocalHealthTarget(string Scope, int StartingHp, int TargetHp, bool FullHealth,
-    string Basis = "当前内容", bool Uncertain = false);
+    string Basis = "当前内容", bool Uncertain = false, string[]? Sources = null);
 
 // Kept separate from duplicate-history counters and available to both algorithms.
 public sealed record LocalHealthBoundStats(int Pruned = 0, int KnownRecoveryChecks = 0,
