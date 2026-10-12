@@ -529,12 +529,17 @@
     "Historical TaskCallableNative fixed mode inherited FastVerification=true; this run and launcher explicitly set false."
   ],
   "delivery": {
-    "status": "blocked_game_running",
-    "installed_version_unchanged": "0.7.85",
-    "prepared_version": "0.7.86",
-    "formal_game_process_confirmed": true,
-    "player_process_stopped": false,
+    "status": "installed",
+    "installed_version": "0.7.86",
+    "installed_at": "2026-10-13T00:33:26+08:00",
+    "elapsed_ms": 928,
+    "entrypoint": "Update.ps1 -InstallOnly",
+    "dll_sha256_matches_prepared_and_native_tested": true,
+    "manifest_sha256_matches_prepared": true,
+    "reused_verified_package": true,
+    "core_tests_rerun": false,
+    "player_process_started_or_stopped_by_agent": false,
     "worker_caches_cleaned": false,
-    "requires": "Exit the player game, then reuse the exact verified package with Update.ps1 -InstallOnly."
+    "live_player_game_validation": "not_started"
   }
 }
