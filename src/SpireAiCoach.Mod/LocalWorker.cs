@@ -311,8 +311,8 @@ public static class LocalWorker
             try { await LocalWorkerLogic.Run(() => Restore(request), () => _choices?.Tick(), Frame, 60); CheckCancellation(); }
             finally { restoreMs += (long)Stopwatch.GetElapsedTime(started).TotalMilliseconds; restores++; }
         }
-        long sequence = 0, lastProgress = -1000, lastResult = -1000;
-        LocalCandidate? lastPublishedBest = null;
+        long sequence = 0, lastProgress = -1000;
+        var resultPublication = new LocalResultPublication();
         int route = 0, bestRoute = 0, rootBranches = 0;
         var events = new Queue<LocalSimEvent>();
         var trials = new List<LocalSearchTrial>();
@@ -352,11 +352,11 @@ public static class LocalWorker
             if (status != "running") progressWriter?.FlushAsync().GetAwaiter().GetResult();
             // The parent polls every 250 ms. Rewriting the unchanged, potentially large
             // candidate after every fast route does not provide any newer recommendation.
-            if (status == "running" && (LocalWorkerOverhead.Active || ReferenceEquals(best, lastPublishedBest)) && timer.ElapsedMilliseconds - lastResult < 250)
+            if (!resultPublication.ShouldPublish(timer.ElapsedMilliseconds, status, best, minimumStatus?.Certificate,
+                LocalWorkerOverhead.Active, request.ThrottleUnchangedResults))
             { SkipMethod("LocalWorker.Publish"); return; }
             using var publishing = Trace("publish", "候选结果");
             using var measuring = MeasureMethod("LocalWorker.Publish");
-            lastResult = timer.ElapsedMilliseconds; lastPublishedBest = best;
             if (status != "running") LocalWire.Write(Path.Combine(_root, "runtime.json"), new
                 { status, model_display = LocalModelDisplay.Status(), mode = LocalWorkerDataMode.MinimalRun ? "native-model" : LocalWorkerDataMode.Active ? "no-combat-scene" : "regular-scene",
                     max_fps = Engine.MaxFps, observed_fps = Engine.GetFramesPerSecond(), numerical = LocalWorkerLogic.Counters(),

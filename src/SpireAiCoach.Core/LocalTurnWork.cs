@@ -14,7 +14,7 @@ public sealed class LocalTurnWork : IDisposable
         LocalTurnOffer[]? Offers = null, LocalTurnTask? Task = null,
         LocalAction[]? Actions = null, LocalDecision[]? Decisions = null,
         LocalTurnHint? Hint = null, LocalWinningBound? Bound = null, string? TerminalDigest = null,
-        LocalCandidate? Outcome = null, LocalCandidate? WinningCandidate = null, LocalLossProofFocus[]? LossProof = null);
+        LocalCandidate? Outcome = null, LocalCandidate? WinningCandidate = null, LocalLossProofFocus[]? LossProof = null, int SuppressedOffers = 0);
     internal sealed record Reply(LocalTurnTask? Task, int Pending, int Active,
         int Offered, int Duplicates, int Affected = 0, string? Error = null, bool RootReady = false);
 
@@ -139,6 +139,8 @@ public sealed class LocalTurnWork : IDisposable
                 command.Hint ?? throw new InvalidDataException("Missing initial native root hint"));
             _state.RootReady = true; return Snapshot();
         }
+        if (command.SuppressedOffers < 0) throw new InvalidDataException("Invalid suppressed offer count");
+        _frontier.DuplicateOffers += command.SuppressedOffers;
         foreach (var offer in command.Offers ?? []) _frontier.Offer(offer.Prefix, offer.SearchRound, offer.Hint);
         if (command.Offers is { Length: > 0 }) _state.RootReady = true;
         switch (command.Operation)
@@ -241,8 +243,18 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
     public int LastLane { get; private set; }
     public IReadOnlyDictionary<int, int> ClaimedByRound => new Dictionary<int, int>(_roundClaims);
 
+    // A bounded request-local cache. Eviction only resends proposals to the authoritative
+    // broker; it never removes search work or treats matching visible states as equivalent.
+    private readonly LocalTurnPrefixIndex _offeredPrefixes = new();
+    private readonly HashSet<(int Round, int Prefix)> _offeredKeys = [];
+    private readonly bool _coalesce;
+    private int _suppressed;
+    public long LocallySuppressedOffers { get; private set; }
+    public long TransmittedOffers { get; private set; }
+
     public LocalTurnWorkClient(LocalSearchRequest request)
     {
+        _coalesce = request.CoalesceTurnOffers;
         _scope = LocalTurnWork.Scope(request); _owner = request.Partition;
         _cardGoals = request.CardGoals;
         _choices = new(1729 + _owner, cardGoals: request.CardGoals);
@@ -257,16 +269,34 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
         LocalTurnHint? hint = null, LocalWinningBound? bound = null, string? terminalDigest = null,
         LocalCandidate? outcome = null, LocalCandidate? winningCandidate = null, LocalLossProofFocus[]? lossProof = null)
     {
-        var command = new LocalTurnWork.Command(_scope, _owner, operation, _offers.ToArray(), task, actions, decisions, hint, bound, terminalDigest, outcome, winningCandidate, lossProof);
+        var command = new LocalTurnWork.Command(_scope, _owner, operation, _offers.ToArray(), task, actions, decisions, hint, bound, terminalDigest, outcome, winningCandidate, lossProof, _suppressed);
         _writer.WriteLine(JsonSerializer.Serialize(command));
         var reply = JsonSerializer.Deserialize<LocalTurnWork.Reply>(_reader.ReadLine() ?? throw new IOException("Turn task broker closed"))
             ?? throw new InvalidDataException("Empty turn task reply");
         if (reply.Error != null) throw new InvalidOperationException(reply.Error);
-        _offers.Clear(); _lastFlush = Environment.TickCount64; _last = reply; return reply;
+        TransmittedOffers += _offers.Count;
+        _offers.Clear(); _suppressed = 0; _lastFlush = Environment.TickCount64; _last = reply; return reply;
     }
 
     public void Offer(LocalAction[] prefix, int searchRound, LocalTurnHint hint)
     {
+        if (searchRound < 1) throw new ArgumentOutOfRangeException(nameof(searchRound));
+        // Do not build a second prefix index for a stream that has no repeats.
+        // The authoritative broker's cumulative evidence enables the cache only
+        // after actual duplicate traffic, including a retained search batch.
+        if (_coalesce && _last.Duplicates > 0)
+        {
+            if (_offeredPrefixes.Count >= 65536 || _offeredKeys.Count >= 65536)
+            { _offeredPrefixes.Clear(); _offeredKeys.Clear(); }
+            if (!_offeredKeys.Add((searchRound, _offeredPrefixes.GetId(prefix, true))))
+            {
+                _suppressed++; LocallySuppressedOffers++;
+                // Flush other pending work at the same bounded cadence even in a burst
+                // of duplicates; do not hold unique proposals behind duplicate traffic.
+                if (Environment.TickCount64 - _lastFlush >= 100) Exchange("offer");
+                return;
+            }
+        }
         _offers.Add(new(prefix.ToArray(), searchRound, hint));
         if (_offers.Count >= 32 || Environment.TickCount64 - _lastFlush >= 100) Exchange("offer");
     }

@@ -1,0 +1,540 @@
+{
+  "version": "0.7.86",
+  "date": "2026-10-13",
+  "package": {
+    "version": "0.7.86",
+    "dll_sha256": "63570011b0e402c0a0366d60be6cafcc051165b8855f2beba480c00ad12b2da7",
+    "manifest_sha256": "b23689b316840993de4ca347a6b25799761b97d3e824307693e2e42d86d47607",
+    "zip_sha256": "c9e3d8e866a9e5d33c580a4f448b0b6bb5d1998a00a610334a054cd1fd719e32"
+  },
+  "core_tests": {
+    "passed": 477,
+    "total": 477
+  },
+  "performance": {
+    "completed": true,
+    "dll_sha256": "63570011B0E402C0A0366D60BE6CAFCC051165B8855F2BEBA480C00AD12B2DA7",
+    "samples": [
+      {
+        "algorithm": "MonteCarlo",
+        "fast": false,
+        "warm": true,
+        "ElapsedMs": 18206,
+        "Evaluated": 32,
+        "Victories": 0,
+        "turn": null,
+        "Timing": {
+          "RestoreMs": 1994,
+          "ActionMs": 2612,
+          "DecisionMs": 2302,
+          "VerificationMs": 7262,
+          "StartupMs": 0,
+          "Actions": 1262,
+          "Restores": 32,
+          "Verifications": 1
+        },
+        "publish_ms": 167.9655,
+        "writes": 25,
+        "skipped_writes": 9,
+        "checkpoints": 35,
+        "native_history_rng_state_settlement_match": true,
+        "ordinary_replay_passed": true
+      },
+      {
+        "algorithm": "MonteCarlo",
+        "fast": true,
+        "warm": true,
+        "ElapsedMs": 9027,
+        "Evaluated": 32,
+        "Victories": 0,
+        "turn": null,
+        "Timing": {
+          "RestoreMs": 711,
+          "ActionMs": 1687,
+          "DecisionMs": 1943,
+          "VerificationMs": 1385,
+          "StartupMs": 0,
+          "Actions": 1262,
+          "Restores": 32,
+          "Verifications": 1
+        },
+        "publish_ms": 55.1908,
+        "writes": 10,
+        "skipped_writes": 24,
+        "checkpoints": 35,
+        "native_history_rng_state_settlement_match": true,
+        "ordinary_replay_passed": true
+      },
+      {
+        "algorithm": "MonteCarlo",
+        "fast": false,
+        "warm": false,
+        "ElapsedMs": 8997,
+        "Evaluated": 32,
+        "Victories": 0,
+        "turn": null,
+        "Timing": {
+          "RestoreMs": 696,
+          "ActionMs": 1684,
+          "DecisionMs": 1974,
+          "VerificationMs": 1323,
+          "StartupMs": 0,
+          "Actions": 1262,
+          "Restores": 32,
+          "Verifications": 1
+        },
+        "publish_ms": 139.8469,
+        "writes": 23,
+        "skipped_writes": 11,
+        "checkpoints": 35,
+        "native_history_rng_state_settlement_match": true,
+        "ordinary_replay_passed": true
+      },
+      {
+        "algorithm": "MonteCarlo",
+        "fast": true,
+        "warm": false,
+        "ElapsedMs": 8482,
+        "Evaluated": 32,
+        "Victories": 0,
+        "turn": null,
+        "Timing": {
+          "RestoreMs": 679,
+          "ActionMs": 1533,
+          "DecisionMs": 1810,
+          "VerificationMs": 1292,
+          "StartupMs": 0,
+          "Actions": 1262,
+          "Restores": 32,
+          "Verifications": 1
+        },
+        "publish_ms": 45.4568,
+        "writes": 9,
+        "skipped_writes": 25,
+        "checkpoints": 35,
+        "native_history_rng_state_settlement_match": true,
+        "ordinary_replay_passed": true
+      },
+      {
+        "algorithm": "MonteCarlo",
+        "fast": true,
+        "warm": false,
+        "ElapsedMs": 8517,
+        "Evaluated": 32,
+        "Victories": 0,
+        "turn": null,
+        "Timing": {
+          "RestoreMs": 667,
+          "ActionMs": 1535,
+          "DecisionMs": 1801,
+          "VerificationMs": 1312,
+          "StartupMs": 0,
+          "Actions": 1262,
+          "Restores": 32,
+          "Verifications": 1
+        },
+        "publish_ms": 43.452600000000004,
+        "writes": 9,
+        "skipped_writes": 25,
+        "checkpoints": 35,
+        "native_history_rng_state_settlement_match": true,
+        "ordinary_replay_passed": true
+      },
+      {
+        "algorithm": "MonteCarlo",
+        "fast": false,
+        "warm": false,
+        "ElapsedMs": 9001,
+        "Evaluated": 32,
+        "Victories": 0,
+        "turn": null,
+        "Timing": {
+          "RestoreMs": 682,
+          "ActionMs": 1596,
+          "DecisionMs": 1868,
+          "VerificationMs": 1385,
+          "StartupMs": 0,
+          "Actions": 1262,
+          "Restores": 32,
+          "Verifications": 1
+        },
+        "publish_ms": 134.88039999999998,
+        "writes": 23,
+        "skipped_writes": 11,
+        "checkpoints": 35,
+        "native_history_rng_state_settlement_match": true,
+        "ordinary_replay_passed": true
+      },
+      {
+        "algorithm": "TurnFrontier",
+        "fast": false,
+        "warm": true,
+        "ElapsedMs": 11439,
+        "Evaluated": 32,
+        "Victories": 1,
+        "turn": {
+          "Offered": 3206,
+          "DuplicateOffers": 0,
+          "Probes": 9
+        },
+        "Timing": {
+          "RestoreMs": 869,
+          "ActionMs": 1788,
+          "DecisionMs": 2432,
+          "VerificationMs": 2321,
+          "StartupMs": 0,
+          "Actions": 1397,
+          "Restores": 41,
+          "Verifications": 1
+        },
+        "publish_ms": 155.69459999999995,
+        "writes": 25,
+        "skipped_writes": 18,
+        "checkpoints": 55,
+        "native_history_rng_state_settlement_match": true,
+        "ordinary_replay_passed": true
+      },
+      {
+        "algorithm": "TurnFrontier",
+        "fast": true,
+        "warm": true,
+        "ElapsedMs": 11136,
+        "Evaluated": 32,
+        "Victories": 1,
+        "turn": {
+          "Offered": 3206,
+          "DuplicateOffers": 0,
+          "Probes": 9
+        },
+        "Timing": {
+          "RestoreMs": 906,
+          "ActionMs": 1865,
+          "DecisionMs": 2489,
+          "VerificationMs": 2231,
+          "StartupMs": 0,
+          "Actions": 1397,
+          "Restores": 41,
+          "Verifications": 1
+        },
+        "publish_ms": 55.6452,
+        "writes": 11,
+        "skipped_writes": 32,
+        "checkpoints": 55,
+        "native_history_rng_state_settlement_match": true,
+        "ordinary_replay_passed": true
+      },
+      {
+        "algorithm": "TurnFrontier",
+        "fast": false,
+        "warm": false,
+        "ElapsedMs": 11366,
+        "Evaluated": 32,
+        "Victories": 1,
+        "turn": {
+          "Offered": 3206,
+          "DuplicateOffers": 0,
+          "Probes": 9
+        },
+        "Timing": {
+          "RestoreMs": 905,
+          "ActionMs": 1933,
+          "DecisionMs": 2616,
+          "VerificationMs": 2125,
+          "StartupMs": 0,
+          "Actions": 1397,
+          "Restores": 41,
+          "Verifications": 1
+        },
+        "publish_ms": 194.31719999999999,
+        "writes": 27,
+        "skipped_writes": 16,
+        "checkpoints": 55,
+        "native_history_rng_state_settlement_match": true,
+        "ordinary_replay_passed": true
+      },
+      {
+        "algorithm": "TurnFrontier",
+        "fast": true,
+        "warm": false,
+        "ElapsedMs": 11393,
+        "Evaluated": 32,
+        "Victories": 1,
+        "turn": {
+          "Offered": 3206,
+          "DuplicateOffers": 0,
+          "Probes": 9
+        },
+        "Timing": {
+          "RestoreMs": 920,
+          "ActionMs": 1885,
+          "DecisionMs": 2609,
+          "VerificationMs": 2339,
+          "StartupMs": 0,
+          "Actions": 1397,
+          "Restores": 41,
+          "Verifications": 1
+        },
+        "publish_ms": 67.6632,
+        "writes": 12,
+        "skipped_writes": 31,
+        "checkpoints": 55,
+        "native_history_rng_state_settlement_match": true,
+        "ordinary_replay_passed": true
+      },
+      {
+        "algorithm": "TurnFrontier",
+        "fast": true,
+        "warm": false,
+        "ElapsedMs": 11390,
+        "Evaluated": 32,
+        "Victories": 1,
+        "turn": {
+          "Offered": 3206,
+          "DuplicateOffers": 0,
+          "Probes": 9
+        },
+        "Timing": {
+          "RestoreMs": 903,
+          "ActionMs": 1840,
+          "DecisionMs": 2523,
+          "VerificationMs": 2269,
+          "StartupMs": 0,
+          "Actions": 1397,
+          "Restores": 41,
+          "Verifications": 1
+        },
+        "publish_ms": 60.974199999999996,
+        "writes": 11,
+        "skipped_writes": 32,
+        "checkpoints": 55,
+        "native_history_rng_state_settlement_match": true,
+        "ordinary_replay_passed": true
+      },
+      {
+        "algorithm": "TurnFrontier",
+        "fast": false,
+        "warm": false,
+        "ElapsedMs": 10841,
+        "Evaluated": 32,
+        "Victories": 1,
+        "turn": {
+          "Offered": 3206,
+          "DuplicateOffers": 0,
+          "Probes": 9
+        },
+        "Timing": {
+          "RestoreMs": 876,
+          "ActionMs": 1841,
+          "DecisionMs": 2502,
+          "VerificationMs": 2002,
+          "StartupMs": 0,
+          "Actions": 1397,
+          "Restores": 41,
+          "Verifications": 1
+        },
+        "publish_ms": 144.9811,
+        "writes": 24,
+        "skipped_writes": 19,
+        "checkpoints": 55,
+        "native_history_rng_state_settlement_match": true,
+        "ordinary_replay_passed": true
+      }
+    ],
+    "transport": [
+      {
+        "fast": false,
+        "index": 0,
+        "input_offers": 5792,
+        "Offered": 181,
+        "DuplicateOffers": 5611,
+        "TransmittedOffers": 5792,
+        "LocallySuppressedOffers": 0,
+        "elapsed_ms": 1493.6994,
+        "exact_task_order_matches": true,
+        "native_execution_benchmark": false
+      },
+      {
+        "fast": true,
+        "index": 1,
+        "input_offers": 5792,
+        "Offered": 181,
+        "DuplicateOffers": 5611,
+        "TransmittedOffers": 373,
+        "LocallySuppressedOffers": 5419,
+        "elapsed_ms": 239.1005,
+        "exact_task_order_matches": true,
+        "native_execution_benchmark": false
+      },
+      {
+        "fast": true,
+        "index": 2,
+        "input_offers": 5792,
+        "Offered": 181,
+        "DuplicateOffers": 5611,
+        "TransmittedOffers": 373,
+        "LocallySuppressedOffers": 5419,
+        "elapsed_ms": 230.9089,
+        "exact_task_order_matches": true,
+        "native_execution_benchmark": false
+      },
+      {
+        "fast": false,
+        "index": 3,
+        "input_offers": 5792,
+        "Offered": 181,
+        "DuplicateOffers": 5611,
+        "TransmittedOffers": 5792,
+        "LocallySuppressedOffers": 0,
+        "elapsed_ms": 1416.7856,
+        "exact_task_order_matches": true,
+        "native_execution_benchmark": false
+      }
+    ],
+    "scope": "Same DLL and frozen input, one resident native worker, 32 complete attempts per mode; both orders warmed and interleaved. Not an eight-worker or all-combat speed claim."
+  },
+  "nonwarm_means": [
+    {
+      "algorithm": "MonteCarlo",
+      "optimized": false,
+      "measured_runs": 2,
+      "ElapsedMs": 8999,
+      "publish_ms": 137.3637,
+      "writes": 23
+    },
+    {
+      "algorithm": "MonteCarlo",
+      "optimized": true,
+      "measured_runs": 2,
+      "ElapsedMs": 8499.5,
+      "publish_ms": 44.4547,
+      "writes": 9
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "optimized": false,
+      "measured_runs": 2,
+      "ElapsedMs": 11103.5,
+      "publish_ms": 169.6491,
+      "writes": 25.5
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "optimized": true,
+      "measured_runs": 2,
+      "ElapsedMs": 11391.5,
+      "publish_ms": 64.3187,
+      "writes": 11.5
+    }
+  ],
+  "original_eight_worker_regression": {
+    "version": "0.7.86",
+    "baseline": false,
+    "samples": [
+      {
+        "algorithm": "TurnFrontier",
+        "Evaluated": 512,
+        "Victories": 103,
+        "ElapsedMs": 111658,
+        "Workers": 8,
+        "Verifications": 1,
+        "checkpoints": 52,
+        "StartingHp": 55,
+        "Hp": 32,
+        "MaxHp": 71,
+        "HpLost": 63,
+        "Won": true,
+        "recoveredFailures": 0
+      },
+      {
+        "algorithm": "MonteCarlo",
+        "Evaluated": 512,
+        "Victories": 0,
+        "ElapsedMs": 43892,
+        "Workers": 8,
+        "Verifications": 1,
+        "checkpoints": 30,
+        "StartingHp": 55,
+        "Hp": 0,
+        "MaxHp": 69,
+        "HpLost": 58,
+        "Won": false,
+        "recoveredFailures": 0
+      }
+    ],
+    "observedVfxMethods": {
+      "FlyingKickStrike": 1943
+    },
+    "fast_verification": false,
+    "independent_final_replay": true,
+    "callback_components": [
+      {
+        "callbackStarts": 1,
+        "callbackCompletions": 1,
+        "nilReturn": true,
+        "integerCallbackPreserved": true
+      },
+      {
+        "callbackStarts": 1,
+        "callbackCompletions": 1,
+        "nilReturn": true,
+        "integerCallbackPreserved": true
+      },
+      {
+        "callbackStarts": 1,
+        "callbackCompletions": 1,
+        "nilReturn": true,
+        "integerCallbackPreserved": true
+      },
+      {
+        "callbackStarts": 1,
+        "callbackCompletions": 1,
+        "nilReturn": true,
+        "integerCallbackPreserved": true
+      },
+      {
+        "callbackStarts": 1,
+        "callbackCompletions": 1,
+        "nilReturn": true,
+        "integerCallbackPreserved": true
+      },
+      {
+        "callbackStarts": 1,
+        "callbackCompletions": 1,
+        "nilReturn": true,
+        "integerCallbackPreserved": true
+      },
+      {
+        "callbackStarts": 1,
+        "callbackCompletions": 1,
+        "nilReturn": true,
+        "integerCallbackPreserved": true
+      },
+      {
+        "callbackStarts": 1,
+        "callbackCompletions": 1,
+        "nilReturn": true,
+        "integerCallbackPreserved": true
+      }
+    ],
+    "scope": "Correctness and callback regression only; not a paired performance or search-quality comparison.",
+    "retire_rebuild_fallback_failure_spans": 0,
+    "last_data_failure_files": 0
+  },
+  "limitations": [
+    "No blanket Godot animation return. Audited callbacks, damage, pile notifications and completion semantics remain.",
+    "Native comparison uses one fixed frozen combat, one resident worker and 32 attempts. Two measured samples per mode are not a general speed guarantee.",
+    "Transport microbenchmark repeats a native-observed proposal stream 32 times. It is not a measurement of avoided native game actions.",
+    "TurnFrontier wall time was 2.59% higher in the small no-duplicate sample despite lower publication cost.",
+    "No player process was started or stopped and no save or RNG was edited.",
+    "Historical TaskCallableNative fixed mode inherited FastVerification=true; this run and launcher explicitly set false."
+  ],
+  "delivery": {
+    "status": "blocked_game_running",
+    "installed_version_unchanged": "0.7.85",
+    "prepared_version": "0.7.86",
+    "formal_game_process_confirmed": true,
+    "player_process_stopped": false,
+    "worker_caches_cleaned": false,
+    "requires": "Exit the player game, then reuse the exact verified package with Update.ps1 -InstallOnly."
+  }
+}

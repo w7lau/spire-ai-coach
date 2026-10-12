@@ -90,9 +90,7 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
 {
     private readonly Dictionary<int, Entry> _pending = new();
     private readonly Dictionary<(int Round, int Prefix), int> _seen = new();
-    private readonly List<Dictionary<StepKey, int>> _prefixes = [new()];
-    private readonly record struct StepKey(string Before, int Round, bool End, int? Potion, uint? Target,
-        string Model, uint? Card, int? Hand, string Choices);
+    private readonly LocalTurnPrefixIndex _prefixIndex = new();
     private readonly PriorityQueue<int, (double, int)> _health = new();
     private readonly PriorityQueue<int, (double, int)> _damage = new();
     private readonly Queue<int> _fair = new();
@@ -120,7 +118,7 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
     private int _ownerGuidedTakes;
     public int Count => _pending.Count;
     public int Offered => _next;
-    public int DuplicateOffers { get; private set; }
+    public int DuplicateOffers { get; internal set; }
     public int FocusedTakes { get; private set; }
     public int LastLane { get; private set; }
     public bool LastFocused { get; private set; }
@@ -156,29 +154,7 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         _pending[id] = entry with { Task = entry.Task with { FullRollout = true, Continuation = continuation.ToArray() } };
     }
 
-    private int PrefixId(IReadOnlyList<LocalAction> actions, bool create)
-    {
-        // Intern exact action identities under their exact parents. This shares
-        // immutable history structure, never native states, RNG or Mod objects.
-        // Typed fields avoid serializing and storing the whole prefix per fork.
-        int parent = 0;
-        foreach (var action in actions)
-        {
-            string choices = action.Choices is not { Length: > 0 } ? "" : JsonSerializer.Serialize(
-                action.Choices.Select(c => new { c.OfferHash, c.Kind, c.Index, c.ModelId, Indices = c.Indices ?? [] }));
-            var step = new StepKey(action.BeforeHash, action.Round, action.EndTurn, action.PotionSlot,
-                action.TargetId, action.ModelId, action.CombatCardIndex,
-                action.CombatCardIndex.HasValue ? null : action.HandIndex, choices);
-            var children = _prefixes[parent];
-            if (!children.TryGetValue(step, out int next))
-            {
-                if (!create) return -1;
-                next = _prefixes.Count; children.Add(step, next); _prefixes.Add(new());
-            }
-            parent = next;
-        }
-        return parent;
-    }
+    private int PrefixId(IReadOnlyList<LocalAction> actions, bool create) => _prefixIndex.GetId(actions, create);
 
     private void Queue(Entry entry)
     {
@@ -502,10 +478,10 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         if (decision.BeforeStep < 0 || decision.BeforeStep >= actions.Count)
             throw new InvalidOperationException("Decision is outside the executed history");
         var actual = actions[decision.BeforeStep];
-        var prefix = actions.Take(decision.BeforeStep).ToArray();
         // A claimed prefix already fixes its actions and earlier choices. Do not
         // publish its ancestor's siblings from another worker's owned subtree.
         if (owner != null && decision.BeforeStep < owner.Prefix.Length - 1) yield break;
+        var prefix = actions.Take(decision.BeforeStep).ToArray();
         bool fixedAction = owner != null && decision.BeforeStep < owner.Prefix.Length;
         if (!fixedAction)
             foreach (var alternate in decision.Legal.OrderByDescending(a => a.Preference))

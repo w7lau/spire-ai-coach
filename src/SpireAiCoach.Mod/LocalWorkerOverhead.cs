@@ -27,6 +27,7 @@ namespace SpireAiCoach.Mod;
 internal static class LocalWorkerOverhead
 {
     private static readonly Dictionary<MethodBase, string> Names = [];
+    private static readonly Dictionary<MethodBase, string> SnapshotNames = [];
     private static readonly List<string> Boundaries = [];
     private static readonly List<string> Failures = [];
     private static readonly HashSet<MethodBase> PassiveFactories = [];
@@ -244,6 +245,7 @@ internal static class LocalWorkerOverhead
             foreach (var method in methods)
             {
                 Names[method] = type.Name + "." + name;
+                if (prefix == nameof(SnapshotTiming)) SnapshotNames[method] = "Snapshot." + Names[method];
                 harmony.Patch(method, prefix: new(AccessTools.Method(typeof(LocalWorkerOverhead), prefix)),
                     finalizer: new(AccessTools.Method(typeof(LocalWorkerOverhead), nameof(FinishTiming))));
             }
@@ -281,7 +283,7 @@ internal static class LocalWorkerOverhead
     private static void SnapshotTiming(MethodBase __originalMethod, ref LocalTimeline.MethodScope __state)
     {
         if (LocalCapture.InFingerprintSnapshot)
-            __state = LocalWorker.MeasureMethod("Snapshot." + Names[__originalMethod]);
+            __state = LocalWorker.MeasureMethod(SnapshotNames[__originalMethod]);
     }
     // Finalizer observes both success and exception and never replaces/swallows it.
     private static void FinishTiming(LocalTimeline.MethodScope __state) => __state.Dispose();
