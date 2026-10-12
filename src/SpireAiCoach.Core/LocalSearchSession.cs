@@ -49,7 +49,7 @@ public sealed class LocalSearchSession : IDisposable
             InitialPlan = null, VerifyCandidate = null, DeferVerification = false, TargetLabels = null,
             TimelineOrigin = 0, InitialTrace = null, TurnWorkPipe = null, SearchWorkPipe = null,
             MinimumLossPipe = null, ProgressPipe = null, StopOnZeroLoss = false, StopOnFirstWin = false,
-            SkipFinalVerification = false, FastVerification = false, CoalesceTurnOffers = true, ThrottleUnchangedResults = true };
+            SkipFinalVerification = false, FastVerification = false, CoalesceTurnOffers = true, ThrottleUnchangedResults = true, CompactTurnOffers = true };
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(stable))));
     }
     public void Dispose() { Work?.ReleasePlans(); Work?.Dispose(); }

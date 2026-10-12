@@ -1,0 +1,722 @@
+{
+  "version": "0.7.87",
+  "passed": true,
+  "nativeSdk": "v0.111.0",
+  "package": {
+    "version": "0.7.87",
+    "dll_sha256": "6eb7c0d2ff05be197b9fd40ceddf85bf2d5356ee5b329a1bfe164f412866486d",
+    "manifest_sha256": "54a988f89755124cec4e562a83b20d1a6d84b3716d3d7e0f62b68fb2e7556eae",
+    "zip_sha256": "ea6b61e73cfef4f1abffa24d7784e764f0e6313611a78d3857ebe60607a41d55"
+  },
+  "coreTests": {
+    "passed": 481,
+    "total": 481
+  },
+  "incident": {
+    "previousVersion": "0.7.86",
+    "startingHp": 31,
+    "finalHp": 31,
+    "maxHp": 71,
+    "wallMs": 99151,
+    "evaluated": 488,
+    "victories": 151,
+    "incorrectFullHealthTarget": true,
+    "onlyReportedSource": "HextechRunes.BodyguardUpgradeRune",
+    "actualHealRecipient": "Player.Osty",
+    "actualExecutionCompletedSteps": 68,
+    "recoveredFailures": 0,
+    "retainedTraceDroppedEvents": 109552,
+    "exactFirstZeroLossTimestampAvailable": false
+  },
+  "changes": [
+    "Exclude proven native unpatched summon recipients from content health targets only; preserve strict proof closure and unknown recipients",
+    "Share observed parent histories, intern once per batch, materialize full native prefix only on claim",
+    "Prioritize observed potion-saving deviations around completed incumbent and share continuation arrays",
+    "Write length-prefixed progress packet in one pipe operation; retain existing background latest-value writer and fallback"
+  ],
+  "recipientMetadata": {
+    "completed": true,
+    "version": "0.7.87",
+    "dll_sha256": "6EB7C0D2FF05BE197B9FD40CEDDF85BF2D5356EE5B329A1BFE164F412866486D",
+    "rune_mvid": "730cd0af-a1c5-4fe0-b932-add4bf4809ef",
+    "results": [
+      {
+        "source": "DirectSummon",
+        "target": true,
+        "activeRecovery": false,
+        "callbackExecuted": false
+      },
+      {
+        "source": "DirectSummon",
+        "target": false,
+        "activeRecovery": true,
+        "callbackExecuted": false
+      },
+      {
+        "source": "AsyncSummon",
+        "target": true,
+        "activeRecovery": false,
+        "callbackExecuted": false
+      },
+      {
+        "source": "AsyncSummon",
+        "target": false,
+        "activeRecovery": true,
+        "callbackExecuted": false
+      },
+      {
+        "source": "HelperSummon",
+        "target": true,
+        "activeRecovery": false,
+        "callbackExecuted": false
+      },
+      {
+        "source": "HelperSummon",
+        "target": false,
+        "activeRecovery": true,
+        "callbackExecuted": false
+      },
+      {
+        "source": "GrowSummon",
+        "target": true,
+        "activeRecovery": false,
+        "callbackExecuted": false
+      },
+      {
+        "source": "GrowSummon",
+        "target": false,
+        "activeRecovery": true,
+        "callbackExecuted": false
+      },
+      {
+        "source": "PlayerHeal",
+        "target": true,
+        "activeRecovery": true,
+        "callbackExecuted": false
+      },
+      {
+        "source": "UnknownHeal",
+        "target": true,
+        "activeRecovery": true,
+        "callbackExecuted": false
+      },
+      {
+        "source": "MixedHeal",
+        "target": true,
+        "activeRecovery": true,
+        "callbackExecuted": false
+      },
+      {
+        "source": "MixedBranches",
+        "target": true,
+        "activeRecovery": true,
+        "callbackExecuted": false
+      },
+      {
+        "source": "MutableRecipient",
+        "target": true,
+        "activeRecovery": true,
+        "callbackExecuted": false
+      },
+      {
+        "source": "HextechRunes.BodyguardUpgradeRune",
+        "target": true,
+        "activeRecovery": false,
+        "callbackExecuted": false
+      },
+      {
+        "source": "HextechRunes.BodyguardUpgradeRune",
+        "target": false,
+        "activeRecovery": true,
+        "callbackExecuted": false
+      },
+      {
+        "source": "DirectSummon",
+        "target": true,
+        "activeRecovery": true,
+        "callbackExecuted": false
+      },
+      {
+        "source": "HextechRunes.BodyguardUpgradeRune",
+        "target": true,
+        "activeRecovery": true,
+        "callbackExecuted": false
+      },
+      {
+        "source": "DirectSummon",
+        "target": true,
+        "activeRecovery": false,
+        "callbackExecuted": false
+      },
+      {
+        "source": "DirectSummon",
+        "target": true,
+        "activeRecovery": true,
+        "callbackExecuted": false
+      },
+      {
+        "source": "HextechRunes.BodyguardUpgradeRune",
+        "target": true,
+        "activeRecovery": true,
+        "callbackExecuted": false
+      },
+      {
+        "source": "DirectSummon",
+        "target": true,
+        "activeRecovery": false,
+        "callbackExecuted": false
+      }
+    ],
+    "nativeCombatBenchmark": false
+  },
+  "singleResidentNativeComparison": [
+    {
+      "algorithm": "MonteCarlo",
+      "fast": false,
+      "warm": true,
+      "ElapsedMs": 19013,
+      "Evaluated": 32,
+      "Victories": 0,
+      "turn": null,
+      "Timing": {
+        "RestoreMs": 2192,
+        "ActionMs": 2582,
+        "DecisionMs": 2187,
+        "VerificationMs": 8032,
+        "StartupMs": 0,
+        "Actions": 1262,
+        "Restores": 32,
+        "Verifications": 1
+      },
+      "publish_ms": 89.9005,
+      "writes": 11,
+      "skipped_writes": 23,
+      "checkpoints": 35,
+      "native_history_rng_state_settlement_match": true,
+      "ordinary_replay_passed": true,
+      "alternatives_ms": 0
+    },
+    {
+      "algorithm": "MonteCarlo",
+      "fast": true,
+      "warm": true,
+      "ElapsedMs": 9286,
+      "Evaluated": 32,
+      "Victories": 0,
+      "turn": null,
+      "Timing": {
+        "RestoreMs": 748,
+        "ActionMs": 1834,
+        "DecisionMs": 2213,
+        "VerificationMs": 1491,
+        "StartupMs": 0,
+        "Actions": 1262,
+        "Restores": 32,
+        "Verifications": 1
+      },
+      "publish_ms": 54.709199999999996,
+      "writes": 10,
+      "skipped_writes": 24,
+      "checkpoints": 35,
+      "native_history_rng_state_settlement_match": true,
+      "ordinary_replay_passed": true,
+      "alternatives_ms": 0
+    },
+    {
+      "algorithm": "MonteCarlo",
+      "fast": false,
+      "warm": false,
+      "ElapsedMs": 9299,
+      "Evaluated": 32,
+      "Victories": 0,
+      "turn": null,
+      "Timing": {
+        "RestoreMs": 744,
+        "ActionMs": 1867,
+        "DecisionMs": 2179,
+        "VerificationMs": 1423,
+        "StartupMs": 0,
+        "Actions": 1262,
+        "Restores": 32,
+        "Verifications": 1
+      },
+      "publish_ms": 55.29570000000001,
+      "writes": 10,
+      "skipped_writes": 24,
+      "checkpoints": 35,
+      "native_history_rng_state_settlement_match": true,
+      "ordinary_replay_passed": true,
+      "alternatives_ms": 0
+    },
+    {
+      "algorithm": "MonteCarlo",
+      "fast": true,
+      "warm": false,
+      "ElapsedMs": 9025,
+      "Evaluated": 32,
+      "Victories": 0,
+      "turn": null,
+      "Timing": {
+        "RestoreMs": 714,
+        "ActionMs": 1730,
+        "DecisionMs": 2019,
+        "VerificationMs": 1404,
+        "StartupMs": 0,
+        "Actions": 1262,
+        "Restores": 32,
+        "Verifications": 1
+      },
+      "publish_ms": 50.0892,
+      "writes": 9,
+      "skipped_writes": 25,
+      "checkpoints": 35,
+      "native_history_rng_state_settlement_match": true,
+      "ordinary_replay_passed": true,
+      "alternatives_ms": 0
+    },
+    {
+      "algorithm": "MonteCarlo",
+      "fast": true,
+      "warm": false,
+      "ElapsedMs": 9302,
+      "Evaluated": 32,
+      "Victories": 0,
+      "turn": null,
+      "Timing": {
+        "RestoreMs": 759,
+        "ActionMs": 1841,
+        "DecisionMs": 2207,
+        "VerificationMs": 1416,
+        "StartupMs": 0,
+        "Actions": 1262,
+        "Restores": 32,
+        "Verifications": 1
+      },
+      "publish_ms": 58.8943,
+      "writes": 10,
+      "skipped_writes": 24,
+      "checkpoints": 35,
+      "native_history_rng_state_settlement_match": true,
+      "ordinary_replay_passed": true,
+      "alternatives_ms": 0
+    },
+    {
+      "algorithm": "MonteCarlo",
+      "fast": false,
+      "warm": false,
+      "ElapsedMs": 9542,
+      "Evaluated": 32,
+      "Victories": 0,
+      "turn": null,
+      "Timing": {
+        "RestoreMs": 745,
+        "ActionMs": 1914,
+        "DecisionMs": 2186,
+        "VerificationMs": 1478,
+        "StartupMs": 0,
+        "Actions": 1262,
+        "Restores": 32,
+        "Verifications": 1
+      },
+      "publish_ms": 56.534499999999994,
+      "writes": 10,
+      "skipped_writes": 24,
+      "checkpoints": 35,
+      "native_history_rng_state_settlement_match": true,
+      "ordinary_replay_passed": true,
+      "alternatives_ms": 0
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "fast": false,
+      "warm": true,
+      "ElapsedMs": 12206,
+      "Evaluated": 32,
+      "Victories": 1,
+      "turn": {
+        "Offered": 3127,
+        "DuplicateOffers": 0,
+        "Probes": 9
+      },
+      "Timing": {
+        "RestoreMs": 957,
+        "ActionMs": 2150,
+        "DecisionMs": 2845,
+        "VerificationMs": 2550,
+        "StartupMs": 0,
+        "Actions": 1390,
+        "Restores": 41,
+        "Verifications": 1
+      },
+      "publish_ms": 75.5131,
+      "writes": 12,
+      "skipped_writes": 31,
+      "checkpoints": 55,
+      "native_history_rng_state_settlement_match": true,
+      "ordinary_replay_passed": true,
+      "alternatives_ms": 510.0671999999997
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "fast": true,
+      "warm": true,
+      "ElapsedMs": 11127,
+      "Evaluated": 32,
+      "Victories": 1,
+      "turn": {
+        "Offered": 3127,
+        "DuplicateOffers": 0,
+        "Probes": 9
+      },
+      "Timing": {
+        "RestoreMs": 908,
+        "ActionMs": 2003,
+        "DecisionMs": 2687,
+        "VerificationMs": 2258,
+        "StartupMs": 0,
+        "Actions": 1390,
+        "Restores": 41,
+        "Verifications": 1
+      },
+      "publish_ms": 70.43540000000002,
+      "writes": 12,
+      "skipped_writes": 31,
+      "checkpoints": 55,
+      "native_history_rng_state_settlement_match": true,
+      "ordinary_replay_passed": true,
+      "alternatives_ms": 193.40950000000032
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "fast": false,
+      "warm": false,
+      "ElapsedMs": 11651,
+      "Evaluated": 32,
+      "Victories": 1,
+      "turn": {
+        "Offered": 3127,
+        "DuplicateOffers": 0,
+        "Probes": 9
+      },
+      "Timing": {
+        "RestoreMs": 979,
+        "ActionMs": 2159,
+        "DecisionMs": 2934,
+        "VerificationMs": 2196,
+        "StartupMs": 0,
+        "Actions": 1390,
+        "Restores": 41,
+        "Verifications": 1
+      },
+      "publish_ms": 76.1298,
+      "writes": 12,
+      "skipped_writes": 31,
+      "checkpoints": 55,
+      "native_history_rng_state_settlement_match": true,
+      "ordinary_replay_passed": true,
+      "alternatives_ms": 520.7512999999992
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "fast": true,
+      "warm": false,
+      "ElapsedMs": 11113,
+      "Evaluated": 32,
+      "Victories": 1,
+      "turn": {
+        "Offered": 3127,
+        "DuplicateOffers": 0,
+        "Probes": 9
+      },
+      "Timing": {
+        "RestoreMs": 935,
+        "ActionMs": 2023,
+        "DecisionMs": 2665,
+        "VerificationMs": 2190,
+        "StartupMs": 0,
+        "Actions": 1390,
+        "Restores": 41,
+        "Verifications": 1
+      },
+      "publish_ms": 55.2127,
+      "writes": 10,
+      "skipped_writes": 33,
+      "checkpoints": 55,
+      "native_history_rng_state_settlement_match": true,
+      "ordinary_replay_passed": true,
+      "alternatives_ms": 167.57779999999997
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "fast": true,
+      "warm": false,
+      "ElapsedMs": 11662,
+      "Evaluated": 32,
+      "Victories": 1,
+      "turn": {
+        "Offered": 3127,
+        "DuplicateOffers": 0,
+        "Probes": 9
+      },
+      "Timing": {
+        "RestoreMs": 950,
+        "ActionMs": 2103,
+        "DecisionMs": 2824,
+        "VerificationMs": 2606,
+        "StartupMs": 0,
+        "Actions": 1390,
+        "Restores": 41,
+        "Verifications": 1
+      },
+      "publish_ms": 72.6967,
+      "writes": 12,
+      "skipped_writes": 31,
+      "checkpoints": 55,
+      "native_history_rng_state_settlement_match": true,
+      "ordinary_replay_passed": true,
+      "alternatives_ms": 194.77179999999987
+    },
+    {
+      "algorithm": "TurnFrontier",
+      "fast": false,
+      "warm": false,
+      "ElapsedMs": 11637,
+      "Evaluated": 32,
+      "Victories": 1,
+      "turn": {
+        "Offered": 3127,
+        "DuplicateOffers": 0,
+        "Probes": 9
+      },
+      "Timing": {
+        "RestoreMs": 963,
+        "ActionMs": 2213,
+        "DecisionMs": 2956,
+        "VerificationMs": 2227,
+        "StartupMs": 0,
+        "Actions": 1390,
+        "Restores": 41,
+        "Verifications": 1
+      },
+      "publish_ms": 70.78599999999999,
+      "writes": 12,
+      "skipped_writes": 31,
+      "checkpoints": 55,
+      "native_history_rng_state_settlement_match": true,
+      "ordinary_replay_passed": true,
+      "alternatives_ms": 496.5748999999998
+    }
+  ],
+  "singleResidentAverages": {
+    "ElapsedMs": {
+      "before": 11644,
+      "after": 11387.5,
+      "reductionPercent": 2.202851253864646
+    },
+    "alternatives_ms": {
+      "before": 508.66309999999953,
+      "after": 181.17479999999992,
+      "reductionPercent": 64.38216178842143
+    }
+  },
+  "proposalMicrobenchmark": [
+    {
+      "fast": false,
+      "index": 0,
+      "input_offers": 5792,
+      "Offered": 181,
+      "DuplicateOffers": 5611,
+      "TransmittedOffers": 373,
+      "LocallySuppressedOffers": 5419,
+      "elapsed_ms": 298.92,
+      "exact_task_order_matches": true,
+      "native_execution_benchmark": false
+    },
+    {
+      "fast": true,
+      "index": 1,
+      "input_offers": 5792,
+      "Offered": 181,
+      "DuplicateOffers": 5611,
+      "TransmittedOffers": 387,
+      "LocallySuppressedOffers": 5405,
+      "elapsed_ms": 187.2861,
+      "exact_task_order_matches": true,
+      "native_execution_benchmark": false
+    },
+    {
+      "fast": true,
+      "index": 2,
+      "input_offers": 5792,
+      "Offered": 181,
+      "DuplicateOffers": 5611,
+      "TransmittedOffers": 387,
+      "LocallySuppressedOffers": 5405,
+      "elapsed_ms": 166.4957,
+      "exact_task_order_matches": true,
+      "native_execution_benchmark": false
+    },
+    {
+      "fast": false,
+      "index": 3,
+      "input_offers": 5792,
+      "Offered": 181,
+      "DuplicateOffers": 5611,
+      "TransmittedOffers": 373,
+      "LocallySuppressedOffers": 5419,
+      "elapsed_ms": 251.8838,
+      "exact_task_order_matches": true,
+      "native_execution_benchmark": false
+    }
+  ],
+  "proposalPayload": {
+    "ordinaryBytes": 1455279,
+    "compactBytes": 524341,
+    "offers": 181,
+    "batches": 55
+  },
+  "seededHealthTargetReturn": {
+    "completed": true,
+    "dll_sha256": "6EB7C0D2FF05BE197B9FD40CEDDF85BF2D5356EE5B329A1BFE164F412866486D",
+    "samples": [
+      {
+        "algorithm": "MonteCarlo",
+        "skip": false,
+        "Evaluated": 1,
+        "ElapsedMs": 15540,
+        "StoppedOnHealthTarget": true,
+        "StartingHp": 74,
+        "Hp": 74,
+        "MaxHp": 75,
+        "TargetHp": 74,
+        "FullHealth": false,
+        "checkpoints": 65,
+        "verifications": 1,
+        "exactOriginalNativeCheckpoints": true,
+        "seeded": true
+      },
+      {
+        "algorithm": "MonteCarlo",
+        "skip": true,
+        "Evaluated": 1,
+        "ElapsedMs": 1077,
+        "StoppedOnHealthTarget": true,
+        "StartingHp": 74,
+        "Hp": 74,
+        "MaxHp": 75,
+        "TargetHp": 74,
+        "FullHealth": false,
+        "checkpoints": 65,
+        "verifications": 0,
+        "exactOriginalNativeCheckpoints": true,
+        "seeded": true
+      },
+      {
+        "algorithm": "TurnFrontier",
+        "skip": false,
+        "Evaluated": 1,
+        "ElapsedMs": 5594,
+        "StoppedOnHealthTarget": true,
+        "StartingHp": 74,
+        "Hp": 74,
+        "MaxHp": 75,
+        "TargetHp": 74,
+        "FullHealth": false,
+        "checkpoints": 65,
+        "verifications": 1,
+        "exactOriginalNativeCheckpoints": true,
+        "seeded": true
+      },
+      {
+        "algorithm": "TurnFrontier",
+        "skip": true,
+        "Evaluated": 1,
+        "ElapsedMs": 1342,
+        "StoppedOnHealthTarget": true,
+        "StartingHp": 74,
+        "Hp": 74,
+        "MaxHp": 75,
+        "TargetHp": 74,
+        "FullHealth": false,
+        "checkpoints": 65,
+        "verifications": 0,
+        "exactOriginalNativeCheckpoints": true,
+        "seeded": true
+      }
+    ],
+    "scope": "Same-DLL seeded native non-full zero-loss return, two algorithms and both final replay modes; distinct frozen fixture from the October 13 Bodyguard incident"
+  },
+  "eightWorkerNative": {
+    "completed": true,
+    "dll_sha256": "6EB7C0D2FF05BE197B9FD40CEDDF85BF2D5356EE5B329A1BFE164F412866486D",
+    "Workers": 8,
+    "Evaluated": 128,
+    "Victories": 18,
+    "ElapsedMs": 27849,
+    "Timing": {
+      "RestoreMs": 25635,
+      "ActionMs": 33664,
+      "DecisionMs": 30799,
+      "VerificationMs": 9556,
+      "StartupMs": 1,
+      "Actions": 6284,
+      "Restores": 193,
+      "Verifications": 1
+    },
+    "TurnSearch": {
+      "Probes": 65,
+      "BoundPruned": 0,
+      "Offered": 8967,
+      "DuplicateOffers": 2,
+      "Pending": 8774,
+      "UnknownRecoveryChecks": 873,
+      "CoveredPrefixes": 3,
+      "CompletedHistories": 128,
+      "RepeatedHistories": 0,
+      "ClaimedByRound": {
+        "1": 69,
+        "2": 30,
+        "3": 10,
+        "4": 9,
+        "5": 5,
+        "6": 6,
+        "7": 12,
+        "8": 13,
+        "9": 5,
+        "10": 5,
+        "11": 5,
+        "12": 5,
+        "13": 5,
+        "14": 5,
+        "15": 5,
+        "16": 4
+      },
+      "RolloutStyles": {
+        "Preparation": 31,
+        "Balanced": 21,
+        "Attack": 21,
+        "Correlated": 42
+      },
+      "LossProofProbes": 0
+    },
+    "checkpoints": 52,
+    "ordinaryFinalReplayPassed": true,
+    "recoveredFailures": 0,
+    "scope": "Eight owned native workers and compact exact-history broker; correctness check, not comparative speed"
+  },
+  "nativeRuns": 17,
+  "recordedNativeCheckpoints": 852,
+  "ordinaryIndependentFinalReplays": 15,
+  "installation": {
+    "status": "pending_game_exit",
+    "throughUpdateInstallOnly": true,
+    "installedDllMatchesAcceptedPackage": false
+  },
+  "limits": [
+    "Single-resident comparison varies CompactTurnOffers only; not an old-version or eight-worker speed estimate",
+    "Seeded 74/75 return fixture is distinct from the 31/71 Bodyguard incident; no unseeded discovery-speed claim",
+    "Recipient checks inspect real native and actual incident Mod metadata without executing callbacks",
+    "Health-target completion is not a general global-optimality certificate; no recovery/proof or execution guard was relaxed",
+    "Progress pipe call count reduced from two to one; background cost is not equated with search wall time"
+  ]
+}

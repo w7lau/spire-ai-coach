@@ -18,6 +18,14 @@ internal sealed class LocalTurnPrefixIndex
         int parent = 0;
         foreach (var action in actions)
         {
+            parent = GetChild(parent, action, create);
+            if (parent < 0) return -1;
+        }
+        return parent;
+    }
+
+    public int GetChild(int parent, LocalAction action, bool create)
+    {
             string choices = action.Choices is not { Length: > 0 } ? "" : JsonSerializer.Serialize(
                 action.Choices.Select(c => new { c.OfferHash, c.Kind, c.Index, c.ModelId, Indices = c.Indices ?? [] }));
             var step = new StepKey(action.BeforeHash, action.Round, action.EndTurn, action.PotionSlot,
@@ -29,9 +37,7 @@ internal sealed class LocalTurnPrefixIndex
                 if (!create) return -1;
                 next = _nodes.Count; children.Add(step, next); _nodes.Add(new());
             }
-            parent = next;
-        }
-        return parent;
+        return next;
     }
 
 }

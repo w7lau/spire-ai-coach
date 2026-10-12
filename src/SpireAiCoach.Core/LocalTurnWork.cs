@@ -14,7 +14,7 @@ public sealed class LocalTurnWork : IDisposable
         LocalTurnOffer[]? Offers = null, LocalTurnTask? Task = null,
         LocalAction[]? Actions = null, LocalDecision[]? Decisions = null,
         LocalTurnHint? Hint = null, LocalWinningBound? Bound = null, string? TerminalDigest = null,
-        LocalCandidate? Outcome = null, LocalCandidate? WinningCandidate = null, LocalLossProofFocus[]? LossProof = null, int SuppressedOffers = 0);
+        LocalCandidate? Outcome = null, LocalCandidate? WinningCandidate = null, LocalLossProofFocus[]? LossProof = null, int SuppressedOffers = 0, LocalTurnBatch[]? Batches = null);
     internal sealed record Reply(LocalTurnTask? Task, int Pending, int Active,
         int Offered, int Duplicates, int Affected = 0, string? Error = null, bool RootReady = false);
 
@@ -131,7 +131,7 @@ public sealed class LocalTurnWork : IDisposable
     {
         if (command.Operation == "seed")
         {
-            if (command.Owner != 0 || _state.RootReady || command.Offers is { Length: > 0 } || command.Task?.Prefix.Length != 0 ||
+            if (command.Owner != 0 || _state.RootReady || command.Offers is { Length: > 0 } || command.Batches is { Length: > 0 } || command.Task?.Prefix.Length != 0 ||
                 _initialPlan is not { Length: > 0 } || _initialPlan[0].BeforeHash != _nativeRoot || command.Actions == null ||
                 command.Actions.Length != _initialPlan.Length || !LocalSearchWork.MatchesPrefix(command.Actions, _initialPlan))
                 throw new InvalidDataException("Initial route does not match the frozen producer request");
@@ -142,7 +142,8 @@ public sealed class LocalTurnWork : IDisposable
         if (command.SuppressedOffers < 0) throw new InvalidDataException("Invalid suppressed offer count");
         _frontier.DuplicateOffers += command.SuppressedOffers;
         foreach (var offer in command.Offers ?? []) _frontier.Offer(offer.Prefix, offer.SearchRound, offer.Hint);
-        if (command.Offers is { Length: > 0 }) _state.RootReady = true;
+        foreach (var batch in command.Batches ?? []) _frontier.OfferBatch(batch);
+        if (command.Offers is { Length: > 0 } || command.Batches?.Any(b => b.Alternatives.Length > 0) == true) _state.RootReady = true;
         switch (command.Operation)
         {
             case "offer": return Snapshot();
@@ -230,12 +231,15 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
     private readonly LocalTurnSearch _choices;
     private readonly LocalCardGoals? _cardGoals;
     private readonly List<LocalTurnOffer> _offers = [];
+    private readonly List<LocalTurnBatch> _batches = [];
+    private int _batchOffers;
+    private readonly bool _compact;
     private LocalTurnWork.Reply _last = new(null, 0, 0, 0, 0);
     private LocalTurnTask? _owned;
     private int _disposed;
     private readonly Dictionary<int, int> _roundClaims = new();
     private long _lastFlush = Environment.TickCount64;
-    public int Count => _last.Pending + _offers.Count;
+    public int Count => _last.Pending + _offers.Count + _batchOffers;
     public int Active => _last.Active;
     public bool RootReady => _last.RootReady;
     public int Offered => _last.Offered;
@@ -254,7 +258,7 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
 
     public LocalTurnWorkClient(LocalSearchRequest request)
     {
-        _coalesce = request.CoalesceTurnOffers;
+        _coalesce = request.CoalesceTurnOffers; _compact = request.CompactTurnOffers;
         _scope = LocalTurnWork.Scope(request); _owner = request.Partition;
         _cardGoals = request.CardGoals;
         _choices = new(1729 + _owner, cardGoals: request.CardGoals);
@@ -269,13 +273,13 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
         LocalTurnHint? hint = null, LocalWinningBound? bound = null, string? terminalDigest = null,
         LocalCandidate? outcome = null, LocalCandidate? winningCandidate = null, LocalLossProofFocus[]? lossProof = null)
     {
-        var command = new LocalTurnWork.Command(_scope, _owner, operation, _offers.ToArray(), task, actions, decisions, hint, bound, terminalDigest, outcome, winningCandidate, lossProof, _suppressed);
+        var command = new LocalTurnWork.Command(_scope, _owner, operation, _offers.ToArray(), task, actions, decisions, hint, bound, terminalDigest, outcome, winningCandidate, lossProof, _suppressed, _batches.ToArray());
         _writer.WriteLine(JsonSerializer.Serialize(command));
         var reply = JsonSerializer.Deserialize<LocalTurnWork.Reply>(_reader.ReadLine() ?? throw new IOException("Turn task broker closed"))
             ?? throw new InvalidDataException("Empty turn task reply");
         if (reply.Error != null) throw new InvalidOperationException(reply.Error);
-        TransmittedOffers += _offers.Count;
-        _offers.Clear(); _suppressed = 0; _lastFlush = Environment.TickCount64; _last = reply; return reply;
+        TransmittedOffers += _offers.Count + _batchOffers;
+        _offers.Clear(); _batches.Clear(); _batchOffers = 0; _suppressed = 0; _lastFlush = Environment.TickCount64; _last = reply; return reply;
     }
 
     public void Offer(LocalAction[] prefix, int searchRound, LocalTurnHint hint)
@@ -297,8 +301,9 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
                 return;
             }
         }
+        if (_batchOffers > 0) Exchange("offer");
         _offers.Add(new(prefix.ToArray(), searchRound, hint));
-        if (_offers.Count >= 32 || Environment.TickCount64 - _lastFlush >= 100) Exchange("offer");
+        if (_offers.Count + _batchOffers >= 32 || Environment.TickCount64 - _lastFlush >= 100) Exchange("offer");
     }
 
     public void SeedRoot(LocalAction[] continuation, int searchRound, LocalTurnHint hint) =>
@@ -342,8 +347,30 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
     public void OfferAlternatives(IReadOnlyList<LocalAction> actions, LocalDecision decision, LocalTurnHint before,
         LocalTurnTask? owner = null)
     {
-        foreach (var offer in LocalTurnSearch.Alternatives(actions, decision, before, owner))
-            Offer(offer.Prefix, offer.SearchRound, offer.Hint);
+        if (!_compact)
+        {
+            foreach (var offer in LocalTurnSearch.Alternatives(actions, decision, before, owner))
+                Offer(offer.Prefix, offer.SearchRound, offer.Hint);
+            return;
+        }
+        var batch = LocalTurnSearch.AlternativeBatch(actions, decision, before, owner);
+        if (batch == null || batch.Alternatives.Length == 0) return;
+        if (_coalesce && _last.Duplicates > 0)
+        {
+            if (_offeredPrefixes.Count >= 65536 || _offeredKeys.Count >= 65536)
+            { _offeredPrefixes.Clear(); _offeredKeys.Clear(); }
+            int parent = _offeredPrefixes.GetId(batch.Parent, true);
+            var unique = batch.Alternatives.Where(a => _offeredKeys.Add((batch.SearchRound,
+                _offeredPrefixes.GetChild(parent, a, true)))).ToArray();
+            int duplicates = batch.Alternatives.Length - unique.Length;
+            _suppressed += duplicates; LocallySuppressedOffers += duplicates;
+            batch = batch with { Alternatives = unique };
+        }
+        // Flush ordinary offers before the batch and vice versa: wire compaction
+        // must not change first-offer hints, task IDs or deterministic FIFO order.
+        if (_offers.Count > 0) Exchange("offer");
+        if (batch.Alternatives.Length > 0) { _batches.Add(batch); _batchOffers += batch.Alternatives.Length; }
+        if (_batchOffers >= 32 || Environment.TickCount64 - _lastFlush >= 100) Exchange("offer");
     }
 
     public void Dispose()

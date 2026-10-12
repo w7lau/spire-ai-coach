@@ -26,7 +26,7 @@ public sealed record LocalSearchRequest(string Id, string SnapshotId, byte[] Rep
     LocalCardGoals? CardGoals = null, string? MinimumLossPipe = null, bool StopOnFirstWin = false,
     LocalEventEntry? EventEntry = null, bool ResumingFrontier = false, bool ReuseSnapshotMetadata = false,
     bool ReplayRootOnly = false, LocalModReplayCheckpoint? ModReplay = null, bool CompactMinimumLossReplies = true,
-    bool CoalesceTurnOffers = true, bool ThrottleUnchangedResults = true);
+    bool CoalesceTurnOffers = true, bool ThrottleUnchangedResults = true, bool CompactTurnOffers = true);
 
 // A stop belongs to one frozen request. Goal stops exclude verification;
 // explicit caller cancellation also applies during verification or with goals off.

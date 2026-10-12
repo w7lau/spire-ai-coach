@@ -366,6 +366,9 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                 // source callbacks/helpers are read when those methods are queued.
                 if (declaring.FullName == "MegaCrit.Sts2.Core.Commands.CreatureCmd" && called.Name is "Heal" or "GainMaxHp")
                 {
+                    // Only the user-facing combat target excludes a proved summon recipient.
+                    // Unknown recipients and the strict recovery proof retain the old closure.
+                    if (targetOnly && arguments?.FirstOrDefault()?.Tag == "summon-creature" && !ForeignPatch(called)) continue;
                     bool gain = called.Name == "GainMaxHp";
                     if (terminal && direct && typeof(RelicModel).IsAssignableFrom(type) && !LocalMethodBody.HasBackwardJump(code) &&
                         FixedVictoryValue(code, i, type, gain ? "get_MaxHp" : "get_Heal", !gain))
@@ -518,6 +521,10 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
         }
         LocalIlFacts.Value Call(MethodBase called, LocalIlFacts.Value[] args)
         {
+            // Read native identity from metadata, without invoking a getter. A foreign
+            // getter patch can change the recipient and therefore removes this fact.
+            if (called.DeclaringType == typeof(Player) && called.Name == "get_Osty" && !ForeignPatch(called))
+                return new(Tag: "summon-creature");
             if (completionPath && called.DeclaringType?.Namespace == "System.Runtime.CompilerServices" &&
                 called.DeclaringType.Name.StartsWith("TaskAwaiter", StringComparison.Ordinal) && called.Name == "get_IsCompleted")
                 return LocalIlFacts.Value.Number(1); // Analyze the equivalent post-completion path; handlers remain independent.

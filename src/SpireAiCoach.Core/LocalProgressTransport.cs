@@ -100,12 +100,12 @@ public sealed class LocalProgressSender : IDisposable
             using (measure?.Invoke("Serialize"))
                 bytes = JsonSerializer.SerializeToUtf8Bytes(new LocalProgressTransport.Envelope(_scope, progress));
             if (bytes.Length > LocalProgressTransport.MaximumBytes) throw new InvalidDataException("Local progress is too large");
-            var header = new byte[4];
-            BinaryPrimitives.WriteInt32LittleEndian(header, bytes.Length);
+            var packet = new byte[sizeof(int) + bytes.Length];
+            BinaryPrimitives.WriteInt32LittleEndian(packet, bytes.Length);
+            bytes.CopyTo(packet, sizeof(int));
             using var writing = measure?.Invoke("PipeWrite");
             using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(2));
-            _pipe.WriteAsync(header, timeout.Token).AsTask().GetAwaiter().GetResult();
-            _pipe.WriteAsync(bytes, timeout.Token).AsTask().GetAwaiter().GetResult();
+            _pipe.WriteAsync(packet, timeout.Token).AsTask().GetAwaiter().GetResult();
             return true;
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or TimeoutException or OperationCanceledException or UnauthorizedAccessException)

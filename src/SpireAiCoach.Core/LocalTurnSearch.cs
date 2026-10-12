@@ -43,6 +43,9 @@ public interface ILocalTurnFrontier
 }
 
 public sealed record LocalTurnOffer(LocalAction[] Prefix, int SearchRound, LocalTurnHint Hint);
+// One observed parent history, with its exact legal siblings. Full replay prefixes
+// are materialized only when claimed; identities, ordering and coverage stay exact.
+public sealed record LocalTurnBatch(LocalAction[] Parent, LocalAction[] Alternatives, int SearchRound, LocalTurnHint Hint);
 
 // Request-local tracking of observed choice edges, keyed by the complete parent
 // history. Replaying another history with the same visible offer cannot consume
@@ -123,7 +126,14 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
     public int LastLane { get; private set; }
     public bool LastFocused { get; private set; }
     public IReadOnlyDictionary<int, int> ClaimedByRound => new Dictionary<int, int>(_roundClaims);
-    private sealed record Entry(LocalTurnTask Task, LocalTurnHint Hint);
+    private sealed record Entry(LocalTurnTask Task, LocalTurnHint Hint, LocalAction[]? Parent = null, LocalAction? Alternative = null)
+    {
+        public int Length => Parent == null ? Task.Prefix.Length : Parent.Length + 1;
+        public LocalAction At(int index) => Parent == null ? Task.Prefix[index] : index < Parent.Length ? Parent[index] : Alternative!;
+        public LocalTurnTask Materialize() => Parent == null ? Task : Task with { Prefix = [..Parent, Alternative!] };
+        public int Potions => Parent == null ? Task.Prefix.Count(a => a.PotionSlot.HasValue) :
+            Parent.Count(a => a.PotionSlot.HasValue) + (Alternative!.PotionSlot.HasValue ? 1 : 0);
+    }
     private sealed class RoundQueue
     {
         public readonly PriorityQueue<int, (double, int)> Damage = new();
@@ -141,6 +151,22 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         var task = new LocalTurnTask(_next++, prefix.ToArray(), searchRound, Hint: hint);
         _seen.Add(key, task.Id);
         Queue(new(task with { Hint = hint }, hint));
+    }
+
+    public void OfferBatch(LocalTurnBatch batch)
+    {
+        if (batch.SearchRound < 1) throw new ArgumentOutOfRangeException(nameof(batch));
+        if (batch.Alternatives.Length == 0) return;
+        var parent = batch.Parent.ToArray();
+        int parentId = PrefixId(parent, true);
+        foreach (var alternate in batch.Alternatives)
+        {
+            var key = (batch.SearchRound, _prefixIndex.GetChild(parentId, alternate, true));
+            if (_seen.ContainsKey(key)) { DuplicateOffers++; continue; }
+            var task = new LocalTurnTask(_next++, [], batch.SearchRound, Hint: batch.Hint);
+            _seen.Add(key, task.Id);
+            Queue(new(task, batch.Hint, parent, alternate));
+        }
     }
 
     public void SeedRoot(LocalAction[] continuation, int searchRound, LocalTurnHint hint)
@@ -166,7 +192,7 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         // A later turn must first replay its entire prefix. Without a cost term,
         // near-victory states monopolize probes that are almost full rollouts.
         // FIFO work retains long prefixes; this only orders the other lanes.
-        double replayCost = Math.Sqrt(1 + entry.Task.Prefix.Length);
+        double replayCost = Math.Sqrt(1 + entry.Length);
         _health.Enqueue(entry.Task.Id, (-(hp * 2 + progress + carry - cost) / replayCost, entry.Task.Id));
         var damageScore = (-(progress * 2 + hp + carry - cost) / replayCost, entry.Task.Id);
         _damage.Enqueue(entry.Task.Id, damageScore);
@@ -216,7 +242,7 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
             var queue = lane == 1 ? _damage : _health;
             do { id = queue.Dequeue(); } while (!_pending.ContainsKey(id));
         }
-        task = _pending[id].Task with { FullRollout = !proof && (guided || _pending[id].Task.FullRollout), LossProof = proof,
+        task = _pending[id].Materialize() with { FullRollout = !proof && (guided || _pending[id].Task.FullRollout), LossProof = proof,
             Style = _lastStyle ?? (guided ? _guidedIncumbent?.RolloutStyle ?? LocalRolloutStyle.Balanced : _pending[id].Task.Style),
             Continuation = _lastContinuation ?? (guided ? _winningTails.GetValueOrDefault(id) : null) ?? _pending[id].Task.Continuation };
         if (goalFocus) task = task with { FullRollout = true, Style = LocalRolloutStyle.Preparation,
@@ -277,21 +303,22 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         // Complete native outcomes guide exploration around the actual incumbent.
         // Its exact alternatives have already been offered; no legal prefix is
         // invented, reopened, merged, or discarded by this scheduling hint.
-        var alternatives = new List<(int Id, int Round, int Step, int Rank, LocalAction[] Tail)>();
+        var alternatives = new List<(int Id, int Round, int Step, int Rank, bool SavesPotion, LocalAction[] Tail)>();
         foreach (var decision in candidate.Decisions ?? [])
         {
             if (decision.BeforeStep < 0 || decision.BeforeStep >= candidate.Actions.Length) continue;
             var actual = candidate.Actions[decision.BeforeStep];
             var hint = new LocalTurnHint(candidate.Hp, candidate.StartingHp ?? candidate.Hp, candidate.EnemyHp, 1);
+            var tail = candidate.Actions.Skip(decision.BeforeStep).ToArray();
             foreach (var offer in Alternatives(candidate.Actions, decision, hint))
             {
                 var key = (offer.SearchRound, PrefixId(offer.Prefix, false));
                 if (_seen.TryGetValue(key, out int id) && _pending.ContainsKey(id))
                     alternatives.Add((id, actual.Round, decision.BeforeStep, offer.Prefix[^1].Preference,
-                        candidate.Actions.Skip(decision.BeforeStep).ToArray()));
+                        actual.PotionSlot.HasValue && !offer.Prefix[^1].PotionSlot.HasValue, tail));
             }
         }
-        foreach (var item in alternatives.OrderBy(x => x.Round).ThenBy(x => x.Step).ThenByDescending(x => x.Rank))
+        foreach (var item in alternatives.OrderByDescending(x => x.SavesPotion).ThenBy(x => x.Round).ThenBy(x => x.Step).ThenByDescending(x => x.Rank))
             _winner.Enqueue((item.Id, item.Tail));
     }
 
@@ -323,14 +350,16 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
             int step = decision.BeforeStep;
             if (step < 0 || step >= candidate.Actions.Length) continue;
             var actual = candidate.Actions[step];
+            var tail = candidate.Actions.Skip(step).ToArray();
             foreach (var alternative in decision.Legal.Where(a => !SameAction(a, actual)))
             {
                 var key = (actual.Round, PrefixId([.. candidate.Actions.Take(step), alternative], false));
                 int id = _seen.GetValueOrDefault(key, -1);
                 if (_pending.ContainsKey(id))
                 {
-                    options.Add((id, (alternative.Preference - actual.Preference) / Math.Sqrt(1 + step)));
-                    tails[id] = candidate.Actions.Skip(step).ToArray();
+                    options.Add((id, (actual.PotionSlot.HasValue && !alternative.PotionSlot.HasValue ? 1000 : 0) +
+                        (alternative.Preference - actual.Preference) / Math.Sqrt(1 + step)));
+                    tails[id] = tail;
                 }
             }
         }
@@ -435,10 +464,10 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
 
     public int DiscardDescendants(IReadOnlyList<LocalAction> prefix)
     {
-        var ids = _pending.Where(p => p.Value.Task.Prefix.Length >= prefix.Count &&
-            prefix.Select((a, i) => SameAction(a, p.Value.Task.Prefix[i]) &&
-                (a.Choices ?? []).Length == (p.Value.Task.Prefix[i].Choices ?? []).Length &&
-                (a.Choices ?? []).Select((c, n) => SameChoice(c, p.Value.Task.Prefix[i].Choices![n])).All(x => x)).All(x => x))
+        var ids = _pending.Where(p => p.Value.Length >= prefix.Count &&
+            prefix.Select((a, i) => SameAction(a, p.Value.At(i)) &&
+                (a.Choices ?? []).Length == (p.Value.At(i).Choices ?? []).Length &&
+                (a.Choices ?? []).Select((c, n) => SameChoice(c, p.Value.At(i).Choices![n])).All(x => x)).All(x => x))
             .Select(p => p.Key).ToArray();
         foreach (int id in ids) _pending.Remove(id);
         return ids.Length;
@@ -451,7 +480,7 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         // carries a certified recovery ceiling, or null when effects are unknown.
         // Potion expense alone cannot bound unknown future healing.
         var ids = _pending.Where(p => LocalHealthBound.CannotImprove(new(_root,
-            p.Value.Hint.StartingHp, p.Value.Hint.Hp, p.Value.Task.Prefix.Count(a => a.PotionSlot.HasValue),
+            p.Value.Hint.StartingHp, p.Value.Hint.Hp, p.Value.Potions,
             p.Value.Hint.MaximumFurtherHpGain), incumbent, _cardGoals))
             .Select(p => p.Key).ToArray();
         foreach (int id in ids) _pending.Remove(id);
@@ -468,24 +497,34 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
     public void OfferAlternatives(IReadOnlyList<LocalAction> actions, LocalDecision decision, LocalTurnHint before,
         LocalTurnTask? owner = null)
     {
-        foreach (var offer in Alternatives(actions, decision, before, owner))
-            Offer(offer.Prefix, offer.SearchRound, offer.Hint);
+        var batch = AlternativeBatch(actions, decision, before, owner);
+        if (batch != null) OfferBatch(batch);
     }
 
     public static IEnumerable<LocalTurnOffer> Alternatives(IReadOnlyList<LocalAction> actions,
         LocalDecision decision, LocalTurnHint before, LocalTurnTask? owner = null)
     {
+        var batch = AlternativeBatch(actions, decision, before, owner);
+        if (batch == null) yield break;
+        foreach (var alternate in batch.Alternatives)
+            yield return new([..batch.Parent, alternate], batch.SearchRound, batch.Hint);
+    }
+
+    public static LocalTurnBatch? AlternativeBatch(IReadOnlyList<LocalAction> actions,
+        LocalDecision decision, LocalTurnHint before, LocalTurnTask? owner = null)
+    {
         if (decision.BeforeStep < 0 || decision.BeforeStep >= actions.Count)
             throw new InvalidOperationException("Decision is outside the executed history");
         var actual = actions[decision.BeforeStep];
+        var alternatives = new List<LocalAction>();
         // A claimed prefix already fixes its actions and earlier choices. Do not
         // publish its ancestor's siblings from another worker's owned subtree.
-        if (owner != null && decision.BeforeStep < owner.Prefix.Length - 1) yield break;
+        if (owner != null && decision.BeforeStep < owner.Prefix.Length - 1) return null;
         var prefix = actions.Take(decision.BeforeStep).ToArray();
         bool fixedAction = owner != null && decision.BeforeStep < owner.Prefix.Length;
         if (!fixedAction)
             foreach (var alternate in decision.Legal.OrderByDescending(a => a.Preference))
-                if (!SameAction(actual, alternate)) yield return new([..prefix, alternate], actual.Round, before);
+                if (!SameAction(actual, alternate)) alternatives.Add(alternate);
         int fixedChoices = fixedAction ? owner!.Prefix[decision.BeforeStep].Choices?.Length ?? 0 : 0;
         foreach (var choice in decision.Choices ?? [])
         {
@@ -499,9 +538,10 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
                 // A changed earlier selection may produce a different later offer.
                 // Fix only the observed prefix through this selection, never its tail.
                 var choices = actual.Choices.Take(choice.AtChoice).Append(alternate).ToArray();
-                yield return new([..prefix, actual with { Choices = choices }], actual.Round, before);
+                alternatives.Add(actual with { Choices = choices });
             }
         }
+        return new(prefix, alternatives.ToArray(), actual.Round, before);
     }
 
     public static LocalAction ResolveExact(LocalAction planned, IReadOnlyList<LocalAction> legal) =>
