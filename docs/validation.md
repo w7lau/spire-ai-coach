@@ -11,7 +11,7 @@
 - 实际 181 个提案的序列化负载 **1,455,279 → 524,341 字节（下降 63.97%）**；重复提案真实 broker 微测仍保留 181 个独立分支及 5,611 次重复，完整任务顺序相同。微测时间与原生搜索时间分开报告。
 - 另一份冻结 `74/75 → 74/75` 胜利路线，以已有动作作为起始方案：两算法 × 复核开/关 **4/4 均在 1 次评估后由健康目标返回**，每次原有 65 个完整检查点完全一致。它不是护卫事故的原根重跑，也不用于估计首次发现路线速度；护卫对象识别由实际 Mod 元数据另行验证。
 - 八路同时提交紧凑分支完成 **128 次评估、18 次胜利**，最终 52 步普通独立复核通过，无恢复失败。这是并发正确性检查，不是与旧版的配对测速。逃跑/非原生胜利、可选目标、严格最优证明与执行门禁仍由已有核心回归覆盖。
-- DLL SHA256 **`6eb7c0d2ff05be197b9fd40ceddf85bf2d5356ee5b329a1bfe164f412866486d`**；ZIP SHA256 **`ea6b61e73cfef4f1abffa24d7784e764f0e6313611a78d3857ebe60607a41d55`**。安装器于 01:13（+08:00）检测到正式游戏仍在运行并拒绝替换，待用户退出；准备包及已通过的证据保留，无需重建。 未停止玩家游戏、编辑玩家存档、改变 RNG 或清理缓存。[脱敏证据](../experiments/LocalIntegration/results/2026-10-13-compact-summon-0.7.87.json)，[固定工作量检查](../experiments/CompactTurnNative/README.md)，[目标返回检查](../experiments/HealthReturnNative/README.md)。
+- DLL SHA256 **`6eb7c0d2ff05be197b9fd40ceddf85bf2d5356ee5b329a1bfe164f412866486d`**；ZIP SHA256 **`ea6b61e73cfef4f1abffa24d7784e764f0e6313611a78d3857ebe60607a41d55`**。已通过 `Update.ps1 -InstallOnly` 安装，安装 DLL 与原生验收包 SHA256 一致。 未停止玩家游戏、编辑玩家存档、改变 RNG 或清理缓存。[脱敏证据](../experiments/LocalIntegration/results/2026-10-13-compact-summon-0.7.87.json)，[固定工作量检查](../experiments/CompactTurnNative/README.md)，[目标返回检查](../experiments/HealthReturnNative/README.md)。
 
 ## 0.7.86 搜索提案与输出减负（2026-10-13）
 

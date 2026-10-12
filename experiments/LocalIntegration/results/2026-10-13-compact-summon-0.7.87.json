@@ -708,9 +708,9 @@
   "recordedNativeCheckpoints": 852,
   "ordinaryIndependentFinalReplays": 15,
   "installation": {
-    "status": "pending_game_exit",
+    "status": "installed",
     "throughUpdateInstallOnly": true,
-    "installedDllMatchesAcceptedPackage": false
+    "installedDllMatchesAcceptedPackage": true
   },
   "limits": [
     "Single-resident comparison varies CompactTurnOffers only; not an old-version or eight-worker speed estimate",
