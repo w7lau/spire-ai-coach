@@ -1,0 +1,87 @@
+{
+  "date": "2026-10-12",
+  "version": "0.7.85",
+  "passed": true,
+  "dll_sha256": "f340afd2b5d9ad004eecb6379ca2f935be4aeaf7e77a82f4813dbe9181334d36",
+  "zip_sha256": "94441c3ece5762016a4b33b0b9681465ef089bc287478df416e07515866238f5",
+  "core_checks": {
+    "passed": 471,
+    "total": 471
+  },
+  "game_sdk": "v0.111.0",
+  "scope": "Exact frozen incident, seven original external Mods plus an owned test-only observer; original eight workers, 64 trials per worker and 60-second budget. Fixed cases explicitly retain ordinary independent final replay.",
+  "baseline": {
+    "adapter_disabled": true,
+    "reproduced": true,
+    "category": "local_runtime",
+    "exception": "System.InvalidOperationException: unsupported System.Threading.Tasks.Task to Godot Variant",
+    "elapsed_ms": 54297,
+    "observed_vfx": {
+      "FlyingKickStrike": 27
+    }
+  },
+  "native_samples": [
+    {
+      "algorithm": "TurnFrontier",
+      "evaluated": 512,
+      "victories": 102,
+      "elapsed_ms": 99096,
+      "workers": 8,
+      "verifications": 1,
+      "checkpoints": 58,
+      "won": true,
+      "dead": false,
+      "starting_hp": 55,
+      "final_hp": 22,
+      "final_max_hp": 71,
+      "recovered_failures": 0,
+      "ordinary_native_replay_passed": true
+    },
+    {
+      "algorithm": "MonteCarlo",
+      "evaluated": 512,
+      "victories": 0,
+      "elapsed_ms": 32213,
+      "workers": 8,
+      "verifications": 1,
+      "checkpoints": 30,
+      "won": false,
+      "dead": true,
+      "starting_hp": 55,
+      "final_hp": 0,
+      "final_max_hp": 69,
+      "recovered_failures": 0,
+      "ordinary_native_replay_passed": true
+    }
+  ],
+  "native_callback_components": {
+    "passed": 8,
+    "total": 8,
+    "starts_once": true,
+    "completes_once": true,
+    "nil_return": true,
+    "integer_callback_preserved": true,
+    "audited_registration_sites": [
+      "BoomerangSweep",
+      "OmegaJudgment",
+      "FlyingKickStrike",
+      "CorpseBloomBurst",
+      "QuantumPulse"
+    ],
+    "flying_kick_invocations": 2058
+  },
+  "limitations": [
+    "Single exact frozen incident and audited callback signatures, not general Mod compatibility or an optimality/speed claim.",
+    "MonteCarlo completed the original bounded search without a victory; its native defeat was independently replayed rather than relabeled as a win.",
+    "Compatibility applies only to owned simulation/replay workers; the external Mod original live-game VFX implementation is unchanged."
+  ],
+  "installation": {
+    "status": "installed",
+    "date": "2026-10-12",
+    "method": "scripts/Update.ps1 -InstallOnly",
+    "elapsed_ms": 1383,
+    "same_native_validated_package": true,
+    "manifest_sha256": "206e71e10ff205cd1ebba4ee2625cc919e41d3a3ece156da6d984c62cf93c031",
+    "player_restart_verified": false
+  }
+}

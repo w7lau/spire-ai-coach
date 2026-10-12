@@ -100,6 +100,7 @@ public static class LocalWorker
         LocalWorkerStartup.Install("patch_snapshot_metadata", LocalWorkerSnapshotMetadata.Install);
         LocalWorkerStartup.Install("patch_verification", LocalWorkerVerification.Install);
         LocalWorkerStartup.Install("patch_discard", LocalDiscardObservation.Install);
+        LocalWorkerStartup.Install("patch_task_callables", LocalTaskCallableCompatibility.Install);
         Callable.From(Run).CallDeferred();
         return true;
     }
