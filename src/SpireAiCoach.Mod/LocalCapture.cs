@@ -27,8 +27,10 @@ public static class LocalCapture
     [ThreadStatic] private static bool _writerInUse;
     [ThreadStatic] private static int _snapshotDepth;
     internal static bool InFingerprintSnapshot => _snapshotDepth > 0;
-    private static CombatReplay Replay() => typeof(CombatReplayWriter).GetField("_replay", BindingFlags.Instance | BindingFlags.NonPublic)
-        ?.GetValue(RunManager.Instance.CombatReplayWriter) as CombatReplay ?? throw new InvalidOperationException("No combat replay");
+    private static readonly FieldInfo? ReplayField = typeof(CombatReplayWriter)
+        .GetField("_replay", BindingFlags.Instance | BindingFlags.NonPublic);
+    private static CombatReplay Replay() => ReplayField?.GetValue(RunManager.Instance.CombatReplayWriter)
+        as CombatReplay ?? throw new InvalidOperationException("No combat replay");
 
     // The native network action encodes the combat-card instance, unlike its current hand index.
     // Normalize only readiness/resume bookkeeping. Keep the exact ordered native choice results.

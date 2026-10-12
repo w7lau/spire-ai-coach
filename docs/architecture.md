@@ -1,5 +1,17 @@
 # 设计与合同
 
+## 0.7.86 搜索提案与输出减负
+
+父队列实际报告重复提案后，LocalTurnWorkClient 才启用请求内缓存并提前合并同一完整操作/选择历史与搜索回合的重复提案。客户端与父队列共用 LocalTurnPrefixIndex，保留原生 BeforeHash、回合、卡牌实例、目标、药水槽、原生选择顺序及选择 offer 身份；显示名、排序提示及有稳定卡牌实例时的当前手牌位置不参与身份。父队列原本忽略重复提案及后续 hint，因此首次提案的排队与评分仍由父队列负责。没有重复的提案流不建立第二份前缀树；缓存按前缀节点数/提案数各 65536 有界，达到边界只清理本地去重缓存并允许重送，不能丢掉父队列任务；请求结束释放。重复数通过受同一请求/所有者核对的管道累计到保留的 frontier，继续搜索时不丢失。取消、归还、退休、共享目标与证明路径沿用原规则。
+
+LocalResultPublication 将未变化的候选和相同最低损失证书的完整 running 结果更新间隔从 250ms 调整为 1000ms。候选或证书改变仍使用 250ms 上限，所有非 running 终态立即发布；原 100ms 过程进度独立保留。终态仍包含完整候选、逐步检查点、诊断与当前计数，不省略最终原生核对。CoalesceTurnOffers / ThrottleUnchangedResults 仅为冻结输入对照开关，不属于合法搜索域，也不使保留的 frontier 失效。
+
+快照计时标签在安装入口预先构造，避免每张牌/每个费用 Hook 重复拼接固定字符串；原生历史的 FieldInfo 缓存固定元数据。所有完整快照、费用 getter、Mod Hook、RNG/历史与实际执行检查仍照常运行。原实验性 ReuseSnapshotMetadata 保持关闭，不缓存跨状态数值。
+
+版本包含 0.7.85 的所属 worker Task/Callable 适配。动画仍按已审计纯表现边界省略，保留伤害信号、牌堆通知、异步任务完成及清理；没有全局跳过 Godot/Tween 或把未知动画任务默认视为完成。
+
+experiments/SearchHotpathNative 在相同 DLL、冻结输入和同一常驻 worker 上做两种算法的交错对照，并独立回放每份最终候选；另用原生实际观察的合法提案流测试重复提交的传输开销。固定 32 次、单路实验与原产品八路 64 次/60 秒预算分开说明，不把提案重复数当作避免了同样多的原生动作，不以微基准声称所有战斗都提速。
+
 ## 0.7.85 外部动画 Task 回调的 Godot 接口兼容
 
 当前已审计的 HextechRunes.HextechCombatVfx 五个静态动画入口使用 `Callable.From<Task>(Func<Task>)` 后立即延迟调用；Godot 的返回值转换不接受 Task。所属 worker 在现有所有权校验通过后，仅对精确类型、方法及参数签名、void 返回、单个 Task 工厂和单个 void CallDeferred 的匹配边界替换工厂。回调改为 Action，原 delegate 只调用一次并继续 await 原 Task；不返回 Task 给 Variant，不跳过动画体、规则或回调，不更改全局 TestMode、Godot 转换器或外部 Mod 文件。

@@ -46,10 +46,11 @@ foreach (var order in baseline ? new[] { captured.SearchOrder } : new[] { LocalS
         MaxNodes = captured.MaxNodes, BudgetSeconds = captured.BudgetSeconds,
         InitialPlan = null, VerifyCandidate = null, RecordedReplayProbe = null,
         TurnWorkPipe = null, SearchWorkPipe = null, MinimumLossPipe = null, ProgressPipe = null,
-        SkipFinalVerification = baseline ? captured.SkipFinalVerification : false, DeferVerification = true };
+        SkipFinalVerification = baseline ? captured.SkipFinalVerification : false,
+        FastVerification = baseline && captured.FastVerification, DeferVerification = true };
     var watch = Stopwatch.StartNew();
     Console.WriteLine(JsonSerializer.Serialize(new { phase = "search", algorithm = order.ToString(), request.Workers,
-        request.MaxNodes, request.BudgetSeconds, independentFinalReplay = !request.SkipFinalVerification }));
+        request.MaxNodes, request.BudgetSeconds, independentFinalReplay = !request.SkipFinalVerification, request.FastVerification }));
     try
     {
         var result = await pool.Analyze(request, installation, _ => { }, CancellationToken.None);
