@@ -45,8 +45,10 @@ public sealed class LocalMinimumLossProof(LocalSearchRequest request, int capaci
         public int Round;
         public Floor Own = Floor.Unknown, Minimum = Floor.Unknown;
         public bool Complete, Terminal;
+        public LinkedListNode<Node>? Frontier;
     }
     private readonly Node _root = new();
+    private readonly LinkedList<Node> _frontier = new();
     private readonly string _scope = Scope(request);
     private int? _startingHp;
     private int _nodes = 1, _trials;
@@ -123,6 +125,7 @@ public sealed class LocalMinimumLossProof(LocalSearchRequest request, int capaci
             }
             node.Hint = step.AfterHint ?? node.Hint;
             node.Round = step.AfterRound ?? node.Round;
+            RefreshFrontier(node);
             Recalculate(node);
             if (_invalid.Length > 0) return;
         }
@@ -135,47 +138,56 @@ public sealed class LocalMinimumLossProof(LocalSearchRequest request, int capaci
                 { Invalidate("A native victory contradicts a proposed loss floor"); return; }
             if (node.Children.Count > 0 || node.Terminal && node.Own != terminal)
             { Invalidate("Native terminal history changed"); return; }
-            node.Terminal = true; node.Own = terminal; Recalculate(node);
+            node.Terminal = true; node.Own = terminal; Recalculate(node); RefreshFrontier(node);
             if (trial.Won) _goal = _goal is { } goal ? Floor.Min(goal, terminal) : terminal;
         }
         _trials++;
     }
 
-    // Seek the weakest OPEN prefixes, rather than repeatedly finishing battles
-    // whose outcome already reaches an incumbent. This is scheduling only: no
-    // optimistic score becomes a certificate and no legal sibling is removed.
+    // Index only actionable boundaries as native observations arrive. Internal
+    // nodes never consume a bounded root scan, so a wide/deep open tree cannot
+    // hide its remaining work. This index schedules work; it proves nothing.
+    private void RefreshFrontier(Node node)
+    {
+        bool actionable = !node.Terminal && node.Hint != null && node.Round > 0 &&
+            (node.Legal.Any(key => !node.Children.ContainsKey(key)) ||
+             node.Parent != null && (!node.Complete || node.Legal.Count == 0));
+        if (node.Frontier != null) _frontier.Remove(node.Frontier);
+        node.Frontier = actionable ? _frontier.AddLast(node) : null;
+    }
+
     private LocalLossProofFocus[] FindFocus()
     {
         if (_invalid.Length > 0 || !_knownRecovery || _goal is not { } target ||
             _root.Minimum.CompareTo(target) >= 0) return [];
         var result = new List<LocalLossProofFocus>();
-        var queue = new Queue<Node>(); queue.Enqueue(_root);
-        int inspected = 0;
-        while (queue.TryDequeue(out var node) && result.Count < 16 && inspected++ < 512)
+        int remaining = _frontier.Count;
+        while (remaining-- > 0 && result.Count < 16 && _frontier.First is { } entry)
         {
-            if (node.Terminal || node.Minimum.CompareTo(target) >= 0) continue;
-            var prefix = Prefix(node);
+            var node = entry.Value;
+            _frontier.RemoveFirst(); node.Frontier = null;
+            // An ancestor may close without visiting every indexed descendant.
+            // Certified floors only increase and winning targets only improve.
+            bool closed = false;
+            for (var ancestor = node; ancestor != null; ancestor = ancestor.Parent)
+                if (ancestor.Terminal || ancestor.Minimum.CompareTo(target) >= 0)
+                { closed = true; break; }
+            if (closed) continue;
+            node.Frontier = _frontier.AddLast(node);
+            LocalAction[]? prefix = null;
             foreach (var key in node.Legal)
             {
-                if (node.Children.TryGetValue(key, out var child))
-                {
-                    // Resolved siblings need no more proof work. Do not let
-                    // them consume the bounded scan before open descendants.
-                    if (!child.Terminal && child.Minimum.CompareTo(target) < 0) queue.Enqueue(child);
-                    continue;
-                }
-                if (node.Hint == null || node.Round < 1) continue;
+                if (node.Children.ContainsKey(key)) continue;
+                prefix ??= Prefix(node);
                 LocalAction[]? proposed = node.Actions.TryGetValue(key, out var action) ? [..prefix, action] :
                     node.Choices.TryGetValue(key, out var choice) && prefix.Length > 0 ?
                     [..prefix.Take(prefix.Length - 1), prefix[^1] with { Choices = [..prefix[^1].Choices ?? [], choice] }] : null;
-                if (proposed != null) result.Add(new(proposed, node.Round, node.Hint));
+                if (proposed != null) result.Add(new(proposed, node.Round, node.Hint!));
                 if (result.Count >= 16) break;
             }
-            // Fast exact replay can observe a single action without enumerating
-            // its whole native offer. Replay to that node, then expand the full
-            // offer; completed observed children do not close missing siblings.
-            if ((!node.Complete || node.Legal.Count == 0) && node.Hint != null && node.Round > 0 && prefix.Length > 0)
-                result.Add(new(prefix, node.Round, node.Hint));
+            // A partial offer stays open even when every observed child exists.
+            if (result.Count < 16 && node.Parent != null && (!node.Complete || node.Legal.Count == 0))
+                result.Add(new(prefix ?? Prefix(node), node.Round, node.Hint!));
         }
         return result.ToArray();
     }
@@ -211,6 +223,7 @@ public sealed class LocalMinimumLossProof(LocalSearchRequest request, int capaci
             if (_nodes >= capacity) Invalidate("Loss proof storage capacity reached");
             child = new(node); node.Children.Add(key, child); _nodes++;
         }
+        RefreshFrontier(node);
         return child;
     }
     private static void Recalculate(Node node)

@@ -18,6 +18,70 @@ internal static class MinimumLossTests
     }
     public static void Register(Action<string, Action> test, Action<string, Func<Task>> asyncTest)
     {
+
+        test("proof frontier reaches an open boundary beyond 512 internal histories", () =>
+        {
+            var r = Request(); var proof = new LocalMinimumLossProof(r);
+            var root = new[] { Move(1), Move(2) };
+            var hint = new LocalTurnHint(50, 50, 100, 100, MaximumFurtherHpGain: 0);
+            proof.Observe(new(50, [new(root[0], root, [], Bound(r, 38), BeforeHint: hint)], 38, Won: true));
+            var steps = new List<LocalLossProofStep> { new(root[1], root, [], Bound(r, 50), BeforeHint: hint) };
+            for (int depth = 1; depth <= 600; depth++)
+            {
+                var action = Move(10 + depth, "depth-" + depth);
+                var legal = depth == 600 ? new[] { action, Move(999, action.BeforeHash) } : [action];
+                steps.Add(new(action, legal, [], Bound(r, 50), BeforeHint: hint));
+            }
+            proof.Observe(new(50, steps.ToArray(), 50));
+            var focus = proof.Status.Focus!.Single();
+            Check(focus.Prefix.Length == 601 && focus.Prefix[^1].CombatCardIndex == 999,
+                "The sole missing legal sibling must remain reachable beyond the old scan window");
+            Check(proof.Status.Certificate?.MinimumNetHpLoss == 0 &&
+                !LocalSearchPolicy.CanStopAtMinimum(Win([root[0]]), r, proof.Status.Certificate),
+                "Finding work cannot promote an incomplete tree to an optimality certificate");
+        });
+        test("proof frontier rotates open boundaries and removes descendants of closed ancestors", () =>
+        {
+            var r = Request(); var proof = new LocalMinimumLossProof(r);
+            var root = Enumerable.Range(1, 25).Select(i => Move(i)).ToArray();
+            var hint = new LocalTurnHint(50, 50, 100, 100, MaximumFurtherHpGain: 0);
+            proof.Observe(new(50, [new(root[0], root, [], Bound(r, 38), BeforeHint: hint)], 38, Won: true));
+            var trials = root.Skip(1).Select(a => new LocalLossProofTrial(50,
+                [new(a, root, [], Bound(r, 50), BeforeHint: hint, AfterHint: hint, AfterRound: 2)], 50)).ToArray();
+            foreach (var trial in trials) proof.Observe(trial);
+            var seen = new HashSet<uint?>();
+            for (int i = 0; i < 3; i++)
+            {
+                foreach (var focus in proof.Status.Focus!) seen.Add(focus.Prefix[0].CombatCardIndex);
+                proof.Observe(trials[0]); // Settled observation invalidates the cached candidate batch.
+            }
+            Check(seen.Count == 24, "Later open boundaries were starved by the first candidate batch");
+            foreach (var trial in trials)
+                proof.Observe(trial with { Hp = 38, Steps = [trial.Steps[0] with { After = Bound(r, 38) }] });
+            Check(proof.Status.Focus!.Length == 0 && proof.Status.Certificate?.MinimumNetHpLoss == 12,
+                "A certified ancestor must retire open descendants without completing later battles");
+        });
+        test("proof frontier preserves partial offers when the winning target improves", () =>
+        {
+            var r = Request(); var proof = new LocalMinimumLossProof(r);
+            var root = new[] { Move(1), Move(2), Move(3) };
+            var hint = new LocalTurnHint(50, 50, 100, 100, MaximumFurtherHpGain: 0);
+            proof.Observe(new(50, [new(root[0], root, [], Bound(r, 38), BeforeHint: hint)], 38, Won: true));
+            var later = Move(4, "later", 2);
+            var partial = new LocalLossProofTrial(50, [new(root[1], root, [], Bound(r, 50), BeforeHint: hint),
+                new(later, [later], [], Bound(r, 38), CompleteLegal: false, BeforeHint: hint)], 38);
+            proof.Observe(partial);
+            Check(proof.Status.Focus!.Any(f => f.Prefix.Length == 1 && f.Prefix[0] == root[1]),
+                "Observed children cannot close a partial native offer");
+            proof.Observe(new(50, [new(root[2], root, [], Bound(r, 45), BeforeHint: hint)], 45, Won: true));
+            Check(proof.Status.Target?.NetHpLoss == 5 && proof.Status.Certificate?.MinimumNetHpLoss == 0 &&
+                proof.Status.Focus!.Any(f => f.Prefix.Length == 1 && f.Prefix[0] == root[1]),
+                "Improving the winner cannot lose an unresolved partial offer");
+            proof.Observe(partial with { Steps = [partial.Steps[0], partial.Steps[1] with { CompleteLegal = true }] });
+            Check(proof.Status.Certificate?.MinimumNetHpLoss == 5 && proof.Status.Focus!.Length == 0,
+                "Complete native coverage must close at the improved incumbent");
+        });
+
         asyncTest("compact proof replies retain exact claim order target certificates and final diagnostics", async () =>
         {
             (string[] Claims, string[] Statuses, long Bytes) Run(bool compact)
