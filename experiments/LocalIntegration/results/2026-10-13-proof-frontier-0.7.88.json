@@ -182,5 +182,14 @@
     "scope": "Synthetic deep proof tree; Status queries only after warmup; excludes Observe and native execution. Depth 600 baseline failed to find its open task."
   },
   "core_note": "Initial full run 483/484: simulated maximum-healed-HP worker interrupted; unchanged filtered rerun and full rerun passed. No timeout or stopping gate relaxed.",
-  "installation": "pending_game_exit"
+  "installation": "installed",
+  "installation_receipt": {
+    "version": "0.7.88",
+    "dll_sha256": "48ba4bc96c2d7d8763ec31986265fdb0244eafeafa2ebcf9d46e1e759241e5b9",
+    "manifest_sha256": "40855d3cd489121f896ec4cfedb4c426e3754efbce37e3609af646b3a58db5c7",
+    "cache_cleanup": false,
+    "started_player": false,
+    "utc": "2026-10-13T05:30:46.5952203Z",
+    "previous_version": "0.7.87"
+  }
 }
