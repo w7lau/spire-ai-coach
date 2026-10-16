@@ -41,7 +41,7 @@ foreach (var item in config.Cases)
         (config.Algorithms ?? ["MonteCarlo", "TurnFrontier"]).Reverse()).Select(Enum.Parse<LocalSearchOrder>))
     foreach (var mode in repeat % 2 == 0 ? config.Modes ?? ["current"] : (config.Modes ?? ["current"]).Reverse())
     {
-        if (mode is not ("current" or "absolute-priority" or "fresh-continuations" or "loss-round-refinement" or "fresh-guided-tail" or "goal-before-proof" or "goal-continuation")) throw new ArgumentException("Unknown study mode");
+        if (mode is not ("current" or "absolute-priority" or "fresh-continuations" or "loss-round-refinement" or "fresh-guided-tail" or "goal-before-proof" or "goal-continuation" or "retained-goal-seed")) throw new ArgumentException("Unknown study mode");
         LossRoundStudy.Begin(mode == "loss-round-refinement");
         DecisionStudy.Begin(mode, captured.CardGoals);
         pool.DiscardSearch();

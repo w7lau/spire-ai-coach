@@ -9,6 +9,8 @@ static class DecisionStudy
     private static bool _fresh;
     private static bool _goalBeforeProof;
     private static bool _goalContinuation;
+    private static bool _retainedGoal;
+    private static readonly Dictionary<LocalAction[], LocalGoalOpportunity?> Retained = new(ReferenceEqualityComparer.Instance);
     private static LocalCardGoals? _goals;
     private static LocalCandidate? _best;
     private static int _deferred;
@@ -19,11 +21,14 @@ static class DecisionStudy
     public static void Begin(string mode, LocalCardGoals? goals)
     { _fresh = mode == "fresh-guided-tail"; _goalBeforeProof = mode == "goal-before-proof";
       _goalContinuation = mode == "goal-continuation";
+      _retainedGoal = mode == "retained-goal-seed"; Retained.Clear();
       _goals = goals; _best = null; _deferred = 0; Cleared = 0; Promoted = 0; Events.Clear(); }
     public static object[] Snapshot() => Events.ToArray();
     public static void Install()
     {
         var h = new Harmony("spire.route.study.decisions.parent.only");
+        h.Patch(typeof(LocalCardGoalTactics).GetMethod(nameof(LocalCardGoalTactics.BetterExplorationSeed)),
+            postfix: new HarmonyMethod(typeof(DecisionStudy).GetMethod(nameof(ExplorationSeed), BindingFlags.NonPublic | BindingFlags.Static)));
         h.Patch(typeof(LocalTurnSearch).GetMethod(nameof(LocalTurnSearch.TryTake), [typeof(LocalTurnTask).MakeByRefType(), typeof(int?)]),
             postfix: new HarmonyMethod(typeof(DecisionStudy).GetMethod(nameof(Taken), BindingFlags.NonPublic | BindingFlags.Static)));
         h.Patch(typeof(LocalTurnSearch).GetMethod(nameof(LocalTurnSearch.FocusNext),
@@ -58,6 +63,22 @@ static class DecisionStudy
             Promoted++;
         }
         Events.Add(new { kind = "take", task });
+    }
+    private static void ExplorationSeed(LocalCandidate candidate, LocalCandidate? incumbent, LocalCardGoals? goals, ref bool __result)
+    {
+        if (!_retainedGoal || goals?.Enabled != true || !candidate.Won || candidate.Dead || incumbent == null ||
+            goals.Compare(candidate, incumbent) != 0) return;
+        LocalGoalOpportunity? Stock(LocalCandidate c)
+        {
+            if (c.Decisions?.LastOrDefault() is { } last && last.BeforeStep == c.Actions.Length-1)
+                Retained[c.Actions] = last.GoalsBefore;
+            return Retained.GetValueOrDefault(c.Actions);
+        }
+        var a=Stock(candidate); var b=Stock(incumbent);
+        if (a?.Matches(goals)!=true || b?.Matches(goals)!=true) return;
+        int Score(LocalGoalOpportunity s) => Math.Min(s.Finisher?.Available??0,
+            Math.Max(0,(s.Finisher?.Target??0)-(s.Finisher?.Completed??0)));
+        if (Score(a)!=Score(b)) __result=Score(a)>Score(b);
     }
     private static void Focused(LocalTurnTask task, IReadOnlyList<LocalAction> actions, IReadOnlyList<LocalDecision> decisions) =>
         Events.Add(new { kind = "observed", task.Id, actions = actions.ToArray(), decisions = decisions.ToArray() });

@@ -14,7 +14,7 @@ for run in args.runs:
         raise ValueError('Only completed batches can enter this export')
     for row in summary['rows']:
         sample = dict(batch=run.name, case=row['Name'], algorithm=row.get('algorithm'),
-                      repeat=row.get('repeat'), dll_sha256=summary['product_sha256'],
+                      mode=row.get('mode'), repeat=row.get('repeat'), dll_sha256=summary['product_sha256'],
                       workers=summary['Workers'], max_nodes=summary['MaxNodes'],
                       budget_seconds=summary['BudgetSeconds'])
         if 'error' in row:
@@ -28,6 +28,8 @@ for run in args.runs:
         health = best.get('HealthChanges') or {}
         damage = best.get('DamageSources') or {}
         target = result.get('HealthTarget') or {}
+        goals = best.get('CardGoalOutcome') or {}
+        finite = (goals.get('ConsumableGoals') or {}).get('Finisher') or {}
         runtime_errors = sum(s.get('Phase') == 'runtime_error'
                              for s in (result.get('Trace') or {}).get('Spans') or [])
         same_hp = [x for x in (result.get('TurnSearch') or {}).get('Outcomes') or []
@@ -48,6 +50,9 @@ for run in args.runs:
                       first_win_at_final_hp_worker=first_hp.get('Worker'),
                       first_win_at_final_hp_attempt=first_hp.get('Attempt'),
                       final_hp=best.get('Hp'), max_hp=best.get('MaxHp'), net_loss=best.get('NetHpLoss'),
+                      goal_hp_loss_threshold=(result.get('CardGoals') or {}).get('HpLossThreshold'),
+                      goal_plays=goals.get('Plays'), goal_kills=goals.get('Kills'),
+                      finisher_target=finite.get('Target'), finisher_complete=finite.get('Complete'),
                       gross_hp_lost=health.get('HpLost'), hp_gained=health.get('HpGained'),
                       enemy_damage=damage.get('Enemy'), self_damage=damage.get('Self'),
                       damage_accounting_complete=damage.get('Complete'),

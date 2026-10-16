@@ -938,6 +938,19 @@ Test("compact local advice preserves incomplete death and execution warnings whi
     Check(advice.Contains("左侧敌人") && advice.Contains("当时手牌第 2 张") && !advice.Contains("目标 123") && !advice.Contains("评估"));
     Check(LocalSearchPolicy.Format(result).Contains("目标 123") && LocalSearchPolicy.Format(result).Contains("详细停止原因"));
 });
+Test("compact activity distinguishes preparing searching and compatibility transitions", () =>
+{
+    var waiting = new LocalProgress("job", "snapshot", 0, 8, 0, 0, 0, 64, 0, 0, 60, "准备计算", null, []);
+    var searching = waiting with { Worker = 1, RootBranches = 3, Evaluated = 12, Victories = 4 };
+    Check(LocalProgressBook.CompactActivity([], "准备计算…").Stage == "准备中");
+    Check(LocalProgressBook.CompactActivity([waiting], "正在计算…").Stage == "准备中");
+    var active = LocalProgressBook.CompactActivity([waiting, searching], "正在计算…");
+    Check(active.Stage == "搜索中" && active.Detail.Contains("已评估 12 条") && active.Detail.Contains("搜索 1 路 · 准备 1 路"));
+    Check(LocalProgressBook.CompactActivity([searching], "正在用一个实例核对战斗起点…").Stage == "核对起点");
+    Check(LocalProgressBook.CompactActivity([searching], "原生试走未完成，正在切换兼容模式…").Stage == "重新准备");
+    Check(LocalProgressBook.CompactActivity([searching], "正在复核最终路线…").Stage == "复核中");
+    Check(LocalProgressBook.CompactActivity([searching with { Status = "searched" }], "正在计算…").Stage == "收尾中");
+});
 AsyncTest("frequent local telemetry replacement stays readable during concurrent reads on Windows", async () =>
 {
     var directory = Path.Combine(Path.GetTempPath(), "spire-wire-test-" + Guid.NewGuid().ToString("N"));

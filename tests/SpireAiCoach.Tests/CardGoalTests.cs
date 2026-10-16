@@ -84,6 +84,41 @@ static class CardGoalTests
             Check(choices.Penalty(source with { BeforeHash = "different" }, Stock()) == 0,
                 "One selected sacrifice became a rule about all selections of its source");
         });
+        test("turn exploration retains an unspent finisher without changing final HP or goal credit", () =>
+        {
+            var action = new LocalAction(0,"other",1,"","","native",3,CombatCardIndex:2);
+            LocalCandidate Seed(int hp,int available) => Win(hp,0,0) with { Actions=[action],
+                Decisions=[new(0,[action],GoalsBefore:Stock(available))] };
+            var retained=Seed(36,1); var spent=Seed(42,0);
+            Check(LocalCardGoalTactics.BetterExplorationSeed(retained,spent,Goals(),preserveFinisher:true) &&
+                !LocalCardGoalTactics.BetterExplorationSeed(spent,retained,Goals(),preserveFinisher:true),
+                "Higher HP erased the opportunity-preserving exploration seed");
+            Check(!LocalCardGoalTactics.BetterExplorationSeed(retained,spent,Goals()) &&
+                !LocalSearchPolicy.Better(retained,spent,Goals()),"Final result or other rollout policy changed");
+            Check(LocalCardGoalTactics.BetterExplorationSeed(Win(20,0,1),retained,Goals(),preserveFinisher:true),
+                "An available copy outranked a native completed finishing blow");
+            Check(!LocalCardGoalTactics.BetterExplorationSeed(retained with { Dead=true },spent,Goals(),preserveFinisher:true) &&
+                !LocalCardGoalTactics.BetterExplorationSeed(retained with { Decisions=null },spent,Goals(),preserveFinisher:true),
+                "Death or absent observation manufactured a preserved opportunity");
+        });
+        test("goal source risk does not transfer across changed ordered native hands", () =>
+        {
+            var learning = new LocalGoalLossLearning(Goals());
+            var source = new LocalAction(0,"opaque:source",1,"","","observed",4,CombatCardIndex:12);
+            learning.Begin(); learning.CompleteStep(source,Stock(),Stock(0),"12:source;16:goal");
+            learning.Begin();
+            var changed=source with { BeforeHash="changed",HandIndex=2 };
+            Check(learning.Penalty(changed,Stock(),handContext:"12:source;16:goal")==180,
+                "The same exposed hand lost its measured source hint");
+            Check(learning.Penalty(changed,Stock(),handContext:"12:source;2:attack;16:goal")==0 &&
+                learning.Penalty(changed,Stock(),handContext:"16:goal;12:source")==0 &&
+                learning.Penalty(changed,Stock())==0,
+                "Additional candidates, hand ordering or missing context inherited a random-consumption hint");
+            Check(learning.Penalty(source)==180,
+                "Context scoping must not discard the actual exact-history loss");
+            Check(learning.Penalty(changed,Stock(),finisherReady:true,handContext:"12:source;16:goal")==0,
+                "A currently ready finishing hit must supersede historical advisory risk");
+        });
         test("turn frontier revisits legal siblings before any observed goal loss while retaining unrelated work", () =>
         {
             var search = new LocalTurnSearch(1, cardGoals: Goals(100));

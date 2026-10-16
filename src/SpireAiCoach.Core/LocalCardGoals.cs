@@ -55,7 +55,7 @@ public static class LocalCardGoalTactics
     // Search around an achieved goal even when its current HP cost is too high.
     // This is an exploration seed only; final selection keeps the strict HP gate.
     public static bool BetterExplorationSeed(LocalCandidate candidate, LocalCandidate? incumbent,
-        LocalCardGoals? goals)
+        LocalCardGoals? goals, bool preserveFinisher = false)
     {
         if (!candidate.Won || candidate.Dead) return false;
         if (incumbent == null) return true;
@@ -63,8 +63,23 @@ public static class LocalCardGoalTactics
         {
             int progress = goals.Compare(candidate, incumbent);
             if (progress != 0) return progress > 0;
+            if (preserveFinisher && RemainingFinisher(candidate, goals) is { } remaining &&
+                RemainingFinisher(incumbent, goals) is { } previous && remaining != previous)
+                return remaining > previous;
         }
         return LocalSearchPolicy.Better(candidate, incumbent, goals);
+    }
+
+    // A surviving root copy immediately before the final native operation is a
+    // useful exploration opportunity, not credit for a finishing blow. Keep it
+    // ahead of an already-spent copy only in the turn-frontier's proposal seed.
+    private static int? RemainingFinisher(LocalCandidate candidate, LocalCardGoals goals)
+    {
+        var last = candidate.Decisions?.LastOrDefault();
+        if (last == null || last.BeforeStep != candidate.Actions.Length - 1 ||
+            last.GoalsBefore?.Matches(goals) != true || last.GoalsBefore.Finisher is not { } stock)
+            return null;
+        return Math.Min(stock.Available, Math.Max(0, stock.Target - stock.Completed));
     }
 
     public static LocalAction? AdaptSoftContinuation(LocalAction? proposed,

@@ -9,6 +9,7 @@ public sealed record CoachSettings
     public bool IncludeStreamUsage { get; init; } = true;
     public bool ShowOverlayButton { get; init; }
     public bool AutoShowCombatPanel { get; init; } = true;
+    public bool CompactOverlay { get; init; }
     public int TimeoutSeconds { get; init; } = 120;
     public int LocalWorkers { get; init; } = 0;
     public bool LocalIncludePotions { get; init; }

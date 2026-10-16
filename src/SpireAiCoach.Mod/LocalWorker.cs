@@ -783,8 +783,15 @@ public static class LocalWorker
                         using var deciding = Trace("decision");
                         var legal = EnumerateActions(out var finisherHints);
                         var goalsBefore = cardGoalCounts.Opportunity();
+                        // A source that consumed the last goal attack in one hand
+                        // may be useful before other attacks are played. Preserve
+                        // ordered native instances; this remains a hint, not an
+                        // assertion about the random recipient in another history.
+                        var goalHandContext = request.CardGoals?.Enabled == true
+                            ? string.Join(";", player.PlayerCombatState!.Hand.Cards.Select(c =>
+                                $"{NetCombatCard.FromModel(c).CombatCardIndex}:{c.Id}:{c.Type}")) : null;
                         int GoalLossHint(LocalAction action) => goalLossLearning.Penalty(action, goalsBefore,
-                            finisherHints.Any(h => h.Priority > 0 && LocalTurnSearch.SameAction(h.Action, action)));
+                            finisherHints.Any(h => h.Priority > 0 && LocalTurnSearch.SameAction(h.Action, action)), goalHandContext);
                         if (request.CardGoals?.Enabled == true)
                             legal = legal.Select(a => a with { Preference = a.Preference - GoalLossHint(a) }).ToArray();
                         var proofLegal = proofSteps == null ? null : legal;
@@ -966,7 +973,7 @@ public static class LocalWorker
                         actions.Add(next);
                         cardGoalCounts.CompleteStep();
                         var goalsAfter = cardGoalCounts.Opportunity();
-                        goalLossLearning.CompleteStep(next, goalsBefore, goalsAfter);
+                        goalLossLearning.CompleteStep(next, goalsBefore, goalsAfter, goalHandContext);
                         if (covered) break;
                         if (exactAction && plannedAction != null)
                         {

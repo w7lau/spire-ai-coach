@@ -26,6 +26,8 @@ public sealed class CoachOverlay
     private bool _disposed;
     private CanvasLayer _layer = null!;
     private PanelContainer _panel = null!;
+    private CompactCoachPanel _compact = null!;
+    private long _compactSearchStarted;
     private object? _panelCombat;
     private bool _panelExecuting;
     private bool? _manualPanelVisibility;
@@ -130,6 +132,8 @@ public sealed class CoachOverlay
             VerticalAlignment = VerticalAlignment.Center, TooltipText = "当前已加载的 Mod 版本" };
         version.AddThemeFontSizeOverride("font_size", 13); version.AddThemeColorOverride("font_color", CoachTheme.Muted);
         heading.AddChild(version);
+        var compact = new Button { Name = "CoachCompactMode", Text = "精简", TooltipText = "切换半透明小窗，仅显示计算、执行和停止" };
+        compact.Pressed += () => SetCompactMode(true); heading.AddChild(compact);
         _battle = Wrapped("进入战斗后可计算。"); shell.AddChild(_battle);
         _status = Wrapped("本地计算无需配置 API。"); _status.AddThemeColorOverride("font_color", CoachTheme.Gold); shell.AddChild(_status);
         var row = new HBoxContainer();
@@ -358,6 +362,11 @@ public sealed class CoachOverlay
         copy.Pressed += () => DisplayServer.ClipboardSet(_diagnosticJson);
         body.AddChild(CoachTheme.Disclosure("详细记录", tools)); body.AddChild(tools);
         shell.AddChild(scroll);
+        _compact = new CompactCoachPanel(_panel.Theme, _localAnalyze, _turnAnalyze, _execute, _useVictory,
+            () => SetCompactMode(false), () => SetPanelVisible(false),
+            () => Cancel(_executing ? "已停止执行；已出手的动作会正常结算。" : "已取消计算。"));
+        _layer.AddChild(_compact.View);
+        _compact.View.MinimumSizeChanged += () => { if (!_disposed) _compact.Resize(); };
         _tree.ProcessFrame += OnFrame;
         _layer.TreeExiting += Dispose;
         Resize();
@@ -383,6 +392,39 @@ public sealed class CoachOverlay
         var width = Math.Min(560, Math.Max(300, screen.X - 32));
         _panel.Position = new Vector2(Math.Max(12, screen.X - width - 20), 50);
         _panel.Size = new Vector2(width, Math.Max(280, screen.Y - 80));
+        _compact?.Resize();
+    }
+
+    private bool PanelVisible => _panel.Visible || (_compact?.View.Visible ?? false);
+
+    private void SetCompactMode(bool compact)
+    {
+        _settings = _settings with { CompactOverlay = compact };
+        // Changing presentation never cancels a search or modifies a prepared plan.
+        _manualPanelVisibility = true;
+        ApplyPanelContext(_panelCombat, _panelExecuting);
+        RefreshCompactPanel(); Resize();
+        try { _store.SaveInterfaceOptions(compactOverlay: compact); }
+        catch (Exception ex) { _status.Text = "界面模式本次已切换，保存失败：" + ex.GetType().Name; }
+    }
+
+    private void RefreshCompactPanel()
+    {
+        if (_compact == null) return;
+        var plan = _continuation is { Invalid: false } ? _continuation.Original : null;
+        var result = plan?.Best is { } best
+            ? $"预计{(best.Won ? "获胜" : "未获胜")} · {best.Hp}/{best.MaxHp} 血\n剩余 {best.Actions.Length - _continuation!.CompletedActions} 步" +
+                (plan.VerificationSkipped ? " · 未独立复核" : " · 已复核")
+            : string.IsNullOrEmpty(_freshness.Text) ? "先计算，再点击执行方案。" : _freshness.Text;
+        string status = _status.Text;
+        if (_localAnalyzing && _request != null)
+        {
+            var activity = _localProgress.CompactActivity(status);
+            double seconds = Math.Max(0, System.Environment.TickCount64 - _compactSearchStarted) / 1000d;
+            status = $"{activity.Stage} · {seconds:0.0} 秒";
+            result = activity.Detail;
+        }
+        _compact.Refresh(_battle.Text, status, result, _executing || _request != null);
     }
 
     private void RefreshPanelVisibility()
@@ -397,30 +439,35 @@ public sealed class CoachOverlay
         // A manual choice lasts for the current battle/execution context.
         if (!ReferenceEquals(_panelCombat, combat) || _panelExecuting != executing)
         {
+            bool keepCompactStop = _settings.CompactOverlay && executing && PanelVisible;
             _panelCombat = combat; _panelExecuting = executing;
-            _manualPanelVisibility = null;
+            _manualPanelVisibility = keepCompactStop ? true : null;
         }
-        _panel.Visible = _manualPanelVisibility ?? (_settings.AutoShowCombatPanel && combat != null && !executing);
+        bool visible = _manualPanelVisibility ?? (_settings.AutoShowCombatPanel && combat != null &&
+            (!executing || _settings.CompactOverlay));
+        _panel.Visible = visible && !_settings.CompactOverlay;
+        if (_compact != null) _compact.View.Visible = visible && _settings.CompactOverlay;
     }
 
     private void SetPanelVisible(bool visible)
     {
         RefreshPanelVisibility();
         _manualPanelVisibility = visible;
-        _panel.Visible = visible;
+        ApplyPanelContext(_panelCombat, _panelExecuting);
     }
 
     private void TogglePanel()
     {
         RefreshPanelVisibility();
-        SetPanelVisible(!_panel.Visible);
+        SetPanelVisible(!PanelVisible);
     }
 
     private void OnFrame()
     {
         if (_disposed) return;
         RefreshPanelVisibility();
-        if (_executing && Input.IsKeyPressed(Key.Escape)) Cancel("已停止执行；已出手的动作会正常结算。");
+        if ((_executing || _settings.CompactOverlay && _request != null) && Input.IsKeyPressed(Key.Escape))
+            Cancel(_executing ? "已停止执行；已出手的动作会正常结算。" : "已取消计算。");
         while (_mainThread.TryDequeue(out var action)) action();
         foreach (var worker in _pendingLocalProgress.Keys)
             if (_pendingLocalProgress.TryRemove(worker, out var local)) _localProgress.Accept(local);
@@ -442,10 +489,12 @@ public sealed class CoachOverlay
             if (f8 && !_f8) TogglePanel();
         }
         _f8 = f8;
+        RefreshCompactPanel();
         long now = System.Environment.TickCount64;
         if (now < _nextPoll) return;
         _nextPoll = now + 750;
         RefreshSnapshot();
+        RefreshCompactPanel();
     }
 
     private void RefreshSnapshot()
@@ -839,6 +888,7 @@ public sealed class CoachOverlay
         _continuation = null;
         _pendingLocalProgress.Clear();
         _localProgress.Begin(request);
+        _compactSearchStarted = System.Environment.TickCount64;
         _adviceHash = null;
         _advice.Text = LocalCalculation.Name(order) + "进行中，不调用 AI…";
         _localResultDetails.Text = "正在计算，完成后显示详细结果。";

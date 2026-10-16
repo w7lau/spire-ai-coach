@@ -1,0 +1,1928 @@
+{
+  "samples": [
+    {
+      "batch": "baseline-frozen",
+      "case": "giant",
+      "algorithm": "TurnFrontier",
+      "mode": "current",
+      "repeat": 0,
+      "dll_sha256": "E74D65DAAF32B7680D4D0EE23D46BB49266047E3A209DAA651CBF8A4911279FA",
+      "workers": 8,
+      "max_nodes": 64,
+      "budget_seconds": 60,
+      "status": "done",
+      "native_replay_passed": true,
+      "continuation_guided": false,
+      "seeded": false,
+      "prefix_matched": null,
+      "conditional_comparison_valid": true,
+      "recorded_runtime_errors": 0,
+      "evaluated": 459,
+      "won": true,
+      "starting_hp": 169,
+      "elapsed_ms": 75875,
+      "wall_ms": 76290.6315,
+      "first_win_at_final_hp_ms": 20531.0666,
+      "first_win_at_final_hp_worker": 4,
+      "first_win_at_final_hp_attempt": 21,
+      "final_hp": 142,
+      "max_hp": 265,
+      "net_loss": 27,
+      "goal_hp_loss_threshold": 80,
+      "goal_plays": 0,
+      "goal_kills": 0,
+      "finisher_target": 1,
+      "finisher_complete": false,
+      "gross_hp_lost": 59,
+      "hp_gained": 32,
+      "enemy_damage": 53,
+      "self_damage": 6,
+      "damage_accounting_complete": true,
+      "minimum_observed_hp": 142,
+      "round_end_hp": [
+        {
+          "round": 1,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 2,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 3,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 4,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 5,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 6,
+          "before": 167,
+          "after": 167
+        },
+        {
+          "round": 7,
+          "before": 165,
+          "after": 165
+        },
+        {
+          "round": 8,
+          "before": 165,
+          "after": 165
+        },
+        {
+          "round": 9,
+          "before": 165,
+          "after": 165
+        },
+        {
+          "round": 10,
+          "before": 165,
+          "after": 157
+        },
+        {
+          "round": 11,
+          "before": 155,
+          "after": 155
+        },
+        {
+          "round": 12,
+          "before": 181,
+          "after": 181
+        },
+        {
+          "round": 13,
+          "before": 181,
+          "after": 142
+        }
+      ],
+      "max_hp_gained": 0,
+      "health_changes_fully_observed": true,
+      "round_start_hp": {
+        "1": 169,
+        "2": 169,
+        "3": 169,
+        "4": 169,
+        "5": 169,
+        "6": 169,
+        "7": 167,
+        "8": 165,
+        "9": 165,
+        "10": 165,
+        "11": 157,
+        "12": 155,
+        "13": 181
+      },
+      "target_hp": null,
+      "target_full_health": null,
+      "target_uncertain": null,
+      "rest_callback_excluded": false,
+      "stopped_on_health_target": false,
+      "stopped_on_minimum": false,
+      "final_verifications": 1
+    },
+    {
+      "batch": "baseline-frozen",
+      "case": "giant",
+      "algorithm": "TurnFrontier",
+      "mode": "fresh-guided-tail",
+      "repeat": 0,
+      "dll_sha256": "E74D65DAAF32B7680D4D0EE23D46BB49266047E3A209DAA651CBF8A4911279FA",
+      "workers": 8,
+      "max_nodes": 64,
+      "budget_seconds": 60,
+      "status": "done",
+      "native_replay_passed": true,
+      "continuation_guided": false,
+      "seeded": false,
+      "prefix_matched": null,
+      "conditional_comparison_valid": true,
+      "recorded_runtime_errors": 0,
+      "evaluated": 441,
+      "won": true,
+      "starting_hp": 169,
+      "elapsed_ms": 70347,
+      "wall_ms": 70693.1615,
+      "first_win_at_final_hp_ms": 39771.9947,
+      "first_win_at_final_hp_worker": 6,
+      "first_win_at_final_hp_attempt": 49,
+      "final_hp": 158,
+      "max_hp": 265,
+      "net_loss": 11,
+      "goal_hp_loss_threshold": 80,
+      "goal_plays": 0,
+      "goal_kills": 0,
+      "finisher_target": 1,
+      "finisher_complete": false,
+      "gross_hp_lost": 43,
+      "hp_gained": 32,
+      "enemy_damage": 35,
+      "self_damage": 8,
+      "damage_accounting_complete": true,
+      "minimum_observed_hp": 155,
+      "round_end_hp": [
+        {
+          "round": 1,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 2,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 3,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 4,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 5,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 6,
+          "before": 167,
+          "after": 167
+        },
+        {
+          "round": 7,
+          "before": 165,
+          "after": 165
+        },
+        {
+          "round": 8,
+          "before": 165,
+          "after": 165
+        },
+        {
+          "round": 9,
+          "before": 165,
+          "after": 165
+        },
+        {
+          "round": 10,
+          "before": 165,
+          "after": 157
+        },
+        {
+          "round": 11,
+          "before": 155,
+          "after": 155
+        },
+        {
+          "round": 12,
+          "before": 181,
+          "after": 181
+        },
+        {
+          "round": 13,
+          "before": 179,
+          "after": 158
+        }
+      ],
+      "max_hp_gained": 0,
+      "health_changes_fully_observed": true,
+      "round_start_hp": {
+        "1": 169,
+        "2": 169,
+        "3": 169,
+        "4": 169,
+        "5": 169,
+        "6": 169,
+        "7": 167,
+        "8": 165,
+        "9": 165,
+        "10": 165,
+        "11": 157,
+        "12": 155,
+        "13": 181
+      },
+      "target_hp": null,
+      "target_full_health": null,
+      "target_uncertain": null,
+      "rest_callback_excluded": false,
+      "stopped_on_health_target": false,
+      "stopped_on_minimum": false,
+      "final_verifications": 1
+    },
+    {
+      "batch": "baseline-standard",
+      "case": "giant-standard",
+      "algorithm": "TurnFrontier",
+      "mode": "current",
+      "repeat": 0,
+      "dll_sha256": "E74D65DAAF32B7680D4D0EE23D46BB49266047E3A209DAA651CBF8A4911279FA",
+      "workers": 8,
+      "max_nodes": 64,
+      "budget_seconds": 60,
+      "status": "done",
+      "native_replay_passed": true,
+      "continuation_guided": false,
+      "seeded": false,
+      "prefix_matched": null,
+      "conditional_comparison_valid": true,
+      "recorded_runtime_errors": 0,
+      "evaluated": 473,
+      "won": true,
+      "starting_hp": 169,
+      "elapsed_ms": 73605,
+      "wall_ms": 74090.2317,
+      "first_win_at_final_hp_ms": 20868.2911,
+      "first_win_at_final_hp_worker": 6,
+      "first_win_at_final_hp_attempt": 24,
+      "final_hp": 163,
+      "max_hp": 265,
+      "net_loss": 6,
+      "goal_hp_loss_threshold": null,
+      "goal_plays": 0,
+      "goal_kills": 0,
+      "finisher_target": 1,
+      "finisher_complete": false,
+      "gross_hp_lost": 38,
+      "hp_gained": 32,
+      "enemy_damage": 32,
+      "self_damage": 6,
+      "damage_accounting_complete": true,
+      "minimum_observed_hp": 155,
+      "round_end_hp": [
+        {
+          "round": 1,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 2,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 3,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 4,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 5,
+          "before": 169,
+          "after": 161
+        },
+        {
+          "round": 6,
+          "before": 159,
+          "after": 159
+        },
+        {
+          "round": 7,
+          "before": 157,
+          "after": 155
+        },
+        {
+          "round": 8,
+          "before": 155,
+          "after": 155
+        },
+        {
+          "round": 9,
+          "before": 181,
+          "after": 181
+        },
+        {
+          "round": 10,
+          "before": 179,
+          "after": 163
+        }
+      ],
+      "max_hp_gained": 0,
+      "health_changes_fully_observed": true,
+      "round_start_hp": {
+        "1": 169,
+        "2": 169,
+        "3": 169,
+        "4": 169,
+        "5": 169,
+        "6": 161,
+        "7": 159,
+        "8": 155,
+        "9": 155,
+        "10": 181
+      },
+      "target_hp": 175,
+      "target_full_health": true,
+      "target_uncertain": true,
+      "rest_callback_excluded": false,
+      "stopped_on_health_target": false,
+      "stopped_on_minimum": false,
+      "final_verifications": 1
+    },
+    {
+      "batch": "baseline-repeat",
+      "case": "giant",
+      "algorithm": "TurnFrontier",
+      "mode": "current",
+      "repeat": 0,
+      "dll_sha256": "E74D65DAAF32B7680D4D0EE23D46BB49266047E3A209DAA651CBF8A4911279FA",
+      "workers": 8,
+      "max_nodes": 64,
+      "budget_seconds": 60,
+      "status": "done",
+      "native_replay_passed": true,
+      "continuation_guided": false,
+      "seeded": false,
+      "prefix_matched": null,
+      "conditional_comparison_valid": true,
+      "recorded_runtime_errors": 0,
+      "evaluated": 491,
+      "won": true,
+      "starting_hp": 169,
+      "elapsed_ms": 73034,
+      "wall_ms": 73387.0327,
+      "first_win_at_final_hp_ms": 12004.9029,
+      "first_win_at_final_hp_worker": 3,
+      "first_win_at_final_hp_attempt": 10,
+      "final_hp": 148,
+      "max_hp": 265,
+      "net_loss": 21,
+      "goal_hp_loss_threshold": 80,
+      "goal_plays": 0,
+      "goal_kills": 0,
+      "finisher_target": 1,
+      "finisher_complete": false,
+      "gross_hp_lost": 53,
+      "hp_gained": 32,
+      "enemy_damage": 49,
+      "self_damage": 4,
+      "damage_accounting_complete": true,
+      "minimum_observed_hp": 142,
+      "round_end_hp": [
+        {
+          "round": 1,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 2,
+          "before": 169,
+          "after": 168
+        },
+        {
+          "round": 3,
+          "before": 166,
+          "after": 166
+        },
+        {
+          "round": 4,
+          "before": 166,
+          "after": 166
+        },
+        {
+          "round": 5,
+          "before": 166,
+          "after": 155
+        },
+        {
+          "round": 6,
+          "before": 155,
+          "after": 145
+        },
+        {
+          "round": 7,
+          "before": 145,
+          "after": 142
+        },
+        {
+          "round": 8,
+          "before": 142,
+          "after": 142
+        },
+        {
+          "round": 9,
+          "before": 142,
+          "after": 142
+        },
+        {
+          "round": 10,
+          "before": 168,
+          "after": 168
+        },
+        {
+          "round": 11,
+          "before": 166,
+          "after": 148
+        }
+      ],
+      "max_hp_gained": 0,
+      "health_changes_fully_observed": true,
+      "round_start_hp": {
+        "1": 169,
+        "2": 169,
+        "3": 168,
+        "4": 166,
+        "5": 166,
+        "6": 155,
+        "7": 145,
+        "8": 142,
+        "9": 142,
+        "10": 142,
+        "11": 168
+      },
+      "target_hp": null,
+      "target_full_health": null,
+      "target_uncertain": null,
+      "rest_callback_excluded": false,
+      "stopped_on_health_target": false,
+      "stopped_on_minimum": false,
+      "final_verifications": 1
+    },
+    {
+      "batch": "baseline-repeat",
+      "case": "giant-standard",
+      "algorithm": "TurnFrontier",
+      "mode": "current",
+      "repeat": 0,
+      "dll_sha256": "E74D65DAAF32B7680D4D0EE23D46BB49266047E3A209DAA651CBF8A4911279FA",
+      "workers": 8,
+      "max_nodes": 64,
+      "budget_seconds": 60,
+      "status": "done",
+      "native_replay_passed": true,
+      "continuation_guided": false,
+      "seeded": false,
+      "prefix_matched": null,
+      "conditional_comparison_valid": true,
+      "recorded_runtime_errors": 0,
+      "evaluated": 512,
+      "won": true,
+      "starting_hp": 169,
+      "elapsed_ms": 67207,
+      "wall_ms": 67502.1819,
+      "first_win_at_final_hp_ms": 8367.0487,
+      "first_win_at_final_hp_worker": 5,
+      "first_win_at_final_hp_attempt": 15,
+      "final_hp": 142,
+      "max_hp": 265,
+      "net_loss": 27,
+      "goal_hp_loss_threshold": null,
+      "goal_plays": 0,
+      "goal_kills": 0,
+      "finisher_target": 1,
+      "finisher_complete": false,
+      "gross_hp_lost": 59,
+      "hp_gained": 32,
+      "enemy_damage": 53,
+      "self_damage": 6,
+      "damage_accounting_complete": true,
+      "minimum_observed_hp": 142,
+      "round_end_hp": [
+        {
+          "round": 1,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 2,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 3,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 4,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 5,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 6,
+          "before": 167,
+          "after": 167
+        },
+        {
+          "round": 7,
+          "before": 165,
+          "after": 165
+        },
+        {
+          "round": 8,
+          "before": 165,
+          "after": 165
+        },
+        {
+          "round": 9,
+          "before": 165,
+          "after": 165
+        },
+        {
+          "round": 10,
+          "before": 165,
+          "after": 157
+        },
+        {
+          "round": 11,
+          "before": 155,
+          "after": 155
+        },
+        {
+          "round": 12,
+          "before": 181,
+          "after": 181
+        },
+        {
+          "round": 13,
+          "before": 181,
+          "after": 142
+        }
+      ],
+      "max_hp_gained": 0,
+      "health_changes_fully_observed": true,
+      "round_start_hp": {
+        "1": 169,
+        "2": 169,
+        "3": 169,
+        "4": 169,
+        "5": 169,
+        "6": 169,
+        "7": 167,
+        "8": 165,
+        "9": 165,
+        "10": 165,
+        "11": 157,
+        "12": 155,
+        "13": 181
+      },
+      "target_hp": 175,
+      "target_full_health": true,
+      "target_uncertain": true,
+      "rest_callback_excluded": false,
+      "stopped_on_health_target": false,
+      "stopped_on_minimum": false,
+      "final_verifications": 1
+    },
+    {
+      "batch": "counterfactual",
+      "case": "control",
+      "algorithm": "MonteCarlo",
+      "mode": "current",
+      "repeat": 0,
+      "dll_sha256": "E74D65DAAF32B7680D4D0EE23D46BB49266047E3A209DAA651CBF8A4911279FA",
+      "workers": 1,
+      "max_nodes": 1,
+      "budget_seconds": 40,
+      "status": "done",
+      "native_replay_passed": true,
+      "continuation_guided": false,
+      "seeded": true,
+      "prefix_matched": true,
+      "conditional_comparison_valid": true,
+      "recorded_runtime_errors": 0,
+      "evaluated": 1,
+      "won": true,
+      "starting_hp": 169,
+      "elapsed_ms": 13703,
+      "wall_ms": 13750.2193,
+      "first_win_at_final_hp_ms": null,
+      "first_win_at_final_hp_worker": null,
+      "first_win_at_final_hp_attempt": null,
+      "final_hp": 149,
+      "max_hp": 265,
+      "net_loss": 20,
+      "goal_hp_loss_threshold": 80,
+      "goal_plays": 0,
+      "goal_kills": 0,
+      "finisher_target": 1,
+      "finisher_complete": false,
+      "gross_hp_lost": 52,
+      "hp_gained": 32,
+      "enemy_damage": 48,
+      "self_damage": 4,
+      "damage_accounting_complete": true,
+      "minimum_observed_hp": 149,
+      "round_end_hp": [
+        {
+          "round": 1,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 2,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 3,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 4,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 5,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 6,
+          "before": 167,
+          "after": 167
+        },
+        {
+          "round": 7,
+          "before": 167,
+          "after": 167
+        },
+        {
+          "round": 8,
+          "before": 167,
+          "after": 167
+        },
+        {
+          "round": 9,
+          "before": 167,
+          "after": 167
+        },
+        {
+          "round": 10,
+          "before": 167,
+          "after": 159
+        },
+        {
+          "round": 11,
+          "before": 157,
+          "after": 157
+        },
+        {
+          "round": 12,
+          "before": 157,
+          "after": 157
+        },
+        {
+          "round": 13,
+          "before": 157,
+          "after": 157
+        },
+        {
+          "round": 14,
+          "before": 183,
+          "after": 183
+        },
+        {
+          "round": 15,
+          "before": 183,
+          "after": 149
+        }
+      ],
+      "max_hp_gained": 0,
+      "health_changes_fully_observed": true,
+      "round_start_hp": {
+        "1": 169,
+        "2": 169,
+        "3": 169,
+        "4": 169,
+        "5": 169,
+        "6": 169,
+        "7": 167,
+        "8": 167,
+        "9": 167,
+        "10": 167,
+        "11": 159,
+        "12": 157,
+        "13": 157,
+        "14": 157,
+        "15": 183
+      },
+      "target_hp": null,
+      "target_full_health": null,
+      "target_uncertain": null,
+      "rest_callback_excluded": false,
+      "stopped_on_health_target": false,
+      "stopped_on_minimum": false,
+      "final_verifications": 1
+    },
+    {
+      "batch": "counterfactual",
+      "case": "preserve",
+      "algorithm": "MonteCarlo",
+      "mode": "current",
+      "repeat": 0,
+      "dll_sha256": "E74D65DAAF32B7680D4D0EE23D46BB49266047E3A209DAA651CBF8A4911279FA",
+      "workers": 1,
+      "max_nodes": 1,
+      "budget_seconds": 40,
+      "status": "done",
+      "native_replay_passed": true,
+      "continuation_guided": true,
+      "seeded": true,
+      "prefix_matched": true,
+      "conditional_comparison_valid": true,
+      "recorded_runtime_errors": 0,
+      "evaluated": 1,
+      "won": false,
+      "starting_hp": 169,
+      "elapsed_ms": 3988,
+      "wall_ms": 3998.192,
+      "first_win_at_final_hp_ms": null,
+      "first_win_at_final_hp_worker": null,
+      "first_win_at_final_hp_attempt": null,
+      "final_hp": 0,
+      "max_hp": 265,
+      "net_loss": 169,
+      "goal_hp_loss_threshold": 80,
+      "goal_plays": 0,
+      "goal_kills": 0,
+      "finisher_target": 1,
+      "finisher_complete": false,
+      "gross_hp_lost": 169,
+      "hp_gained": 0,
+      "enemy_damage": 163,
+      "self_damage": 6,
+      "damage_accounting_complete": true,
+      "minimum_observed_hp": 0,
+      "round_end_hp": [
+        {
+          "round": 1,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 2,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 3,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 4,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 5,
+          "before": 169,
+          "after": 161
+        },
+        {
+          "round": 6,
+          "before": 159,
+          "after": 159
+        },
+        {
+          "round": 7,
+          "before": 159,
+          "after": 146
+        },
+        {
+          "round": 8,
+          "before": 146,
+          "after": 133
+        },
+        {
+          "round": 9,
+          "before": 133,
+          "after": 133
+        },
+        {
+          "round": 10,
+          "before": 133,
+          "after": 98
+        },
+        {
+          "round": 11,
+          "before": 96,
+          "after": 96
+        },
+        {
+          "round": 12,
+          "before": 96,
+          "after": 76
+        },
+        {
+          "round": 13,
+          "before": 76,
+          "after": 63
+        },
+        {
+          "round": 14,
+          "before": 63,
+          "after": 63
+        },
+        {
+          "round": 15,
+          "before": 63,
+          "after": 22
+        },
+        {
+          "round": 16,
+          "before": 22,
+          "after": 12
+        },
+        {
+          "round": 17,
+          "before": 10,
+          "after": 10
+        },
+        {
+          "round": 18,
+          "before": 10,
+          "after": 10
+        },
+        {
+          "round": 19,
+          "before": 10,
+          "after": 10
+        },
+        {
+          "round": 20,
+          "before": 10,
+          "after": 0
+        }
+      ],
+      "max_hp_gained": 0,
+      "health_changes_fully_observed": true,
+      "round_start_hp": {
+        "1": 169,
+        "2": 169,
+        "3": 169,
+        "4": 169,
+        "5": 169,
+        "6": 161,
+        "7": 159,
+        "8": 146,
+        "9": 133,
+        "10": 133,
+        "11": 98,
+        "12": 96,
+        "13": 76,
+        "14": 63,
+        "15": 63,
+        "16": 22,
+        "17": 12,
+        "18": 10,
+        "19": 10,
+        "20": 10
+      },
+      "target_hp": null,
+      "target_full_health": null,
+      "target_uncertain": null,
+      "rest_callback_excluded": false,
+      "stopped_on_health_target": false,
+      "stopped_on_minimum": false,
+      "final_verifications": 1
+    },
+    {
+      "batch": "order-study",
+      "case": "thrash-early-0",
+      "algorithm": "MonteCarlo",
+      "mode": "current",
+      "repeat": 0,
+      "dll_sha256": "E74D65DAAF32B7680D4D0EE23D46BB49266047E3A209DAA651CBF8A4911279FA",
+      "workers": 1,
+      "max_nodes": 1,
+      "budget_seconds": 40,
+      "status": "done",
+      "native_replay_passed": true,
+      "continuation_guided": true,
+      "seeded": true,
+      "prefix_matched": true,
+      "conditional_comparison_valid": true,
+      "recorded_runtime_errors": 0,
+      "evaluated": 1,
+      "won": true,
+      "starting_hp": 169,
+      "elapsed_ms": 12110,
+      "wall_ms": 12154.1282,
+      "first_win_at_final_hp_ms": null,
+      "first_win_at_final_hp_worker": null,
+      "first_win_at_final_hp_attempt": null,
+      "final_hp": 142,
+      "max_hp": 265,
+      "net_loss": 27,
+      "goal_hp_loss_threshold": 80,
+      "goal_plays": 0,
+      "goal_kills": 0,
+      "finisher_target": 1,
+      "finisher_complete": false,
+      "gross_hp_lost": 59,
+      "hp_gained": 32,
+      "enemy_damage": 53,
+      "self_damage": 6,
+      "damage_accounting_complete": true,
+      "minimum_observed_hp": 142,
+      "round_end_hp": [
+        {
+          "round": 1,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 2,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 3,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 4,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 5,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 6,
+          "before": 167,
+          "after": 167
+        },
+        {
+          "round": 7,
+          "before": 165,
+          "after": 165
+        },
+        {
+          "round": 8,
+          "before": 165,
+          "after": 165
+        },
+        {
+          "round": 9,
+          "before": 165,
+          "after": 165
+        },
+        {
+          "round": 10,
+          "before": 165,
+          "after": 157
+        },
+        {
+          "round": 11,
+          "before": 155,
+          "after": 155
+        },
+        {
+          "round": 12,
+          "before": 181,
+          "after": 181
+        },
+        {
+          "round": 13,
+          "before": 181,
+          "after": 142
+        }
+      ],
+      "max_hp_gained": 0,
+      "health_changes_fully_observed": true,
+      "round_start_hp": {
+        "1": 169,
+        "2": 169,
+        "3": 169,
+        "4": 169,
+        "5": 169,
+        "6": 169,
+        "7": 167,
+        "8": 165,
+        "9": 165,
+        "10": 165,
+        "11": 157,
+        "12": 155,
+        "13": 181
+      },
+      "target_hp": null,
+      "target_full_health": null,
+      "target_uncertain": null,
+      "rest_callback_excluded": false,
+      "stopped_on_health_target": false,
+      "stopped_on_minimum": false,
+      "final_verifications": 1
+    },
+    {
+      "batch": "order-study",
+      "case": "thrash-early-1",
+      "algorithm": "MonteCarlo",
+      "mode": "current",
+      "repeat": 0,
+      "dll_sha256": "E74D65DAAF32B7680D4D0EE23D46BB49266047E3A209DAA651CBF8A4911279FA",
+      "workers": 1,
+      "max_nodes": 1,
+      "budget_seconds": 40,
+      "status": "done",
+      "native_replay_passed": true,
+      "continuation_guided": true,
+      "seeded": true,
+      "prefix_matched": true,
+      "conditional_comparison_valid": true,
+      "recorded_runtime_errors": 0,
+      "evaluated": 1,
+      "won": true,
+      "starting_hp": 169,
+      "elapsed_ms": 2928,
+      "wall_ms": 2937.4904,
+      "first_win_at_final_hp_ms": null,
+      "first_win_at_final_hp_worker": null,
+      "first_win_at_final_hp_attempt": null,
+      "final_hp": 142,
+      "max_hp": 265,
+      "net_loss": 27,
+      "goal_hp_loss_threshold": 80,
+      "goal_plays": 0,
+      "goal_kills": 0,
+      "finisher_target": 1,
+      "finisher_complete": false,
+      "gross_hp_lost": 59,
+      "hp_gained": 32,
+      "enemy_damage": 53,
+      "self_damage": 6,
+      "damage_accounting_complete": true,
+      "minimum_observed_hp": 142,
+      "round_end_hp": [
+        {
+          "round": 1,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 2,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 3,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 4,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 5,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 6,
+          "before": 167,
+          "after": 167
+        },
+        {
+          "round": 7,
+          "before": 165,
+          "after": 165
+        },
+        {
+          "round": 8,
+          "before": 165,
+          "after": 165
+        },
+        {
+          "round": 9,
+          "before": 165,
+          "after": 165
+        },
+        {
+          "round": 10,
+          "before": 165,
+          "after": 157
+        },
+        {
+          "round": 11,
+          "before": 155,
+          "after": 155
+        },
+        {
+          "round": 12,
+          "before": 181,
+          "after": 181
+        },
+        {
+          "round": 13,
+          "before": 181,
+          "after": 142
+        }
+      ],
+      "max_hp_gained": 0,
+      "health_changes_fully_observed": true,
+      "round_start_hp": {
+        "1": 169,
+        "2": 169,
+        "3": 169,
+        "4": 169,
+        "5": 169,
+        "6": 169,
+        "7": 167,
+        "8": 165,
+        "9": 165,
+        "10": 165,
+        "11": 157,
+        "12": 155,
+        "13": 181
+      },
+      "target_hp": null,
+      "target_full_health": null,
+      "target_uncertain": null,
+      "rest_callback_excluded": false,
+      "stopped_on_health_target": false,
+      "stopped_on_minimum": false,
+      "final_verifications": 1
+    },
+    {
+      "batch": "order-study",
+      "case": "thrash-early-2",
+      "algorithm": "MonteCarlo",
+      "mode": "current",
+      "repeat": 0,
+      "dll_sha256": "E74D65DAAF32B7680D4D0EE23D46BB49266047E3A209DAA651CBF8A4911279FA",
+      "workers": 1,
+      "max_nodes": 1,
+      "budget_seconds": 40,
+      "status": "done",
+      "native_replay_passed": true,
+      "continuation_guided": true,
+      "seeded": true,
+      "prefix_matched": true,
+      "conditional_comparison_valid": true,
+      "recorded_runtime_errors": 0,
+      "evaluated": 1,
+      "won": true,
+      "starting_hp": 169,
+      "elapsed_ms": 3179,
+      "wall_ms": 3188.1894,
+      "first_win_at_final_hp_ms": null,
+      "first_win_at_final_hp_worker": null,
+      "first_win_at_final_hp_attempt": null,
+      "final_hp": 142,
+      "max_hp": 265,
+      "net_loss": 27,
+      "goal_hp_loss_threshold": 80,
+      "goal_plays": 0,
+      "goal_kills": 0,
+      "finisher_target": 1,
+      "finisher_complete": false,
+      "gross_hp_lost": 59,
+      "hp_gained": 32,
+      "enemy_damage": 53,
+      "self_damage": 6,
+      "damage_accounting_complete": true,
+      "minimum_observed_hp": 142,
+      "round_end_hp": [
+        {
+          "round": 1,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 2,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 3,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 4,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 5,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 6,
+          "before": 167,
+          "after": 167
+        },
+        {
+          "round": 7,
+          "before": 165,
+          "after": 165
+        },
+        {
+          "round": 8,
+          "before": 165,
+          "after": 165
+        },
+        {
+          "round": 9,
+          "before": 165,
+          "after": 165
+        },
+        {
+          "round": 10,
+          "before": 165,
+          "after": 157
+        },
+        {
+          "round": 11,
+          "before": 155,
+          "after": 155
+        },
+        {
+          "round": 12,
+          "before": 181,
+          "after": 181
+        },
+        {
+          "round": 13,
+          "before": 181,
+          "after": 142
+        }
+      ],
+      "max_hp_gained": 0,
+      "health_changes_fully_observed": true,
+      "round_start_hp": {
+        "1": 169,
+        "2": 169,
+        "3": 169,
+        "4": 169,
+        "5": 169,
+        "6": 169,
+        "7": 167,
+        "8": 165,
+        "9": 165,
+        "10": 165,
+        "11": 157,
+        "12": 155,
+        "13": 181
+      },
+      "target_hp": null,
+      "target_full_health": null,
+      "target_uncertain": null,
+      "rest_callback_excluded": false,
+      "stopped_on_health_target": false,
+      "stopped_on_minimum": false,
+      "final_verifications": 1
+    },
+    {
+      "batch": "candidate",
+      "case": "giant",
+      "algorithm": "TurnFrontier",
+      "mode": "current",
+      "repeat": 0,
+      "dll_sha256": "DDDC33D680AA52D5AEB7D593164B45D47FE76223473692EFEDC6ADDC6F075B1B",
+      "workers": 8,
+      "max_nodes": 64,
+      "budget_seconds": 60,
+      "status": "done",
+      "native_replay_passed": true,
+      "continuation_guided": false,
+      "seeded": false,
+      "prefix_matched": null,
+      "conditional_comparison_valid": true,
+      "recorded_runtime_errors": 0,
+      "evaluated": 506,
+      "won": true,
+      "starting_hp": 169,
+      "elapsed_ms": 73421,
+      "wall_ms": 73812.1009,
+      "first_win_at_final_hp_ms": 40408.1361,
+      "first_win_at_final_hp_worker": 7,
+      "first_win_at_final_hp_attempt": 57,
+      "final_hp": 155,
+      "max_hp": 265,
+      "net_loss": 14,
+      "goal_hp_loss_threshold": 80,
+      "goal_plays": 0,
+      "goal_kills": 0,
+      "finisher_target": 1,
+      "finisher_complete": false,
+      "gross_hp_lost": 46,
+      "hp_gained": 32,
+      "enemy_damage": 44,
+      "self_damage": 2,
+      "damage_accounting_complete": true,
+      "minimum_observed_hp": 145,
+      "round_end_hp": [
+        {
+          "round": 1,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 2,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 3,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 4,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 5,
+          "before": 169,
+          "after": 148
+        },
+        {
+          "round": 6,
+          "before": 148,
+          "after": 145
+        },
+        {
+          "round": 7,
+          "before": 145,
+          "after": 145
+        },
+        {
+          "round": 8,
+          "before": 145,
+          "after": 145
+        },
+        {
+          "round": 9,
+          "before": 145,
+          "after": 145
+        },
+        {
+          "round": 10,
+          "before": 171,
+          "after": 171
+        },
+        {
+          "round": 11,
+          "before": 169,
+          "after": 155
+        }
+      ],
+      "max_hp_gained": 0,
+      "health_changes_fully_observed": true,
+      "round_start_hp": {
+        "1": 169,
+        "2": 169,
+        "3": 169,
+        "4": 169,
+        "5": 169,
+        "6": 148,
+        "7": 145,
+        "8": 145,
+        "9": 145,
+        "10": 145,
+        "11": 171
+      },
+      "target_hp": null,
+      "target_full_health": null,
+      "target_uncertain": null,
+      "rest_callback_excluded": false,
+      "stopped_on_health_target": false,
+      "stopped_on_minimum": false,
+      "final_verifications": 1
+    },
+    {
+      "batch": "candidate",
+      "case": "giant-standard",
+      "algorithm": "TurnFrontier",
+      "mode": "current",
+      "repeat": 0,
+      "dll_sha256": "DDDC33D680AA52D5AEB7D593164B45D47FE76223473692EFEDC6ADDC6F075B1B",
+      "workers": 8,
+      "max_nodes": 64,
+      "budget_seconds": 60,
+      "status": "done",
+      "native_replay_passed": true,
+      "continuation_guided": false,
+      "seeded": false,
+      "prefix_matched": null,
+      "conditional_comparison_valid": true,
+      "recorded_runtime_errors": 0,
+      "evaluated": 483,
+      "won": true,
+      "starting_hp": 169,
+      "elapsed_ms": 69696,
+      "wall_ms": 70053.1355,
+      "first_win_at_final_hp_ms": 59459.493,
+      "first_win_at_final_hp_worker": 2,
+      "first_win_at_final_hp_attempt": 87,
+      "final_hp": 155,
+      "max_hp": 265,
+      "net_loss": 14,
+      "goal_hp_loss_threshold": null,
+      "goal_plays": 0,
+      "goal_kills": 0,
+      "finisher_target": 1,
+      "finisher_complete": false,
+      "gross_hp_lost": 46,
+      "hp_gained": 32,
+      "enemy_damage": 42,
+      "self_damage": 4,
+      "damage_accounting_complete": true,
+      "minimum_observed_hp": 149,
+      "round_end_hp": [
+        {
+          "round": 1,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 2,
+          "before": 169,
+          "after": 168
+        },
+        {
+          "round": 3,
+          "before": 166,
+          "after": 166
+        },
+        {
+          "round": 4,
+          "before": 166,
+          "after": 166
+        },
+        {
+          "round": 5,
+          "before": 166,
+          "after": 162
+        },
+        {
+          "round": 6,
+          "before": 162,
+          "after": 152
+        },
+        {
+          "round": 7,
+          "before": 152,
+          "after": 149
+        },
+        {
+          "round": 8,
+          "before": 149,
+          "after": 149
+        },
+        {
+          "round": 9,
+          "before": 149,
+          "after": 149
+        },
+        {
+          "round": 10,
+          "before": 175,
+          "after": 175
+        },
+        {
+          "round": 11,
+          "before": 173,
+          "after": 155
+        }
+      ],
+      "max_hp_gained": 0,
+      "health_changes_fully_observed": true,
+      "round_start_hp": {
+        "1": 169,
+        "2": 169,
+        "3": 168,
+        "4": 166,
+        "5": 166,
+        "6": 162,
+        "7": 152,
+        "8": 149,
+        "9": 149,
+        "10": 149,
+        "11": 175
+      },
+      "target_hp": 175,
+      "target_full_health": true,
+      "target_uncertain": true,
+      "rest_callback_excluded": false,
+      "stopped_on_health_target": false,
+      "stopped_on_minimum": false,
+      "final_verifications": 1
+    },
+    {
+      "batch": "hand",
+      "case": "giant",
+      "algorithm": "TurnFrontier",
+      "mode": "current",
+      "repeat": 0,
+      "dll_sha256": "0D2C1A0D3E6340052DB9CEA47090F9B8DB44793DBD45AEE8BB9391B93BC0B513",
+      "workers": 8,
+      "max_nodes": 64,
+      "budget_seconds": 60,
+      "status": "done",
+      "native_replay_passed": true,
+      "continuation_guided": false,
+      "seeded": false,
+      "prefix_matched": null,
+      "conditional_comparison_valid": true,
+      "recorded_runtime_errors": 0,
+      "evaluated": 507,
+      "won": true,
+      "starting_hp": 169,
+      "elapsed_ms": 72498,
+      "wall_ms": 72881.5116,
+      "first_win_at_final_hp_ms": 25030.0403,
+      "first_win_at_final_hp_worker": 0,
+      "first_win_at_final_hp_attempt": 39,
+      "final_hp": 161,
+      "max_hp": 265,
+      "net_loss": 8,
+      "goal_hp_loss_threshold": 80,
+      "goal_plays": 0,
+      "goal_kills": 0,
+      "finisher_target": 1,
+      "finisher_complete": false,
+      "gross_hp_lost": 40,
+      "hp_gained": 32,
+      "enemy_damage": 36,
+      "self_damage": 4,
+      "damage_accounting_complete": true,
+      "minimum_observed_hp": 157,
+      "round_end_hp": [
+        {
+          "round": 1,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 2,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 3,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 4,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 5,
+          "before": 169,
+          "after": 161
+        },
+        {
+          "round": 6,
+          "before": 159,
+          "after": 159
+        },
+        {
+          "round": 7,
+          "before": 157,
+          "after": 157
+        },
+        {
+          "round": 8,
+          "before": 157,
+          "after": 157
+        },
+        {
+          "round": 9,
+          "before": 157,
+          "after": 157
+        },
+        {
+          "round": 10,
+          "before": 183,
+          "after": 183
+        },
+        {
+          "round": 11,
+          "before": 183,
+          "after": 161
+        }
+      ],
+      "max_hp_gained": 0,
+      "health_changes_fully_observed": true,
+      "round_start_hp": {
+        "1": 169,
+        "2": 169,
+        "3": 169,
+        "4": 169,
+        "5": 169,
+        "6": 161,
+        "7": 159,
+        "8": 157,
+        "9": 157,
+        "10": 157,
+        "11": 183
+      },
+      "target_hp": null,
+      "target_full_health": null,
+      "target_uncertain": null,
+      "rest_callback_excluded": false,
+      "stopped_on_health_target": false,
+      "stopped_on_minimum": false,
+      "final_verifications": 1
+    },
+    {
+      "batch": "hand",
+      "case": "giant-standard",
+      "algorithm": "TurnFrontier",
+      "mode": "current",
+      "repeat": 0,
+      "dll_sha256": "0D2C1A0D3E6340052DB9CEA47090F9B8DB44793DBD45AEE8BB9391B93BC0B513",
+      "workers": 8,
+      "max_nodes": 64,
+      "budget_seconds": 60,
+      "status": "done",
+      "native_replay_passed": true,
+      "continuation_guided": false,
+      "seeded": false,
+      "prefix_matched": null,
+      "conditional_comparison_valid": true,
+      "recorded_runtime_errors": 0,
+      "evaluated": 492,
+      "won": true,
+      "starting_hp": 169,
+      "elapsed_ms": 69817,
+      "wall_ms": 70139.232,
+      "first_win_at_final_hp_ms": 59736.024,
+      "first_win_at_final_hp_worker": 3,
+      "first_win_at_final_hp_attempt": 106,
+      "final_hp": 168,
+      "max_hp": 265,
+      "net_loss": 1,
+      "goal_hp_loss_threshold": null,
+      "goal_plays": 0,
+      "goal_kills": 0,
+      "finisher_target": 1,
+      "finisher_complete": false,
+      "gross_hp_lost": 33,
+      "hp_gained": 32,
+      "enemy_damage": 29,
+      "self_damage": 4,
+      "damage_accounting_complete": true,
+      "minimum_observed_hp": 161,
+      "round_end_hp": [
+        {
+          "round": 1,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 2,
+          "before": 169,
+          "after": 168
+        },
+        {
+          "round": 3,
+          "before": 168,
+          "after": 168
+        },
+        {
+          "round": 4,
+          "before": 168,
+          "after": 168
+        },
+        {
+          "round": 5,
+          "before": 166,
+          "after": 163
+        },
+        {
+          "round": 6,
+          "before": 163,
+          "after": 163
+        },
+        {
+          "round": 7,
+          "before": 161,
+          "after": 161
+        },
+        {
+          "round": 8,
+          "before": 161,
+          "after": 161
+        },
+        {
+          "round": 9,
+          "before": 161,
+          "after": 161
+        },
+        {
+          "round": 10,
+          "before": 187,
+          "after": 187
+        },
+        {
+          "round": 11,
+          "before": 187,
+          "after": 168
+        }
+      ],
+      "max_hp_gained": 0,
+      "health_changes_fully_observed": true,
+      "round_start_hp": {
+        "1": 169,
+        "2": 169,
+        "3": 168,
+        "4": 168,
+        "5": 168,
+        "6": 163,
+        "7": 163,
+        "8": 161,
+        "9": 161,
+        "10": 161,
+        "11": 187
+      },
+      "target_hp": 175,
+      "target_full_health": true,
+      "target_uncertain": true,
+      "rest_callback_excluded": false,
+      "stopped_on_health_target": false,
+      "stopped_on_minimum": false,
+      "final_verifications": 1
+    },
+    {
+      "batch": "retained-seed",
+      "case": "giant",
+      "algorithm": "TurnFrontier",
+      "mode": "retained-goal-seed",
+      "repeat": 0,
+      "dll_sha256": "E74D65DAAF32B7680D4D0EE23D46BB49266047E3A209DAA651CBF8A4911279FA",
+      "workers": 8,
+      "max_nodes": 64,
+      "budget_seconds": 60,
+      "status": "done",
+      "native_replay_passed": true,
+      "continuation_guided": false,
+      "seeded": false,
+      "prefix_matched": null,
+      "conditional_comparison_valid": true,
+      "recorded_runtime_errors": 0,
+      "evaluated": 501,
+      "won": true,
+      "starting_hp": 169,
+      "elapsed_ms": 73009,
+      "wall_ms": 73400.3219,
+      "first_win_at_final_hp_ms": 27910.4433,
+      "first_win_at_final_hp_worker": 3,
+      "first_win_at_final_hp_attempt": 36,
+      "final_hp": 173,
+      "max_hp": 265,
+      "net_loss": 0,
+      "goal_hp_loss_threshold": 80,
+      "goal_plays": 0,
+      "goal_kills": 0,
+      "finisher_target": 1,
+      "finisher_complete": false,
+      "gross_hp_lost": 28,
+      "hp_gained": 32,
+      "enemy_damage": 24,
+      "self_damage": 4,
+      "damage_accounting_complete": true,
+      "minimum_observed_hp": 165,
+      "round_end_hp": [
+        {
+          "round": 1,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 2,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 3,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 4,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 5,
+          "before": 169,
+          "after": 169
+        },
+        {
+          "round": 6,
+          "before": 167,
+          "after": 167
+        },
+        {
+          "round": 7,
+          "before": 165,
+          "after": 165
+        },
+        {
+          "round": 8,
+          "before": 165,
+          "after": 165
+        },
+        {
+          "round": 9,
+          "before": 191,
+          "after": 191
+        },
+        {
+          "round": 10,
+          "before": 191,
+          "after": 173
+        }
+      ],
+      "max_hp_gained": 0,
+      "health_changes_fully_observed": true,
+      "round_start_hp": {
+        "1": 169,
+        "2": 169,
+        "3": 169,
+        "4": 169,
+        "5": 169,
+        "6": 169,
+        "7": 167,
+        "8": 165,
+        "9": 165,
+        "10": 191
+      },
+      "target_hp": null,
+      "target_full_health": null,
+      "target_uncertain": null,
+      "rest_callback_excluded": false,
+      "stopped_on_health_target": false,
+      "stopped_on_minimum": false,
+      "final_verifications": 1
+    }
+  ],
+  "scope": "Frozen native follow-up. Seeded prefixes test conditional consequences or return behavior, not search discovery speed. Failed runs are excluded from quality conclusions. No general optimality claim."
+}

@@ -35,15 +35,16 @@ public sealed class LocalGoalLossLearning(LocalCardGoals? goals, int capacity = 
     public int Penalty(LocalAction action) => goals?.Enabled != true || _prefix < 0 || _penalties.Count == 0
         ? 0 : _penalties.GetValueOrDefault((_prefix, Key(action)));
 
-    private static string? SourceKey(LocalAction action) => action.Choices is { Length: > 0 } ||
+    private static string? SourceKey(LocalAction action, string? handContext) => action.Choices is { Length: > 0 } ||
         !action.EndTurn && !action.PotionSlot.HasValue && !action.CombatCardIndex.HasValue ? null :
         System.Text.Json.JsonSerializer.Serialize(new { action.ModelId, action.CombatCardIndex, action.PotionSlot,
-            action.TargetId, action.EndTurn, action.Round });
+            action.TargetId, action.EndTurn, action.Round, handContext });
 
-    public int Penalty(LocalAction action, LocalGoalOpportunity? current, bool finisherReady = false)
+    public int Penalty(LocalAction action, LocalGoalOpportunity? current, bool finisherReady = false,
+        string? handContext = null)
     {
         int exact = Penalty(action);
-        if (current?.Matches(goals) != true || _risks.Count == 0 || SourceKey(action) is not { } key ||
+        if (current?.Matches(goals) != true || _risks.Count == 0 || SourceKey(action, handContext) is not { } key ||
             !_risks.TryGetValue(key, out var risk)) return exact;
         int Exposed(LocalGoalStock? stock, int removed) => stock == null ? 0 :
             Math.Max(0, stock.Target - stock.Completed - Math.Max(0, stock.Available - removed)) - stock.Missing;
@@ -53,10 +54,11 @@ public sealed class LocalGoalLossLearning(LocalCardGoals? goals, int capacity = 
             (finisherReady ? 0 : 180 * Exposed(current.Finisher, risk.Finisher)));
     }
 
-    public void CompleteStep(LocalAction action, LocalGoalOpportunity? before, LocalGoalOpportunity? after)
+    public void CompleteStep(LocalAction action, LocalGoalOpportunity? before, LocalGoalOpportunity? after,
+        string? handContext = null)
     {
         if (goals?.Enabled != true) return;
-        if (before?.Matches(goals) == true && after?.Matches(goals) == true && SourceKey(action) is { } source)
+        if (before?.Matches(goals) == true && after?.Matches(goals) == true && SourceKey(action, handContext) is { } source)
         {
             int Removed(LocalGoalStock? a, LocalGoalStock? b) => a == null || b == null || a.Target != b.Target ? 0 :
                 Math.Max(0, a.Available - b.Available - Math.Max(0, b.Completed - a.Completed));

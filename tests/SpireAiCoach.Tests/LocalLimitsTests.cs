@@ -58,6 +58,13 @@ static class LocalLimitsTests
                 store.SaveInterfaceOptions(true);
                 Check(store.Load().Settings.ShowOverlayButton && !store.Load().Settings.AutoShowCombatPanel);
                 store.SaveLocalWorkers(8);
+                store.SaveInterfaceOptions(compactOverlay: true);
+                Check(store.Load().Settings.CompactOverlay && !new CoachSettings().CompactOverlay);
+                store.SaveInterfaceOptions(showOverlayButton: false);
+                Check(store.Load().Settings.CompactOverlay && !store.Load().Settings.ShowOverlayButton);
+                store.SaveInterfaceOptions(compactOverlay: false);
+                Check(!store.Load().Settings.CompactOverlay &&
+                    JsonNode.Parse(File.ReadAllText(config))!["extension_setting"]!["value"]!.GetValue<int>() == 7);
                 Check(!store.Load().Settings.AutoShowCombatPanel && store.Load().Settings.LocalWorkers == 8 &&
                     File.ReadAllBytes(key).SequenceEqual(new byte[] { 1, 2, 3, 4 }));
             }

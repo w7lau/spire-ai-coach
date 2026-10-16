@@ -9,19 +9,21 @@ using SpireAiCoach.Core;
 
 namespace SpireAiCoach.Mod;
 
-// The audited Hextech field affects its real card selection but is absent from
+// The audited Hextech fields affect real selections but are absent from
 // native relic serialization. Observe it in the live game; restore only in owned
 // workers, before room initialization and the original recorded history.
 internal static class LocalModReplay
 {
-    private const string RuneType = "HextechRunes.HiddenGemUpgradeRune";
-    private const string RuneModule = "730cd0af-a1c5-4fe0-b932-add4bf4809ef";
-    private const string Ordinal = "_localUpgradedPlayOrdinal";
+    private sealed record SupportedField(string TypeName, string ModuleId, string FieldName);
+    private static readonly SupportedField[] Supported =
+    [
+        new("HextechRunes.HiddenGemUpgradeRune", "730cd0af-a1c5-4fe0-b932-add4bf4809ef", "_localUpgradedPlayOrdinal"),
+        new("HextechRunes.CircleOfDeathRune", "81593f41-70fb-41de-9a5e-2103436f255d", "_localTargetRollOrdinal")
+    ];
     private static readonly FieldInfo ReplayField = typeof(CombatReplayWriter)
         .GetField("_replay", BindingFlags.Instance | BindingFlags.NonPublic)!;
     private sealed record Root(LocalRelicReplayField[] Fields, string? Error = null);
     private static readonly ConditionalWeakTable<CombatReplay, Root> Roots = new();
-    private static FieldInfo? _ordinalField;
     private static bool _installed;
 
     public static void Install()
@@ -63,10 +65,11 @@ internal static class LocalModReplay
             for (int slot = 0; slot < player.Relics.Count; slot++)
             {
                 var relic = player.Relics[slot];
-                if (relic.GetType().FullName != RuneType) continue;
+                if (!Supported.Any(s => s.TypeName == relic.GetType().FullName)) continue;
                 var field = Field(relic);
                 values ??= [];
-                values.Add(new(player.NetId, slot, relic.Id.ToString(), RuneType, RuneModule, Ordinal, (int)field.GetValue(relic)!));
+                values.Add(new(player.NetId, slot, relic.Id.ToString(), relic.GetType().FullName!,
+                    relic.GetType().Assembly.ManifestModule.ModuleVersionId.ToString(), field.Name, (int)field.GetValue(relic)!));
             }
         }
         return values?.ToArray() ?? [];
@@ -107,11 +110,12 @@ internal static class LocalModReplay
     private static FieldInfo Field(RelicModel relic)
     {
         var type = relic.GetType();
-        if (type.Assembly.ManifestModule.ModuleVersionId.ToString() != RuneModule)
-            throw Missing("当前隐藏宝石符文版本尚未验证状态还原。");
-        var field = _ordinalField ??= type.GetField(Ordinal, BindingFlags.Instance | BindingFlags.NonPublic);
+        var supported = Supported.SingleOrDefault(s => s.TypeName == type.FullName &&
+            s.ModuleId == type.Assembly.ManifestModule.ModuleVersionId.ToString());
+        if (supported == null) throw Missing("当前符文版本尚未验证状态还原：" + relic.Id);
+        var field = type.GetField(supported.FieldName, BindingFlags.Instance | BindingFlags.NonPublic);
         if (field == null || field.FieldType != typeof(int) || field.IsStatic || field.IsInitOnly || field.DeclaringType != type)
-            throw Missing("隐藏宝石符文状态字段已变化。");
+            throw Missing("符文状态字段已变化：" + relic.Id);
         return field;
     }
 

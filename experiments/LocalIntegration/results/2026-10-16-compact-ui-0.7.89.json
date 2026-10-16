@@ -1,0 +1,39 @@
+{
+  "passed": true,
+  "version": "0.7.89",
+  "layouts": [
+    {
+      "width": 1280,
+      "height": 720,
+      "panel_width": 340,
+      "panel_height": 272
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "panel_width": 340,
+      "panel_height": 272
+    }
+  ],
+  "opacity": 0.72156864,
+  "controls_mirror_existing_gates": true,
+  "stale_click_rejected": true,
+  "outside_combat_actions_rejected": true,
+  "search_and_execution_cancel_tokens_checked": true,
+  "execution_keeps_stop_visible": true,
+  "hide_and_expand_checked": true,
+  "mode_persisted": true,
+  "mode_switch_preserves_request": true,
+  "status_labels_have_nonzero_area": true,
+  "result_both_lines_visible": true,
+  "fixture_only_no_combat_executed": true,
+  "dll_sha256": "5d79f1b630ce218274f2a9a953f2d1acb4d65654bdca71369e7816a570ca9a34",
+  "visual_review_passed": true,
+  "full_panel_native_regression_passed": true,
+  "core_tests_passed": 501,
+  "build_receipt": "20261016-184703-506-4dcfbea4",
+  "installation_receipt": "20261016-185122-031-9a1c987a",
+  "installed_dll_sha256": "5d79f1b630ce218274f2a9a953f2d1acb4d65654bdca71369e7816a570ca9a34",
+  "post_package_native_ui_recheck_passed": true,
+  "player_runtime_observed": false
+}

@@ -26,6 +26,8 @@ public sealed class LocalProgressPanel
     private readonly RichTextLabel _events = TextBox(220);
     private LocalProgressBook? _book;
     private bool _accepting;
+    public LocalCompactActivity CompactActivity(string hostStatus) =>
+        LocalProgressBook.CompactActivity(_book?.Latest.Values ?? [], hostStatus);
 
     public LocalProgressPanel()
     {

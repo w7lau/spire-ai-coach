@@ -315,6 +315,7 @@ internal static class PresentationIntegration
                 expanded_sections_checked = 3, visualization_workers = 16, visualization_rendered = true,
                 hidden_and_finished_animation_stops = true, route_sixteen_selectable = true });
         }
+        await CompactOverlayIntegration.Run(root, tree, overlay, layer);
         layer.QueueFree();
         LocalWire.Write(Path.Combine(root, "integration-presentation-summary.json"), new
         {

@@ -62,6 +62,13 @@ public static class Entry
                 return;
             }
             SaveManager.Instance.PrefsSave.FastMode = FastModeType.Instant;
+            if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_REFLECT_REPLAY") is { Length: > 0 } reflectPath)
+            {
+                await ReflectReplayIntegration.Run(root, LocalWire.Read<LocalSearchRequest>(reflectPath),
+                    System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_SEED_RESULT")!);
+                File.WriteAllText(Path.Combine(root, "integration-success"), "passed");
+                return;
+            }
             if (System.Environment.GetEnvironmentVariable("SPIRE_LOCAL_PRESENTATION_SMOKE") == "1")
             {
                 await PresentationIntegration.Run(root, tree);

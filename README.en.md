@@ -11,6 +11,8 @@ A **Slay the Spire 2** battle assistant with **AI advice for the current turn**,
 3. Under “本地整场计算” (Local whole-battle planning), choose “路线采样算法” (Rollout Sampling) or “分支扩展算法” (Branch Expansion). Once a victory is found, “停止并使用胜利路线” (Stop and use winning route) ends further search and keeps a plan using your verification setting; Cancel discards the calculation. Follow the plan manually or click “执行方案” (Execute plan). **Esc stops execution**.
 4. For AI advice, enter a Chat Completions compatible URL, model and API key under “AI 指导与设置”, save, and click “AI 分析”.
 
+Click **“精简”** (Compact) in the panel header for a small translucent window with calculation, execution, stop controls and a short status. Drag its title to move it, or choose **“展开”** (Expand) to return to the full panel. The mode is remembered and uses the same search, potion and card-goal settings. Stop remains visible during execution; **Esc** also cancels calculation in compact mode.
+
 ## Local battle planning
 
 Both algorithms plan the whole battle from the current state without an API.

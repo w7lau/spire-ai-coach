@@ -1,0 +1,34 @@
+{
+  "passed": true,
+  "version": "0.7.90",
+  "layouts": [
+    {
+      "width": 1280,
+      "height": 720,
+      "panel_width": 340,
+      "panel_height": 272
+    },
+    {
+      "width": 1920,
+      "height": 1080,
+      "panel_width": 340,
+      "panel_height": 272
+    }
+  ],
+  "opacity": 0.72156864,
+  "controls_mirror_existing_gates": true,
+  "stale_click_rejected": true,
+  "outside_combat_actions_rejected": true,
+  "search_and_execution_cancel_tokens_checked": true,
+  "execution_keeps_stop_visible": true,
+  "hide_and_expand_checked": true,
+  "mode_persisted": true,
+  "mode_switch_preserves_request": true,
+  "status_labels_have_nonzero_area": true,
+  "result_both_lines_visible": true,
+  "compact_activity_phases_and_counters": true,
+  "idle_activity_stops": true,
+  "fixture_only_no_combat_executed": true,
+  "dll_sha256": "e0950f62da599eeaab9a4c2cef8331acc991c723a6d1ba9d797212436c4493fe",
+  "visual_review_passed": true
+}

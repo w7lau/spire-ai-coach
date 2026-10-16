@@ -10,6 +10,7 @@
 [*]“路线采样”和“分支扩展”都计算整场战斗，无需 API；优先降低战后净损血，计入回血，同等损失优先保留药水。
 [*]可设置并发、次数、搜索时间、回合上限、提前返回条件，以及用药、补刀和目标牌选项。
 [*]可查看进度、路线与耗时，并继续搜索。
+[*]可切换半透明精简浮窗，只保留计算、执行、停止等基础功能；显示准备、搜索、复核阶段和实际评估数量。
 [*]自动执行支持单人战斗；实际状态偏离方案时停止。
 [/list]
 
@@ -22,6 +23,8 @@
 [/list]
 
 [h2]兼容与算法优化[/h2]
+0.7.90：新增半透明精简浮窗和阶段进度显示；修复已验证版本“死亡之环”符文的内部触发计数还原，避免模拟与实际执行选择不同目标。补刀探索会保留仍有机会的路线，手牌改变后重新判断历史风险；不保证指定牌目标一定完成。
+
 2026-10-16 更新：修正回血来源与条件回血目标判断，改进弃牌后防御、苦无出牌顺序、毒的后续收益和低受伤路线探索；前面的选择改变后，会重新检查后续结束回合。最终选路仍优先战后血量，可能选择触发复活的路线。
 
 为尽力兼容不同 Mod，搜索尽量复用游戏底层规则和已加载的 Mod 钩子，模拟出牌与结算，减少逐卡适配。部分 Mod 仍可能需要额外处理。
@@ -40,10 +43,13 @@ Press F8, choose Rollout Sampling or Branch Expansion, then click “执行方�
 [*]AI uses your hand, piles, buffs, relics, potions and enemy intents to suggest plays, with streamed replies.
 [*]Rollout Sampling (路线采样) and Branch Expansion (分支扩展) both plan the whole battle without an API. Plans prioritize net HP loss including healing; equal-loss routes prefer preserving potions.
 [*]Configure concurrency, attempts, search time, turn limits, stopping conditions, potion use and card goals. Inspect progress, routes and timing, or continue searching.
+[*]Switch to a small translucent panel with basic compute, execute and stop controls. See preparation, search and verification stages with actual evaluated-route counts.
 [*]Subscribe, enable the mod and press F8 to open/close the panel. Choose either the Workshop or manual installation.
 [*]Follow a plan manually or click “执行方案” to execute in singleplayer. Esc stops execution; divergence from the plan also stops it.
 [*]AI requires a Chat Completions compatible URL, model and API key. Clicking AI analysis sends combat information to your provider and may incur charges.
 [/list]
+
+0.7.90: added the compact translucent panel and phase progress display. Restores the internal trigger counter for the validated Circle of Death rune version to keep simulated and actual target selection aligned. Finisher exploration preserves remaining opportunities and scopes historical risk to the observed hand; completing a requested card goal is not guaranteed.
 
 2026-10-16 update: improved recovery-source and conditional-healing analysis, discard/block sequencing, Kunai/poison tactics and low-damage route exploration. Changed earlier choices prompt another check of later end-turn decisions. Final selection still prioritizes ending HP and may choose a route that consumes revival.
 

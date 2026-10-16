@@ -37,11 +37,13 @@ public sealed class SettingsStore
 
     public void SaveLocalWorkers(int workers) => SaveLocalOptions(workers, null);
 
-    public void SaveInterfaceOptions(bool? showOverlayButton = null, bool? autoShowCombatPanel = null)
+    public void SaveInterfaceOptions(bool? showOverlayButton = null, bool? autoShowCombatPanel = null,
+        bool? compactOverlay = null)
     {
         var settings = File.Exists(ConfigPath) ? JsonNode.Parse(File.ReadAllText(ConfigPath))!.AsObject() : new JsonObject();
         if (showOverlayButton.HasValue) settings["show_overlay_button"] = showOverlayButton.Value;
         if (autoShowCombatPanel.HasValue) settings["auto_show_combat_panel"] = autoShowCombatPanel.Value;
+        if (compactOverlay.HasValue) settings["compact_overlay"] = compactOverlay.Value;
         Directory.CreateDirectory(_directory);
         AtomicWrite(ConfigPath, Encoding.UTF8.GetBytes(settings.ToJsonString()));
     }

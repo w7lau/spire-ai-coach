@@ -312,7 +312,7 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
 
     public void ObserveOutcome(LocalCandidate candidate)
     {
-        bool best = LocalCardGoalTactics.BetterExplorationSeed(candidate, _winningOutcome, _cardGoals);
+        bool best = LocalCardGoalTactics.BetterExplorationSeed(candidate, _winningOutcome, _cardGoals, preserveFinisher: true);
         ProposeLowDamageRoute(candidate);
         if (best) { _winningOutcome = candidate; _winner.Clear(); }
         if (!best) return;
@@ -364,11 +364,13 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
     public void PromoteWinning(LocalCandidate candidate, int? owner)
     {
         if (!candidate.Won || candidate.Dead || candidate.Decisions == null ||
-            !LocalCardGoalTactics.BetterExplorationSeed(candidate, _guidedIncumbent, _cardGoals)) return;
+            !LocalCardGoalTactics.BetterExplorationSeed(candidate, _guidedIncumbent, _cardGoals, preserveFinisher: true)) return;
         // Cross-worker measurements steer proposals only, never a health cut.
         // With optional goals, an achieved goal can be refined to lower its HP
         // cost. Without goals, a weaker local win cannot replace the shared focus.
-        _guidedIncumbent = candidate with { Continuation = null, Decisions = null };
+        // Retain only the final observed opportunity for seed comparison, not
+        // the full decision trace or execution checkpoints.
+        _guidedIncumbent = candidate with { Continuation = null, Decisions = candidate.Decisions.TakeLast(1).ToArray() };
         var options = new List<(int Id, double Priority)>();
         var tails = new Dictionary<int, LocalAction[]>();
         foreach (var decision in candidate.Decisions)

@@ -20,13 +20,18 @@ namespace SpireLocalIntegration;
 // The live incident's frozen bytes and hashes remain unchanged on disk.
 internal static class ModReplayIntegration
 {
-    public static async Task Run(string root, SceneTree tree, LocalSearchRequest before, string resultPath, string afterPath)
+    public static async Task Run(string root, SceneTree tree, LocalSearchRequest before, string resultPath, string afterPath,
+        bool circleOfDeath = false)
     {
         var incident = LocalWire.Read<LocalSearchResult>(resultPath);
         var after = LocalWire.Read<LocalSearchRequest>(afterPath);
-        var prefix = incident.Best!.Actions.Take(4).ToArray();
-        if (before.History?.Count != 0 || after.History?.Count != 4 || prefix.Last().ModelId != "CARD.HIDDEN_GEM")
-            throw new InvalidDataException("Expected the frozen four-step Hidden Gem incident");
+        int prefixLength = circleOfDeath ? 1 : 4;
+        string runeType = circleOfDeath ? "HextechRunes.CircleOfDeathRune" : "HextechRunes.HiddenGemUpgradeRune";
+        string fieldName = circleOfDeath ? "_localTargetRollOrdinal" : "_localUpgradedPlayOrdinal";
+        var prefix = incident.Best!.Actions.Take(prefixLength).ToArray();
+        if (before.History?.Count != 0 || after.History?.Count != prefixLength ||
+            prefix.Last().ModelId != (circleOfDeath ? "CARD.REFLECT" : "CARD.HIDDEN_GEM"))
+            throw new InvalidDataException("Unexpected frozen Mod-state incident prefix");
         string NativeHash() => (string)typeof(LocalCapture).GetMethod("NativeFingerprint", BindingFlags.NonPublic | BindingFlags.Static)!.Invoke(null, null)!;
         async Task Frame() => await tree.ToSignal(tree, SceneTree.SignalName.ProcessFrame);
         async Task Settle()
@@ -42,8 +47,8 @@ internal static class ModReplayIntegration
                 await Frame();
             }
         }
-        RelicModel Rune(Player p) => p.Relics.Single(r => r.GetType().FullName == "HextechRunes.HiddenGemUpgradeRune");
-        FieldInfo Ordinal(RelicModel r) => r.GetType().GetField("_localUpgradedPlayOrdinal", BindingFlags.Instance | BindingFlags.NonPublic)!;
+        RelicModel Rune(Player p) => p.Relics.Single(r => r.GetType().FullName == runeType);
+        FieldInfo Ordinal(RelicModel r) => r.GetType().GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic)!;
         async Task<Player> RestoreHost(int ordinal)
         {
             var manager = RunManager.Instance;
@@ -86,7 +91,7 @@ internal static class ModReplayIntegration
         }
         var player = await RestoreHost(0); await PlayPrefix(player);
         string baseline = NativeHash();
-        if (baseline != incident.Best.Actions[4].BeforeHash) throw new InvalidOperationException("Native baseline did not reproduce the old worker prediction");
+        if (baseline != incident.Best.Actions[prefixLength].BeforeHash) throw new InvalidOperationException("Native baseline did not reproduce the old worker prediction");
         player = await RestoreHost(1);
         var initial = LocalCapture.Capture("owned-mod-replay", false);
         if (initial.ModReplay is not { Initial.Length: 1, Current.Length: 1 } || initial.ModReplay.Initial[0].Value != 1)
@@ -113,7 +118,7 @@ internal static class ModReplayIntegration
         using var pool = new LocalWorkerPool(Path.Combine(root, "mod-replay-pool"));
         var lane = ((Array)typeof(LocalWorkerPool).GetField("_workers", BindingFlags.Instance | BindingFlags.NonPublic)!.GetValue(pool)!).GetValue(0)!;
         async Task Ensure() => await (Task)lane.GetType().GetMethod("Ensure")!.Invoke(lane,
-            [Path.Combine(root, "mod-replay-workers"), 0, installation, CancellationToken.None, null])!;
+            [Path.Combine(root, "mod-replay-workers"), 0, installation, CancellationToken.None, null, null])!;
         Process Process() => (Process)lane.GetType().GetProperty("Process")!.GetValue(lane)!;
         string WorkerRoot() => (string)lane.GetType().GetProperty("Root")!.GetValue(lane)!;
         async Task<LocalSearchResult> Send(LocalSearchRequest command, bool requireIdle = true)

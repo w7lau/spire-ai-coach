@@ -17,6 +17,8 @@ public sealed record LocalProgress(string Id, string SnapshotId, int Worker, int
     string Phase, LocalSimState? State, LocalSimEvent[] Events, string Status = "running", int TurnProbes = 0, int BoundPruned = 0,
     int RootBranches = 0, LocalProgressBest? Best = null, int Pass = 0);
 
+public sealed record LocalCompactActivity(string Stage, string Detail);
+
 public sealed class LocalProgressBook(string id, string snapshotId)
 {
     public static LocalProgress? BestVictory(IEnumerable<LocalProgress> progress) =>
@@ -38,6 +40,28 @@ public sealed class LocalProgressBook(string id, string snapshotId)
     // A losing trial is not the end of its worker: it may restore another branch.
     public static bool Finished(LocalProgress progress) => progress.Status != "running";
     public static bool Preparing(LocalProgress progress) => !Finished(progress) && progress.RootBranches <= 0 && progress.State == null;
+    public static LocalCompactActivity CompactActivity(IEnumerable<LocalProgress> progress, string hostStatus)
+    {
+        // Parent transitions take precedence over the preceding pass's telemetry.
+        if (hostStatus.Contains("核对战斗起点", StringComparison.Ordinal))
+            return new("核对起点", "切换普通模式 · 核对当前战斗");
+        if (hostStatus.Contains("切换兼容模式", StringComparison.Ordinal))
+            return new("重新准备", "正在切换兼容模式");
+        if (hostStatus.Contains("复核最终", StringComparison.Ordinal))
+            return new("复核中", "正在独立重放最终路线");
+        if (hostStatus.Contains("确认", StringComparison.Ordinal))
+            return new("收尾中", "已找到路线 · 等待其余计算停止");
+        var lanes = progress.ToArray();
+        int searching = lanes.Count(p => !Finished(p) && !Preparing(p));
+        int preparing = lanes.Count(Preparing);
+        int evaluated = lanes.Sum(p => Math.Max(0, p.Evaluated));
+        int victories = lanes.Sum(p => Math.Max(0, p.Victories));
+        if (searching > 0)
+            return new("搜索中", $"已评估 {evaluated} 条 · 获胜 {victories} 条\n搜索 {searching} 路 · 准备 {preparing} 路");
+        if (preparing > 0 || lanes.Length == 0)
+            return new("准备中", preparing > 0 ? $"准备 {preparing} 路 · 恢复并核对战斗" : "正在准备计算资源");
+        return new("收尾中", $"已评估 {evaluated} 条 · 获胜 {victories} 条\n正在汇总搜索结果");
+    }
     public static string LaneState(LocalProgress progress) => progress.Status switch
     {
         "running" => Preparing(progress) ? "准备中" : "搜索中",
