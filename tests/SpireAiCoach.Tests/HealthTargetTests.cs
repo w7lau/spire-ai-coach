@@ -12,6 +12,20 @@ static class HealthTargetTests
 
     public static void Register(Action<string, Action> test, Action<string, Func<Task>> asyncTest)
     {
+        test("conditional recovery returns high HP but rejects a low HP zero-loss shortcut", () =>
+        {
+            var transfer = LocalTerminalHealth.Envelope(Enumerable.Range(0, 67)
+                .Select(hp => hp <= 33 ? Math.Min(66, hp + 12) : hp).ToArray());
+            foreach (var order in new[] { LocalSearchOrder.MonteCarlo, LocalSearchOrder.TurnFrontier })
+            {
+                var request = Request() with { SearchOrder = order };
+                var high = Target(request, LocalTerminalHealth.Compose(52, [transfer])!.Value);
+                Check(LocalSearchPolicy.CanStopAfterVictory(Win(), request, healthTarget: high), "High HP must return");
+                var low = Target(request, LocalTerminalHealth.Compose(30, [transfer])!.Value, 30);
+                Check(!LocalSearchPolicy.CanStopAfterVictory(Win(30, 30), request, healthTarget: low), "Zero loss skipped attainable healing");
+                Check(LocalSearchPolicy.CanStopAfterVictory(Win(42, 30), request, healthTarget: low), "Native healed victory must return");
+            }
+        });
         test("content health target returns zero or fixed gain without a ceiling certificate", () =>
         {
             foreach (var order in new[] { LocalSearchOrder.MonteCarlo, LocalSearchOrder.TurnFrontier })

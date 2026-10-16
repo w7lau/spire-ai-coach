@@ -11,6 +11,31 @@ static class TurnWorkTests
 
     public static void Register(Action<string, Action> test, Action<string, Func<Task>> asyncTest)
     {
+        test("completed proof routes supply scoped soft proposals without bypassing owned outcome checks", () =>
+        {
+            var captured = Request(); using var broker = new LocalTurnWork(captured, 1);
+            using var owner = new LocalTurnWorkClient(captured with { TurnWorkPipe=broker.PipeName });
+            var hit = Move(1) with { TargetId=1 }; var alt = hit with { TargetId=2 };
+            var seed = new LocalCandidate([hit],18,14,0,0,72,true,false,false, StartingHp:31,
+                Decisions:[new(0,[hit,alt])], HealthChanges:new(31,71,18,72,14,1,1,0,0), CombatOutcome:new(true,true,[]));
+            owner.ProposeLowDamageRoute(seed);
+            Check(broker.Pending > 0 && broker.CompletedHistories == 0, "Proposal must not certify completion");
+            bool rejected=false; try { owner.ObserveOutcome(seed); } catch (InvalidOperationException) { rejected=true; }
+            Check(rejected, "Soft proposal bypassed the owned outcome gate");
+            Check(owner.TryTake(out var task) && task.Prefix.Length == 0 && task.Continuation![0].TargetId == 2,
+                "Proof-discovered route was not available for new native exploration");
+            owner.Finish(task);
+            bool empty = false;
+            while (owner.TryTake(out var remaining))
+            {
+                empty |= remaining.Continuation is { Length: 0 } && remaining.SearchRound == hit.Round;
+                owner.Finish(remaining);
+            }
+            Check(empty, "Removing the only action must remain a valid fresh native proposal");
+            using var stale = new LocalTurnWorkClient(captured with { TurnWorkPipe=broker.PipeName, NativeHash="other" });
+            rejected=false; try { stale.ProposeLowDamageRoute(seed); } catch (InvalidOperationException) { rejected=true; }
+            Check(rejected, "A different frozen root supplied route proposals");
+        });
         test("shared turn work carries deeper native goal loss through the owned pipe without losing other branches", () =>
         {
             var goals = new LocalCardGoals(FinisherModelId: "opaque", HpLossThreshold: 100);

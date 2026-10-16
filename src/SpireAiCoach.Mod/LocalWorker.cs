@@ -286,6 +286,8 @@ public static class LocalWorker
         var refiner = new LocalRouteRefiner();
         var goalRefiner = request.CardGoals?.Enabled == true ? new LocalRouteRefiner() : null;
         LocalCandidate? goalSeed = null;
+        var lowDamageSeeds = new HashSet<string>(StringComparer.Ordinal);
+        int lowestSeedDamage = int.MaxValue;
         var goalLossLearning = new LocalGoalLossLearning(request.CardGoals);
         var policy = turnMode || request.CorrelatedRollouts && !systematic ? new LocalRolloutPolicy(314159 + request.Partition, request.CardGoals) : null;
         LocalCandidate? refinementSeed = null;
@@ -798,6 +800,7 @@ public static class LocalWorker
                         // certified expense cuts belong to settled checkpoints.
                         LocalAction? preferred = null;
                         LocalAction? plannedAction = null;
+                        int previousPlanIndex = planIndex, previousTailIndex = tailIndex, previousContinuationIndex = continuationIndex;
                         bool exactAction = false;
                         if ((turnMode || lossProbe) && planIndex < planned!.Length)
                         {
@@ -844,9 +847,9 @@ public static class LocalWorker
                                 continuationIndex++;
                                 preferred = LocalRouteRefiner.Resolve(plannedAction, legal);
                             }
-                            // Preserve this proposed line, including deliberate holding.
-                            // Other legal plays are already published as exact siblings;
-                            // a heuristic must not rewrite its end turn before measuring it.
+                            // Keep the measured tail as a proposal. Explicit guided
+                            // improvement tasks may reconsider its soft end below;
+                            // fixed prefixes and the original legal end remain exact.
                         }
                         else if (!systematic && preferred == null && evaluated == 0 && actions.Count == 0)
                             preferred = roots.OrderByDescending(a => a.Preference).First();
@@ -861,6 +864,22 @@ public static class LocalWorker
                                 .Where(h => h.Action != null).ToArray(), adaptGoalTail,
                             preferred == null ? 0 : GoalLossHint(preferred));
                         if (adapted != preferred) { preferred = adapted; plannedAction = null; }
+                        if (!exactAction && !lossProbe && turnTask?.ReconsiderEndTurn == true && preferred?.EndTurn == true)
+                        {
+                            var defensePreview = LocalTacticalPreview.Capture(player, []);
+                            var defense = LocalSequenceTactics.ReconsiderEnd(preferred, true, defensePreview.BlockGap,
+                                legal.Where(a => !a.EndTurn && a.PotionSlot == null).Select(a =>
+                                    (a, defensePreview.Defense(player.PlayerCombatState!.Hand.Cards[a.HandIndex]).Value)));
+                            if (defense != preferred)
+                            {
+                                // Revisit this soft end after each new play: changed
+                                // draw/discard/block may leave another useful defense.
+                                // Exact prefixes and final replay never enter here.
+                                planIndex = previousPlanIndex; tailIndex = previousTailIndex;
+                                continuationIndex = previousContinuationIndex;
+                                preferred = defense; plannedAction = null;
+                            }
+                        }
                         // Explore explicit branch proposals, then continue most trials coherently.
                         // Randomizing every card in a long rollout almost never preserves a combo.
                         // Monte Carlo retains stochastic trials. The turn frontier
@@ -1114,7 +1133,17 @@ public static class LocalWorker
                         selectedGoals.Counts(candidate) != (0, 0) &&
                         LocalCardGoalTactics.BetterExplorationSeed(candidate, goalSeed, selectedGoals);
                     if (improvesGoalSeed) goalSeed = candidate;
-                    if ((improvesBest || improvesGoalSeed) && turnTask != null && turns != null && request.GuideWinningRoutes)
+                    bool improvesLowDamage = completeAttempt && request.CardGoals?.Enabled != true &&
+                        LocalSequenceTactics.BetterLowDamageSeed(candidate, null) && candidate.HpLost <= lowestSeedDamage;
+                    if (improvesLowDamage)
+                    {
+                        if (candidate.HpLost < lowestSeedDamage) { lowestSeedDamage = candidate.HpLost; lowDamageSeeds.Clear(); }
+                        // Send equal-cost routes too: the parent retains a small
+                        // set of different first-turn card/resource combinations.
+                        improvesLowDamage = lowDamageSeeds.Add(LocalFrontier.Key(candidate.Actions));
+                        if (request.GuideWinningRoutes && improvesLowDamage) turns?.ProposeLowDamageRoute(candidate);
+                    }
+                    if ((improvesBest || improvesGoalSeed || improvesLowDamage) && turnTask != null && turns != null && request.GuideWinningRoutes)
                     {
                         // Actual achieved goals also guide lowering their HP cost.
                         // One message preserves owned-prefix checks and affinity.
@@ -1554,7 +1583,8 @@ public static class LocalWorker
         // CanPlay walks the hook chain. Query once per card and reuse within this settled
         // decision, instead of recomputing the full hand for every card/target preview.
         var playable = hand.Where(c => !_excludedModels.Contains(c.Id.ToString()) && c.CanPlay()).ToArray();
-        var tactics = LocalTacticalPreview.Capture(player, playable, _efficientTactics);
+        var tactics = LocalTacticalPreview.Capture(player, playable, _efficientTactics,
+            LocalCardGoalTactics.UseFollowupKills(_activeRequest?.CardGoals));
         var hints = new Dictionary<uint, int>();
         for (var i = 0; i < hand.Count; i++)
         {
@@ -1581,7 +1611,13 @@ public static class LocalWorker
                 _rolloutStyle, _nativeLearning.Priority);
             result[i] = result[i] with { Preference = priority };
         }
-        if (_rolloutStyle == LocalRolloutStyle.Preparation) _nativeLearning?.OrderDependencies(player, result);
+        if (_rolloutStyle == LocalRolloutStyle.Preparation)
+        {
+            _nativeLearning?.OrderDependencies(player, result);
+            for (int i = 0; i < result.Count; i++)
+                result[i] = result[i] with { Preference = result[i].Preference + tactics.SequencePriority(
+                    hand[result[i].HandIndex], state.Creatures.FirstOrDefault(c => c.CombatId == result[i].TargetId)) };
+        }
         if (_activeRequest?.CardGoals is { Enabled: true } goals)
             for (int i = 0; i < result.Count; i++)
             {

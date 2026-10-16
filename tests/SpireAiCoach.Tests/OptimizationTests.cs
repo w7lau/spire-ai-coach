@@ -5,6 +5,71 @@ static class OptimizationTests
     public static void Register(Action<string, Action> test)
     {
         void Check(bool ok, string message) { if (!ok) throw new Exception(message); }
+        test("low damage archive keeps bounded equal-cost resource diversity and rotates proposals", () =>
+        {
+            LocalCandidate Seed(uint index, int loss = 14) {
+                var hit = new LocalAction(0,"opaque",1,"","","root",CombatCardIndex:index);
+                return new([hit],32-loss,loss,0,0,72,true,false,false,StartingHp:31,
+                    Decisions:[new(0,[hit,hit with {TargetId=2},hit with {TargetId=3}])],
+                    HealthChanges:new(31,71,32-loss,72,loss,1,1,0,0),CombatOutcome:new(true,true,[]));
+            }
+            var archive = new LocalLowDamageRoutes();
+            for(uint i=1;i<=5;i++) archive.Offer(Seed(i));
+            var first = new List<uint?>();
+            for(int i=0;i<4;i++) {
+                Check(archive.TryTake(out var p,out _,out _) && p[0].TargetId==2,"Missing first target proposal");
+                first.Add(p[0].CombatCardIndex);
+            }
+            Check(first.SequenceEqual(new uint?[]{1,2,3,4}),"Equal-cost seed diversity must be bounded and fair");
+            for(int i=0;i<4;i++) Check(archive.TryTake(out var p,out _,out _) && p[0].TargetId==3,
+                "Second target was buried behind unrelated neighborhoods");
+            archive.Offer(Seed(6,13));
+            Check(archive.TryTake(out var improved,out _,out _) && improved[0].CombatCardIndex==6 && archive.Count<=63,
+                "A strictly lower damage seed must replace higher-damage archive entries");
+        });
+        test("low damage seed preserves observed survival without changing final HP selection", () =>
+        {
+            var low = new LocalCandidate([], 18, 14, 0, 0, 72, true, false, false, StartingHp: 31,
+                HealthChanges: new(31,71,18,72,14,1,1,0,0), CombatOutcome: new(true,true,[]));
+            var healed = low with { Hp = 22, HpLost = 31, HealthChanges = new(31,71,22,72,31,22,1,0,0) };
+            Check(LocalSequenceTactics.BetterLowDamageSeed(low, healed), "Retain lower gross damage independently");
+            Check(!LocalSequenceTactics.BetterLowDamageSeed(healed, low), "Healing must not clear the low damage seed");
+            Check(LocalSearchPolicy.Better(healed, low), "Exploration must not invert the final HP objective");
+            Check(!LocalSequenceTactics.BetterLowDamageSeed(low with { Dead = true }, null) &&
+                !LocalSequenceTactics.BetterLowDamageSeed(low with { CombatOutcome = new(true,false,[]) }, null) &&
+                !LocalSequenceTactics.BetterLowDamageSeed(low with { HealthChanges = low.HealthChanges! with { UnobservedChanges = 1 } }, null),
+                "Only observed native victories can seed this lane");
+        });
+        test("soft end defense reconsideration leaves exact replay and unknown threat untouched", () =>
+        {
+            var end = new LocalAction(-1,"",null,"","","state",EndTurn:true);
+            var block = new LocalAction(0,"opaque",null,"","","state",CombatCardIndex:12);
+            var potion = block with { PotionSlot = 0 };
+            var legal = new[] { (block, 6), (potion, 20) };
+            Check(LocalSequenceTactics.ReconsiderEnd(end,true,10,legal) == block, "Current legal defense should be proposed");
+            Check(LocalSequenceTactics.ReconsiderEnd(end,false,10,legal) == end &&
+                LocalSequenceTactics.ReconsiderEnd(end,true,0,legal) == end &&
+                LocalSequenceTactics.ReconsiderEnd(end,true,double.NaN,legal) == end &&
+                LocalSequenceTactics.ReconsiderEnd(block,true,10,legal) == block,
+                "Only eligible soft end proposals with a positive known gap may change");
+        });
+        test("sequence hint shares defensive resources and caps overlapping block", () =>
+        {
+            LocalFollowupCard[] blocks = [new(8, 1), new(6, 1), new(9, 2), new(3, 0, 1)];
+            Check(LocalSequenceTactics.Defense(blocks, 1, 0, 20) == 8, "Cannot spend one energy twice");
+            Check(LocalSequenceTactics.Defense(blocks, 1, 1, 20) == 11, "Both resources constrain the combination");
+            Check(LocalSequenceTactics.Defense(blocks, 2, 1, 10) == 10, "Do not count excess block as saved HP");
+            Check(LocalSequenceTactics.Defense(blocks, -1, 1, 20) == 0, "No negative budget");
+            Check(LocalSequenceTactics.LostDefense(8, 8) == 0 && LocalSequenceTactics.LostDefense(8, 3) > 0,
+                "Only lost affordable protection is a cost");
+        });
+        test("delayed hint values marginal poison without inventing lethal credit", () =>
+        {
+            Check(LocalSequenceTactics.DelayedDamage(3, 0, 20) > 0, "Delayed damage has exploration value");
+            Check(LocalSequenceTactics.DelayedDamage(3, 20, 10) == 0, "Do not repeatedly reward already covered HP");
+            Check(LocalSequenceTactics.DelayedDamage(double.NaN, 0, 20) == 0, "Unknown preview stays neutral");
+            Check(LocalSequenceTactics.DelayedDamage(100, 0, 1) == 2, "Low HP caps the hint");
+        });
         test("optimization tests unused legal resources before end turn and removes wasted actions", () =>
         {
             var hit = new LocalAction(0, "unknown-hit", 1, "", "", "a", 1, CombatCardIndex: 1);
@@ -88,6 +153,31 @@ static class OptimizationTests
             Check(LocalTactics.Priority(new(Block: 5, Incoming: 0, Known: true)) < LocalTactics.Priority(new(EndTurn: true, Known: true)), "Unused block may wait");
             Check(LocalTactics.Priority(new(Block: 8, Incoming: 10, Hp: 5, Known: true)) > LocalTactics.Priority(hit), "Survival block first");
             Check(LocalTactics.Priority(new(Known: false)) == 0, "Unknown remains neutral");
+        });
+        test("optimization two-hit targets outrank split damage without inventing a followup", () =>
+        {
+            var hit = new LocalTacticalFeatures(Damage: 15, EnemyHp: 20, FollowupAttacks: 1,
+                FollowupDamage: 6, Known: true, ResourceCost: 2, FollowupKillHint: true);
+            Check(LocalTactics.Priority(hit with { FollowupKillHint = false }) == 10,
+                "Ordinary combat must retain its existing attack score");
+            Check(LocalTactics.Priority(hit) > LocalTactics.Priority(hit with { EnemyHp = 30 }),
+                "Equal immediate damage hid the target that a following hit can finish");
+            Check(LocalTactics.Priority(hit with { FollowupAttacks = 0 }) ==
+                LocalTactics.Priority(hit with { FollowupDamage = 0 }), "Absent followup must remain neutral");
+            Check(LocalTactics.Priority(hit with { FollowupDamage = double.NaN }) ==
+                LocalTactics.Priority(hit with { FollowupDamage = 0 }), "Unknown damage must not invent a combo");
+            Check(LocalTactics.Priority(hit with { EnemyHp = 15 }) > LocalTactics.Priority(hit),
+                "A possible combo must not outrank the same attack's immediate kill");
+            Check(LocalTactics.Priority(hit with { Known = false }) == 0, "Unknown native preview stays neutral");
+        });
+        test("optimization followup kill hint is confined to explicit play-only goals", () =>
+        {
+            Check(LocalCardGoalTactics.UseFollowupKills(new(PlayModelId: "selected")), "Play-only goal missing");
+            Check(!LocalCardGoalTactics.UseFollowupKills(null) && !LocalCardGoalTactics.UseFollowupKills(new()),
+                "Ordinary combat changed");
+            Check(!LocalCardGoalTactics.UseFollowupKills(new(FinisherModelId: "selected")) &&
+                !LocalCardGoalTactics.UseFollowupKills(new(PlayModelId: "play", FinisherModelId: "finish")),
+                "Unvalidated finishing-blow or combined goals changed");
         });
         test("optimization rollout portfolios explore native persistent setup without changing the default", () =>
         {

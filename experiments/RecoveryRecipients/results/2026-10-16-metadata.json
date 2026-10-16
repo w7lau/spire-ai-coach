@@ -1,0 +1,214 @@
+{
+  "completed": true,
+  "dll_sha256": "6D07EAA63D09A5E351FCDA8A62761A499599804CF455273DE0826C1B59DFDC1B",
+  "rows": [
+    {
+      "source": "FurCoat",
+      "target": true,
+      "combatOnly": false,
+      "active": false
+    },
+    {
+      "source": "FurCoat",
+      "target": false,
+      "combatOnly": false,
+      "active": true
+    },
+    {
+      "source": "EnemyList",
+      "target": true,
+      "combatOnly": false,
+      "active": false
+    },
+    {
+      "source": "EnemyList",
+      "target": false,
+      "combatOnly": false,
+      "active": true
+    },
+    {
+      "source": "EnemyGuard",
+      "target": true,
+      "combatOnly": false,
+      "active": false
+    },
+    {
+      "source": "EnemyGuard",
+      "target": false,
+      "combatOnly": false,
+      "active": true
+    },
+    {
+      "source": "AsyncEnemyGuard",
+      "target": true,
+      "combatOnly": false,
+      "active": false
+    },
+    {
+      "source": "AsyncEnemyGuard",
+      "target": false,
+      "combatOnly": false,
+      "active": true
+    },
+    {
+      "source": "SummonSet",
+      "target": true,
+      "combatOnly": false,
+      "active": false
+    },
+    {
+      "source": "SummonSet",
+      "target": false,
+      "combatOnly": false,
+      "active": true
+    },
+    {
+      "source": "PlayerSet",
+      "target": true,
+      "combatOnly": false,
+      "active": true
+    },
+    {
+      "source": "UnknownSet",
+      "target": true,
+      "combatOnly": false,
+      "active": true
+    },
+    {
+      "source": "MixedSet",
+      "target": true,
+      "combatOnly": false,
+      "active": true
+    },
+    {
+      "source": "OwnerHealFromEnemy",
+      "target": true,
+      "combatOnly": false,
+      "active": true
+    },
+    {
+      "source": "UnguardedTail",
+      "target": true,
+      "combatOnly": false,
+      "active": true
+    },
+    {
+      "source": "MutableRecipient",
+      "target": true,
+      "combatOnly": false,
+      "active": true
+    },
+    {
+      "source": "BookOfFiveRings",
+      "target": true,
+      "combatOnly": true,
+      "active": false
+    },
+    {
+      "source": "BookOfFiveRings",
+      "target": true,
+      "combatOnly": false,
+      "active": true
+    },
+    {
+      "source": "SoulsPower",
+      "target": true,
+      "combatOnly": false,
+      "active": false
+    },
+    {
+      "method": "CardCmd.RemoveKeyword",
+      "changesDeck": false
+    },
+    {
+      "method": "CardPileCmd.RemoveFromDeck",
+      "changesDeck": true
+    },
+    {
+      "method": "CardPileCmd.RemoveFromDeck",
+      "changesDeck": true
+    },
+    {
+      "method": "CardPileCmd.AddCurseToDeck",
+      "changesDeck": true
+    },
+    {
+      "method": "CardPileCmd.AddCursesToDeck",
+      "changesDeck": true
+    },
+    {
+      "method": "CardCmd.TransformToRandom",
+      "changesDeck": true
+    },
+    {
+      "method": "CardCmd.TransformTo",
+      "changesDeck": true
+    },
+    {
+      "method": "CardCmd.Transform",
+      "changesDeck": true
+    },
+    {
+      "method": "CardCmd.Transform",
+      "changesDeck": true
+    },
+    {
+      "source": "EnemyGuard",
+      "target": true,
+      "combatOnly": false,
+      "active": true
+    },
+    {
+      "source": "EnemyGuard",
+      "target": true,
+      "combatOnly": false,
+      "active": false
+    },
+    {
+      "source": "EnemyList",
+      "target": true,
+      "combatOnly": false,
+      "active": true
+    },
+    {
+      "source": "EnemyList",
+      "target": true,
+      "combatOnly": false,
+      "active": false
+    },
+    {
+      "source": "EnemyGuard",
+      "target": true,
+      "combatOnly": false,
+      "active": true
+    },
+    {
+      "source": "EnemyGuard",
+      "target": true,
+      "combatOnly": false,
+      "active": false
+    },
+    {
+      "source": "EnemyGuard",
+      "target": true,
+      "combatOnly": false,
+      "active": true
+    },
+    {
+      "source": "EnemyGuard",
+      "target": true,
+      "combatOnly": false,
+      "active": false
+    },
+    {
+      "method": "CardCmd.RemoveKeyword",
+      "changesDeck": true
+    },
+    {
+      "method": "CardCmd.RemoveKeyword",
+      "changesDeck": false
+    }
+  ],
+  "callbacksExecuted": false,
+  "nativeSearchExecuted": false
+}

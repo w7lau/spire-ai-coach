@@ -1,0 +1,36 @@
+{
+  "rows": [
+    {
+      "case": "latest-66",
+      "variant": "baseline",
+      "module": "00dd3fe9-fbd6-48c0-95b1-7c40932eb3dc",
+      "root_unchanged": true,
+      "starting_hp": 66,
+      "target_hp": 66,
+      "full_health": true,
+      "uncertain": true,
+      "audited_types": 69,
+      "active_target_sources": [
+        "MegaCrit.Sts2.Core.Models.Relics.BookOfFiveRings",
+        "MegaCrit.Sts2.Core.Models.Relics.FurCoat"
+      ],
+      "combat_pile_events_only": false,
+      "deck_capability_reason": "MegaCrit.Sts2.Core.Models.Enchantments.SoulsPower: permanent deck may change"
+    },
+    {
+      "case": "latest-66",
+      "variant": "fixed",
+      "module": "7dc4baff-e4d9-4cf1-bf83-b6d80674aa73",
+      "root_unchanged": true,
+      "starting_hp": 66,
+      "target_hp": 66,
+      "full_health": false,
+      "uncertain": true,
+      "audited_types": 69,
+      "active_target_sources": [],
+      "combat_pile_events_only": true,
+      "deck_capability_reason": null
+    }
+  ],
+  "scope": "Read-only restored native root audit; no search or card play."
+}

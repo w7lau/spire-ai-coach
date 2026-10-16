@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup>
+    <Reference Include="SpireAiCoach" HintPath="$(NativeCoachDll)" />
+    <Reference Include="sts2" HintPath="$(GameDir)/data_sts2_windows_x86_64/sts2.dll" />
+    <Reference Include="GodotSharp" HintPath="$(GameDir)/data_sts2_windows_x86_64/GodotSharp.dll" />
+    <Reference Include="0Harmony" HintPath="$(GameDir)/data_sts2_windows_x86_64/0Harmony.dll" />
+  </ItemGroup>
+  <Target Name="RequireAcceptedProduct" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(NativeCoachDll)')" Text="Set NativeCoachDll to the exact prepared package." />
+  </Target>
+</Project>

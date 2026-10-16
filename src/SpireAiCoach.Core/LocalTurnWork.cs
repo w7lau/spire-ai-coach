@@ -170,6 +170,12 @@ public sealed class LocalTurnWork : IDisposable
                 _frontier.ObserveOutcome(outcome);
                 _frontier.PromoteWinning(outcome, _ownedWinningFocus ? command.Owner : null);
                 return Snapshot();
+            case "low-damage-proposal":
+                // Scope and worker identity were checked above. Proof probes do
+                // not own a turn task; this channel supplies proposals only and
+                // deliberately does not bypass RequireOwner for native outcomes.
+                _frontier.ProposeLowDamageRoute(command.Outcome ?? throw new InvalidDataException("Missing route proposal"));
+                return Snapshot();
             case "improve":
                 var incumbentOwner = RequireOwner(command);
                 var incumbent = command.WinningCandidate ?? throw new InvalidDataException("Missing native incumbent");
@@ -330,6 +336,7 @@ public sealed class LocalTurnWorkClient : ILocalTurnFrontier, IDisposable
         Exchange("focus", task, actions.Take(length).ToArray(), focused);
     }
     public void ObserveOutcome(LocalCandidate candidate) => Exchange("outcome", _owned, outcome: candidate);
+    public void ProposeLowDamageRoute(LocalCandidate candidate) => Exchange("low-damage-proposal", outcome: candidate);
     public void PrioritizeLossProof(LocalLossProofFocus[] focus) => Exchange("loss-proof", lossProof: focus);
     public void PromoteWinning(LocalCandidate candidate)
     {

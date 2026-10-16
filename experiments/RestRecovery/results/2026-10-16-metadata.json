@@ -1,0 +1,56 @@
+{
+  "completed": true,
+  "dll_sha256": "146D3443EA1D17675353C9C1D8DBAF5D318CBB2C7042B1CBBB4BFC1F82C8C526",
+  "rows": [
+    {
+      "source": "StoneHumidifier",
+      "target": true,
+      "active": false,
+      "dynamicMaxHp": false,
+      "victoryHeals": 0,
+      "restExcluded": true
+    },
+    {
+      "source": "StoneHumidifier",
+      "target": false,
+      "active": true,
+      "dynamicMaxHp": true,
+      "victoryHeals": 0,
+      "restExcluded": false
+    },
+    {
+      "source": "BurningBlood",
+      "target": true,
+      "active": false,
+      "dynamicMaxHp": false,
+      "victoryHeals": 1,
+      "restExcluded": false
+    },
+    {
+      "source": "ExternalRest",
+      "target": true,
+      "active": true,
+      "dynamicMaxHp": true,
+      "victoryHeals": 0,
+      "restExcluded": false
+    },
+    {
+      "source": "CombatHelper",
+      "target": true,
+      "active": true,
+      "dynamicMaxHp": true,
+      "victoryHeals": 0,
+      "restExcluded": false
+    },
+    {
+      "source": "CombatHeal",
+      "target": true,
+      "active": true,
+      "dynamicMaxHp": false,
+      "victoryHeals": 0,
+      "restExcluded": false
+    }
+  ],
+  "callbacksExecuted": false,
+  "nativeSearchExecuted": false
+}

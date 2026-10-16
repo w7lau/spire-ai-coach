@@ -1,0 +1,197 @@
+{
+  "samples": [
+    {
+      "batch": "candidate-eight",
+      "case": "case-9",
+      "algorithm": "TurnFrontier",
+      "repeat": 0,
+      "dll_sha256": "E9327CBB128E3207CA6F259D3286FF459A62F7B01E5B66CBE40DE1509EE1D0BB",
+      "workers": 8,
+      "max_nodes": 64,
+      "budget_seconds": 60,
+      "status": "done",
+      "native_replay_passed": true,
+      "continuation_guided": false,
+      "seeded": false,
+      "prefix_matched": null,
+      "conditional_comparison_valid": true,
+      "recorded_runtime_errors": 0,
+      "evaluated": 390,
+      "won": true,
+      "starting_hp": 31,
+      "elapsed_ms": 74158,
+      "wall_ms": 74390.8925,
+      "first_win_at_final_hp_ms": 9937.3208,
+      "first_win_at_final_hp_worker": 1,
+      "first_win_at_final_hp_attempt": 2,
+      "final_hp": 22,
+      "max_hp": 72,
+      "net_loss": 9,
+      "gross_hp_lost": 31,
+      "hp_gained": 22,
+      "enemy_damage": 31,
+      "self_damage": 0,
+      "damage_accounting_complete": true,
+      "minimum_observed_hp": 1,
+      "round_end_hp": [
+        {
+          "round": 1,
+          "before": 31,
+          "after": 31
+        },
+        {
+          "round": 2,
+          "before": 31,
+          "after": 16
+        },
+        {
+          "round": 3,
+          "before": 16,
+          "after": 7
+        },
+        {
+          "round": 4,
+          "before": 7,
+          "after": 7
+        },
+        {
+          "round": 5,
+          "before": 7,
+          "after": 1
+        },
+        {
+          "round": 6,
+          "before": 1,
+          "after": 21
+        },
+        {
+          "round": 7,
+          "before": 21,
+          "after": 21
+        },
+        {
+          "round": 8,
+          "before": 21,
+          "after": 21
+        }
+      ],
+      "max_hp_gained": 1,
+      "health_changes_fully_observed": true,
+      "round_start_hp": {
+        "1": 31,
+        "2": 31,
+        "3": 16,
+        "4": 7,
+        "5": 7,
+        "6": 1,
+        "7": 21,
+        "8": 21,
+        "9": 21
+      },
+      "target_hp": 32,
+      "target_full_health": false,
+      "target_uncertain": true,
+      "rest_callback_excluded": false,
+      "stopped_on_health_target": false,
+      "stopped_on_minimum": false,
+      "final_verifications": 1
+    },
+    {
+      "batch": "candidate-eight",
+      "case": "case-9",
+      "algorithm": "TurnFrontier",
+      "repeat": 1,
+      "dll_sha256": "E9327CBB128E3207CA6F259D3286FF459A62F7B01E5B66CBE40DE1509EE1D0BB",
+      "workers": 8,
+      "max_nodes": 64,
+      "budget_seconds": 60,
+      "status": "done",
+      "native_replay_passed": true,
+      "continuation_guided": false,
+      "seeded": false,
+      "prefix_matched": null,
+      "conditional_comparison_valid": true,
+      "recorded_runtime_errors": 0,
+      "evaluated": 418,
+      "won": true,
+      "starting_hp": 31,
+      "elapsed_ms": 70346,
+      "wall_ms": 70527.0711,
+      "first_win_at_final_hp_ms": 6691.8727,
+      "first_win_at_final_hp_worker": 7,
+      "first_win_at_final_hp_attempt": 6,
+      "final_hp": 22,
+      "max_hp": 72,
+      "net_loss": 9,
+      "gross_hp_lost": 31,
+      "hp_gained": 22,
+      "enemy_damage": 31,
+      "self_damage": 0,
+      "damage_accounting_complete": true,
+      "minimum_observed_hp": 1,
+      "round_end_hp": [
+        {
+          "round": 1,
+          "before": 31,
+          "after": 31
+        },
+        {
+          "round": 2,
+          "before": 31,
+          "after": 16
+        },
+        {
+          "round": 3,
+          "before": 16,
+          "after": 7
+        },
+        {
+          "round": 4,
+          "before": 7,
+          "after": 7
+        },
+        {
+          "round": 5,
+          "before": 7,
+          "after": 1
+        },
+        {
+          "round": 6,
+          "before": 1,
+          "after": 21
+        },
+        {
+          "round": 7,
+          "before": 21,
+          "after": 21
+        },
+        {
+          "round": 8,
+          "before": 21,
+          "after": 21
+        }
+      ],
+      "max_hp_gained": 1,
+      "health_changes_fully_observed": true,
+      "round_start_hp": {
+        "1": 31,
+        "2": 31,
+        "3": 16,
+        "4": 7,
+        "5": 7,
+        "6": 1,
+        "7": 21,
+        "8": 21,
+        "9": 21
+      },
+      "target_hp": 32,
+      "target_full_health": false,
+      "target_uncertain": true,
+      "rest_callback_excluded": false,
+      "stopped_on_health_target": false,
+      "stopped_on_minimum": false,
+      "final_verifications": 1
+    }
+  ],
+  "scope": "Frozen native follow-up. Seeded prefixes test conditional consequences or return behavior, not search discovery speed. Failed runs are excluded from quality conclusions. No general optimality claim."
+}

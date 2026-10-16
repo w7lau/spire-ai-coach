@@ -10,6 +10,45 @@ static class TurnSearchTests
 
     public static void Register(Action<string, Action> test)
     {
+        test("low damage winner tail survives a higher healed incumbent and keeps broad lanes", () =>
+        {
+            var search = new LocalTurnSearch(1);
+            var hint = new LocalTurnHint(31,31,100,100);
+            for (int i = 100; i < 200; i++) search.Offer([Move(i)],1,hint);
+            LocalCandidate Seed(int root, int hp, int lost, int gained)
+            {
+                var a = Move(root); var hit = Move(root+1,"after") with { TargetId = 1 }; var alt = hit with { TargetId = 2 };
+                var decision = new LocalDecision(1,[hit,alt]);
+                search.OfferAlternatives([a,hit],decision,hint);
+                return Win(hp,31,[a,hit]) with { HpLost=lost, Decisions=[decision],
+                    HealthChanges=new(31,71,hp,72,lost,gained,1,0,0), CombatOutcome=new(true,true,[]) };
+            }
+            search.ObserveOutcome(Seed(1,18,14,1));
+            search.ObserveOutcome(Seed(10,22,31,22));
+            Check(search.TryTake(out var broad) && !broad.ReconsiderEndTurn, "Broad lane changed");
+            Check(search.TryTake(out var low) && low.ReconsiderEndTurn && low.FullRollout &&
+                low.Prefix.Length == 0 && low.Continuation![0].CombatCardIndex == 1 && low.Continuation[1].TargetId == 2,
+                "Healed incumbent erased the lower damage seed or its tail");
+            search.ReturnInterrupted(low,hint);
+            var taken = new List<LocalTurnTask>();
+            while (search.TryTake(out var task)) taken.Add(task);
+            Check(taken.Any(t => t.Prefix.Length > 0 && t.Prefix[0].CombatCardIndex == 10 && t.Continuation != null), "Original winner alternative lost");
+            Check(taken.Any(t => t.Id == low.Id && t.ReconsiderEndTurn), "Interrupted defensive proposal lost its policy");
+            Check(taken.Count(t => t.Prefix.Length > 0) == 101, "Exploration deleted or invented exact histories");
+        });
+        test("low damage refinement can revisit a tried target with a newly measured soft continuation", () =>
+        {
+            var search = new LocalTurnSearch(1);
+            var hit = Move(1) with { TargetId=1 }; var alt = hit with { TargetId=2 };
+            var end = Move(2) with { EndTurn=true }; var hint = new LocalTurnHint(31,31,100,100);
+            search.Offer([alt],1,hint); search.TryTake(out _);
+            search.ObserveOutcome(Win(18,31,[hit,end]) with { HpLost=14, Decisions=[new(0,[hit,alt])],
+                HealthChanges=new(31,71,18,72,14,1,1,0,0), CombatOutcome=new(true,true,[]) });
+            Check(search.TryTake(out var proposal) && proposal.Prefix.Length == 0 && proposal.FullRollout &&
+                proposal.Continuation![0].TargetId == 2 && proposal.Continuation[1] == end,
+                "Already claimed target lost its new whole-route improvement opportunity");
+            Check(proposal.ReconsiderEndTurn, "Changed soft route must revisit old ends");
+        });
         test("turn optimization efficiency and preparation preserve distinct native proposals", () =>
         {
             var costly = new LocalTacticalFeatures(Damage: 30, EnemyHp: 100, Known: true, ResourceCost: 2);
@@ -78,6 +117,7 @@ static class TurnSearchTests
             Check(search.Count == 4999, "Winning feedback must only reorder the retained exact frontier");
             Check(task.Continuation is { Length: 1 } && task.Continuation[0].CombatCardIndex == 1,
                 "An improved prefix lost the native incumbent's remaining combination");
+            Check(task.ReconsiderEndTurn, "All changed winning tails need current-state end-turn reconsideration");
             var now = attack with { BeforeHash = "new native state", HandIndex = 8 };
             Check(LocalRouteRefiner.Resolve(task.Continuation![0], [now]) == now,
                 "A continuation is a newly legal proposal, not an old native state checkpoint");

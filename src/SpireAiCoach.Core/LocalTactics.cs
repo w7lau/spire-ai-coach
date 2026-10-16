@@ -9,7 +9,7 @@ public sealed record LocalTacticalFeatures(double Damage = 0, double EnemyHp = 0
     double EnergyGain = 0, double Draw = 0, double HpCost = 0,
     int FollowupAttacks = 0, double FollowupDamage = 0, int Upgrades = 0,
     bool EndTurn = false, bool Known = false, bool RetainsBlock = false, double HandEndHpLoss = 0,
-    bool PersistentSetup = false, int EnergyCost = -1, double? ResourceCost = null);
+    bool PersistentSetup = false, int EnergyCost = -1, double? ResourceCost = null, bool FollowupKillHint = false);
 
 public static class LocalTactics
 {
@@ -29,6 +29,12 @@ public static class LocalTactics
             score += Math.Min(f.Damage, f.EnemyBlock) * .5;
         if (f.EnemyHp > 0 && effective >= f.EnemyHp)
             score += 65 + Math.Min(20, f.TargetThreat * 2);
+        // A nonlethal hit can enable a currently previewed follow-up to remove
+        // an enemy. This is only an ordering hint; native rollouts still judge
+        // costs, targeting, intervening effects and the completed outcome.
+        else if (f.FollowupKillHint && effective > 0 && f.EnemyHp > effective && f.FollowupAttacks > 0 &&
+            double.IsFinite(f.FollowupDamage) && f.FollowupDamage > 0 && effective + f.FollowupDamage >= f.EnemyHp)
+            score += 15 + Math.Min(20, Math.Max(0, f.TargetThreat) * 2);
         var saved = Math.Min(gap, f.Block);
         score += saved * 4;
         if (saved > 0 && gap >= f.Hp && gap - saved < f.Hp) score += 60;

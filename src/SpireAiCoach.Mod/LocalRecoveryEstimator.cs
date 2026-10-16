@@ -6,6 +6,7 @@ using HarmonyLib;
 using MegaCrit.Sts2.Core.Combat;
 using MegaCrit.Sts2.Core.Entities.Players;
 using MegaCrit.Sts2.Core.Entities.Cards;
+using MegaCrit.Sts2.Core.Entities.Creatures;
 using MegaCrit.Sts2.Core.Models;
 using MegaCrit.Sts2.Core.Modding;
 using SpireAiCoach.Core;
@@ -22,11 +23,11 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
     private readonly Dictionary<MethodBase, LocalInstruction[]?> _bodies = [];
     private sealed record ContentEffects(bool ActiveRecovery, int VictoryHeals, int VictoryMaxHpGains,
         bool Uncertain, Type[] Generated, bool DynamicMaxHp = false, bool UsesCardPool = false, string? UncertainAt = null,
-        bool MayChangeDeck = false, bool UsesCharacterPool = false, string[]? ExcludedCallbacks = null);
+        bool MayChangeDeck = false, bool UsesCharacterPool = false, string[]? ExcludedCallbacks = null, bool TerminalOnly = true);
     private readonly Dictionary<Type, ContentEffects> _content = [];
     private readonly Dictionary<Type, ContentEffects> _targetContent = [];
     private readonly Dictionary<Type, ContentEffects> _deckContent = [];
-    private readonly Dictionary<(MethodBase Method, MethodInfo? Event, string Input), LocalIlFacts.Result> _eventFacts = [];
+    private readonly Dictionary<(MethodBase Method, MethodInfo? Event, string Input, string? PlayerRecipient), LocalIlFacts.Result> _eventFacts = [];
     private LocalRecoveryAllowance? _allowance;
     private Type[] _sourceTypes = [];
     private int? _nextPlayerTurnNumber;
@@ -197,6 +198,7 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
         decimal heal = 0, maxHp = 0;
         bool limited = false, dynamicMaxHp = false;
         var revivals = new List<(Type Type, LocalRevivalEstimate Rule)>();
+        var terminal = new List<(RelicModel Owner, ContentEffects Effect)>();
         var sources = new List<string>();
         bool active = false, uncertain = request.LoadedMods.Any(m => !m.StartsWith("sts2:", StringComparison.Ordinal) &&
             !m.StartsWith("SpireAiCoach:", StringComparison.Ordinal));
@@ -215,28 +217,74 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
             if (seen.Count > 128) { limited = uncertain = true; break; }
             var effect = ReadContent(type, targetOnly: true);
             uncertain |= effect.Uncertain; dynamicMaxHp |= effect.DynamicMaxHp;
-            if (effect.ExcludedCallbacks != null) sources.AddRange(effect.ExcludedCallbacks.Select(m => m + ": 房间进入回调已在起点前结算"));
-            if (effect.ActiveRecovery)
+            if (effect.ExcludedCallbacks != null) sources.AddRange(effect.ExcludedCallbacks.Select(m => m +
+                (m.EndsWith(".AfterRestSiteHeal", StringComparison.Ordinal) ? ": 休息点回血回调不属于本场战斗" :
+                    ": 房间进入回调已在起点前结算")));
+            var owners = held.OfType<RelicModel>().Where(r => r.GetType() == type).ToArray();
+            bool deferredTerminal = owners.Length > 0 && effect.TerminalOnly && !effect.Uncertain && !effect.DynamicMaxHp &&
+                effect.VictoryMaxHpGains == 0 && (effect.ActiveRecovery || effect.VictoryHeals > 0);
+            if (deferredTerminal) terminal.AddRange(owners.Select(o => (o, effect)));
+            if (effect.ActiveRecovery && !deferredTerminal)
             {
                 var revival = effect.Uncertain ? null : LocalRevivalEstimate.Read(type);
                 if (revival != null) revivals.Add((type, revival));
                 else { active = true; sources.Add(type.FullName + ": 可触发的战中或动态生命恢复"); }
             }
             foreach (var generated in effect.Generated) pending.Enqueue(generated);
-            var owners = held.OfType<RelicModel>().Where(r => r.GetType() == type).ToArray();
             if (owners.Length == 0 && (effect.VictoryHeals > 0 || effect.VictoryMaxHpGains > 0))
                 active = true;
             foreach (var owner in owners)
             {
-                if (effect.VictoryHeals > 0) heal += Math.Max(0, owner.DynamicVars.Heal.BaseValue) * effect.VictoryHeals;
+                if (effect.VictoryHeals > 0 && !deferredTerminal) heal += Math.Max(0, owner.DynamicVars.Heal.BaseValue) * effect.VictoryHeals;
                 if (effect.VictoryMaxHpGains > 0) maxHp += Math.Max(0, owner.DynamicVars.MaxHp.BaseValue) * effect.VictoryMaxHpGains;
             }
         }
         int start = player.Creature.CurrentHp;
         decimal goal = Math.Min(player.Creature.MaxHp + maxHp, start + heal + maxHp);
+        var transfers = new List<int[]>();
+        // Amount modifiers are outside the scalar transfer language. Keep the
+        // existing conservative target rather than assuming unmodified healing.
+        bool modifiedHealing = held.Any(m => m.GetType().GetMethods(BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)
+            .Any(h => h.DeclaringType != typeof(AbstractModel) && h.GetBaseDefinition().DeclaringType == typeof(AbstractModel) &&
+                h.Name.StartsWith("Modify", StringComparison.Ordinal) && h.Name.Contains("Heal", StringComparison.Ordinal)));
+        foreach (var (owner, effect) in terminal)
+        {
+            var transfer = !dynamicMaxHp && maxHp == 0 && !modifiedHealing ? LocalTerminalRecovery.Read(owner.GetType(), player.Creature.MaxHp,
+                key => owner.DynamicVars.TryGetValue(key, out var value) ? value.BaseValue : null, Body) : null;
+            if (transfer == null)
+            {
+                uncertain = true;
+                if (effect.ActiveRecovery) active = true;
+                else heal += Math.Max(0, owner.DynamicVars.Heal.BaseValue) * effect.VictoryHeals;
+                sources.Add(owner.GetType().FullName + ": 战后条件或生命收益尚未完整解析，保留保守目标");
+            }
+            else
+            {
+                transfers.AddRange(transfer);
+                sources.Add(owner.GetType().FullName + ": 已解析条件战后恢复，按触发前血量和结算收益组合目标");
+            }
+        }
+        goal = Math.Min(player.Creature.MaxHp + maxHp, start + heal + maxHp);
+        if (transfers.Count > 0)
+        {
+            // Keep fixed allowances as one additional transfer, not an amount
+            // added both before and after conditional settlement.
+            if (heal > 0) transfers.Add(LocalTerminalHealth.Envelope(Enumerable.Range(0, player.Creature.MaxHp + 1)
+                .Select(hp => (int)Math.Min(player.Creature.MaxHp, hp + decimal.Ceiling(heal))).ToArray()));
+            var result = LocalTerminalHealth.Compose(start, transfers);
+            if (result == null) { active = uncertain = true; }
+            else goal = result.Value;
+            sources.Add("条件战后恢复组合目标=" + goal + "; 起点=" + start + "; 上限=" + player.Creature.MaxHp);
+        }
         foreach (var (type, rule) in revivals)
         {
             bool improves = rule.CanImprove(goal, player.Creature.MaxHp + maxHp, heal + maxHp, dynamicMaxHp);
+            if (transfers.Count > 0)
+            {
+                int revivedHp = (int)Math.Min(player.Creature.MaxHp, rule.MaximumHp(player.Creature.MaxHp));
+                var recovered = LocalTerminalHealth.Compose(revivedHp, transfers);
+                improves |= recovered == null || recovered > goal;
+            }
             active |= improves;
             sources.Add(type.FullName + (improves ? ": 濒死回复仍可能提高目标血量" :
                 ": 濒死回复上限" + rule.MaximumHp(player.Creature.MaxHp + maxHp) + "，加已识别战后收益不能超过目标" + goal));
@@ -245,8 +293,9 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
         return new(LocalMinimumLossProof.Scope(request), start, (int)decimal.Ceiling(goal), active,
             limited ? active ? "检测到生命恢复，目标为战后满血；内容分析触及数量上限" :
                 "内容分析触及数量上限，按已识别生命效果估计返回目标" :
-            active ? "检测到战中或动态生命恢复，目标为战后满血" : heal + maxHp > 0 ?
-                "当前内容的固定战后生命增加" : "当前内容未识别到可提高战后血量的恢复，目标为不净损血", uncertain, sources.Take(32).ToArray());
+            active ? "存在战中或尚未界定的生命恢复，保守目标为战后满血" : heal + maxHp > 0 ?
+                "当前内容的固定战后生命增加" : transfers.Count > 0 ? "按条件战后恢复的可改善血量设定目标" :
+                "当前内容未识别到可提高战后血量的恢复，目标为不净损血", uncertain, sources.Take(32).ToArray());
     }
 
     // Small current-content scan. Read only concrete model callbacks, their own
@@ -260,6 +309,7 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
         var cache = combatDeckScan ? _deckContent : targetOnly ? _targetContent : _content;
         if (cache.TryGetValue(type, out var cached)) return cached;
         bool active = false, uncertain = false, growth = false, pool = false, changesDeck = false, characterPool = false;
+        bool terminalOnly = true;
         string? uncertainAt = null;
         void Unknown(MethodBase method, MethodBase? caller = null)
         { uncertain = true; uncertainAt ??= (caller == null ? "" : caller.DeclaringType?.FullName + "." + caller.Name + " -> ") +
@@ -283,17 +333,21 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                     !LocalRevivalEstimate.Automatic(type)) continue;
                 if (method.IsSpecialName || !method.IsVirtual || method.GetBaseDefinition() == method ||
                     !overrides.Add(method.GetBaseDefinition()) || method.Name is "AfterObtained" or "BeforeRemoved" or "AfterRemoved") continue;
-                // Room-entry effects happen after this combat. Keep them in the
-                // strict recovery closure; they cannot produce an in-combat pile event.
+                // These native phase entry points are not dispatched after the
+                // frozen playable root and before combat settlement. Keep them
+                // in the strict recovery closure. A helper explicitly reached
+                // from another callback still enters the queue normally.
                 if ((combatDeckScan || targetOnly) && method.DeclaringType?.Assembly == Native &&
-                    method.GetBaseDefinition().DeclaringType == typeof(AbstractModel) && method.Name is "BeforeRoomEntered" or "AfterRoomEntered")
+                    method.GetBaseDefinition().DeclaringType == typeof(AbstractModel) &&
+                    method.Name is "BeforeRoomEntered" or "AfterRoomEntered" or "AfterRestSiteHeal")
                 { excluded.Add(method.DeclaringType.FullName + "." + method.Name); continue; }
                 bool futureStart = method.DeclaringType?.Assembly == Native &&
                     method.GetBaseDefinition().DeclaringType == typeof(AbstractModel) &&
                     method.Name is "AfterPlayerTurnStart" or "AfterPlayerTurnStartEarly" or "AfterPlayerTurnStartLate";
                 var pileEvent = method.GetBaseDefinition().DeclaringType == typeof(AbstractModel) &&
                     method.Name == "AfterCardChangedPiles" ? method : null;
-                queue.Enqueue((method, method.Name is "AfterCombatVictory" or "AfterCombatEnd", true, futureStart, pileEvent, null));
+                queue.Enqueue((method, targetOnly ? LocalTerminalRecovery.IsTerminal(method) :
+                    method.Name is "AfterCombatVictory" or "AfterCombatEnd", true, futureStart, pileEvent, null));
             }
         }
         var seen = new HashSet<(MethodBase, bool, bool, bool, MethodInfo?, string)>();
@@ -351,11 +405,11 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                 // Arbitrary display patch names do not invalidate every source.
                 if (method.DeclaringType?.Assembly != Native && code[i].Operand is string api &&
                     (HpWrites.Contains(api) || api is "Heal" or "set_CurrentHp" or "set_MaxHp"))
-                { active = true; growth |= api.Contains("MaxHp", StringComparison.Ordinal); }
+                { active = true; terminalOnly = false; growth |= api.Contains("MaxHp", StringComparison.Ordinal); }
                 if (code[i].Operand is FieldInfo field && field.DeclaringType?.FullName == "MegaCrit.Sts2.Core.Entities.Creatures.Creature" &&
                     field.Name is "_currentHp" or "_maxHp" && code[i].Code is var op &&
                     (op == System.Reflection.Emit.OpCodes.Stfld || op == System.Reflection.Emit.OpCodes.Ldflda))
-                { active = true; growth |= field.Name == "_maxHp"; }
+                { active = true; terminalOnly = false; growth |= field.Name == "_maxHp"; }
                 if (code[i].Operand is not MethodBase called) continue;
                 var declaring = called.DeclaringType!;
                 var arguments = facts.Complete && facts.Calls.TryGetValue(i, out var atCall) ? atCall : null;
@@ -368,7 +422,8 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                 {
                     // Only the user-facing combat target excludes a proved summon recipient.
                     // Unknown recipients and the strict recovery proof retain the old closure.
-                    if (targetOnly && arguments?.FirstOrDefault()?.Tag == "summon-creature" && !ForeignPatch(called)) continue;
+                    if (targetOnly && NonPlayerHealthWrite(method, code, pileEvent, input, i, called, arguments)) continue;
+                    terminalOnly &= terminal;
                     bool gain = called.Name == "GainMaxHp";
                     if (terminal && direct && typeof(RelicModel).IsAssignableFrom(type) && !LocalMethodBody.HasBackwardJump(code) &&
                         FixedVictoryValue(code, i, type, gain ? "get_MaxHp" : "get_Heal", !gain))
@@ -378,7 +433,10 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                 }
                 if (declaring.Namespace?.StartsWith("MegaCrit.Sts2.Core", StringComparison.Ordinal) == true &&
                     (HpWrites.Contains(called.Name) || called.Name is "set_CurrentHp" or "set_MaxHp"))
-                { active = true; growth |= called.Name.Contains("MaxHp", StringComparison.Ordinal); }
+                {
+                    if (targetOnly && NonPlayerHealthWrite(method, code, pileEvent, input, i, called, arguments)) continue;
+                    active = true; terminalOnly = false; growth |= called.Name.Contains("MaxHp", StringComparison.Ordinal);
+                }
                 if (typeof(CardPoolModel).IsAssignableFrom(declaring) || called.Name == "get_CardPool") pool = true;
                 if (called.Name == "get_CardPool" && typeof(CharacterModel).IsAssignableFrom(declaring)) characterPool = true;
                 if (called.IsGenericMethod && (declaring == typeof(ModelDb) || declaring.FullName == "MegaCrit.Sts2.Core.Commands.PowerCmd" && called.Name == "Apply"))
@@ -429,7 +487,7 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
                 }
             }
         }
-        return cache[type] = new(active, heals, gains, uncertain, generated.ToArray(), growth, pool, uncertainAt, changesDeck, characterPool, excluded.ToArray());
+        return cache[type] = new(active, heals, gains, uncertain, generated.ToArray(), growth, pool, uncertainAt, changesDeck, characterPool, excluded.ToArray(), terminalOnly);
     }
 
     private bool CanChangeDeck(Player player, AbstractModel[] held)
@@ -463,9 +521,29 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
     private static string InputKey(LocalIlFacts.Value[]? input) => input == null ? "root" :
         string.Join(";", input.Select(v => (v.Tag ?? "?") + ":" + (v.Numbers == null ? "?" : string.Join(",", v.Numbers))));
 
-    private LocalIlFacts.Result EventFacts(MethodBase method, LocalInstruction[] code, MethodInfo? pileEvent, LocalIlFacts.Value[]? input = null)
+    private bool NonPlayerHealthWrite(MethodBase method, LocalInstruction[] code, MethodInfo? pileEvent,
+        LocalIlFacts.Value[]? input, int index, MethodBase writer, LocalIlFacts.Value[]? arguments)
     {
-        var key = (method, pileEvent, InputKey(input));
+        if (ForeignPatch(writer) || ForeignPatch(method)) return false;
+        var owner = method.DeclaringType?.DeclaringType?.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
+            .FirstOrDefault(m => m.GetCustomAttribute<AsyncStateMachineAttribute>()?.StateMachineType == method.DeclaringType);
+        if (owner != null && ForeignPatch(owner)) return false;
+        var recipient = arguments?.FirstOrDefault()?.Tag;
+        if (recipient is "summon-creature" or "enemy-creature") return true;
+        if (recipient?.StartsWith("creature-argument:", StringComparison.Ordinal) != true) return false;
+        if (code.Any(i => i.Code == OpCodes.Ldarga || i.Code == OpCodes.Ldarga_S ||
+            i.Operand is MethodBase m && m.GetParameters().Any(p => p.ParameterType == typeof(Creature).MakeByRefType()))) return false;
+        // Re-evaluate only this writer's reachability assuming its recipient is
+        // on the player's side. Other writes (including healing the owner from
+        // an enemy-added callback) remain independent. No callback is executed.
+        var player = EventFacts(method, code, pileEvent, input, recipient);
+        return player.Complete && !player.Reachable[index];
+    }
+
+    private LocalIlFacts.Result EventFacts(MethodBase method, LocalInstruction[] code, MethodInfo? pileEvent, LocalIlFacts.Value[]? input = null,
+        string? playerRecipient = null)
+    {
+        var key = (method, pileEvent, InputKey(input), playerRecipient);
         if (_eventFacts.TryGetValue(key, out var cached)) return cached;
         var asyncOwner = method.DeclaringType?.DeclaringType?.GetMethods(BindingFlags.Instance | BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)
             .FirstOrDefault(m => m.GetCustomAttribute<AsyncStateMachineAttribute>()?.StateMachineType == method.DeclaringType);
@@ -495,6 +573,7 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
             int n = index - (method.IsStatic ? 0 : 1);
             if (method != root || n < 0 || n >= parameters.Length) return LocalIlFacts.Value.Unknown;
             if (input != null && index < input.Length) return parameters[n].ParameterType.IsByRef ? LocalIlFacts.Value.Unknown : input[index];
+            if (parameters[n].ParameterType == typeof(Creature)) return new(Tag: "creature-argument:" + index);
             var parameterType = parameters[n].ParameterType.IsByRef ? parameters[n].ParameterType.GetElementType() : parameters[n].ParameterType;
             if (pileModifier && parameterType?.Assembly == Native && parameterType.Name == "CardLocation")
                 return new([0, 1, 2, 3, 4, 5], "play-result");
@@ -512,6 +591,7 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
             {
                 int n = Array.FindIndex(parameters, p => p.Name == member.Name && p.ParameterType == member.FieldType) + (root.IsStatic ? 0 : 1);
                 if (completionPath && input != null && n < input.Length) return input[n];
+                if (completionPath && member.FieldType == typeof(Creature)) return new(Tag: "creature-argument:" + n);
                 if (member.FieldType == typeof(CardModel) && pileEvent != null) return new(Tag: "event-card");
                 if (member.FieldType == typeof(PileType) && (pileEvent != null || pileModifier)) return new([0, 1, 2, 3, 4, 5]);
             }
@@ -525,6 +605,24 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
             // getter patch can change the recipient and therefore removes this fact.
             if (called.DeclaringType == typeof(Player) && called.Name == "get_Osty" && !ForeignPatch(called))
                 return new(Tag: "summon-creature");
+            if (called.DeclaringType == typeof(Creature) && called.Name == "get_Side" &&
+                playerRecipient != null && args.FirstOrDefault()?.Tag == playerRecipient && !ForeignPatch(called))
+            {
+                // The native Side is constructor-assigned and immutable. Do not
+                // infer identity through a changed getter or mutable side field.
+                var body = Body(called);
+                if (body is { Length: 3 } && body[0].Code == OpCodes.Ldarg_0 && body[1].Code == OpCodes.Ldfld &&
+                    body[1].Operand is FieldInfo side && side.IsInitOnly && body[2].Code == OpCodes.Ret)
+                    return LocalIlFacts.Value.Number((int)CombatSide.Player);
+            }
+            if ((called.DeclaringType == typeof(ICombatState) || called.DeclaringType == typeof(CombatState)) &&
+                called.Name is "get_Enemies" or "get_HittableEnemies" && Native.ManifestModule.ModuleVersionId.ToString() == CertifiedNativeModule &&
+                !ForeignPatch(called) && typeof(CombatState).GetMethod(called.Name) is { } concrete && !ForeignPatch(concrete))
+                return new(Tag: "enemy-creatures");
+            if (called.DeclaringType?.Namespace == "System.Collections.Generic" && called.Name == "GetEnumerator" &&
+                args.FirstOrDefault()?.Tag == "enemy-creatures") return new(Tag: "enemy-enumerator");
+            if (called.DeclaringType?.Namespace == "System.Collections.Generic" && called.Name == "get_Current" &&
+                args.FirstOrDefault()?.Tag == "enemy-enumerator") return new(Tag: "enemy-creature");
             if (completionPath && called.DeclaringType?.Namespace == "System.Runtime.CompilerServices" &&
                 called.DeclaringType.Name.StartsWith("TaskAwaiter", StringComparison.Ordinal) && called.Name == "get_IsCompleted")
                 return LocalIlFacts.Value.Number(1); // Analyze the equivalent post-completion path; handlers remain independent.
@@ -623,6 +721,12 @@ internal sealed class LocalRecoveryEstimator(LocalSearchRequest request)
     private static bool CallCanChangeDeck(MethodBase method, LocalIlFacts.Value[]? arguments)
     {
         var owner = method.DeclaringType;
+        // Removing a keyword changes the card, not membership of the permanent
+        // deck. Only the inspected native command has this certified meaning.
+        if (owner?.FullName == "MegaCrit.Sts2.Core.Commands.CardCmd" && method.Name == "RemoveKeyword" &&
+            Native.ManifestModule.ModuleVersionId.ToString() == CertifiedNativeModule && !ForeignPatch(method)) return false;
+        if (owner?.FullName == "MegaCrit.Sts2.Core.Commands.CardPileCmd" &&
+            method.Name is "RemoveFromDeck" or "AddCurseToDeck" or "AddCursesToDeck" or "GiveToAnotherPlayer") return true;
         // The certified native generation commands reject non-combat piles.
         if (owner?.FullName == "MegaCrit.Sts2.Core.Commands.CardPileCmd" &&
             method.Name is "AddGeneratedCardToCombat" or "AddGeneratedCardsToCombat") return false;

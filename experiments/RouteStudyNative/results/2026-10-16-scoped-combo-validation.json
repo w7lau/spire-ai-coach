@@ -1,0 +1,596 @@
+{
+  "product_sha256": "23D7EB7FAD958FA223A1CDBE2CB16C76ECD74F221DE2ED4E58A80712F221C59D",
+  "implementation": "product-candidate",
+  "studies": [
+    {
+      "study": "scoped-goal",
+      "batch_completed": true,
+      "workers": 1,
+      "attempts": 32,
+      "budget_seconds": 20,
+      "samples": [
+        {
+          "case": "case-1",
+          "mode": "current",
+          "repeat": 0,
+          "native_replay_passed": true,
+          "elapsed_ms": 29200,
+          "search_ms": 21464,
+          "verification_ms": 6760,
+          "evaluated": 13,
+          "won": true,
+          "final_hp": 59,
+          "gross_loss": 1,
+          "rounds": 3,
+          "actions": 9,
+          "minimum_hp": 59,
+          "goal_plays": 1,
+          "goal_kills": 0,
+          "goal_completion": {
+            "Play": {
+              "Copies": 1,
+              "CompletedCopies": 1,
+              "ExhaustedCopies": 0,
+              "LivingEnemies": null,
+              "BattleEnded": true,
+              "RemovedCopies": 1,
+              "Target": 1,
+              "Complete": true
+            },
+            "Finisher": null,
+            "Scope": "current-consumable-copies-v1"
+          },
+          "soft_tails_cleared": 0,
+          "proof_focus_deferred": 0,
+          "goal_continuations_promoted": 0,
+          "ordinary_final_verifications": 1,
+          "stopped_on_minimum": false,
+          "round_end_hp": [
+            {
+              "round": 1,
+              "before": 60,
+              "after": 59
+            },
+            {
+              "round": 2,
+              "before": 59,
+              "after": 59
+            }
+          ],
+          "seeded_counterfactual": false,
+          "first_complete_final_hp_and_goal_ms": 4617.7224
+        },
+        {
+          "case": "case-1",
+          "mode": "current",
+          "repeat": 0,
+          "native_replay_passed": true,
+          "elapsed_ms": 21400,
+          "search_ms": 20056,
+          "verification_ms": 860,
+          "evaluated": 17,
+          "won": true,
+          "final_hp": 59,
+          "gross_loss": 1,
+          "rounds": 3,
+          "actions": 9,
+          "minimum_hp": 59,
+          "goal_plays": 1,
+          "goal_kills": 0,
+          "goal_completion": {
+            "Play": {
+              "Copies": 1,
+              "CompletedCopies": 1,
+              "ExhaustedCopies": 0,
+              "LivingEnemies": null,
+              "BattleEnded": true,
+              "RemovedCopies": 1,
+              "Target": 1,
+              "Complete": true
+            },
+            "Finisher": null,
+            "Scope": "current-consumable-copies-v1"
+          },
+          "soft_tails_cleared": 0,
+          "proof_focus_deferred": 0,
+          "goal_continuations_promoted": 0,
+          "ordinary_final_verifications": 1,
+          "stopped_on_minimum": false,
+          "round_end_hp": [
+            {
+              "round": 1,
+              "before": 60,
+              "after": 59
+            },
+            {
+              "round": 2,
+              "before": 59,
+              "after": 59
+            }
+          ],
+          "seeded_counterfactual": false,
+          "first_complete_final_hp_and_goal_ms": 946.2292
+        },
+        {
+          "case": "case-1",
+          "mode": "current",
+          "repeat": 1,
+          "native_replay_passed": true,
+          "elapsed_ms": 21403,
+          "search_ms": 20096,
+          "verification_ms": 637,
+          "evaluated": 17,
+          "won": true,
+          "final_hp": 59,
+          "gross_loss": 1,
+          "rounds": 3,
+          "actions": 9,
+          "minimum_hp": 59,
+          "goal_plays": 1,
+          "goal_kills": 0,
+          "goal_completion": {
+            "Play": {
+              "Copies": 1,
+              "CompletedCopies": 1,
+              "ExhaustedCopies": 0,
+              "LivingEnemies": null,
+              "BattleEnded": true,
+              "RemovedCopies": 1,
+              "Target": 1,
+              "Complete": true
+            },
+            "Finisher": null,
+            "Scope": "current-consumable-copies-v1"
+          },
+          "soft_tails_cleared": 0,
+          "proof_focus_deferred": 0,
+          "goal_continuations_promoted": 0,
+          "ordinary_final_verifications": 1,
+          "stopped_on_minimum": false,
+          "round_end_hp": [
+            {
+              "round": 1,
+              "before": 60,
+              "after": 59
+            },
+            {
+              "round": 2,
+              "before": 59,
+              "after": 59
+            }
+          ],
+          "seeded_counterfactual": false,
+          "first_complete_final_hp_and_goal_ms": 832.7231
+        },
+        {
+          "case": "case-1",
+          "mode": "current",
+          "repeat": 1,
+          "native_replay_passed": true,
+          "elapsed_ms": 19853,
+          "search_ms": 18681,
+          "verification_ms": 679,
+          "evaluated": 14,
+          "won": true,
+          "final_hp": 59,
+          "gross_loss": 1,
+          "rounds": 3,
+          "actions": 9,
+          "minimum_hp": 59,
+          "goal_plays": 1,
+          "goal_kills": 0,
+          "goal_completion": {
+            "Play": {
+              "Copies": 1,
+              "CompletedCopies": 1,
+              "ExhaustedCopies": 0,
+              "LivingEnemies": null,
+              "BattleEnded": true,
+              "RemovedCopies": 1,
+              "Target": 1,
+              "Complete": true
+            },
+            "Finisher": null,
+            "Scope": "current-consumable-copies-v1"
+          },
+          "soft_tails_cleared": 0,
+          "proof_focus_deferred": 0,
+          "goal_continuations_promoted": 0,
+          "ordinary_final_verifications": 1,
+          "stopped_on_minimum": true,
+          "round_end_hp": [
+            {
+              "round": 1,
+              "before": 60,
+              "after": 59
+            },
+            {
+              "round": 2,
+              "before": 59,
+              "after": 59
+            }
+          ],
+          "seeded_counterfactual": false,
+          "first_complete_final_hp_and_goal_ms": 1542.8513
+        }
+      ]
+    },
+    {
+      "study": "scoped-holdouts",
+      "batch_completed": true,
+      "workers": 1,
+      "attempts": 32,
+      "budget_seconds": 20,
+      "samples": [
+        {
+          "case": "case-4",
+          "mode": "current",
+          "repeat": 0,
+          "native_replay_passed": true,
+          "elapsed_ms": 19212,
+          "search_ms": 11260,
+          "verification_ms": 6691,
+          "evaluated": 7,
+          "won": true,
+          "final_hp": 61,
+          "gross_loss": 0,
+          "rounds": 4,
+          "actions": 27,
+          "minimum_hp": 61,
+          "goal_plays": null,
+          "goal_kills": null,
+          "goal_completion": null,
+          "soft_tails_cleared": 0,
+          "proof_focus_deferred": 0,
+          "goal_continuations_promoted": 0,
+          "ordinary_final_verifications": 1,
+          "stopped_on_minimum": false,
+          "round_end_hp": [
+            {
+              "round": 1,
+              "before": 61,
+              "after": 61
+            },
+            {
+              "round": 2,
+              "before": 61,
+              "after": 61
+            },
+            {
+              "round": 3,
+              "before": 61,
+              "after": 61
+            }
+          ],
+          "seeded_counterfactual": false
+        },
+        {
+          "case": "case-4",
+          "mode": "current",
+          "repeat": 1,
+          "native_replay_passed": true,
+          "elapsed_ms": 10572,
+          "search_ms": 8773,
+          "verification_ms": 1173,
+          "evaluated": 7,
+          "won": true,
+          "final_hp": 61,
+          "gross_loss": 0,
+          "rounds": 4,
+          "actions": 27,
+          "minimum_hp": 61,
+          "goal_plays": null,
+          "goal_kills": null,
+          "goal_completion": null,
+          "soft_tails_cleared": 0,
+          "proof_focus_deferred": 0,
+          "goal_continuations_promoted": 0,
+          "ordinary_final_verifications": 1,
+          "stopped_on_minimum": false,
+          "round_end_hp": [
+            {
+              "round": 1,
+              "before": 61,
+              "after": 61
+            },
+            {
+              "round": 2,
+              "before": 61,
+              "after": 61
+            },
+            {
+              "round": 3,
+              "before": 61,
+              "after": 61
+            }
+          ],
+          "seeded_counterfactual": false
+        },
+        {
+          "case": "case-9",
+          "mode": "current",
+          "repeat": 0,
+          "native_replay_passed": true,
+          "elapsed_ms": 31450,
+          "search_ms": 21406,
+          "verification_ms": 9043,
+          "evaluated": 27,
+          "won": true,
+          "final_hp": 22,
+          "gross_loss": 31,
+          "rounds": 12,
+          "actions": 85,
+          "minimum_hp": 1,
+          "goal_plays": null,
+          "goal_kills": null,
+          "goal_completion": null,
+          "soft_tails_cleared": 0,
+          "proof_focus_deferred": 0,
+          "goal_continuations_promoted": 0,
+          "ordinary_final_verifications": 1,
+          "stopped_on_minimum": false,
+          "round_end_hp": [
+            {
+              "round": 1,
+              "before": 31,
+              "after": 31
+            },
+            {
+              "round": 2,
+              "before": 31,
+              "after": 17
+            },
+            {
+              "round": 3,
+              "before": 17,
+              "after": 11
+            },
+            {
+              "round": 4,
+              "before": 11,
+              "after": 11
+            },
+            {
+              "round": 5,
+              "before": 11,
+              "after": 1
+            },
+            {
+              "round": 6,
+              "before": 1,
+              "after": 1
+            },
+            {
+              "round": 7,
+              "before": 1,
+              "after": 1
+            },
+            {
+              "round": 8,
+              "before": 1,
+              "after": 1
+            },
+            {
+              "round": 9,
+              "before": 1,
+              "after": 1
+            },
+            {
+              "round": 10,
+              "before": 1,
+              "after": 1
+            },
+            {
+              "round": 11,
+              "before": 1,
+              "after": 21
+            }
+          ],
+          "seeded_counterfactual": false
+        },
+        {
+          "case": "case-9",
+          "mode": "current",
+          "repeat": 1,
+          "native_replay_passed": true,
+          "elapsed_ms": 23902,
+          "search_ms": 20064,
+          "verification_ms": 3249,
+          "evaluated": 27,
+          "won": true,
+          "final_hp": 22,
+          "gross_loss": 31,
+          "rounds": 12,
+          "actions": 85,
+          "minimum_hp": 1,
+          "goal_plays": null,
+          "goal_kills": null,
+          "goal_completion": null,
+          "soft_tails_cleared": 0,
+          "proof_focus_deferred": 0,
+          "goal_continuations_promoted": 0,
+          "ordinary_final_verifications": 1,
+          "stopped_on_minimum": false,
+          "round_end_hp": [
+            {
+              "round": 1,
+              "before": 31,
+              "after": 31
+            },
+            {
+              "round": 2,
+              "before": 31,
+              "after": 17
+            },
+            {
+              "round": 3,
+              "before": 17,
+              "after": 11
+            },
+            {
+              "round": 4,
+              "before": 11,
+              "after": 11
+            },
+            {
+              "round": 5,
+              "before": 11,
+              "after": 1
+            },
+            {
+              "round": 6,
+              "before": 1,
+              "after": 1
+            },
+            {
+              "round": 7,
+              "before": 1,
+              "after": 1
+            },
+            {
+              "round": 8,
+              "before": 1,
+              "after": 1
+            },
+            {
+              "round": 9,
+              "before": 1,
+              "after": 1
+            },
+            {
+              "round": 10,
+              "before": 1,
+              "after": 1
+            },
+            {
+              "round": 11,
+              "before": 1,
+              "after": 21
+            }
+          ],
+          "seeded_counterfactual": false
+        },
+        {
+          "case": "case-2",
+          "mode": "current",
+          "repeat": 0,
+          "native_replay_passed": true,
+          "elapsed_ms": 26742,
+          "search_ms": 14089,
+          "verification_ms": 11731,
+          "evaluated": 11,
+          "won": true,
+          "final_hp": 74,
+          "gross_loss": 0,
+          "rounds": 7,
+          "actions": 75,
+          "minimum_hp": 74,
+          "goal_plays": null,
+          "goal_kills": null,
+          "goal_completion": null,
+          "soft_tails_cleared": 0,
+          "proof_focus_deferred": 0,
+          "goal_continuations_promoted": 0,
+          "ordinary_final_verifications": 1,
+          "stopped_on_minimum": false,
+          "round_end_hp": [
+            {
+              "round": 1,
+              "before": 74,
+              "after": 74
+            },
+            {
+              "round": 2,
+              "before": 74,
+              "after": 74
+            },
+            {
+              "round": 3,
+              "before": 74,
+              "after": 74
+            },
+            {
+              "round": 4,
+              "before": 74,
+              "after": 74
+            },
+            {
+              "round": 5,
+              "before": 74,
+              "after": 74
+            },
+            {
+              "round": 6,
+              "before": 74,
+              "after": 74
+            }
+          ],
+          "seeded_counterfactual": false
+        },
+        {
+          "case": "case-2",
+          "mode": "current",
+          "repeat": 1,
+          "native_replay_passed": true,
+          "elapsed_ms": 15867,
+          "search_ms": 10827,
+          "verification_ms": 4201,
+          "evaluated": 11,
+          "won": true,
+          "final_hp": 74,
+          "gross_loss": 0,
+          "rounds": 7,
+          "actions": 75,
+          "minimum_hp": 74,
+          "goal_plays": null,
+          "goal_kills": null,
+          "goal_completion": null,
+          "soft_tails_cleared": 0,
+          "proof_focus_deferred": 0,
+          "goal_continuations_promoted": 0,
+          "ordinary_final_verifications": 1,
+          "stopped_on_minimum": false,
+          "round_end_hp": [
+            {
+              "round": 1,
+              "before": 74,
+              "after": 74
+            },
+            {
+              "round": 2,
+              "before": 74,
+              "after": 74
+            },
+            {
+              "round": 3,
+              "before": 74,
+              "after": 74
+            },
+            {
+              "round": 4,
+              "before": 74,
+              "after": 74
+            },
+            {
+              "round": 5,
+              "before": 74,
+              "after": 74
+            },
+            {
+              "round": 6,
+              "before": 74,
+              "after": 74
+            }
+          ],
+          "seeded_counterfactual": false
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "Research implementation identified above; no production optimization installed.",
+    "Counterfactuals contain observed prefix seeds and are not discovery-speed benchmarks.",
+    "Partial batches are explicitly marked; only finished per-run results are included.",
+    "Timing includes independent replay; report warmup and reverse-order controls separately."
+  ]
+}

@@ -1,4 +1,5 @@
 using System.Reflection;
+using System.Reflection.Emit;
 using System.Runtime.CompilerServices;
 using Godot;
 using HarmonyLib;
@@ -45,6 +46,11 @@ internal static class LocalWorkerVisuals
         harmony.Patch(typeof(NCardTrail).GetMethod(nameof(NCardTrail._Process))!, prefix: Patch(nameof(Trail)));
         harmony.Patch(AccessTools.Method(typeof(NDecimillipedeRocksVfx), "Play"),
             prefix: Patch(nameof(FinishAmbientRocks)));
+        var grenadePlay = AccessTools.Method(typeof(NKinPriestGrenadeVfx), "Play");
+        var grenadeState = grenadePlay.GetCustomAttribute<AsyncStateMachineAttribute>()?.StateMachineType
+            ?? throw new InvalidOperationException("Missing grenade visual state machine");
+        harmony.Patch(AccessTools.Method(grenadeState, "MoveNext"),
+            transpiler: Patch(nameof(GuardGrenadeParticles)));
         harmony.Patch(AccessTools.Method(typeof(NCard), "UpdateTypePlaqueSizeAndPosition"),
             prefix: Patch(nameof(TypePlaque)));
         harmony.Patch(typeof(NRewardsScreen).GetMethod("UpdateScreenState", BindingFlags.NonPublic | BindingFlags.Instance)!,
@@ -73,6 +79,30 @@ internal static class LocalWorkerVisuals
         __instance.QueueFreeSafely();
         __result = Task.CompletedTask;
         return false;
+    }
+
+    // The detached native visual can resume after its scene has been freed.
+    // Cancellation on exit cannot revoke an already completed delay. Guard the
+    // three particle writes at their point of use, keeping the native task,
+    // sound and delays intact, including in ordinary replay. Worker-only patch.
+    private static IEnumerable<CodeInstruction> GuardGrenadeParticles(IEnumerable<CodeInstruction> instructions)
+    {
+        var code = instructions.ToList();
+        var setter = AccessTools.Method(typeof(GpuParticles2D), nameof(GpuParticles2D.SetEmitting), [typeof(bool)]);
+        var guard = AccessTools.Method(typeof(LocalWorkerVisuals), nameof(SetGrenadeEmitting));
+        var writes = code.Where(instruction => instruction.Calls(setter)).ToArray();
+        if (writes.Length != 3) throw new InvalidOperationException("Unsupported grenade visual particle writes");
+        foreach (var instruction in writes)
+        {
+            instruction.opcode = OpCodes.Call;
+            instruction.operand = guard;
+        }
+        return code;
+    }
+
+    private static void SetGrenadeEmitting(GpuParticles2D particles, bool emitting)
+    {
+        if (GodotObject.IsInstanceValid(particles) && !particles.IsQueuedForDeletion()) particles.SetEmitting(emitting);
     }
 
     // Only sizes/positions the card type banner. Hidden accelerated scenes do

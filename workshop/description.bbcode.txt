@@ -1,6 +1,9 @@
 [h1]尖塔教练 / Spire AI Coach[/h1]
 《杀戮尖塔 2》的战斗助手：AI 本回合指导、本地整场战斗规划，以及自动执行方案。用于娱乐、研究与比较打法。
 
+[h2]遇到不喜欢、懒得打的怪？让尖塔教练帮你代打。[/h2]
+按 F8 打开面板，选择“路线采样算法”或“分支扩展算法”，计算出方案后点击“执行方案”，就能让教练按方案打完这场战斗。本地计算与代打无需 API Key；支持单人战斗，Esc 可随时停止，实际状态偏离方案时也会自动停止。
+
 [h2]功能[/h2]
 [list]
 [*]AI 根据手牌、牌堆、Buff、遗物、药水和敌人意图给出本回合建议，支持流式回复。
@@ -19,6 +22,8 @@
 [/list]
 
 [h2]兼容与算法优化[/h2]
+2026-10-16 更新：修正回血来源与条件回血目标判断，改进弃牌后防御、苦无出牌顺序、毒的后续收益和低受伤路线探索；前面的选择改变后，会重新检查后续结束回合。最终选路仍优先战后血量，可能选择触发复活的路线。
+
 为尽力兼容不同 Mod，搜索尽量复用游戏底层规则和已加载的 Mod 钩子，模拟出牌与结算，减少逐卡适配。部分 Mod 仍可能需要额外处理。
 
 已验证 Windows x64 / 游戏 v0.111.0，界面主要为中文。搜索受时间和次数限制，结果不保证全局最优。
@@ -28,6 +33,9 @@
 [h2]English[/h2]
 A Slay the Spire 2 battle assistant: AI advice for the current turn, local whole-battle planning, and plan execution. Built for fun, research and comparing strategies.
 
+[b]An enemy you don't feel like fighting? Let Spire AI Coach take over.[/b]
+Press F8, choose Rollout Sampling or Branch Expansion, then click “执行方案” once a plan is ready to have the coach play out the battle. Local planning and execution need no API key. Singleplayer only; press Esc to stop at any time. Execution also stops if the actual state diverges from the plan.
+
 [list]
 [*]AI uses your hand, piles, buffs, relics, potions and enemy intents to suggest plays, with streamed replies.
 [*]Rollout Sampling (路线采样) and Branch Expansion (分支扩展) both plan the whole battle without an API. Plans prioritize net HP loss including healing; equal-loss routes prefer preserving potions.
@@ -36,6 +44,8 @@ A Slay the Spire 2 battle assistant: AI advice for the current turn, local whole
 [*]Follow a plan manually or click “执行方案” to execute in singleplayer. Esc stops execution; divergence from the plan also stops it.
 [*]AI requires a Chat Completions compatible URL, model and API key. Clicking AI analysis sends combat information to your provider and may incur charges.
 [/list]
+
+2026-10-16 update: improved recovery-source and conditional-healing analysis, discard/block sequencing, Kunai/poison tactics and low-damage route exploration. Changed earlier choices prompt another check of later end-turn decisions. Final selection still prioritizes ending HP and may choose a route that consumes revival.
 
 Local search aims to support different mods by reusing underlying game rules and loaded mod hooks. Some mods may need additional integration. Validated on Windows x64 / game v0.111.0; in-game labels are mainly Chinese. Budgeted search does not guarantee globally optimal results.
 

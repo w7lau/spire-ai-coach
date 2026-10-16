@@ -11,7 +11,7 @@ using SpireAiCoach.Core;
 
 namespace SpireAiCoach.Mod;
 
-internal sealed class LocalTacticalPreview(Player player, bool efficient = false)
+internal sealed class LocalTacticalPreview(Player player, bool efficient = false, bool followupKills = false)
 {
     private readonly Dictionary<Creature, double> _threats = new();
     private readonly Dictionary<(CardModel, Creature?), DynamicVarSet> _previews = new(new PreviewKeyComparer());
@@ -28,14 +28,58 @@ internal sealed class LocalTacticalPreview(Player player, bool efficient = false
     private bool? _hasEligibleFinisherTarget;
     private CardModel[] _playable = [];
 
-    public static LocalTacticalPreview Capture(Player player, CardModel[] playable, bool efficient = false) =>
-        CaptureCore(player, playable, efficient, null);
+    public static LocalTacticalPreview Capture(Player player, CardModel[] playable, bool efficient = false, bool followupKills = false) =>
+        CaptureCore(player, playable, efficient, null, followupKills);
     internal static LocalTacticalPreview CaptureDiscard(Player player, CardModel[] hand, bool efficient, bool retainsBlock) =>
         CaptureCore(player, hand, efficient, retainsBlock);
     internal bool RetainsBlockHint => _retainsBlock;
-    private static LocalTacticalPreview CaptureCore(Player player, CardModel[] playable, bool efficient, bool? retainsBlock)
+    internal double BlockGap => Math.Max(0, _incoming - player.Creature.Block);
+
+    internal LocalFollowupCard Defense(CardModel card)
     {
-        var result = new LocalTacticalPreview(player, efficient);
+        try
+        {
+            if (!card.GainsBlock || card.Keywords.Contains(CardKeyword.Unplayable) ||
+                card.EnergyCost.CostsX || card.HasStarCostX) return default;
+            var vars = Preview(card, null);
+            double Value(string key) => vars.TryGetValue(key, out var v) ? Math.Max(0, (double)v.PreviewValue) : 0;
+            return new((int)Math.Min(1000000, Math.Max(Value("Block"), Value("CalculatedBlock"))),
+                card.EnergyCost.GetAmountToSpend(), Math.Max(0, card.GetStarCostWithModifiers()));
+        }
+        catch { return default; }
+    }
+
+    internal int SequencePriority(CardModel card, Creature? target)
+    {
+        try
+        {
+            if (card.EnergyCost.CostsX || card.HasStarCostX) return 0;
+            int energy = (int)player.PlayerCombatState!.Energy, stars = player.PlayerCombatState.Stars;
+            int before = LocalSequenceTactics.Defense(_playable.Select(Defense), energy, stars, BlockGap);
+            int own = Defense(card).Value;
+            int after = own + LocalSequenceTactics.Defense(_playable.Where(c => c != card).Select(Defense),
+                energy - card.EnergyCost.GetAmountToSpend(), stars - Math.Max(0, card.GetStarCostWithModifiers()),
+                Math.Max(0, BlockGap - own));
+            // A directly lethal action can remove the attacker instead. Do not
+            // reserve defense against damage that this native preview removes.
+            bool lethal = target != null && DamageHint(card, target) >= target.CurrentHp + target.Block;
+            int score = lethal ? 0 : -LocalSequenceTactics.LostDefense(before, after);
+            var vars = Preview(card, target);
+            if (vars.TryGetValue("PoisonPower", out var poison))
+            {
+                var enemies = player.Creature.CombatState!.Enemies.Where(e => e.IsAlive &&
+                    (card.TargetType == TargetType.AllEnemies || ReferenceEquals(e, target)));
+                foreach (var enemy in enemies)
+                    score += LocalSequenceTactics.DelayedDamage((double)poison.PreviewValue,
+                        enemy.Powers.OfType<MegaCrit.Sts2.Core.Models.Powers.PoisonPower>().Sum(p => p.Amount), enemy.CurrentHp);
+            }
+            return score;
+        }
+        catch { return 0; }
+    }
+    private static LocalTacticalPreview CaptureCore(Player player, CardModel[] playable, bool efficient, bool? retainsBlock, bool followupKills = false)
+    {
+        var result = new LocalTacticalPreview(player, efficient, followupKills);
         result._playable = playable;
         foreach (var card in player.PlayerCombatState!.Hand.Cards)
         {
@@ -221,7 +265,8 @@ internal sealed class LocalTacticalPreview(Player player, bool efficient = false
                 HandEndHpLoss: handEndHpLoss, PersistentSetup: card.Type == CardType.Power,
                 EnergyCost: card.EnergyCost.GetAmountToSpend(),
                 ResourceCost: efficient ? Math.Max(0, card.EnergyCost.GetAmountToSpend()) +
-                    Math.Max(0, card.HasStarCostX ? player.PlayerCombatState!.Stars : card.GetStarCostWithModifiers()) : null), style);
+                    Math.Max(0, card.HasStarCostX ? player.PlayerCombatState!.Stars : card.GetStarCostWithModifiers()) : null,
+                FollowupKillHint: followupKills), style);
         }
         catch { return 0; }
     }

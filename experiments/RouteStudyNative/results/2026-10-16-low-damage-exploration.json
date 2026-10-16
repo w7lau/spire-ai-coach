@@ -1,0 +1,107 @@
+[
+  {
+    "run": "archive-eight",
+    "sample": "case-9-0",
+    "product_sha256": "E74D65DAAF32B7680D4D0EE23D46BB49266047E3A209DAA651CBF8A4911279FA",
+    "workers": 8,
+    "max_nodes": 64,
+    "budget_seconds": 60,
+    "seeded": false,
+    "lowest_recorded_native_win": {
+      "final_hp": 19,
+      "gross_lost": 13,
+      "healing": 1,
+      "enemy_damage": 13,
+      "self_damage": 0,
+      "damage_complete": true,
+      "fully_observed": true,
+      "minimum_observed_hp": 18,
+      "actions": 73,
+      "rounds": 10
+    },
+    "returned": {
+      "final_hp": 22,
+      "gross_lost": 31,
+      "healing": 22,
+      "enemy_damage": 31,
+      "self_damage": 0,
+      "damage_complete": true,
+      "fully_observed": true,
+      "minimum_observed_hp": 1,
+      "actions": 47,
+      "rounds": 9
+    },
+    "returned_verified": true,
+    "scope": "Lowest recorded proposal candidate only; observation is not exhaustive and independent replay is reported separately. Revival inference is specific to this frozen case."
+  },
+  {
+    "run": "archive-eight",
+    "sample": "case-9-1",
+    "product_sha256": "E74D65DAAF32B7680D4D0EE23D46BB49266047E3A209DAA651CBF8A4911279FA",
+    "workers": 8,
+    "max_nodes": 64,
+    "budget_seconds": 60,
+    "seeded": false,
+    "lowest_recorded_native_win": {
+      "final_hp": 19,
+      "gross_lost": 13,
+      "healing": 1,
+      "enemy_damage": 13,
+      "self_damage": 0,
+      "damage_complete": true,
+      "fully_observed": true,
+      "minimum_observed_hp": 18,
+      "actions": 69,
+      "rounds": 12
+    },
+    "returned": {
+      "final_hp": 22,
+      "gross_lost": 31,
+      "healing": 22,
+      "enemy_damage": 31,
+      "self_damage": 0,
+      "damage_complete": true,
+      "fully_observed": true,
+      "minimum_observed_hp": 1,
+      "actions": 47,
+      "rounds": 9
+    },
+    "returned_verified": true,
+    "scope": "Lowest recorded proposal candidate only; observation is not exhaustive and independent replay is reported separately. Revival inference is specific to this frozen case."
+  },
+  {
+    "run": "archive-eight",
+    "sample": "case-9-2",
+    "product_sha256": "E74D65DAAF32B7680D4D0EE23D46BB49266047E3A209DAA651CBF8A4911279FA",
+    "workers": 8,
+    "max_nodes": 64,
+    "budget_seconds": 60,
+    "seeded": false,
+    "lowest_recorded_native_win": {
+      "final_hp": 19,
+      "gross_lost": 13,
+      "healing": 1,
+      "enemy_damage": 13,
+      "self_damage": 0,
+      "damage_complete": true,
+      "fully_observed": true,
+      "minimum_observed_hp": 18,
+      "actions": 73,
+      "rounds": 10
+    },
+    "returned": {
+      "final_hp": 22,
+      "gross_lost": 31,
+      "healing": 22,
+      "enemy_damage": 31,
+      "self_damage": 0,
+      "damage_complete": true,
+      "fully_observed": true,
+      "minimum_observed_hp": 1,
+      "actions": 47,
+      "rounds": 9
+    },
+    "returned_verified": true,
+    "scope": "Lowest recorded proposal candidate only; observation is not exhaustive and independent replay is reported separately. Revival inference is specific to this frozen case."
+  }
+]

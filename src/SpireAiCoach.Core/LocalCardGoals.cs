@@ -47,6 +47,11 @@ public sealed record LocalFinisherHint(LocalAction Action, int Priority);
 // remains available, including sacrificing a goal card to survive.
 public static class LocalCardGoalTactics
 {
+    // This rollout hint was validated for play-only goals. Ordinary combat and
+    // finishing-blow reservations retain their existing tactical portfolio.
+    public static bool UseFollowupKills(LocalCardGoals? goals) => goals is { Enabled: true } &&
+        !string.IsNullOrEmpty(goals.PlayModelId) && string.IsNullOrEmpty(goals.FinisherModelId);
+
     // Search around an achieved goal even when its current HP cost is too high.
     // This is an exploration seed only; final selection keeps the strict HP gate.
     public static bool BetterExplorationSeed(LocalCandidate candidate, LocalCandidate? incumbent,

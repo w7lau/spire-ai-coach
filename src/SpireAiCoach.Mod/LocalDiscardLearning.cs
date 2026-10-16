@@ -63,6 +63,11 @@ internal sealed class LocalDiscardLearning
             catch { return default; }
         }).ToArray();
         var context = preview.DiscardContext;
+        var hand = style == LocalRolloutStyle.Preparation
+            ? cards.FirstOrDefault()?.Owner.PlayerCombatState?.Hand.Cards.ToArray() ?? [] : [];
+        var blocks = hand.Select(preview.Defense).ToArray();
+        int energy = (int)(cards.FirstOrDefault()?.Owner.PlayerCombatState?.Energy ?? 0);
+        int stars = cards.FirstOrDefault()?.Owner.PlayerCombatState?.Stars ?? 0;
         // Native choice ranks retain order. Only this additive hint is reusable.
         var cache = new Dictionary<System.Numerics.BigInteger, int>();
         return indices =>
@@ -70,7 +75,17 @@ internal sealed class LocalDiscardLearning
             var mask = indices.Aggregate(System.Numerics.BigInteger.Zero,
                 (sum, i) => sum | (System.Numerics.BigInteger.One << i));
             if (!cache.TryGetValue(mask, out int score))
-                cache[mask] = score = LocalDiscardEffects.Value(indices.Select(i => hints[i]), context, style);
+            {
+                score = LocalDiscardEffects.Value(indices.Select(i => hints[i]), context, style);
+                if (style == LocalRolloutStyle.Preparation)
+                {
+                    var removed = indices.Select(i => cards[i]).ToHashSet();
+                    int kept = LocalSequenceTactics.Defense(blocks.Where((_, i) => !removed.Contains(hand[i])),
+                        energy, stars, preview.BlockGap);
+                    score += kept * 4;
+                }
+                cache[mask] = score;
+            }
             return score;
         };
     }

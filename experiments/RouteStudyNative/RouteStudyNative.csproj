@@ -1,0 +1,8 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType></PropertyGroup>
+  <ItemGroup><Reference Include="SpireAiCoach" HintPath="$(NativeCoachDll)" /></ItemGroup>
+  <ItemGroup><Reference Include="0Harmony" HintPath="$(GameDir)/data_sts2_windows_x86_64/0Harmony.dll" /></ItemGroup>
+  <Target Name="RequireAcceptedProduct" BeforeTargets="ResolveReferences">
+    <Error Condition="!Exists('$(NativeCoachDll)')" Text="Set NativeCoachDll to the exact accepted product DLL." />
+  </Target>
+</Project>

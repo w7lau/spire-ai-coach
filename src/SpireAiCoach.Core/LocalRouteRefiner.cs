@@ -9,7 +9,7 @@ public sealed class LocalRouteRefiner
     private string? _seed;
     public int Count => _pending.Count;
 
-    public void Offer(LocalCandidate candidate, int partition = 0, int partitions = 1)
+    public void Offer(LocalCandidate candidate, int partition = 0, int partitions = 1, bool preserveSequence = false)
     {
         if (candidate.Dead) return;
         var seed = LocalFrontier.Key(candidate.Actions);
@@ -35,6 +35,21 @@ public sealed class LocalRouteRefiner
         }
         }
         var decisions = (candidate.Decisions ?? []).Where(d => d.BeforeStep >= 0 && d.BeforeStep < actions.Length).ToArray();
+        IEnumerable<LocalAction[]> TargetChanges()
+        {
+            // Preserve an observed combination while varying one early target.
+            // Same native card instance only; no target or display-name aliasing.
+            foreach (var point in decisions.OrderBy(d => d.BeforeStep))
+            {
+                var actual = actions[point.BeforeStep];
+                if (actual.EndTurn || actual.PotionSlot != null || actual.CombatCardIndex == null) continue;
+                foreach (var alternate in point.Legal.Where(a => a.CombatCardIndex == actual.CombatCardIndex &&
+                    a.ModelId == actual.ModelId && a.TargetId != actual.TargetId && !a.EndTurn && a.PotionSlot == null))
+                {
+                    var plan = actions.ToArray(); plan[point.BeforeStep] = alternate; yield return plan;
+                }
+            }
+        }
         IEnumerable<LocalAction[]> EndSetups()
         {
             // A single insertion can change later copy/selection triggers and look
@@ -100,9 +115,21 @@ public sealed class LocalRouteRefiner
                     }
         }
         // Interleave neighborhoods; a long battle's reorder list must not hide unused-card tests.
-        var streams = new[] { EndSetups(), Reorders(), Insertions(), ChoiceChanges(), Replacements(), Removals() }.Select(s => s.GetEnumerator()).ToList();
+        var neighborhoods = preserveSequence
+            ? new[] { TargetChanges(), ChoiceChanges(), EndSetups(), Reorders(), Insertions(), Replacements(), Removals() }
+            : new[] { EndSetups(), Reorders(), Insertions(), ChoiceChanges(), Replacements(), Removals() };
+        var streams = neighborhoods.Select(s => s.GetEnumerator()).ToList();
         var queued = new HashSet<string>(StringComparer.Ordinal);
         int proposal = 0;
+        // A small pair of target probes preserves the entire measured sequence.
+        // Do not bury the second target behind every other neighborhood first.
+        if (preserveSequence)
+            foreach (var plan in TargetChanges().Take(2))
+            {
+                var key = Key(plan);
+                if (key != originalKey && !_tried.Contains(key) && queued.Add(key) && proposal++ % partitions == partition)
+                    _pending.Enqueue(plan);
+            }
         try
         {
             while (streams.Count > 0 && _pending.Count < 64)

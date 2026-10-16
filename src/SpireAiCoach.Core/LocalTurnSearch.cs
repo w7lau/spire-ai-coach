@@ -7,7 +7,7 @@ public sealed record LocalTurnHint(int Hp, int StartingHp, int EnemyHp, int Init
 public sealed record LocalTurnTask(int Id, LocalAction[] Prefix, int SearchRound,
     bool FullRollout = false, int Lane = 0, bool Focused = false, LocalTurnHint? Hint = null,
     LocalRolloutStyle Style = LocalRolloutStyle.Balanced, LocalAction[]? Continuation = null, bool LossProof = false,
-    bool GoalLossFocus = false);
+    bool GoalLossFocus = false, bool ReconsiderEndTurn = false);
 public sealed record LocalTurnOutcome(int Worker, int Attempt, double CompletedMs, bool Won,
     int Hp, int GrossLoss, int Rounds, int Potions, LocalRolloutStyle Style, LocalDamageSources? DamageSources);
 public sealed record LocalTurnSearchStats(int Probes = 0, int BoundPruned = 0, int Offered = 0,
@@ -32,6 +32,7 @@ public interface ILocalTurnFrontier
     bool TryTake(out LocalTurnTask task);
     void FocusNext(LocalTurnTask task, IReadOnlyList<LocalAction> actions, IReadOnlyList<LocalDecision> decisions);
     void ObserveOutcome(LocalCandidate candidate);
+    void ProposeLowDamageRoute(LocalCandidate candidate);
     void PromoteWinning(LocalCandidate candidate);
     void PrioritizeLossProof(LocalLossProofFocus[] focus);
     void ReturnInterrupted(LocalTurnTask task, LocalTurnHint hint);
@@ -104,6 +105,8 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
     private readonly HashSet<int> _goalLossQueued = [];
     private int _goalLossTakes;
     private readonly Queue<(int Id, LocalAction[] Tail)> _winner = new();
+    private readonly LocalLowDamageRoutes _lowDamage = new();
+    private int _lowDamageTakes;
     private LocalAction[]? _lastContinuation;
     private LocalRolloutStyle? _lastStyle;
     private LocalCandidate? _winningOutcome;
@@ -119,7 +122,7 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
     private LocalCandidate? _guidedIncumbent;
     private int? _winningOwner;
     private int _ownerGuidedTakes;
-    public int Count => _pending.Count;
+    public int Count => _pending.Count + _lowDamage.Count;
     public int Offered => _next;
     public int DuplicateOffers { get; internal set; }
     public int FocusedTakes { get; private set; }
@@ -208,7 +211,7 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
     public bool TryTake(out LocalTurnTask task, int? owner)
     {
         task = null!;
-        if (_pending.Count == 0) return false;
+        if (Count == 0) return false;
         // One lane deepens the next decision of a recently executed exact prefix.
         // Otherwise short replays keep pushing compound alternatives behind a
         // large shallow frontier. Other lanes and FIFO preserve broad coverage.
@@ -221,6 +224,17 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         int id;
         bool guided = false;
         bool proof = false, goalFocus = false;
+        if ((lane == 1 && _lowDamageTakes++ % 2 == 0 || _pending.Count == 0) &&
+            _lowDamage.TryTake(out var proposal, out int proposalRound, out var proposalStyle))
+        {
+            // Soft whole-route proposals are not new exact-history claims. The
+            // worker observes every resulting edge, retaining native coverage.
+            // A previously tried early target can now receive a new continuation.
+            task = new(_next++, [], proposalRound, FullRollout: true, Lane: lane,
+                Style: proposalStyle, Continuation: proposal, ReconsiderEndTurn: true);
+            _roundClaims[task.SearchRound] = _roundClaims.GetValueOrDefault(task.SearchRound) + 1;
+            return true;
+        }
         bool winningAllowed = _winningOwner == null || owner == _winningOwner;
         // Native learning affinity must not replace health, round and FIFO
         // coverage. Alternate it only inside the dedicated focused lane.
@@ -244,7 +258,8 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
         }
         task = _pending[id].Materialize() with { FullRollout = !proof && (guided || _pending[id].Task.FullRollout), LossProof = proof,
             Style = _lastStyle ?? (guided ? _guidedIncumbent?.RolloutStyle ?? LocalRolloutStyle.Balanced : _pending[id].Task.Style),
-            Continuation = _lastContinuation ?? (guided ? _winningTails.GetValueOrDefault(id) : null) ?? _pending[id].Task.Continuation };
+            Continuation = _lastContinuation ?? (guided ? _winningTails.GetValueOrDefault(id) : null) ?? _pending[id].Task.Continuation,
+            ReconsiderEndTurn = guided || _pending[id].Task.ReconsiderEndTurn };
         if (goalFocus) task = task with { FullRollout = true, Style = LocalRolloutStyle.Preparation,
             Continuation = null, GoalLossFocus = true };
         _pending.Remove(id);
@@ -297,9 +312,10 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
 
     public void ObserveOutcome(LocalCandidate candidate)
     {
-        if (!LocalCardGoalTactics.BetterExplorationSeed(candidate, _winningOutcome, _cardGoals)) return;
-        _winningOutcome = candidate;
-        _winner.Clear();
+        bool best = LocalCardGoalTactics.BetterExplorationSeed(candidate, _winningOutcome, _cardGoals);
+        ProposeLowDamageRoute(candidate);
+        if (best) { _winningOutcome = candidate; _winner.Clear(); }
+        if (!best) return;
         // Complete native outcomes guide exploration around the actual incumbent.
         // Its exact alternatives have already been offered; no legal prefix is
         // invented, reopened, merged, or discarded by this scheduling hint.
@@ -319,7 +335,17 @@ public sealed class LocalTurnSearch : ILocalTurnFrontier
             }
         }
         foreach (var item in alternatives.OrderByDescending(x => x.SavesPotion).ThenBy(x => x.Round).ThenBy(x => x.Step).ThenByDescending(x => x.Rank))
-            _winner.Enqueue((item.Id, item.Tail));
+        {
+            if (best) _winner.Enqueue((item.Id, item.Tail));
+        }
+    }
+
+    public void ProposeLowDamageRoute(LocalCandidate candidate)
+    {
+        // A completed proof probe may discover a useful route before an ordinary
+        // rollout does. Import only soft proposals; never credit its outcome to
+        // an owned exact task, close a prefix or publish a winning bound here.
+        if (_cardGoals?.Enabled != true) _lowDamage.Offer(candidate);
     }
 
     private bool TryGuidedFocus(out int id, out bool guided, bool winningAllowed)
